@@ -1,0 +1,1775 @@
+/* =====================================================================
+   LOUNGE MOBILE — GLASS (FLY_LOUNGE_MOBILE.md): the lounge on a phone and a
+   tablet. Every rule is scoped to `.lounge[data-layout]` (LoungeHud stamps it
+   on phones and tablets only), to the fly root's phone attribute, or to the
+   phone binocular view, so a fine-pointer desktop matches none of them.
+
+   Phones get SOLID panels: a backdrop-filter over the live WebGL canvas makes
+   the compositor re-read the framebuffer per blurred panel per frame (the
+   R17 lesson, globals.css .hud-glass). The fills are the glass's hue at its
+   effective density.
+
+   The bottom stack in portrait, from the screen's edge up:
+     the map credit (AttributionBar, measured into --lounge-attr-h)
+     the dock (Board, Seats, BINOCULARS, Follow, More)
+     the board's one-line peek, or one bottom sheet (board, spotter card,
+       lounge menu, seat menu, décor card, instrument panel)
+     transient floats (status line, coach marks, lower thirds).
+   Landscape keeps the credit along the bottom, turns the dock into a rail
+   down the right edge and opens sheets as a side panel beside it.
+
+   The thumb zone contract (FLY_LOUNGE_MOBILE.md contract 2):
+   --lounge-stick-left / --lounge-stick-bottom on the .lounge section; the
+   lower-left zone above that line carries no persistent chrome while
+   standing. While the walk stick shows (seated: its Walk ring; standing: the
+   zone a thumb may start it in) the transient floats keep out of it too —
+   the coach marks, the status line and the director's lower thirds sit
+   above it in portrait and right of it in landscape (--lounge-zone-w /
+   --lounge-zone-h mirror the stick's zone, FLOATS below).
+   ===================================================================== */
+
+/* ---------------------------------------------------------------------
+   SHARED MEASURES
+   --------------------------------------------------------------------- */
+.lounge[data-layout] {
+  --lounge-safe-t: env(safe-area-inset-top, 0px);
+  --lounge-safe-r: env(safe-area-inset-right, 0px);
+  --lounge-safe-b: env(safe-area-inset-bottom, 0px);
+  --lounge-safe-l: env(safe-area-inset-left, 0px);
+  /* Top of the credit strip, from the bottom edge. */
+  --lounge-base: calc(var(--lounge-attr-h, 40px) + var(--lounge-safe-b));
+  --lounge-stick-left: calc(var(--lounge-safe-l) + 20px);
+  --lounge-stick-bottom: calc(var(--lounge-base) + 18px);
+  --lounge-solid: rgba(7, 11, 21, 0.94);
+  --lounge-solid-hi: rgba(16, 24, 42, 0.96);
+}
+/* The safe-area probe LoungeHud reads (lounge-layout.js useSafeInsets). */
+.lounge-safe-probe {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  visibility: hidden;
+  pointer-events: none;
+}
+.lounge[data-layout^='phone'] {
+  --lounge-head-h: 52px;
+  --lounge-head-bottom: calc(var(--lounge-safe-t) + 8px + var(--lounge-head-h));
+  --lounge-dock-h: 64px;
+  --lounge-dock-bottom: calc(var(--lounge-base) + 6px);
+  /* Where a sheet or the peek starts, from the bottom edge. */
+  --lounge-chrome-bottom: calc(var(--lounge-dock-bottom) + var(--lounge-dock-h) + 8px);
+  --lounge-peek-h: 52px;
+  --lounge-float-bottom: calc(var(--lounge-chrome-bottom) + 8px);
+  --lounge-stick-bottom: calc(var(--lounge-chrome-bottom) + 10px);
+  --lounge-gutter-l: calc(var(--lounge-safe-l) + 10px);
+  --lounge-gutter-r: calc(var(--lounge-safe-r) + 10px);
+  /* A lane under the header kept free of sheets: the status line and the
+     director's lower thirds move there while a sheet is up. */
+  --lounge-lane-h: 62px;
+  /* The walk stick's zone (lounge-touch.css .lounge-stick-zone, from
+     MOBILE_TOUCH.stick.zone; verify-lounge-glass.mjs keeps the three in
+     step): lower-left, this wide and this tall above --lounge-stick-bottom. */
+  --lounge-zone-w: min(50vw, 260px);
+  --lounge-zone-h: min(42vh, 300px);
+  -webkit-touch-callout: none;
+}
+.lounge[data-layout^='phone'][data-peek='1'] {
+  --lounge-float-bottom: calc(var(--lounge-chrome-bottom) + var(--lounge-peek-h) + 8px);
+  --lounge-stick-bottom: calc(var(--lounge-chrome-bottom) + var(--lounge-peek-h) + 10px);
+}
+.lounge[data-layout^='phone'] .tgt-kbd,
+.lounge[data-layout='tablet'] .tgt-kbd,
+.lounge[data-layout^='phone'] kbd,
+.lounge[data-layout='tablet'] kbd {
+  display: none !important;
+}
+
+/* The map credit stays visible in every lounge state (licensing) but never
+   under the dock: one compact strip along the bottom edge, which the dock and
+   the binocular controls sit above (--lounge-attr-h). */
+[data-fly-root]:has(.lounge[data-layout^='phone']) [data-zone='attribution'] > div {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-width: none;
+  justify-content: center;
+  gap: 0 8px;
+  padding: 3px calc(env(safe-area-inset-right, 0px) + 8px) 3px calc(env(safe-area-inset-left, 0px) + 8px);
+  border-radius: 0;
+  font-size: 8px;
+  line-height: 10px;
+  text-align: center;
+  color: rgba(214, 222, 234, 0.82);
+  background: rgba(3, 6, 12, 0.9);
+}
+
+/* ---------------------------------------------------------------------
+   HEADER (phone)
+   --------------------------------------------------------------------- */
+.lounge[data-layout^='phone'] .lph {
+  top: calc(var(--lounge-safe-t) + 8px);
+  left: var(--lounge-gutter-l);
+  right: var(--lounge-gutter-r);
+  height: var(--lounge-head-h);
+  align-items: center;
+  gap: 10px;
+  padding: 4px 4px 4px 8px;
+  border-radius: 18px;
+  pointer-events: auto;
+  background: var(--lounge-solid);
+  box-shadow: inset 0 0 0 1px var(--t-edge-strong), 0 12px 32px rgba(0, 0, 0, 0.4);
+}
+.lph-code {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 11px;
+  font: 400 15px/1 var(--t-display);
+  letter-spacing: 0.06em;
+  color: var(--t-cyan);
+  background: rgba(79, 227, 255, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(79, 227, 255, 0.28);
+}
+.lph-feed {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: 700 10px/1 var(--t-mono);
+  color: var(--t-ice);
+}
+.lph-feed i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--t-lime);
+  box-shadow: 0 0 9px var(--t-lime);
+}
+.lph-feed[data-state='quiet'] i {
+  background: var(--t-dim);
+  box-shadow: none;
+}
+.lph-feed[data-state='delayed'] i {
+  background: var(--t-amber);
+  box-shadow: 0 0 9px var(--t-amber);
+}
+.lph-feed[data-state='unavailable'] i {
+  background: var(--t-rose);
+  box-shadow: 0 0 9px var(--t-rose);
+}
+.lph-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.lph-text {
+  display: grid;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+.lph-text strong,
+.lph-text small {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.lph-text strong {
+  font: 650 13px/1.15 var(--t-sans);
+  color: var(--t-ice);
+}
+.lph-text small {
+  font: 600 10.5px/1.15 var(--t-sans);
+  letter-spacing: 0.02em;
+  color: var(--t-dim);
+}
+.lph-clock {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.lph-clock b {
+  font: 600 14px/1 var(--t-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--t-ice);
+}
+.lph-clock small {
+  font: 700 8.5px/1 var(--t-sans);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--t-faint);
+}
+.lph-menu {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 14px;
+  color: var(--t-ice);
+  background: rgba(186, 222, 255, 0.07);
+  box-shadow: inset 0 0 0 1px var(--t-edge);
+}
+.lph-menu[aria-expanded='true'] {
+  color: var(--t-cyan);
+  box-shadow: inset 0 0 0 1px rgba(79, 227, 255, 0.55);
+}
+
+/* ---------------------------------------------------------------------
+   DOCK (phone): a bar in portrait, a rail in landscape
+   --------------------------------------------------------------------- */
+.lounge-dock {
+  position: absolute;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-items: center;
+  pointer-events: auto;
+  background: var(--lounge-solid);
+  box-shadow: inset 0 0 0 1px var(--t-edge-strong), 0 16px 40px rgba(0, 0, 0, 0.45);
+}
+.lounge[data-layout='phone-portrait'] .lounge-dock {
+  left: var(--lounge-gutter-l);
+  right: var(--lounge-gutter-r);
+  bottom: var(--lounge-dock-bottom);
+  height: var(--lounge-dock-h);
+  padding: 0 4px;
+  border-radius: 24px;
+}
+.ldk-btn,
+.lounge-dock .lounge-btn {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  min-width: 44px;
+  height: 56px;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 16px;
+  font: 650 10.5px/1 var(--t-sans);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  color: rgba(238, 245, 255, 0.78);
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  transition: color 0.15s, background 0.15s, transform 0.12s;
+}
+.lounge-dock .lounge-btn svg {
+  width: 20px;
+  height: 20px;
+}
+.ldk-btn span,
+.lounge-dock .lounge-btn span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* A touch leaves :hover on the last control tapped (sticky hover): the dock
+   shows only pressed state and the press itself. */
+.lounge-dock .lounge-btn:hover:not(:disabled):not([aria-pressed='true']) {
+  background: transparent;
+  box-shadow: none;
+}
+.ldk-btn:active:not(:disabled),
+.lounge-dock .lounge-btn:active:not(:disabled) {
+  transform: scale(0.94);
+  background: rgba(186, 222, 255, 0.08);
+}
+.ldk-btn[aria-pressed='true'],
+.lounge-dock .lounge-btn[aria-pressed='true'] {
+  color: var(--t-cyan);
+  background: rgba(79, 227, 255, 0.1);
+}
+.ldk-btn:disabled {
+  opacity: 0.38;
+}
+/* The spotter sheet is up: Follow is the card's (its slot stays, so the
+   primary stays centred). */
+.lounge-dock[data-selection='1'] .ldk-follow {
+  visibility: hidden;
+}
+.ldk-btn em {
+  position: absolute;
+  top: 5px;
+  left: calc(50% + 6px);
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 9px;
+  font: 700 9.5px/17px var(--t-mono);
+  font-style: normal;
+  text-align: center;
+  color: #021018;
+  background: var(--t-cyan);
+}
+.ldk-primary {
+  display: grid;
+  place-items: center;
+  justify-self: center;
+  width: 62px;
+  height: 62px;
+  margin-top: -22px;
+  border: 0;
+  border-radius: 50%;
+  color: #021018;
+  background: radial-gradient(circle at 35% 28%, #d7fbff 0%, #8ff0ff 26%, var(--t-cyan) 55%, var(--t-cyan-deep) 100%);
+  box-shadow: 0 0 0 5px rgba(7, 11, 21, 0.94), 0 0 0 6px rgba(79, 227, 255, 0.35), 0 14px 30px -8px rgba(79, 227, 255, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  transition: transform 0.14s cubic-bezier(0.3, 1.6, 0.6, 1), box-shadow 0.2s;
+}
+.ldk-primary:active {
+  transform: scale(0.92);
+}
+.ldk-primary[aria-pressed='true'] {
+  box-shadow: 0 0 0 5px rgba(7, 11, 21, 0.94), 0 0 0 6px var(--t-cyan), 0 0 34px -2px rgba(79, 227, 255, 0.95);
+}
+
+/* Landscape: a rail down the right edge (the right thumb acts, the left one
+   looks and walks), the binoculars at its foot under the thumb. */
+.lounge[data-layout='phone-landscape'] {
+  --lounge-head-h: 44px;
+  --lounge-head-bottom: calc(var(--lounge-safe-t) + 6px + var(--lounge-head-h));
+  --lounge-rail-w: 62px;
+  --lounge-rail-right: calc(var(--lounge-safe-r) + 8px);
+  --lounge-side-right: calc(var(--lounge-rail-right) + var(--lounge-rail-w) + 8px);
+  --lounge-chrome-bottom: calc(var(--lounge-base) + 8px);
+  --lounge-float-bottom: calc(var(--lounge-base) + 8px);
+  --lounge-stick-bottom: calc(var(--lounge-base) + 14px);
+}
+.lounge[data-layout='phone-landscape'][data-peek='1'] {
+  --lounge-float-bottom: calc(var(--lounge-base) + var(--lounge-peek-h) + 14px);
+  --lounge-stick-bottom: calc(var(--lounge-base) + 14px);
+}
+.lounge[data-layout='phone-landscape'] .lph {
+  top: calc(var(--lounge-safe-t) + 6px);
+  right: var(--lounge-side-right);
+  max-width: 520px;
+}
+.lounge[data-layout='phone-landscape'] .lounge-dock {
+  top: calc(var(--lounge-safe-t) + 6px);
+  right: var(--lounge-rail-right);
+  bottom: calc(var(--lounge-base) + 6px);
+  width: var(--lounge-rail-w);
+  grid-template-columns: 1fr;
+  grid-template-rows: repeat(4, minmax(0, 1fr)) auto;
+  padding: 4px 3px 8px;
+  border-radius: 22px;
+}
+.lounge[data-layout='phone-landscape'] .lounge-dock > * {
+  height: 100%;
+  max-height: 54px;
+}
+.lounge[data-layout='phone-landscape'] .ldk-primary {
+  order: 9;
+  width: 52px;
+  height: 52px;
+  margin: 2px auto 0;
+  box-shadow: 0 0 0 1px rgba(79, 227, 255, 0.45), 0 10px 24px -8px rgba(79, 227, 255, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+.lounge[data-layout='phone-landscape'] .ldk-btn,
+.lounge[data-layout='phone-landscape'] .lounge-dock .lounge-btn {
+  min-height: 44px;
+  font-size: 9.5px;
+  gap: 3px;
+}
+
+/* ---------------------------------------------------------------------
+   THE PEEK (the board folded to the next movement)
+   --------------------------------------------------------------------- */
+.lounge-peek {
+  position: absolute;
+  z-index: 3;
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  height: var(--lounge-peek-h);
+  padding: 4px;
+  border-radius: 18px;
+  pointer-events: auto;
+  background: var(--lounge-solid);
+  box-shadow: inset 0 0 0 1px var(--t-edge-strong), 0 14px 34px rgba(0, 0, 0, 0.45);
+}
+.lounge[data-layout='phone-portrait'] .lounge-peek {
+  left: var(--lounge-gutter-l);
+  right: var(--lounge-gutter-r);
+  bottom: var(--lounge-chrome-bottom);
+}
+.lounge[data-layout='phone-landscape'] .lounge-peek {
+  right: var(--lounge-side-right);
+  bottom: var(--lounge-chrome-bottom);
+  width: min(380px, calc(100% - var(--lounge-side-right) - var(--lounge-zone-w) - 8px));
+}
+.lpk-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  padding: 0 8px 0 12px;
+  border: 0;
+  border-radius: 14px;
+  text-align: left;
+  color: var(--t-ice);
+  background: transparent;
+}
+.lpk-main:active {
+  background: rgba(186, 222, 255, 0.06);
+}
+.lpk-main > i {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--t-dim);
+}
+.lounge-peek[data-tone='land'] .lpk-main > i {
+  background: var(--t-lime);
+  box-shadow: 0 0 10px var(--t-lime);
+}
+.lounge-peek[data-tone='depart'] .lpk-main > i {
+  background: var(--t-amber);
+  box-shadow: 0 0 10px var(--t-amber);
+}
+.lpk-text {
+  display: grid;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+.lpk-text small {
+  font: 700 9px/1 var(--t-sans);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--t-faint);
+}
+.lpk-text strong {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font: 600 13px/1.2 var(--t-sans);
+  color: var(--t-dim);
+}
+.lpk-text strong b {
+  font: 400 13.5px/1 var(--t-display);
+  letter-spacing: 0.03em;
+  color: var(--t-ice);
+}
+.lpk-main > svg {
+  flex-shrink: 0;
+  color: var(--t-dim);
+}
+.lpk-watch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  min-width: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 14px;
+  font: 700 12px/1 var(--t-sans);
+  color: var(--t-ice);
+  background: rgba(186, 222, 255, 0.08);
+  box-shadow: inset 0 0 0 1px var(--t-edge-strong);
+}
+.lpk-watch:active {
+  background: rgba(79, 227, 255, 0.16);
+}
+
+/* ---------------------------------------------------------------------
+   SHEETS: one at a time, above the dock (portrait) or beside the rail
+   (landscape)
+   --------------------------------------------------------------------- */
+.lounge[data-layout^='phone'] :is(.lounge-sheet, .lounge-board[data-sheet], .lounge-card[data-sheet], .lounge-seat-menu, .lounge-decor-card, .observatory-panel, .observatory-window-panel) {
+  position: absolute;
+  z-index: 4;
+  top: auto;
+  bottom: var(--lounge-chrome-bottom);
+  width: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: 24px;
+  background: var(--lounge-solid);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: inset 0 0 0 1px var(--t-edge-strong), 0 -8px 40px rgba(0, 0, 0, 0.5);
+  pointer-events: auto;
+  scrollbar-width: none;
+}
+.lounge[data-layout='phone-portrait'] :is(.lounge-sheet, .lounge-board[data-sheet], .lounge-card[data-sheet], .lounge-seat-menu, .lounge-decor-card, .observatory-panel, .observatory-window-panel) {
+  left: var(--lounge-gutter-l);
+  right: var(--lounge-gutter-r);
+  max-height: calc(100% - var(--lounge-head-bottom) - var(--lounge-lane-h) - var(--lounge-chrome-bottom));
+}
+/* A side sheet never reaches into the walk stick's zone: in landscape the
+   board, the lounge menu and the spotter card leave the stick up (the left
+   thumb walks while the right one reads; LoungeHud's `blocked`). */
+.lounge[data-layout='phone-landscape'] :is(.lounge-sheet, .lounge-board[data-sheet], .lounge-card[data-sheet], .lounge-seat-menu, .lounge-decor-card, .observatory-panel, .observatory-window-panel) {
+  left: auto;
+  right: var(--lounge-side-right);
+  top: auto;
+  width: min(360px, calc(100% - var(--lounge-side-right) - var(--lounge-zone-w) - 8px));
+  max-height: calc(100% - var(--lounge-safe-t) - 6px - var(--lounge-chrome-bottom));
+}
+/* The airport map keeps its full height (the diagram and the list). */
+.lounge[data-layout='phone-landscape'] .observatory-panel {
+  top: calc(var(--lounge-safe-t) + 6px);
+}
+/* The seat menu and the décor card are centred panels on desktop. */
+.lounge[data-layout^='phone'] :is(.lounge-seat-menu, .lounge-decor-card) {
+  transform: none;
+}
+/* Over the header in landscape: the header steps aside while a side sheet is up. */
+.lounge[data-layout='phone-landscape'][data-sheet='1'] .lph {
+  right: calc(var(--lounge-side-right) + 368px);
+}
+.lounge[data-layout='phone-landscape'][data-sheet='1'] .lph .lph-text {
+  display: none;
+}
+
+/* The grabber every sheet carries. */
+.lsheet-grab {
+  display: block;
+  width: 100%;
+  height: 22px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: grab;
+  touch-action: none;
+}
+.lsheet-grab i {
+  display: block;
+  width: 40px;
+  height: 4px;
+  margin: 8px auto 10px;
+  border-radius: 2px;
+  background: rgba(186, 222, 255, 0.32);
+}
+.lounge[data-layout='phone-landscape'] .lsheet-grab {
+  display: none;
+}
+
+/* The lounge menu. */
+.lounge-menu-sheet {
+  padding: 0 14px 14px;
+}
+.lms-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 6px;
+}
+.lms-code {
+  font: 400 15px/1 var(--t-display);
+  letter-spacing: 0.06em;
+  color: var(--t-cyan);
+}
+.lms-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font: 650 14px/1.2 var(--t-sans);
+  color: var(--t-ice);
+}
+.lsheet-close {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 14px;
+  color: var(--t-dim);
+  background: rgba(186, 222, 255, 0.06);
+}
+.lms-conditions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 0 0 14px;
+  font: 600 12px/1.4 var(--t-sans);
+  color: var(--t-dim);
+}
+.lms-conditions > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.lms-conditions .lh-feed {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.lms-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.lms-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 72px;
+  padding: 10px 6px;
+  border: 0;
+  border-radius: 16px;
+  font: 650 11.5px/1.2 var(--t-sans);
+  text-align: center;
+  color: var(--t-ice);
+  background: rgba(186, 222, 255, 0.06);
+  box-shadow: inset 0 0 0 1px var(--t-edge);
+  transition: background 0.15s, transform 0.12s;
+}
+.lms-tile svg {
+  color: var(--t-cyan);
+}
+.lms-tile:active:not(:disabled) {
+  transform: scale(0.96);
+  background: rgba(186, 222, 255, 0.12);
+}
+.lms-tile[aria-pressed='true'] {
+  background: rgba(79, 227, 255, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(79, 227, 255, 0.5);
+}
+.lms-tile:disabled {
+  opacity: 0.42;
+}
+.lms-tile-accent {
+  background: linear-gradient(160deg, rgba(79, 227, 255, 0.2), rgba(79, 227, 255, 0.06));
+  box-shadow: inset 0 0 0 1px rgba(79, 227, 255, 0.45);
+}
+.lms-exit {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+.lms-wide {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 50px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 16px;
+  font: 700 13px/1.2 var(--t-sans);
+  color: var(--t-ice);
+  background: rgba(186, 222, 255, 0.07);
+  box-shadow: inset 0 0 0 1px var(--t-edge-strong);
+}
+/* Upright: compact tiles, then Airports and Leave straight after them, so
+   both are in view without scrolling even with Safari's bars up (a 664 px
+   page); the conditions follow below. */
+.lounge[data-layout='phone-portrait'] .lounge-menu-sheet {
+  display: flex;
+  flex-direction: column;
+}
+.lounge[data-layout='phone-portrait'] .lms-grid {
+  order: 1;
+}
+.lounge[data-layout='phone-portrait'] .lms-tile {
+  min-height: 60px;
+  gap: 5px;
+  padding: 8px 6px;
+}
+.lounge[data-layout='phone-portrait'] .lms-exit {
+  order: 2;
+}
+.lounge[data-layout='phone-portrait'] .lms-conditions {
+  order: 3;
+  margin: 14px 0 0;
+}
+/* Landscape: the menu fits the short height without scrolling, Airports and
+   Leave first under its title. */
+.lounge[data-layout='phone-landscape'] .lounge-menu-sheet {
+  display: flex;
+  flex-direction: column;
+  padding-top: 8px;
+}
+.lounge[data-layout='phone-landscape'] .lms-head {
+  margin-bottom: 2px;
+}
+.lounge[data-layout='phone-landscape'] .lms-exit {
+  order: 1;
+  margin: 0 0 8px;
+}
+.lounge[data-layout='phone-landscape'] .lms-wide {
+  min-height: 46px;
+}
+.lounge[data-layout='phone-landscape'] .lms-grid {
+  order: 2;
+}
+.lounge[data-layout='phone-landscape'] .lms-tile {
+  min-height: 54px;
+  flex-direction: row;
+  gap: 6px;
+  padding: 6px 8px;
+  font-size: 11px;
+  text-align: left;
+}
+.lounge[data-layout='phone-landscape'] .lms-conditions {
+  order: 3;
+  margin: 10px 0 0;
+}
+.lms-leave {
+  color: #ffd9d9;
+  background: rgba(255, 110, 120, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(255, 130, 140, 0.35);
+}
+
+/* The board as a sheet. */
+.lounge[data-layout^='phone'] .lounge-board[data-sheet] {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.lounge[data-layout^='phone'] .lounge-board[data-sheet]::before {
+  display: none;
+}
+.lounge[data-layout^='phone'] .lounge-board[data-sheet] .lb-body {
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.lounge[data-layout^='phone'] .lounge-board[data-sheet] .lb-list {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.lounge[data-layout^='phone'] .lb-head {
+  padding: 0 6px 6px 16px;
+}
+.lounge[data-layout^='phone'] .lb-tabs {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.lounge[data-layout^='phone'] .lb-tabs button {
+  min-height: 44px;
+  flex-shrink: 0;
+}
+.lounge[data-layout^='phone'] .lb-main {
+  min-height: 56px;
+}
+.lounge[data-layout^='phone'] .lb-bino {
+  width: 48px;
+  min-height: 48px;
+}
+.lounge[data-layout^='phone'] .lb-foot {
+  padding-bottom: 12px;
+}
+
+/* The spotter card as a sheet: the peek is the identity, the phase and the
+   primary actions; More opens the route, the live figures and the rest. */
+.lounge[data-layout^='phone'] .lounge-card[data-sheet] {
+  gap: 8px;
+  padding: 0 12px 12px;
+  box-shadow: inset 0 0 0 1px var(--t-edge-strong), 0 -8px 44px rgba(0, 0, 0, 0.5), 0 0 60px -26px rgba(79, 227, 255, 0.5);
+}
+.lounge[data-layout^='phone'] .lounge-card[data-sheet]::before {
+  inset: 0 30px auto 30px;
+}
+.lounge[data-layout^='phone'] .lounge-card[data-sheet='peek'] :is(.lc-route, .lc-tiles, .lc-actions-minor, .lc-phase small) {
+  display: none;
+}
+.lounge[data-layout^='phone'] .lounge-card[data-sheet] .lc-hero {
+  grid-template-columns: 112px minmax(0, 1fr) auto;
+  gap: 11px;
+  min-height: 0;
+}
+.lounge[data-layout^='phone'] .lounge-card[data-sheet] .lc-photo {
+  width: 112px;
+  height: 78px;
+}
+.lounge[data-layout^='phone'] .lounge-card[data-sheet='peek'] .lc-hero {
+  grid-template-columns: 80px minmax(0, 1fr) auto;
+  align-items: center;
+}
+.lounge[data-layout^='phone'] .lounge-card[data-sheet='peek'] .lc-photo {
+  width: 80px;
+  height: 56px;
+}
+.lounge[data-layout^='phone'] .lounge-card[data-sheet='peek'] :is(.lc-photo-state, .lc-credit, .lc-operator) {
+  display: none;
+}
+/* The desktop's short-window rule folds the route away; the expanded sheet
+   has the room. */
+.lounge[data-layout^='phone'] .lounge-card[data-sheet='expanded'] .lc-route {
+  display: flex;
+}
+.lounge[data-layout^='phone'] .lounge-card[data-sheet] .lc-close {
+  width: 44px;
+  height: 44px;
+}
+.lounge[data-layout^='phone'] .lounge-card[data-sheet] .lc-actions:not(.lc-actions-minor) {
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) 64px;
+  align-items: stretch;
+}
+.lounge[data-layout^='phone'] .lounge-card[data-sheet] .lc-act {
+  min-height: 50px;
+}
+.lounge[data-layout^='phone'] .lounge-card[data-sheet] .lc-act .tgt-btn-label span {
+  display: none;
+}
+.lounge[data-layout^='phone'] .lounge-card[data-sheet] :is(.lc-chip, .lc-follow) {
+  min-height: 50px;
+  min-width: 44px;
+}
+.lounge[data-layout^='phone'] .lounge-card[data-sheet] .lc-more {
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 10px;
+  font-size: 10.5px;
+}
+.lounge[data-layout^='phone'] .lounge-card[data-sheet] .lc-actions-minor .lc-chip {
+  flex: 1;
+  justify-content: center;
+}
+
+/* The seat menu, the décor card and the instruments as sheets. */
+.lounge[data-layout^='phone'] .lounge-seat-menu {
+  padding: 12px 12px 10px;
+}
+.lounge[data-layout^='phone'] .lounge-seat-menu header .lounge-btn {
+  width: 44px;
+  height: 44px;
+}
+.lounge[data-layout='phone-portrait'] .lounge-seat-menu[data-grouped] {
+  max-height: calc(100% - var(--lounge-head-bottom) - var(--lounge-lane-h) - var(--lounge-chrome-bottom));
+}
+.lounge[data-layout^='phone'] .lounge-seat-menu[data-grouped] .lsm-row {
+  min-height: 48px;
+}
+.lounge[data-layout^='phone'] .lounge-decor-close,
+.lounge[data-layout^='phone'] .observatory-close {
+  width: 44px;
+  height: 44px;
+}
+.lounge[data-layout^='phone'] .observatory-panel {
+  padding: 16px 16px 14px;
+}
+.lounge[data-layout='phone-portrait'] .observatory-panel {
+  top: calc(var(--lounge-head-bottom) + var(--lounge-lane-h));
+  max-height: none;
+}
+.lounge[data-layout^='phone'] .observatory-diagram {
+  max-height: 220px;
+  margin: 10px 0 12px;
+}
+.lounge[data-layout^='phone'] .observatory-contact-list button {
+  min-height: 48px;
+}
+.lounge[data-layout^='phone'] .observatory-action {
+  min-height: 48px;
+}
+.lounge[data-layout^='phone'] .observatory-text-action {
+  min-height: 44px;
+}
+
+/* Prompts while standing (Sit, a décor piece, an instrument): above the dock
+   on the RIGHT, clear of the walk stick's lower-left zone. */
+.lounge[data-layout^='phone'] :is(.lounge-sit, .lounge-decor-prompt, .observatory-prompt, .observatory-nearby) {
+  left: auto;
+  top: auto;
+  right: var(--lounge-gutter-r);
+  bottom: var(--lounge-float-bottom);
+  transform: none;
+  min-height: 48px;
+  max-width: calc(100% - var(--lounge-gutter-r) - var(--lounge-zone-w) - 8px);
+  z-index: 3;
+  /* Solid, like every phone surface (no framebuffer blur per frame). */
+  background: var(--lounge-solid);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.lounge[data-layout='phone-landscape'] :is(.lounge-sit, .lounge-decor-prompt, .observatory-prompt, .observatory-nearby) {
+  right: var(--lounge-side-right);
+  max-width: min(340px, calc(100% - var(--lounge-side-right) - var(--lounge-zone-w) - 8px));
+}
+.lounge[data-layout^='phone'] .lounge-sit {
+  height: auto;
+  flex-wrap: wrap;
+  padding: 8px 14px;
+  background: var(--lounge-solid);
+}
+.lounge[data-layout^='phone'] .observatory-nearby {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+}
+/* A chair (or a décor piece) and the window's instruments can both be in
+   reach: the instruments stack above the Sit prompt, on the same side. */
+/* The spotter sheet is the focus while it is up: the place prompts wait under
+   it and come back when it closes (Sit by a tap on the chair meanwhile). */
+.lounge[data-layout^='phone']:has(.lounge-card[data-sheet]) :is(.lounge-sit, .lounge-decor-prompt, .observatory-prompt, .observatory-nearby) {
+  display: none;
+}
+.lounge[data-layout^='phone']:has(:is(.lounge-sit, .lounge-decor-prompt)) .observatory-nearby {
+  bottom: calc(var(--lounge-float-bottom) + 56px);
+}
+.lounge[data-layout^='phone'] .observatory-nearby button {
+  min-height: 44px;
+}
+.lounge[data-layout^='phone'] .observatory-direction {
+  top: calc(var(--lounge-head-bottom) + 8px);
+  max-width: calc(100% - var(--lounge-gutter-l) - var(--lounge-gutter-r));
+  width: max-content;
+}
+.lounge[data-layout^='phone'] .observatory-direction button {
+  min-width: 44px;
+  min-height: 44px;
+  justify-content: center;
+  align-items: center;
+}
+
+/* ---------------------------------------------------------------------
+   FLOATS: status line, coach marks, the director
+   --------------------------------------------------------------------- */
+.lounge[data-layout^='phone'] .lounge-status {
+  top: auto;
+  bottom: var(--lounge-float-bottom);
+  width: max-content;
+  max-width: calc(100% - 32px);
+  padding: 9px 14px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  text-wrap: balance;
+  background: var(--lounge-solid);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+/* Landscape: centred in the span between the stick's zone and the rail. */
+.lounge[data-layout='phone-landscape'] .lounge-status {
+  left: calc(var(--lounge-zone-w) + 8px + (100% - var(--lounge-zone-w) - 8px - var(--lounge-side-right)) / 2);
+  max-width: min(440px, calc(100% - var(--lounge-zone-w) - var(--lounge-side-right) - 24px));
+}
+/* With a sheet up the line moves under the header, never over the sheet
+   (in landscape: centred in the open view left of the side sheet). */
+.lounge[data-layout^='phone'][data-sheet='1'] .lounge-status {
+  top: calc(var(--lounge-head-bottom) + 8px);
+  bottom: auto;
+}
+.lounge[data-layout='phone-landscape'][data-sheet='1'] .lounge-status {
+  left: calc((100% - var(--lounge-side-right) - 368px) / 2);
+  max-width: calc(100% - var(--lounge-side-right) - 384px);
+}
+.lounge[data-layout='phone-landscape'][data-sheet='1'] .dir-lower-slot {
+  max-width: calc(100% - var(--lounge-side-right) - 384px);
+}
+
+.lounge-coach {
+  position: absolute;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 8px 10px 14px;
+  border-radius: 20px;
+  pointer-events: none;
+  background: rgba(7, 11, 21, 0.9);
+  box-shadow: inset 0 0 0 1px rgba(79, 227, 255, 0.3), 0 16px 40px rgba(0, 0, 0, 0.45);
+}
+/* A prompt on screen (Sit, a decor card's offer, the window's controls, the
+   observatory) is itself the hint for where you stand: the tips step aside
+   while one is up, so they never cover it. */
+.lounge[data-layout^='phone']:has(:is(.lounge-sit, .lounge-decor-prompt, .observatory-prompt, .observatory-nearby)) .lounge-coach {
+  display: none;
+}
+/* Portrait: in the lane under the header, clear of the thumb's corner (the
+   seated Walk ring, the standing stick), which is where the first tip points
+   and where a first touch lands; a status line that rises above the stick on
+   a short screen takes the space while it is up (one float at a time).
+   Landscape: right of the stick's zone. */
+.lounge[data-layout='phone-portrait'] .lounge-coach {
+  left: var(--lounge-gutter-l);
+  right: var(--lounge-gutter-r);
+  top: calc(var(--lounge-head-bottom) + 8px);
+}
+.lounge[data-layout='phone-portrait']:has(> .lounge-status) .lounge-coach {
+  display: none;
+}
+.lounge[data-layout='phone-landscape'] .lounge-coach {
+  right: var(--lounge-side-right);
+  bottom: var(--lounge-float-bottom);
+  width: min(420px, calc(100% - var(--lounge-side-right) - var(--lounge-zone-w) - 8px));
+}
+.lounge-coach ul {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lounge-coach li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  font: 600 11.5px/1.25 var(--t-sans);
+  color: var(--t-ice);
+}
+.lounge-coach li svg {
+  flex-shrink: 0;
+  color: var(--t-cyan);
+}
+.lounge-coach-dismiss {
+  flex-shrink: 0;
+  min-width: 56px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 14px;
+  font: 700 12px/1 var(--t-sans);
+  color: #021018;
+  background: var(--t-cyan);
+  pointer-events: auto;
+}
+
+/* The director on a phone: its next movement rides the peek, its Stop is a
+   pill at the foot while it has the view, its lower thirds float above the
+   bottom stack (under the header while a sheet is up, hidden behind the
+   glasses, whose bands carry the status). */
+.lounge[data-layout^='phone'] .dir-cue[data-auto='1'] {
+  top: auto;
+  left: var(--lounge-gutter-l);
+  right: var(--lounge-gutter-r);
+  bottom: var(--lounge-dock-bottom);
+  width: auto;
+  background: var(--lounge-solid);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.lounge[data-layout='phone-landscape'] .dir-cue[data-auto='1'] {
+  left: auto;
+  right: var(--lounge-rail-right);
+  width: min(340px, 50%);
+}
+.lounge[data-layout^='phone'] .dir-cue[data-auto='1'][data-compact='1'] {
+  display: none;
+}
+.lounge[data-layout^='phone'] .dir-stop {
+  min-height: 44px;
+  padding: 0 14px;
+}
+.lounge[data-layout^='phone'] .dir-lower-slot,
+.lounge[data-layout^='phone'] .dir-lower-slot[data-beside='1'] {
+  left: var(--lounge-gutter-l);
+  right: auto;
+  bottom: var(--lounge-float-bottom);
+  max-width: calc(100% - var(--lounge-gutter-l) - var(--lounge-gutter-r));
+}
+.lounge[data-layout^='phone'][data-sheet='1'] .dir-lower-slot {
+  top: calc(var(--lounge-head-bottom) + 8px);
+  bottom: auto;
+}
+.lounge[data-layout^='phone'][data-auto='1'] .dir-lower-slot {
+  bottom: calc(var(--lounge-dock-bottom) + 120px);
+}
+.lounge[data-layout^='phone'][data-binocular='1'] .dir-lower-slot {
+  display: none;
+}
+.lounge[data-layout='phone-landscape']:not([data-sheet='1']) .dir-lower-slot {
+  left: calc(var(--lounge-zone-w) + 8px);
+  max-width: calc(100% - var(--lounge-zone-w) - 8px - var(--lounge-side-right));
+}
+.lounge[data-layout^='phone'] .dir-lower {
+  max-width: 100%;
+  background: var(--lounge-solid);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+/* Portrait, while the walk stick shows (and no sheet has the foot of the
+   screen): the status line and the lower thirds rise clear of it — seated,
+   above the Walk ring and the base a push from it draws (120 px); standing,
+   above the whole zone a thumb may start the stick in. */
+.lounge[data-layout='phone-portrait']:has(.lounge-touch[data-show='1']) {
+  --lounge-float-up: calc(var(--lounge-stick-bottom) + 128px);
+}
+.lounge[data-layout='phone-portrait']:is([data-posture='standing'], [data-posture='gliding']):has(.lounge-touch[data-show='1']) {
+  --lounge-float-up: calc(var(--lounge-stick-bottom) + var(--lounge-zone-h) + 8px);
+}
+.lounge[data-layout='phone-portrait']:not([data-sheet='1']):not([data-auto='1']):has(.lounge-touch[data-show='1']) :is(.lounge-status, .dir-lower-slot) {
+  top: auto;
+  bottom: var(--lounge-float-up);
+}
+/* Landscape with a side sheet up and the stick with it: they sit in the strip
+   between the header and the stick's zone, left of the sheet (the status
+   line two lines at most: the strip is all a 342 px tall screen has). */
+.lounge[data-layout='phone-landscape'][data-sheet='1']:not([data-auto='1']):has(.lounge-touch[data-show='1']) :is(.lounge-status, .dir-lower-slot) {
+  top: auto;
+  bottom: calc(var(--lounge-stick-bottom) + var(--lounge-zone-h) + 8px);
+}
+.lounge[data-layout='phone-landscape'][data-sheet='1']:not([data-auto='1']):has(.lounge-touch[data-show='1']) .lounge-status {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+/* ---------------------------------------------------------------------
+   THE PHONE BINOCULAR VIEW (BinocularHud PhoneBinocularHud). The bands are
+   the dark of the figure the mask draws: --bino-top / --bino-bottom are the
+   heights above and below the glass, --bino-left / --bino-right the side
+   columns beside the twin lenses (landscape).
+   --------------------------------------------------------------------- */
+.bino-phone {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  font-family: var(--t-mono);
+  color: var(--t-ice);
+  -webkit-user-select: none;
+  user-select: none;
+}
+/* The top band is read-only (the tape, the identity, then the figures or a
+   notice; the toggles are the thumb's, in the bottom band) and sized for the
+   tallest of them (MOBILE_GLASS.bino.portrait.top). Should it ever overflow,
+   `safe` keeps it starting under the inset (it runs onto the glass instead
+   of under the notch). */
+.bino-phone .bp-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--bino-top, 30%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: safe flex-end;
+  gap: 4px;
+  padding: calc(env(safe-area-inset-top, 0px) + 8px) calc(env(safe-area-inset-right, 0px) + 12px) 8px calc(env(safe-area-inset-left, 0px) + 12px);
+}
+.bino-phone .bp-top > * {
+  flex-shrink: 0;
+}
+.bino-phone .bp-tape-row {
+  display: grid;
+  grid-template-columns: 70px minmax(0, 1fr) 70px;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  margin-bottom: auto;
+}
+.bp-elv {
+  font: 700 9px/1 var(--t-sans);
+  letter-spacing: 0.16em;
+  color: var(--t-faint);
+}
+.bp-elv b {
+  display: block;
+  margin-top: 4px;
+  font: 600 15px/1 var(--t-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  color: var(--t-ice);
+}
+.bp-mag {
+  justify-self: end;
+  font: 400 23px/1 var(--t-display);
+  font-variant-numeric: tabular-nums;
+  color: var(--t-ice);
+  text-shadow: 0 0 18px rgba(79, 227, 255, 0.5);
+}
+.bp-tape {
+  position: relative;
+  height: 36px;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent);
+}
+.bp-tape-strip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  will-change: transform;
+}
+.bp-tape-strip i {
+  position: absolute;
+  top: 6px;
+  width: 1px;
+  height: 5px;
+  background: rgba(238, 245, 255, 0.4);
+}
+.bp-tape-strip i[data-major='1'] {
+  height: 9px;
+  background: rgba(238, 245, 255, 0.85);
+}
+.bp-tape-strip i span {
+  position: absolute;
+  top: 11px;
+  left: 0;
+  transform: translateX(-50%);
+  font: 600 9.5px/1 var(--t-mono);
+  white-space: nowrap;
+  color: rgba(238, 245, 255, 0.6);
+}
+.bp-tape-caret {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid var(--t-cyan);
+  transform: translateX(-50%);
+  filter: drop-shadow(0 0 4px rgba(79, 227, 255, 0.8));
+}
+.bp-tape-digits {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  padding: 2px 6px;
+  border-radius: 5px;
+  transform: translateX(-50%);
+  font: 600 12px/1 var(--t-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--t-cyan);
+  background: rgba(1, 3, 8, 0.96);
+  box-shadow: inset 0 0 0 1px rgba(79, 227, 255, 0.4);
+}
+/* One line: the type gives way (ellipsis) before the line wraps. */
+.bp-ident {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 10px;
+  min-width: 0;
+  max-width: 100%;
+  text-align: center;
+}
+.bp-status {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  font: 700 9.5px/1 var(--t-sans);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--t-cyan);
+}
+.bp-status i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 10px currentColor;
+}
+.bino-phone:is([data-status='acquire'], [data-status='free'], [data-status='search']) .bp-status {
+  color: var(--t-amber);
+}
+.bino-phone[data-status='acquire'] .bp-status i {
+  animation: tgt-pulse 0.7s ease-in-out infinite;
+}
+.bino-phone[data-status='lost'] .bp-status {
+  color: var(--t-rose);
+}
+.bp-callsign {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+}
+.bp-callsign strong {
+  flex-shrink: 0;
+  font: 400 19px/1 var(--t-display);
+  letter-spacing: 0.04em;
+  color: var(--t-ice);
+  white-space: nowrap;
+}
+.bp-callsign small {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font: 600 11.5px/1 var(--t-sans);
+  color: var(--t-dim);
+}
+/* Two lines at most (the band's budget). */
+.bp-notice,
+.bp-hint {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  max-width: 340px;
+  margin: 0 auto;
+  font: 600 12.5px/1.35 var(--t-sans);
+  text-align: center;
+  text-wrap: balance;
+  color: var(--t-ice);
+}
+.bp-hint {
+  color: var(--t-dim);
+}
+.bino-phone .bp-figures {
+  position: static;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  width: 100%;
+  max-width: 420px;
+  padding: 2px;
+  border-radius: 12px;
+  transform: none;
+  background: rgba(186, 222, 255, 0.05);
+  box-shadow: inset 0 0 0 1px rgba(186, 222, 255, 0.1);
+}
+.bp-figures span {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 3px 3px;
+  min-width: 0;
+  padding: 5px 8px 6px;
+}
+.bp-figures span + span {
+  box-shadow: inset 1px 0 0 rgba(186, 222, 255, 0.1);
+}
+.bp-figures small {
+  flex-basis: 100%;
+  font: 700 8.5px/1 var(--t-sans);
+  letter-spacing: 0.18em;
+  color: var(--t-faint);
+}
+.bp-figures b {
+  font: 600 17px/1 var(--t-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  color: var(--t-ice);
+}
+.bp-figures em {
+  font: 600 9px/1 var(--t-sans);
+  font-style: normal;
+  color: var(--t-dim);
+}
+/* The bottom band ends on the map credit, which stays visible under it. */
+.bino-phone .bp-bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: var(--lounge-base, 40px);
+  height: calc(var(--bino-bottom, 30%) - var(--lounge-base, 40px));
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 6px calc(env(safe-area-inset-right, 0px) + 10px) 10px calc(env(safe-area-inset-left, 0px) + 10px);
+}
+.bp-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.bp-round {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  flex-shrink: 0;
+  width: 58px;
+  height: 58px;
+  border: 0;
+  border-radius: 50%;
+  pointer-events: auto;
+  font: 700 8.5px/1 var(--t-sans);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--t-ice);
+  background: rgba(186, 222, 255, 0.08);
+  box-shadow: inset 0 0 0 1px var(--t-edge-strong);
+  transition: transform 0.12s, background 0.15s;
+}
+.bp-round:active {
+  transform: scale(0.92);
+}
+/* The Readouts switch as a labelled chip (landscape: across the right
+   column above Lower, when motion look holds the column's side slot). */
+.bp-chip {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  align-self: flex-start;
+  gap: 7px;
+  min-width: 44px;
+  height: 44px;
+  padding: 0 14px 0 12px;
+  border: 0;
+  border-radius: 14px;
+  pointer-events: auto;
+  font: 700 9px/1 var(--t-sans);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--t-ice);
+  background: rgba(186, 222, 255, 0.08);
+  box-shadow: inset 0 0 0 1px var(--t-edge-strong);
+}
+.bp-chip[aria-pressed='true'],
+.bp-round[aria-pressed='true'] {
+  color: #021018;
+  background: var(--t-cyan);
+  box-shadow: 0 0 22px -4px rgba(79, 227, 255, 0.9);
+}
+.bp-spacer {
+  visibility: hidden;
+  pointer-events: none;
+}
+/* Lower, the wheel, Readouts and Motion: with both toggles the rounds go
+   compact (MOBILE_GLASS.bino.portrait.controls) so the wheel keeps its reach. */
+.bp-controls[data-side='2'] .bp-round {
+  width: 52px;
+  height: 52px;
+}
+.bp-controls[data-side='2'] .bp-round span,
+.bp-round[data-testid='binocular-readouts'] span {
+  font-size: 7.5px;
+  letter-spacing: 0.02em;
+}
+
+/* The focus wheel. */
+.bino-wheel {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 58px;
+  overflow: hidden;
+  border-radius: 16px;
+  pointer-events: auto;
+  touch-action: none;
+  background: linear-gradient(180deg, rgba(20, 28, 44, 0.95), rgba(6, 10, 18, 0.98));
+  box-shadow: inset 0 0 0 1px var(--t-edge-strong), inset 0 10px 18px -12px rgba(255, 255, 255, 0.12), inset 0 -12px 18px -12px rgba(0, 0, 0, 0.8);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent);
+}
+/* The knurl: fine ridges that read as a rubber focus ring. */
+.bino-wheel-knurl {
+  position: absolute;
+  inset: 0;
+  opacity: 0.5;
+  background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 4px);
+  pointer-events: none;
+}
+.bino-wheel-track {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  will-change: transform;
+}
+.bino-wheel-tick {
+  position: absolute;
+  top: 8px;
+  width: 1px;
+  height: 7px;
+  background: rgba(238, 245, 255, 0.35);
+  pointer-events: none;
+}
+.bino-wheel-tick[data-major='1'] {
+  height: 11px;
+  background: rgba(238, 245, 255, 0.7);
+}
+.bino-wheel-tick[data-preset='1'] {
+  height: 14px;
+  width: 2px;
+  background: var(--t-cyan);
+}
+.bino-wheel-preset {
+  position: absolute;
+  top: 12px;
+  width: 44px;
+  height: 44px;
+  margin-left: -22px;
+  padding: 10px 0 0;
+  border: 0;
+  border-radius: 12px;
+  font: 600 13px/1 var(--t-mono);
+  color: var(--t-ice);
+  background: transparent;
+}
+.bino-wheel-preset:active {
+  background: rgba(79, 227, 255, 0.14);
+}
+.bino-wheel-index {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  margin-left: -1px;
+  pointer-events: none;
+  background: linear-gradient(180deg, var(--t-amber), rgba(255, 197, 97, 0.15));
+  box-shadow: 0 0 10px rgba(255, 197, 97, 0.8);
+}
+.bino-wheel[data-axis='y'] {
+  flex: none;
+  width: 70px;
+  height: auto;
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 14%, #000 86%, transparent);
+  mask-image: linear-gradient(180deg, transparent, #000 14%, #000 86%, transparent);
+}
+.bino-wheel[data-axis='y'] .bino-wheel-knurl {
+  background: repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 4px);
+}
+.bino-wheel[data-axis='y'] .bino-wheel-track {
+  width: 100%;
+  height: 0;
+}
+.bino-wheel[data-axis='y'] .bino-wheel-tick {
+  top: auto;
+  left: 8px;
+  width: 7px;
+  height: 1px;
+}
+.bino-wheel[data-axis='y'] .bino-wheel-tick[data-major='1'] {
+  width: 11px;
+  height: 1px;
+}
+.bino-wheel[data-axis='y'] .bino-wheel-tick[data-preset='1'] {
+  width: 14px;
+  height: 2px;
+}
+.bino-wheel[data-axis='y'] .bino-wheel-preset {
+  left: 18px;
+  margin: -22px 0 0;
+  padding: 0 0 0 6px;
+  text-align: left;
+}
+.bino-wheel[data-axis='y'] .bino-wheel-index {
+  top: 50%;
+  bottom: auto;
+  left: 0;
+  right: 0;
+  width: auto;
+  height: 2px;
+  margin: -1px 0 0;
+  background: linear-gradient(90deg, var(--t-amber), rgba(255, 197, 97, 0.15));
+}
+
+/* Landscape: the twin lenses with readouts in the side columns. */
+.bino-phone .bp-col {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 10px);
+  bottom: calc(var(--lounge-base, 24px) + 8px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.bino-phone .bp-col-left {
+  left: calc(env(safe-area-inset-left, 0px) + 10px);
+  width: calc(var(--bino-left, 140px) - env(safe-area-inset-left, 0px) - 14px);
+  align-items: stretch;
+}
+.bino-phone .bp-col-right {
+  right: calc(env(safe-area-inset-right, 0px) + 10px);
+  width: calc(var(--bino-right, 140px) - env(safe-area-inset-right, 0px) - 14px);
+  align-items: center;
+}
+.bino-phone .bp-col .bp-tape-row {
+  display: block;
+  margin: 0;
+}
+.bino-phone .bp-col .bp-tape {
+  height: 36px;
+  flex-shrink: 0;
+}
+.bino-phone .bp-col .bp-ident {
+  justify-content: flex-start;
+  text-align: left;
+}
+.bino-phone .bp-col .bp-callsign {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.bino-phone .bp-col .bp-notice,
+.bino-phone .bp-col .bp-hint {
+  margin: 0;
+  font-size: 11.5px;
+  text-wrap: pretty;
+}
+.bino-phone .bp-col .bp-figures {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: auto;
+}
+.bino-phone .bp-col .bp-figures span:nth-child(3) {
+  box-shadow: inset 0 1px 0 rgba(186, 222, 255, 0.1);
+}
+.bino-phone .bp-col .bp-figures span:nth-child(4) {
+  box-shadow: inset 1px 1px 0 rgba(186, 222, 255, 0.1);
+}
+.bino-phone .bp-col-right .bp-mag {
+  justify-self: auto;
+  font-size: 22px;
+}
+.bino-phone .bp-col-right .bino-wheel {
+  flex: 1;
+  min-height: 0;
+}
+.bino-phone .bp-col-right .bp-chip {
+  align-self: stretch;
+  justify-content: center;
+}
+.bp-col-actions {
+  display: flex;
+  gap: 8px;
+}
+.bino-phone .bp-col-actions .bp-round {
+  width: 50px;
+  height: 50px;
+}
+.bino-phone .bp-col-actions .bp-round span {
+  font-size: 7.5px;
+  letter-spacing: 0.04em;
+}
+.bino-phone .bp-col-actions .bp-spacer {
+  display: none;
+}
+.bp-float-notice {
+  position: absolute;
+  left: var(--bino-left, 140px);
+  right: var(--bino-right, 140px);
+  bottom: calc(var(--lounge-base, 24px) + 10px);
+  width: fit-content;
+  max-width: calc(100% - var(--bino-left, 140px) - var(--bino-right, 140px));
+  margin: 0 auto;
+  padding: 8px 14px;
+  border-radius: 12px;
+  font: 600 12px/1.4 var(--t-sans);
+  text-align: center;
+  text-wrap: balance;
+  color: var(--t-ice);
+  background: rgba(3, 6, 12, 0.86);
+  box-shadow: inset 0 0 0 1px var(--t-edge-strong);
+}
+/* Portrait: a notice that comes while the figures are up (their place in the
+   top band) floats over the foot of the lens, above the thumb's band. */
+.bino-phone[data-layout='portrait'] .bp-float-notice {
+  left: 12px;
+  right: 12px;
+  bottom: calc(var(--bino-bottom, 30%) + 12px);
+  max-width: min(340px, calc(100% - 24px));
+}
+
+/* ---------------------------------------------------------------------
+   TABLETS: the desktop HUD, touch-sized
+   --------------------------------------------------------------------- */
+.lounge[data-layout='tablet'] .lounge-btn {
+  min-height: 44px;
+  min-width: 44px;
+}
+.lounge[data-layout='tablet'] .lounge-bar .lounge-btn {
+  height: 48px;
+}
+.lounge[data-layout='tablet'] :is(.lb-tabs button, .lb-bino, .lc-chip, .observatory-close, .lounge-decor-close, .bino-mag button) {
+  min-height: 44px;
+  min-width: 44px;
+}
+.lounge[data-layout='tablet'] .lounge-seat-menu header .lounge-btn {
+  width: 44px;
+  height: 44px;
+}
+.lounge[data-layout='tablet'] :is(.dir-btn, .dir-stop, .dir-next) {
+  min-height: 44px;
+}
+/* The header's place card keeps to one line per row on a tablet: wrapped, it
+   grows down into the director's cue and the board below it. */
+.lounge[data-layout='tablet'] :is(.lh-text h1, .lh-text p) {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.lounge[data-layout='tablet'] .lh-place {
+  max-width: 34%;
+}
+/* Everything the desktop hangs under the header at a fixed top follows the
+   header's measured height on a tablet (its strip wraps to two rows there). */
+.lounge[data-layout='tablet'] {
+  --lounge-under-head: max(98px, calc(20px + var(--lounge-head-h, 78px) + 10px));
+}
+.lounge[data-layout='tablet'] .lounge-board {
+  top: var(--lounge-under-head);
+  max-height: calc(100% - var(--lounge-under-head) - 186px);
+}
+.lounge[data-layout='tablet'] .dir-cue {
+  top: var(--lounge-under-head);
+}
+.lounge[data-layout='tablet'] .lounge-status {
+  top: calc(var(--lounge-under-head) + 2px);
+}
+/* A portrait tablet: the board keeps to the upper half and the card to the
+   lower, so the two never meet. */
+@media (orientation: portrait) {
+  .lounge[data-layout='tablet'] .lounge-board {
+    max-height: calc(50% - var(--lounge-under-head) - 12px);
+  }
+  .lounge[data-layout='tablet'] .lounge-card {
+    max-height: calc(50% - 88px - 12px);
+    overflow-y: auto;
+  }
+  .lounge[data-layout='tablet'] .lounge-card .lc-route {
+    display: none;
+  }
+  /* The desktop puts the status line between the cue and the board, which
+     leaves an upright tablet no width for it: it drops into the open sky
+     between the board (top half) and the card (bottom half). */
+  .lounge[data-layout='tablet'] .lounge-status {
+    top: 42%;
+    max-width: min(520px, calc(100% - 48px));
+  }
+  /* Upright, the conditions strip keeps the feed and the clock (the sun and
+     the weather fold away) so the header stays one row. */
+  .lounge[data-layout='tablet'] .lh-strip .lh-item:not([data-testid='lounge-clock']) {
+    display: none;
+  }
+}
+
+/* ---------------------------------------------------------------------
+   MOTION
+   --------------------------------------------------------------------- */
+/* The OS setting, and the game's own (Settings > Reduced motion,
+   `fly-reduced-motion`, which LoungeHud stamps as data-reduced on a phone or
+   a tablet; its framer-motion springs and slides go through MotionConfig). */
+@media (prefers-reduced-motion: reduce) {
+  .lounge[data-layout] *,
+  .bino-phone * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+.lounge[data-layout][data-reduced] * {
+  transition: none !important;
+  animation: none !important;
+}

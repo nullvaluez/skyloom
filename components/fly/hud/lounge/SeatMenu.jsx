@@ -64,7 +64,8 @@ const onGroupedKey = (e) => {
   e.preventDefault();
 };
 
-export function SeatMenu({ runtime, watch }) {
+/** `touch` (LOUNGE MOBILE): a touch device, so the footer names the stick and taps, not keys and clicks. */
+export function SeatMenu({ runtime, watch, touch = false }) {
   const veil = useRef(null);
   const menu = useRef(null);
   const walking = !!watch.walk;
@@ -115,7 +116,7 @@ export function SeatMenu({ runtime, watch }) {
               <ul>{g.seats.map(row)}</ul>
             </div>
           ))}
-          <p className="lsm-foot">Or walk: WASD, Shift to run. Click a chair to sit.</p>
+          <p className="lsm-foot">{touch ? 'Or walk with the thumb stick, lower left. Tap a chair to sit.' : 'Or walk: WASD, Shift to run. Click a chair to sit.'}</p>
         </section>
       )}
     </>
@@ -157,7 +158,7 @@ export function SeatMenu({ runtime, watch }) {
               );
             })}
           </ul>
-          <p className="lsm-foot">Or walk: WASD, Shift to run. Click a chair to sit.</p>
+          <p className="lsm-foot">{touch ? 'Or walk with the thumb stick, lower left. Tap a chair to sit.' : 'Or walk: WASD, Shift to run. Click a chair to sit.'}</p>
         </section>
       )}
     </>

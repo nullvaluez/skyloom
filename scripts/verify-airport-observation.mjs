@@ -28,7 +28,11 @@ check('every airport provides one fixed window seat',()=>{assert.equal(observati
 check('provider states distinguish delayed and unavailable',()=>{assert.equal(trafficStatus({now:1000},null,1001000).state,'live');assert.equal(trafficStatus({now:1000},null,1020000).state,'delayed');assert.equal(trafficStatus(null,null).state,'unavailable');});
 globalThis.window={location:{search:'?graphicsReview=1&airports=on&airportArt=off&airportScenery=on'},matchMedia:()=>({matches:false})};
 check('rollout parts are independent',()=>{assert.equal(livingAirportsOn(),true);assert.equal(livingAirportsOn('worldArt'),false);assert.equal(livingAirportsOn('scenery'),true);});
-check('mobile is always excluded',()=>{window.matchMedia=()=>({matches:true});window.ontouchstart=null;assert.equal(livingAirportsOn(),false);delete window.ontouchstart;});
+// LOUNGE MOBILE (2026-10-29, sanctioned move: this check read 'mobile is always
+// excluded' until the owner asked for the lounge on phones). Phones and tablets
+// have the lounge behind LOUNGE_MOBILE; world art and scenery stay desktop-only;
+// -LOUNGE_MOBILE excludes both again and tablets:false excludes tablets only.
+check('mobile has the lounge behind LOUNGE_MOBILE; world art and scenery stay desktop-only',()=>{window.matchMedia=()=>({matches:true});window.ontouchstart=null;window.screen={width:390,height:844};assert.equal(livingAirportsOn(),true);assert.equal(livingAirportsOn('worldArt'),false);assert.equal(livingAirportsOn('scenery'),false);window.__flyLoungeMobileOverride={enabled:false};assert.equal(livingAirportsOn(),false);delete window.__flyLoungeMobileOverride;window.screen={width:1024,height:1366};assert.equal(livingAirportsOn(),true);window.__flyLoungeMobileOverride={tablets:false};assert.equal(livingAirportsOn(),false);window.screen={width:390,height:844};assert.equal(livingAirportsOn(),true);delete window.__flyLoungeMobileOverride;delete window.screen;delete window.ontouchstart;});
 check('ordinary desktop release has the lounge; world art and airport scenery stay review-only',()=>{window.matchMedia=()=>({matches:false});window.location.search='';assert.equal(livingAirportsOn(),true);assert.equal(livingAirportsOn('worldArt'),false);assert.equal(livingAirportsOn('scenery'),false);window.location.search='?graphicsReview=1&airports=off';assert.equal(livingAirportsOn(),false);});
 delete globalThis.window;
 check('every checked-in runway passes runtime validation',()=>{

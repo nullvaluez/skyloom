@@ -83,13 +83,15 @@ const seed = () => {
     await p2.goto(URL_, { timeout: 240000 });
     await p2.getByTestId('title-screen').waitFor({ state: 'visible', timeout: 240000 });
     await p2.waitForTimeout(1500);
+    // LOUNGE MOBILE (2026-10-29, sanctioned move): phones have the lounge
+    // behind LOUNGE_MOBILE (these two checks read "no card" / "no pill" before).
     const phoneCards = await p2.getByTestId('watch-airport').count();
-    check('phones get no lounge card (excluded by policy)', phoneCards === 0, { phoneCards });
+    check('phones get the lounge card (LOUNGE_MOBILE)', phoneCards === 1, { phoneCards });
     await p2.screenshot({ path: path.join(out, 'phone-title.png') });
     await p2.evaluate(() => window.__flyStore.setState({ atlasOpen: true }));
     const atlasUp = await p2.getByTestId('atlas').waitFor({ state: 'visible', timeout: 15000 }).then(() => true, () => false);
     const phonePill = await p2.locator('[data-testid="atlas"] [data-testid="watch-airport"]').count();
-    check('phones get no Atlas pill either', atlasUp && phonePill === 0, { atlasUp, phonePill });
+    check('phones get the Atlas pill too', atlasUp && phonePill === 1, { atlasUp, phonePill });
     check('no page errors on the phone', errors2.length === 0, errors2.slice(0, 3));
     await phone.close();
   } catch (e) {

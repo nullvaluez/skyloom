@@ -53,6 +53,8 @@ export const STANDARD_GATES = [
   ['verify-import-integrity.mjs'],
   ['verify-lounge-light.mjs'], // LIGHT lane: pier-only shading, glow channels, probe, steam
   ['verify-lounge-life.mjs'], // LIFE lane: inspectable décor, seat menu by floor, place label
+  ['verify-lounge-touch.mjs'], // LOUNGE MOBILE (TOUCH): gestures, portrait field, stick, motion look, haptics
+  ['verify-lounge-glass.mjs'], // LOUNGE MOBILE (GLASS): binocular figure, focus wheel, band budget, the two Back chains, phone CSS contracts
 ];
 
 /**

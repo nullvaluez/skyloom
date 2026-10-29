@@ -5,7 +5,8 @@ import { Vector3 } from 'three';
 import { addAfterEffect } from '@react-three/fiber';
 import { HUD_SYNC } from '@/lib/fly/fly-constants';
 import { pinned } from '@/lib/fly/fly-pins';
-import { VIEW } from '@/lib/fly/observation-config';
+import { VIEW, MOBILE_GLASS } from '@/lib/fly/observation-config';
+import { binocularFigure, raisedRadius, reticleFor } from '@/lib/fly/lounge/glass-layout.mjs';
 import { drawnPoint, glazingFor } from '@/lib/fly/airport-watch-runtime';
 import { DEG, clamp, pickRadius, wingspanFor, smoothstep, prefersReducedMotion } from '@/lib/fly/airport-watch-camera.mjs';
 import { contactLabel, typeNameFor } from '@/lib/fly/airport-watch-board.mjs';
@@ -165,15 +166,20 @@ function edgeArrow(ctx, W, H, ux, uy, inset, rgb, avoid) {
   return { ex, ey, ux, uy };
 }
 
-/** DIRECTOR: a pill at (x, y) moved clear of the panels (below one it would cover, else above). */
+/**
+ * DIRECTOR: a pill at (x, y) moved clear of the panels (below one it would
+ * cover, else above). `opts.floor` (a phone): the top of the bottom chrome —
+ * the dock, a sheet, the map credit — which the pill stays above.
+ */
 function pillClear(ctx, x, y, lines, opts, avoid) {
   const [w, h] = measurePill(ctx, lines, !!opts.accent);
-  const rect = [clamp(x, 8, opts.w - w - 8), clamp(y, 8, opts.h - h - 8), w, h];
+  const bottom = (opts.floor ?? opts.h) - h - 8;
+  const rect = [clamp(x, 8, opts.w - w - 8), clamp(y, 8, bottom), w, h];
   for (let i = 0; i < 3; i++) {
     const r = avoid.find((o) => overlaps(o, rect));
     if (!r) break;
     const below = r[1] + r[3] + 6;
-    rect[1] = below + h < opts.h - 8 ? below : Math.max(8, r[1] - h - 6);
+    rect[1] = (opts.floor == null ? below + h < opts.h - 8 : below < bottom) ? below : Math.max(8, r[1] - h - 6);
   }
   drawPill(ctx, rect, lines, opts);
   return rect;
@@ -251,9 +257,122 @@ function drawMask(ctx, w, h, a, posts = 1) {
   ctx.stroke();
 }
 
-export function LoungeOverlay({ runtime, picker }) {
+/*
+ * LOUNGE MOBILE — GLASS: the phone figures (lib/fly/lounge/glass-layout.mjs).
+ * Portrait is one circular field sized from the width and centred on the
+ * optical axis; landscape is the twin-lens figure scaled from the height. The
+ * desktop keeps drawMask above, untouched. Drawn only when the mask key
+ * changes, at the canvas's DPR (fit() below), so the extra optics cost
+ * nothing per frame:
+ *  - the glass is cut with a soft edge, and an optical vignette darkens
+ *    toward the rim;
+ *  - just outside it the eyecup: a rubber lip lit faintly from above, so the
+ *    field reads as something held to the eyes, not a hole in a page;
+ *  - a cool anti-reflection coating ring and a faint violet sheen on the
+ *    upper-left arc where the room light would catch it;
+ *  - the post reticle scaled from the lens radius, centred on the optical
+ *    axis (the screen centre), faded by `posts` like the desktop's.
+ */
+function drawPhoneMask(ctx, w, h, a, posts, fig) {
+  ctx.clearRect(0, 0, w, h);
+  if (a <= 0.001 || !fig) return;
+  const up = 1 - Math.pow(1 - a, 3); // ease-out raise, as on desktop
+  const R = raisedRadius(fig.R, up);
+  const lenses = fig.lenses;
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = `rgba(1,3,7,${0.97 * up})`;
+  ctx.fillRect(0, 0, w, h);
+  // The eyecup lip: a ring just outside the glass, lighter on its upper edge.
+  for (const L of lenses) {
+    const lip = ctx.createRadialGradient(L.cx, L.cy - R * 0.04, R * 0.98, L.cx, L.cy, R * 1.07);
+    lip.addColorStop(0, `rgba(44,54,70,${0.55 * up})`);
+    lip.addColorStop(0.45, `rgba(16,21,30,${0.6 * up})`);
+    lip.addColorStop(1, 'rgba(1,3,7,0)');
+    ctx.fillStyle = lip;
+    ctx.beginPath();
+    ctx.arc(L.cx, L.cy, R * 1.07, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Cut the glass with a soft, slightly blurred edge.
+  ctx.globalCompositeOperation = 'destination-out';
+  for (const L of lenses) {
+    const g = ctx.createRadialGradient(L.cx, L.cy, R * 0.9, L.cx, L.cy, R);
+    g.addColorStop(0, 'rgba(0,0,0,1)');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(L.cx, L.cy, R, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalCompositeOperation = 'source-over';
+  // Optical vignette toward the rim of the fused field.
+  const span = lenses.length > 1 ? R + Math.abs(lenses[1].cx - lenses[0].cx) / 2 : R;
+  const v = ctx.createRadialGradient(fig.cx, fig.cy, span * 0.58, fig.cx, fig.cy, span);
+  v.addColorStop(0, 'rgba(0,0,0,0)');
+  v.addColorStop(0.75, `rgba(0,2,6,${0.14 * up})`);
+  v.addColorStop(1, `rgba(0,2,6,${0.5 * up})`);
+  ctx.fillStyle = v;
+  ctx.fillRect(0, 0, w, h);
+  // Coating ring and sheen: only the arc that borders the dark (inside a
+  // fused twin field the other eyepiece's light covers it).
+  for (const L of lenses) {
+    const other = lenses.find((o) => o !== L);
+    ctx.save();
+    if (other) {
+      ctx.beginPath();
+      ctx.rect(0, 0, w, h);
+      ctx.arc(other.cx, other.cy, R * 0.995, 0, Math.PI * 2, true);
+      ctx.clip('evenodd');
+    }
+    ctx.beginPath();
+    ctx.arc(L.cx, L.cy, R * 0.975, 0, Math.PI * 2);
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = `rgba(150,205,255,${0.11 * up})`;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(L.cx, L.cy, R * 0.955, Math.PI * 1.08, Math.PI * 1.42);
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = `rgba(178,150,255,${0.12 * up})`;
+    ctx.stroke();
+    ctx.restore();
+  }
+  // The post reticle on the optical axis, scaled from the lens radius.
+  const { gap, reach, step, ticks } = reticleFor(fig.R);
+  const x = w / 2, cy = h / 2, ra = up * 0.62 * posts;
+  if (ra < 0.01) return;
+  ctx.beginPath();
+  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    ctx.moveTo(x + dx * gap, cy + dy * gap);
+    ctx.lineTo(x + dx * reach, cy + dy * reach);
+  }
+  for (let i = 1; i <= ticks; i++) {
+    const d = gap + i * step, t = i % 4 === 0 ? 5 : 2.5;
+    ctx.moveTo(x + d, cy - t); ctx.lineTo(x + d, cy + t);
+    ctx.moveTo(x - d, cy - t); ctx.lineTo(x - d, cy + t);
+    ctx.moveTo(x - t, cy + d); ctx.lineTo(x + t, cy + d);
+  }
+  ctx.lineCap = 'butt';
+  ctx.strokeStyle = `rgba(${C.ink},${ra * 0.55})`;
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  ctx.strokeStyle = `rgba(${C.ice},${ra})`;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+}
+
+/**
+ * `binoLayout` ('desktop' | 'portrait' | 'landscape') and `insets` (the
+ * safe-area insets) come from LoungeHud; desktop draws exactly as before.
+ */
+export function LoungeOverlay({ runtime, picker, binoLayout = 'desktop', insets = null }) {
   const markRef = useRef(null);
   const maskRef = useRef(null);
+  // Read inside the frame loop without re-running its effect.
+  const layoutRef = useRef({ mode: binoLayout, insets });
+  useEffect(() => {
+    layoutRef.current = { mode: binoLayout, insets };
+  }, [binoLayout, insets]);
   useEffect(() => {
     const mark = markRef.current, mask = maskRef.current;
     if (!mark || !mask) return undefined;
@@ -268,6 +387,9 @@ export function LoungeOverlay({ runtime, picker }) {
     // Screen rectangles of the lounge's own panels (header, board, card,
     // control bar), re-read at 4 Hz: labels are placed clear of them.
     let avoid = [], avoidAt = -1e9;
+    // A phone: the top of the bottom chrome (dock, bar, peek, a sheet, the map
+    // credit), which the out-of-frame arrow and its pill stay above.
+    let floor = null;
     const readAvoid = (now) => {
       if (now - avoidAt < 250) return;
       avoidAt = now;
@@ -275,9 +397,21 @@ export function LoungeOverlay({ runtime, picker }) {
       const root = mark.closest('.lounge');
       if (!root) return;
       const base = mark.getBoundingClientRect();
-      for (const el of root.querySelectorAll('.lounge-panel, .lh-actions, .lounge-help, .dir-lower')) {
+      // [data-lounge-avoid]: the phone HUD's own chrome (no desktop element carries it).
+      for (const el of root.querySelectorAll('.lounge-panel, .lh-actions, .lounge-help, .dir-lower, [data-lounge-avoid]')) {
         const r = el.getBoundingClientRect();
         if (r.width > 0 && r.height > 0) avoid.push([r.left - base.left - 6, r.top - base.top - 6, r.width + 12, r.height + 12]);
+      }
+      floor = null;
+      if (layoutRef.current.mode !== 'desktop') {
+        const tops = [];
+        const credit = document.querySelector('[data-zone="attribution"] > div')?.getBoundingClientRect();
+        if (credit?.height) tops.push(credit.top - base.top);
+        for (const el of root.querySelectorAll('.lounge-dock, .lounge-bar, .lounge-peek, .lounge-sheet, [data-sheet]')) {
+          const r = el.getBoundingClientRect();
+          if (r.width > 0 && r.height > 0 && r.top - base.top > base.height * 0.45) tops.push(r.top - base.top);
+        }
+        if (tops.length) floor = Math.min(...tops) - 6;
       }
     };
 
@@ -543,6 +677,10 @@ export function LoungeOverlay({ runtime, picker }) {
         }
       }
 
+      // LOUNGE MOBILE: the phone's binocular figure (null on desktop).
+      const { mode } = layoutRef.current;
+      const figure = mode === 'desktop' ? null : binocularFigure(mode, W, H, layoutRef.current.insets || undefined);
+
       // Selection out of frame: an edge arrow toward it (only while it is
       // visible through the glazing — the overlay never points at a wall).
       if (selectedTrack && !(selectedHit?.onScreen)) {
@@ -555,8 +693,18 @@ export function LoungeOverlay({ runtime, picker }) {
         const len = Math.hypot(ux, uy) || 1;
         ux /= len; uy /= len;
         const inset = 46, hx = W / 2 - inset, hy = H / 2 - inset - 40;
-        const s = Math.min(hx / Math.max(1e-6, Math.abs(ux)), hy / Math.max(1e-6, Math.abs(uy)));
-        const ex = W / 2 + ux * s, ey = H / 2 - uy * s;
+        let s = Math.min(hx / Math.max(1e-6, Math.abs(ux)), hy / Math.max(1e-6, Math.abs(uy)));
+        // Phone, glasses up: the arrow rides the inside of the glass (an
+        // ellipse over the fused field), never the dark bands of readouts.
+        if (figure && amount > 0.5) {
+          const rx = ((figure.right - figure.left) / 2) * 0.84, ry = figure.R * 0.84;
+          s = 1 / Math.hypot(ux / rx, uy / ry);
+        }
+        const ex = W / 2 + ux * s;
+        // A phone, glasses down: the arrow and its pill stay above the bottom
+        // chrome (the dock, a sheet, the credit).
+        const low = figure && floor != null && amount <= 0.5 ? floor : null;
+        const ey = low != null ? Math.min(H / 2 - uy * s, low - 14) : H / 2 - uy * s;
         const ang = Math.atan2(-uy, ux);
         ctx.save();
         ctx.translate(ex, ey);
@@ -572,29 +720,43 @@ export function LoungeOverlay({ runtime, picker }) {
         ctx.shadowBlur = 10;
         ctx.fill();
         ctx.restore();
-        pill(ctx, ex - ux * 34 - 40, ey + uy * 34 - 12, [contactLabel(selectedTrack.meta, selectedTrack.hex)], { w: W, h: H, accent: C.cyan, alpha: 0.9 });
+        if (figure) pillClear(ctx, ex - ux * 34 - 40, ey + uy * 34 - 12, [contactLabel(selectedTrack.meta, selectedTrack.hex)], { w: W, h: H, accent: C.cyan, alpha: 0.9, floor: low }, avoid);
+        else pill(ctx, ex - ux * 34 - 40, ey + uy * 34 - 12, [contactLabel(selectedTrack.meta, selectedTrack.hex)], { w: W, h: H, accent: C.cyan, alpha: 0.9 });
       }
 
-      // Binocular lock box: hugs the aircraft once the glasses are up.
+      // Binocular lock box: hugs the aircraft once the glasses are up (on a
+      // phone its smallest size follows the lens radius).
       if (selectedHit && amount > 0.3) {
-        const locked = w.tracking && w.lockError() < fovRad / 8;
+        const locked = w.tracking && w.lockError() < (w.lockTolerance?.() ?? fovRad / 8); // the runtime's lock tolerance (contract 5)
         const a = smoothstep(0.3, 0.9, amount);
-        const half = Math.max(16, selectedHit.half * 1.18);
+        const half = Math.max(figure ? Math.max(12, figure.R * MOBILE_GLASS.bino.lockMinFrac) : 16, selectedHit.half * 1.18);
         brackets(ctx, selectedHit.sx, selectedHit.sy, half, Math.min(14, half * 0.35), locked ? C.cyan : C.amber, 0.85 * a, 1.2);
       }
 
       // DIRECTOR: the reticle fades while steady binoculars frame a held lock.
       if (DIRECTOR) {
-        const framed = w.optics.auto && w.tracking && !!selectedHit && w.lockError() < fovRad / 8;
+        const framed = w.optics.auto && w.tracking && !!selectedHit && w.lockError() < (w.lockTolerance?.() ?? fovRad / 8);
         posts += ((framed ? 0 : 1) - posts) * (1 - Math.exp(-Math.min(0.1, (now - postsAt) / 1000) * 5));
         postsAt = now;
       }
 
       // --- the binocular mask (only redrawn when it changes) ------------------
-      const key = `${Math.round(amount * 400)}|${W}x${H}` + (DIRECTOR ? `|${Math.round(posts * 24)}` : '');
+      const key = `${Math.round(amount * 400)}|${W}x${H}` + (DIRECTOR ? `|${Math.round(posts * 24)}` : '') + (figure ? `|${mode}|${Math.round(figure.R)}` : '');
       if (key !== maskKey) {
         maskKey = key;
-        drawMask(mctx, W, H, amount, DIRECTOR ? Math.round(posts * 24) / 24 : 1);
+        if (figure) {
+          drawPhoneMask(mctx, W, H, amount, DIRECTOR ? Math.round(posts * 24) / 24 : 1, figure);
+          // The map credit (AttributionBar, under the lounge) stays readable
+          // through the dark: its strip is left clear (licensing).
+          const credit = document.querySelector('[data-zone="attribution"] > div')?.getBoundingClientRect();
+          const base = mask.getBoundingClientRect();
+          if (credit?.width) mctx.clearRect(credit.left - base.left, credit.top - base.top, credit.width, credit.height);
+          // The figure the mask was drawn with, for the readouts' probes.
+          mask.dataset.figure = JSON.stringify({ mode, R: Math.round(figure.R), lenses: figure.lenses.map((l) => [Math.round(l.cx), Math.round(l.cy)]) });
+        } else {
+          drawMask(mctx, W, H, amount, DIRECTOR ? Math.round(posts * 24) / 24 : 1);
+          if (mask.dataset.figure) delete mask.dataset.figure;
+        }
       }
     };
 

@@ -1,6 +1,7 @@
 'use client';
 import { Binoculars, ChevronDown, ChevronUp, PlaneLanding, PlaneTakeoff, Radar, TowerControl } from 'lucide-react';
 import { fmtEta, landedRow } from './SpotterCard';
+import { SheetGrabber } from './LoungeSheet';
 
 /*
  * LIVE BOARD — what is happening at this airport right now, from
@@ -54,7 +55,12 @@ function Row({ row, tab, selected, onSelect, onBinoculars }) {
   );
 }
 
-export function LiveBoard({ board, tab, onTab, open, onToggle, selected, onSelect, onBinoculars, feed }) {
+/**
+ * `sheet` (LOUNGE MOBILE, phones only): the board is the phone's bottom sheet,
+ * always open while shown, with a grabber that closes it (onToggle); without
+ * it the board is today's panel, unchanged.
+ */
+export function LiveBoard({ board, tab, onTab, open, onToggle, selected, onSelect, onBinoculars, feed, sheet = false }) {
   const lists = {
     arrivals: board.arrivals,
     departures: board.departures,
@@ -69,7 +75,8 @@ export function LiveBoard({ board, tab, onTab, open, onToggle, selected, onSelec
       : feed === 'delayed' ? 'Waiting for fresh aircraft positions…'
         : current.empty;
   return (
-    <section className={`lounge-panel lounge-board${open ? '' : ' is-collapsed'}`} data-testid="lounge-board" data-overlay="airport-board" aria-label="Live board">
+    <section className={`lounge-panel lounge-board${open ? '' : ' is-collapsed'}`} data-testid="lounge-board" data-overlay="airport-board" aria-label="Live board" data-sheet={sheet ? 'expanded' : undefined}>
+      {sheet && <SheetGrabber expanded onToggle={onToggle} onExpand={() => {}} onCollapse={onToggle} label="Close the live board" />}
       <header className="lb-head">
         <span className="lb-title">
           <i aria-hidden="true" />

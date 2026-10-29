@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotionConfig } from 'framer-motion';
 import { Clapperboard, Eye, PlaneLanding, PlaneTakeoff, Plane, Square } from 'lucide-react';
 import { useRoute } from '@/hooks/use-route';
 import { countdown, movementVerb, captionKicker } from '@/lib/fly/airport-watch-director.mjs';
@@ -179,13 +179,16 @@ function useCaptionRoute(runtime, hex, kind, ident) {
 function LowerThird({ runtime, item, ident }) {
   const route = useCaptionRoute(runtime, item.hex, item.kind, ident);
   const sub = [item.type || item.typeCode, route].filter(Boolean).join(' · ');
+  // LOUNGE MOBILE: under a phone's reduced motion (LoungeHud's MotionConfig;
+  // false on desktop, which has none) the caption is simply there.
+  const still = useReducedMotionConfig();
   return (
     <motion.div
       className="dir-lower"
       data-testid="director-lower"
       data-variant={item.moment ? 'moment' : 'caption'}
       data-tone={item.moment === 'touchdown' ? 'land' : item.moment === 'liftoff' ? 'depart' : tone(item.kind)}
-      initial={{ opacity: 0, x: -18 }}
+      initial={still ? false : { opacity: 0, x: -18 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -10 }}
       transition={{ type: 'spring', stiffness: 260, damping: 30 }}

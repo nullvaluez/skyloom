@@ -14,6 +14,18 @@
 >   director (`LOUNGE_DIRECTOR`), apron detail (`APRON_DETAIL`); read only through
 >   `lib/fly/play-pass.js`, ON by default, `?flags=-NAME` for the previous look.
 >   Takeoff & Landing and Guided Journeys are backlogged for this pass.
+> - **Lounge Mobile (2026-10-29, owner-requested, merged to `main`, ON):**
+>   [FLY_LOUNGE_MOBILE.md](FLY_LOUNGE_MOBILE.md) is the plan and record — the
+>   observation lounge on phones and tablets behind `LOUNGE_MOBILE` (read only
+>   through `lib/fly/lounge-mobile.js`; `?flags=-LOUNGE_MOBILE` restores the
+>   old phone exclusion): touch look / pinch / tap / double-tap / long-press
+>   (`lib/fly/lounge/touch-gestures.mjs`), a portrait naked-eye field (50 deg
+>   across on touch devices; desktop bit-identical), the walk stick, opt-in
+>   motion look in the binoculars, a single-lens portrait binocular view with a
+>   focus wheel, and a thumb-first phone HUD with sheets and Android Back.
+>   Gates: `scripts/verify-lounge-touch.mjs` and `verify-lounge-glass.mjs` (in
+>   `lounge-pass-gates.mjs`), and `scripts/verify-lounge-mobile.cjs` (emulated
+>   iPhone / `--device ipad`, real CDP multi-touch). Desktop unchanged.
 > - **Living World graphics pass (2026-10-20, merged to `main` from `claude/living-world-rtx`):**
 >   [FLY_LIVING_WORLD.md](FLY_LIVING_WORLD.md) is the plan and record — 17 flags
 >   (sky, clouds, trails, aircraft, ground, menus, HUD, hangar), read only through

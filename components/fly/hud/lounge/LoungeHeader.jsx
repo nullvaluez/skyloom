@@ -1,5 +1,5 @@
 'use client';
-import { Clock3, CloudRain, CloudSnow, Cloudy, Cloud, CloudSun, LocateFixed, Moon, Sun, Sunrise, Sunset, Wind, X } from 'lucide-react';
+import { Clock3, CloudRain, CloudSnow, Cloudy, Cloud, CloudSun, Ellipsis, LocateFixed, Moon, Sun, Sunrise, Sunset, Wind, X } from 'lucide-react';
 
 /*
  * LOUNGE HEADER — where you are and what it is like out there: the airport
@@ -93,5 +93,70 @@ export function LoungeHeader({ code, name, runway, feed, count, clock, sun, weat
         </button>
       </div>
     </header>
+  );
+}
+
+/*
+ * LOUNGE MOBILE — GLASS: the phone header. One compact bar under the notch:
+ * the airport code with the feed's live dot and count, the name over the
+ * place and runway, the local clock, and the menu button (lounge-menu) that
+ * opens the lounge menu sheet — Airports and Leave (lounge-airports,
+ * lounge-leave) are two taps away there, and the conditions this bar has no
+ * room for (sun, weather, wind) ride with them (LoungeConditions).
+ */
+export function LoungeHeaderPhone({ code, name, runway, feed, count, clock, place = 'Window lounge', menuOpen = false, onMenu }) {
+  const state = feed === 'live' && !count ? 'quiet' : feed;
+  return (
+    <header className="lounge-header lph" data-testid="lounge-header" data-lounge-avoid="">
+      <span className="lph-code">
+        {code}
+        <span className="lph-feed" data-state={state} data-testid="lounge-feed-status" title={feedLabel(feed, count)}>
+          <i aria-hidden="true" />
+          <span className="lph-sr">{feedLabel(feed, count)}</span>
+          {feed === 'live' && count ? <b aria-hidden="true">{count}</b> : null}
+        </span>
+      </span>
+      <span className="lph-text">
+        <strong title={name}>{name}</strong>
+        <small data-testid="lounge-place">
+          {place}{runway ? <> <span aria-hidden="true">·</span> {runway}</> : null}
+        </small>
+      </span>
+      {clock && (
+        <span className="lph-clock" data-testid="lounge-clock" title={clock.zone === 'solar' ? 'Mean solar time at the airport' : `Local time (${clock.zone})`}>
+          <b>{clock.text}</b>
+          <small>{clock.zone === 'solar' ? 'solar' : 'local'}</small>
+        </span>
+      )}
+      <button type="button" className="lph-menu" data-testid="lounge-menu" aria-label="Lounge menu" aria-haspopup="dialog" aria-expanded={menuOpen} onClick={onMenu}>
+        <Ellipsis size={20} aria-hidden="true" />
+      </button>
+    </header>
+  );
+}
+
+/** The conditions at the field as one wrapping line (the phone's lounge menu). */
+export function LoungeConditions({ feed, count, sun, weather }) {
+  const SkyIcon = weather ? SKY_ICON[weather.kind] || Cloud : Cloud;
+  const SunIcon = sun?.kind === 'night' ? Moon : sun?.kind === 'golden' || sun?.kind === 'twilight' ? (sun.rising ? Sunrise : Sunset) : Sun;
+  return (
+    <p className="lms-conditions" role="group" aria-label="Conditions at the airport">
+      <span className="lh-feed" data-state={feed === 'live' && !count ? 'quiet' : feed}>
+        <i aria-hidden="true" />
+        {feedLabel(feed, count)}
+      </span>
+      {sun && (
+        <span data-sun={sun.kind}>
+          <SunIcon size={14} aria-hidden="true" />
+          {sun.label}
+        </span>
+      )}
+      {weather && (
+        <span data-testid="lounge-weather">
+          <SkyIcon size={14} aria-hidden="true" />
+          {[weather.sky, weather.temp, weather.wind, weather.vis].filter(Boolean).join(' · ')}
+        </span>
+      )}
+    </p>
   );
 }

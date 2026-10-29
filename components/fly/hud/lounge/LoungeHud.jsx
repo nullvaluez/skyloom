@@ -1,6 +1,6 @@
 'use client';
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, MotionConfig, motion } from 'framer-motion';
 import { Binoculars, Camera, Crosshair, ListOrdered, Map as MapIcon, Moon, RotateCcw, Sun, Volume2, VolumeX } from 'lucide-react';
 import { useFlyStore } from '@/stores/fly-store';
 import { getRuntimeAction } from '@/lib/fly/runtime-bus';
@@ -29,6 +29,20 @@ import { decorTurn, pierPlace } from '@/lib/fly/lounge/lounge-life.mjs';
 // director and its lower thirds. Nothing of it renders while the flag is off.
 import { playPassOn } from '@/lib/fly/play-pass';
 import { DirectorCue, DirectorLower, useDirector } from './DirectorHud';
+// LOUNGE MOBILE (FLY_LOUNGE_MOBILE.md): the touch-only controls (the walk
+// stick). The TOUCH stream owns the component; this file mounts it once.
+import { LoungeTouchControls } from './LoungeTouchControls';
+// LOUNGE MOBILE — GLASS: the phone HUD (header, dock, sheets, coach marks),
+// Android Back, and the layout every lounge piece reads. A fine-pointer
+// desktop takes none of it: `layout` is 'desktop' there and every branch
+// below renders today's tree.
+import { useDeviceLayout } from '@/hooks/use-device-layout';
+import { LoungeHeaderPhone } from './LoungeHeader';
+import { BoardPeek, CoachMarks, LoungeMenuSheet, PhoneDock, peekMovement } from './PhoneLounge';
+import { binoLayoutOf, loungeLayoutOf, useSafeInsets } from './lounge-layout';
+import { useLoungeBack } from './use-lounge-back';
+import { prefersReducedMotion } from '@/lib/fly/airport-watch-camera.mjs';
+import './lounge-mobile.css';
 
 const DIRECTOR_ON = playPassOn('LOUNGE_DIRECTOR');
 
@@ -91,6 +105,26 @@ export function LoungeHud({ runtime, watch }) {
   const autoTab = useRef(true);
   const noticeTimer = useRef(null);
   const airport = runtime.airportWatch?.airport;
+  // LOUNGE MOBILE — GLASS: the layout ('desktop' renders today's HUD), the
+  // binocular figure, the safe areas, and the phone's one bottom sheet of its
+  // own ('board' | 'more'), remembered with the selection it opened over (a
+  // new selection closes it, so the spotter sheet can come up).
+  const device = useDeviceLayout();
+  const layout = loungeLayoutOf(device);
+  const mobile = layout !== 'desktop';
+  const phone = layout === 'phone-portrait' || layout === 'phone-landscape';
+  const binoLayout = binoLayoutOf(layout, device);
+  const sectionRef = useRef(null);
+  const safeRef = useRef(null);
+  const insets = useSafeInsets(safeRef, mobile);
+  const paused = useFlyStore((s) => s.phase === 'paused');
+  // Reduced motion (FLY_LOUNGE_MOBILE.md rule 4: the game's own setting, else
+  // the OS), read each render (the 1 Hz tick re-renders, so a change in
+  // Settings lands within a second): data-reduced for the CSS, and
+  // MotionConfig for the framer-motion springs and slides of the phone HUD.
+  const reduced = mobile && prefersReducedMotion();
+  const [sheetState, setSheetState] = useState(null);
+  const [cardExpanded, setCardExpanded] = useState({ hex: null, open: false });
 
   const flash = useCallback((message) => {
     setNotice(message);
@@ -177,9 +211,105 @@ export function LoungeHud({ runtime, watch }) {
   const selectedRow = watch.selected ? picker.categories.get(watch.selected) : null;
   const fieldElev = airport ? (airport.a.elevation + airport.b.elevation) / 2 : 0;
   const status = notice || watch.notice || (!watch.validated ? 'Preparing your window seat…' : '');
+  // Phone: one bottom sheet at a time. A runtime layer (the seat menu, a
+  // décor card, an instrument), the binoculars, the auto director or a full
+  // panel hides the phone's own sheet; so does a new selection.
+  const runtimeLayer = !!watch.seatMenu || !!decorOpen || instrumentOpen;
+  const sheet = phone && sheetState && sheetState.sel === (watch.selected ?? null) && !runtimeLayer && !watch.binocular && !auto && !inspecting && !covered ? sheetState.kind : null;
+  const setSheet = useCallback((kind) => setSheetState(kind ? { kind, sel: runtime.airportWatch?.selected ?? null } : null), [runtime]);
+  const spotterUp = !!watch.selected && !watch.binocular && !covered && !instrumentOpen && !auto && (!phone || (!sheet && !runtimeLayer));
+  const expanded = cardExpanded.hex === watch.selected && cardExpanded.open;
+  const standing = watch.posture === 'standing' || watch.posture === 'gliding';
+  const showPeek = phone && !watch.binocular && !auto && !inspecting && !covered && !sheet && !runtimeLayer && !spotterUp && !standing;
+  // The thumb zone (FLY_LOUNGE_MOBILE.md contract 1): the walk stick hides
+  // while a sheet or panel covers the lower-left zone. A phone held sideways
+  // opens the board, the lounge menu and the spotter card as side sheets on
+  // the right, clear of the zone (lounge-mobile.css), so there they leave the
+  // stick up: the left thumb walks while the right one reads. The seat menu,
+  // a décor card, the instruments, inspect, the full panels, pause and the
+  // binoculars block in every layout.
+  const sideSheets = layout === 'phone-landscape';
+  const blocked = mobile && ((!sideSheets && (!!sheet || spotterUp)) || runtimeLayer || inspecting || covered || paused || !!watch.binocular);
+  const boardCount = board.arrivals.length + board.departures.length + board.ground.length + board.overhead.length + board.local.length;
+
+  // Android Back on a touch device (use-lounge-back.js): the topmost lounge
+  // layer closes first; at the root it leaves the lounge as desktop Esc does.
+  const layers = useRef({ sheet: null, expanded: false });
+  useEffect(() => {
+    layers.current = { sheet, expanded: expanded && spotterUp };
+  }, [sheet, expanded, spotterUp]);
+  const backStep = useCallback(() => {
+    const w = runtime.airportWatch;
+    if (!w?.active) return;
+    if (useFlyStore.getState().airportBrowserOpen) {
+      w.cancelPending?.();
+      useFlyStore.setState({ airportBrowserOpen: false });
+    } else if (layers.current.sheet) setSheetState(null);
+    else if (w.walk?.inspecting) w.walk.closeInspect();
+    else if (w.seatMenu && !w.binocular) w.seatMenuOpen(false);
+    else if (w.observatory?.snapshot().active && !w.binocular) w.observatory.release();
+    else if (layers.current.expanded) setCardExpanded({ hex: null, open: false });
+    else if (w.binocular) w.binoculars(false);
+    else if (w.director?.auto) w.director.setAuto(false);
+    else if (w.selected) w.clearSelection();
+    else if (w.exit) w.exit();
+    else exitToTitle(runtime);
+  }, [runtime]);
+  useLoungeBack(device.isTouch, backStep);
+
+  // Phone: a touch on the view folds the phone's own sheets away (the view is
+  // what the player reached for), and the expanded spotter sheet back to its
+  // peek.
+  useEffect(() => {
+    if (!phone || (!sheet && !expanded)) return undefined;
+    const onDown = (e) => {
+      if (!(e.target instanceof Element) || !e.target.closest('[data-testid="lounge-surface"]')) return;
+      setSheetState(null);
+      setCardExpanded({ hex: null, open: false });
+    };
+    window.addEventListener('pointerdown', onDown, true);
+    return () => window.removeEventListener('pointerdown', onDown, true);
+  }, [phone, sheet, expanded]);
+
+  // Phone and tablet: the attribution strip's height, measured (it wraps with
+  // the width), so the dock and the thumb zone sit above the credit and never
+  // on it.
+  useEffect(() => {
+    const section = sectionRef.current;
+    if (!mobile || !section || typeof ResizeObserver === 'undefined') return undefined;
+    const credit = document.querySelector('[data-zone="attribution"] > div');
+    if (!credit) return undefined;
+    const set = () => section.style.setProperty('--lounge-attr-h', `${Math.ceil(credit.getBoundingClientRect().height)}px`);
+    set();
+    const ro = new ResizeObserver(set);
+    ro.observe(credit);
+    return () => {
+      ro.disconnect();
+      section.style.removeProperty('--lounge-attr-h');
+    };
+  }, [mobile, layout]);
+
+  // Tablet: the desktop header wraps on a narrower screen (the conditions strip
+  // takes two rows), so the cue, the board and the status line below it follow
+  // its measured height (--lounge-head-h) instead of the desktop's fixed tops.
+  useEffect(() => {
+    const section = sectionRef.current;
+    if (layout !== 'tablet' || !section || typeof ResizeObserver === 'undefined') return undefined;
+    const header = section.querySelector('.lounge-header');
+    if (!header) return undefined;
+    const set = () => section.style.setProperty('--lounge-head-h', `${Math.ceil(header.getBoundingClientRect().height)}px`);
+    set();
+    const ro = new ResizeObserver(set);
+    ro.observe(header);
+    return () => {
+      ro.disconnect();
+      section.style.removeProperty('--lounge-head-h');
+    };
+  }, [layout]);
 
   return (
     <section
+      ref={sectionRef}
       className="tgt airport-watch lounge"
       aria-label="Airport lounge"
       data-overlay="airport-observation"
@@ -187,6 +317,13 @@ export function LoungeHud({ runtime, watch }) {
       data-binocular={watch.binocular ? '1' : '0'}
       data-instruments={observatory ? '1' : '0'}
       data-auto={auto ? '1' : undefined}
+      // LOUNGE MOBILE: phones and tablets only (lounge-mobile.css keys off these).
+      data-layout={mobile ? layout : undefined}
+      data-posture={mobile ? watch.posture || 'seated' : undefined}
+      data-sheet={phone && (sheet || runtimeLayer || spotterUp) ? '1' : undefined}
+      data-peek={showPeek ? '1' : undefined}
+      data-thumb-blocked={mobile ? (blocked ? '1' : '0') : undefined}
+      data-reduced={reduced ? '1' : undefined}
       onKeyDown={(e) => {
         // Keyboard isolation: keys typed inside the lounge never steer.
         if (e.key !== 'Escape') e.stopPropagation();
@@ -194,34 +331,56 @@ export function LoungeHud({ runtime, watch }) {
       onPointerDownCapture={auto ? (e) => { if (!e.target.closest?.('[data-director-control]')) w?.director?.handBack(); } : undefined}
       onWheelCapture={auto ? () => w?.director?.handBack() : undefined}
     >
+      <PhoneMotion mobile={mobile} reduced={reduced}>
       <LoungeSurface runtime={runtime} picker={picker} onNotice={flash} />
-      <LoungeOverlay runtime={runtime} picker={picker} />
+      <LoungeOverlay runtime={runtime} picker={picker} binoLayout={binoLayout} insets={mobile ? insets : null} />
+      {/* LOUNGE MOBILE slot: `blocked` is true while a sheet or panel covers
+          the thumb zone. */}
+      <LoungeTouchControls runtime={runtime} watch={watch} blocked={blocked} />
+      {mobile && <i ref={safeRef} className="lounge-safe-probe" aria-hidden="true" />}
 
-      <LoungeHeader
-        code={airport?.ident || watch.id}
-        name={airport?.name}
-        runway={runwayLabel(airport)}
-        feed={feed.state}
-        count={feed.count}
-        clock={conditions.clock}
-        sun={conditions.sun}
-        weather={conditions.weather}
-        place={place}
-        leaveLabel={leaveLabelFor(watch.origin)}
-        onAirports={() => useFlyStore.setState({ airportBrowserOpen: true })}
-        onLeave={leave}
-      />
+      {phone ? (
+        <LoungeHeaderPhone
+          code={airport?.ident || watch.id}
+          name={airport?.name}
+          runway={runwayLabel(airport)}
+          feed={feed.state}
+          count={feed.count}
+          clock={conditions.clock}
+          place={place}
+          menuOpen={sheet === 'more'}
+          onMenu={() => setSheet(sheet === 'more' ? null : 'more')}
+        />
+      ) : (
+        <LoungeHeader
+          code={airport?.ident || watch.id}
+          name={airport?.name}
+          runway={runwayLabel(airport)}
+          feed={feed.state}
+          count={feed.count}
+          clock={conditions.clock}
+          sun={conditions.sun}
+          weather={conditions.weather}
+          place={place}
+          leaveLabel={leaveLabelFor(watch.origin)}
+          onAirports={() => useFlyStore.setState({ airportBrowserOpen: true })}
+          onLeave={leave}
+        />
+      )}
 
-      {!observatory?.prompt && !instrumentOpen && !decorOpen && <SitPrompt runtime={runtime} watch={watch} />}
-      <DecorPrompt runtime={runtime} offer={decorOffer} />
-      {decorOpen && <DecorCard key={decorOpen.id} runtime={runtime} item={decorOpen} />}
-      <ObservatoryHud runtime={runtime} state={observatory} hidden={inspecting || covered || watch.seatMenu || !!decorOpen} />
-      <SeatMenu runtime={runtime} watch={watch} />
+      {!observatory?.prompt && !instrumentOpen && !decorOpen && !sheet && <SitPrompt runtime={runtime} watch={watch} />}
+      {!sheet && <DecorPrompt runtime={runtime} offer={decorOffer} />}
+      {decorOpen && <DecorCard key={decorOpen.id} runtime={runtime} item={decorOpen} touch={mobile || undefined} />}
+      <ObservatoryHud runtime={runtime} state={observatory} hidden={inspecting || covered || watch.seatMenu || !!decorOpen || !!sheet} />
+      <SeatMenu runtime={runtime} watch={watch} touch={mobile || undefined} />
 
-      {DIRECTOR_ON && !inspecting && !covered && !instrumentOpen && !watch.seatMenu && !decorOpen && <DirectorCue runtime={runtime} state={director} binocular={!!watch.binocular} card={!!watch.selected && !watch.binocular && !auto} />}
+      {DIRECTOR_ON && !phone && !inspecting && !covered && !instrumentOpen && !watch.seatMenu && !decorOpen && <DirectorCue runtime={runtime} state={director} binocular={!!watch.binocular} card={!!watch.selected && !watch.binocular && !auto} />}
+      {/* Phone: the next movement rides the board's peek; the cue itself only
+          while the auto director has the view (its Stop). */}
+      {DIRECTOR_ON && phone && auto && !inspecting && !covered && <DirectorCue runtime={runtime} state={director} binocular={!!watch.binocular} />}
       {DIRECTOR_ON && !covered && <DirectorLower runtime={runtime} state={director} ident={airport?.ident || String(airport?.id || '').split(':')[0]} beside={!!watch.selected && !watch.binocular && !auto && !instrumentOpen} />}
 
-      {!watch.binocular && !inspecting && !covered && !instrumentOpen && !auto && (
+      {!phone && !watch.binocular && !inspecting && !covered && !instrumentOpen && !auto && (
         <LiveBoard
           board={board}
           tab={tab}
@@ -245,16 +404,50 @@ export function LoungeHud({ runtime, watch }) {
           feed={feed.state === 'live' && !feed.count ? 'quiet' : feed.state}
         />
       )}
+      {sheet === 'board' && (
+        <LiveBoard
+          sheet
+          board={board}
+          tab={tab}
+          onTab={(t) => {
+            autoTab.current = false;
+            setTab(t);
+          }}
+          open
+          onToggle={() => setSheet(null)}
+          selected={watch.selected}
+          onSelect={(hex) => {
+            w?.select(hex);
+            setSheetState(null);
+          }}
+          onBinoculars={(hex) => {
+            setSheetState(null);
+            w?.select(hex, { binoculars: true });
+          }}
+          feed={feed.state === 'live' && !feed.count ? 'quiet' : feed.state}
+        />
+      )}
+      {showPeek && <BoardPeek runtime={runtime} movement={peekMovement(director, board)} total={boardCount} onOpen={() => setSheet('board')} />}
 
       <AnimatePresence>
-        {watch.selected && !watch.binocular && !covered && !instrumentOpen && !auto && (
-          <SpotterCard key={watch.selected} runtime={runtime} hex={watch.selected} boardRow={selectedRow} fieldElev={fieldElev} airportIdent={airport?.ident || String(airport?.id || '').split(':')[0]} onPhoto={photo} savingPhoto={savingPhoto} />
+        {spotterUp && (
+          <SpotterCard
+            key={watch.selected}
+            runtime={runtime}
+            hex={watch.selected}
+            boardRow={selectedRow}
+            fieldElev={fieldElev}
+            airportIdent={airport?.ident || String(airport?.id || '').split(':')[0]}
+            onPhoto={photo}
+            savingPhoto={savingPhoto}
+            sheet={phone ? { expanded, onToggle: () => setCardExpanded({ hex: watch.selected, open: !expanded }), onClose: () => w?.clearSelection() } : undefined}
+          />
         )}
       </AnimatePresence>
 
-      <AnimatePresence>{watch.binocular && <BinocularHud key="bino" runtime={runtime} />}</AnimatePresence>
+      <AnimatePresence>{watch.binocular && <BinocularHud key="bino" runtime={runtime} layout={binoLayout} insets={insets} notice={binoLayout !== 'desktop' ? status : undefined} />}</AnimatePresence>
 
-      {!watch.binocular && !auto && (
+      {!phone && !watch.binocular && !auto && (
         <footer className="lounge-bar lounge-panel" aria-label="Lounge controls">
           <button type="button" className="lounge-btn" aria-pressed={boardOpen} onClick={() => setBoardOpen((v) => !v)} title="Live board">
             <ListOrdered size={16} aria-hidden="true" />
@@ -286,7 +479,19 @@ export function LoungeHud({ runtime, watch }) {
           <LoungeBridgeBar runtime={runtime} watch={watch} />
         </footer>
       )}
-      {!watch.binocular && !auto && (
+      {phone && !watch.binocular && !auto && (
+        <PhoneDock
+          runtime={runtime}
+          watch={watch}
+          sheet={sheet}
+          boardCount={boardCount}
+          selection={spotterUp ? selectedRow?.label || watch.selected : null}
+          onBoard={() => setSheet(sheet === 'board' ? null : 'board')}
+          onMore={() => setSheet(sheet === 'more' ? null : 'more')}
+          onAction={() => setSheetState(null)}
+        />
+      )}
+      {!phone && !watch.binocular && !auto && (
         <p className="lounge-help" aria-hidden="true">
           {helpHints(watch).map((hint, i) => (
             <Fragment key={hint}>
@@ -296,15 +501,49 @@ export function LoungeHud({ runtime, watch }) {
           ))}
         </p>
       )}
+      {phone && <CoachMarks posture={watch.posture} walk={!!watch.walk} hidden={!watch.validated || !!watch.binocular || auto || inspecting || covered || !!sheet || runtimeLayer || spotterUp} />}
 
       <AnimatePresence>
-        {status && (
+        {sheet === 'more' && (
+          <LoungeMenuSheet
+            key="more"
+            runtime={runtime}
+            watch={watch}
+            observatory={observatory}
+            director={DIRECTOR_ON}
+            sound={sound}
+            savingPhoto={savingPhoto}
+            onPhoto={photo}
+            faceLabel={faceLabel}
+            conditions={conditions}
+            feed={feed}
+            airport={airport}
+            leaveLabel={leaveLabelFor(watch.origin)}
+            onAirports={() => {
+              setSheetState(null);
+              useFlyStore.setState({ airportBrowserOpen: true });
+            }}
+            onLeave={leave}
+            onClose={() => setSheetState(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {status && !(binoLayout !== 'desktop' && watch.binocular) && (
           // framer-motion owns `transform`, so the centring offset rides in x.
-          <motion.p key={status} className="lounge-status airport-status" role="status" initial={{ opacity: 0, y: -6, x: '-50%' }} animate={{ opacity: 1, y: 0, x: '-50%' }} exit={{ opacity: 0, x: '-50%' }} transition={{ duration: 0.2 }}>
+          <motion.p key={status} className="lounge-status airport-status" role="status" initial={reduced ? false : { opacity: 0, y: -6, x: '-50%' }} animate={{ opacity: 1, y: 0, x: '-50%' }} exit={{ opacity: 0, x: '-50%' }} transition={{ duration: 0.2 }}>
             {status}
           </motion.p>
         )}
       </AnimatePresence>
+      </PhoneMotion>
     </section>
   );
+}
+
+/** Phones and tablets: the HUD's framer-motion follows the reduced-motion preference. Desktop: no wrapper, today's tree. */
+function PhoneMotion({ mobile, reduced, children }) {
+  if (!mobile) return children;
+  return <MotionConfig reducedMotion={reduced ? 'always' : 'never'}>{children}</MotionConfig>;
 }
