@@ -421,7 +421,7 @@ await check('touch: a pinch over a lock zooms without breaking it; a midpoint th
   runtime.traffic.tracks = new Map(); runtime.traffic.items = [];
 });
 
-await check('touch: the phone\'s motor answers the cue points (raise, lower) on a phone', async () => {
+await check('touch: the phone\'s motor answers the cue points (raise, lower) on a phone, never while the auto director has the view', async () => {
   await sleep(MOBILE_TOUCH.haptics.minGapMs + 10); // the rate limit runs on the wall clock
   buzz.length = 0;
   watch.binoculars(true); frames(30);
@@ -429,6 +429,15 @@ await check('touch: the phone\'s motor answers the cue points (raise, lower) on 
   watch.binoculars(false); frames(30);
   const P = MOBILE_TOUCH.haptics.patterns;
   assert.deepEqual(buzz, [P.raise, P.lower]);
+  // While the auto director has the view the phone never buzzes on its own.
+  const director = watch.director;
+  watch.director = { auto: true };
+  await sleep(MOBILE_TOUCH.haptics.minGapMs + 10);
+  watch.binoculars(true); frames(30);
+  await sleep(MOBILE_TOUCH.haptics.minGapMs + 10);
+  watch.binoculars(false); frames(30);
+  watch.director = director;
+  assert.deepEqual(buzz, [P.raise, P.lower], 'no buzz under the auto director');
 });
 
 // --- 4. the walk stick ------------------------------------------------------------
