@@ -664,6 +664,38 @@
   background: rgba(186, 222, 255, 0.07);
   box-shadow: inset 0 0 0 1px var(--t-edge-strong);
 }
+/* Landscape: the menu fits the short height without scrolling, Airports and
+   Leave first under its title. */
+.lounge[data-layout='phone-landscape'] .lounge-menu-sheet {
+  display: flex;
+  flex-direction: column;
+  padding-top: 8px;
+}
+.lounge[data-layout='phone-landscape'] .lms-head {
+  margin-bottom: 2px;
+}
+.lounge[data-layout='phone-landscape'] .lms-exit {
+  order: 1;
+  margin: 0 0 8px;
+}
+.lounge[data-layout='phone-landscape'] .lms-wide {
+  min-height: 46px;
+}
+.lounge[data-layout='phone-landscape'] .lms-grid {
+  order: 2;
+}
+.lounge[data-layout='phone-landscape'] .lms-tile {
+  min-height: 54px;
+  flex-direction: row;
+  gap: 6px;
+  padding: 6px 8px;
+  font-size: 11px;
+  text-align: left;
+}
+.lounge[data-layout='phone-landscape'] .lms-conditions {
+  order: 3;
+  margin: 10px 0 0;
+}
 .lms-leave {
   color: #ffd9d9;
   background: rgba(255, 110, 120, 0.1);
@@ -1479,6 +1511,10 @@
 .bino-phone .bp-col-actions .bp-round {
   width: 50px;
   height: 50px;
+}
+.bino-phone .bp-col-actions .bp-round span {
+  font-size: 7.5px;
+  letter-spacing: 0.04em;
 }
 .bino-phone .bp-col-actions .bp-spacer {
   display: none;

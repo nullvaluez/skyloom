@@ -140,6 +140,20 @@ function glass(h) {
     return { x: r.left, y: r.top, w: r.width, h: r.height, r: r.right, b: r.bottom };
   }, sel);
   const shown = async (sel) => !!(await rect(sel));
+  /** On screen without scrolling: inside the viewport and inside every scrolling ancestor's visible box. */
+  const inView = (sel) => page.evaluate((s) => {
+    const el = document.querySelector(s);
+    if (!el) return false;
+    const r = el.getBoundingClientRect();
+    if (r.width < 1 || r.top < 0 || r.left < 0 || r.bottom > innerHeight || r.right > innerWidth) return false;
+    for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+      const cs = getComputedStyle(p);
+      if (!/(auto|scroll|hidden)/.test(cs.overflowX + cs.overflowY)) continue;
+      const c = p.getBoundingClientRect();
+      if (r.top < c.top - 0.5 || r.bottom > c.bottom + 0.5 || r.left < c.left - 0.5 || r.right > c.right + 0.5) return false;
+    }
+    return true;
+  }, sel);
   // Sheets spring in: a target is tapped once its box has stopped moving.
   const stableRect = async (sel, ms = 6000) => {
     let last = null;
@@ -153,6 +167,7 @@ function glass(h) {
     return last;
   };
   const tapEl = async (sel) => {
+    await page.evaluate((s) => document.querySelector(s)?.scrollIntoView({ block: 'nearest', inline: 'nearest' }), sel);
     const r = await stableRect(sel);
     if (!r) throw new Error(`nothing to tap: ${sel}`);
     await h.touch.tap(r.x + r.w / 2, r.y + r.h / 2);
@@ -204,7 +219,7 @@ function glass(h) {
     });
     await h.wait(500);
   };
-  return { tid, rect, shown, stableRect, gone, appear, tapEl, setInsets, audit, watch, section, back, lowerAll };
+  return { tid, rect, shown, inView, stableRect, gone, appear, tapEl, setInsets, audit, watch, section, back, lowerAll };
 }
 
 /** The mask canvas around the figure, read back: alpha at the lens centre, its rim, the bands and a corner. */
@@ -219,6 +234,8 @@ function maskSample() {
   const L = fig.lenses;
   const mid = L.length > 1 ? [(L[0][0] + L[1][0]) / 2, cy] : [cx, cy];
   const credit = document.querySelector('[data-zone="attribution"] > div')?.getBoundingClientRect();
+  // Below the glass, above the map credit (whose strip the mask leaves clear).
+  const gap = (credit?.width ? credit.top : innerHeight) - (cy + fig.R);
   return {
     credit: credit?.width ? a(credit.left + credit.width / 2, credit.top + credit.height / 2) : null,
     fig,
@@ -227,7 +244,7 @@ function maskSample() {
     centre: a(mid[0], mid[1]),
     inner: a(L[0][0] - fig.R * 0.8, cy),
     above: a(mid[0], Math.max(2, cy - fig.R - 14)),
-    below: a(mid[0], Math.min(innerHeight - 3, cy + fig.R + 14)),
+    below: gap >= 6 ? a(mid[0], cy + fig.R + Math.min(14, gap / 2)) : null,
     corner: a(4, 4),
   };
 }
@@ -274,7 +291,7 @@ async function figureGates(h, g, portrait, { label = 'binoculars', sizeGates = t
   }
   if (sizeGates) {
     // Read back from the canvas: the glass is clear, the bands are dark.
-    h.check(`${h.phase} ${label}: the drawn mask is clear through the glass and dark in the bands`, s.centre < 20 && s.inner < 60 && s.above > 200 && s.below > 200 && s.corner > 200, { centre: s.centre, inner: s.inner, above: s.above, below: s.below, corner: s.corner });
+    h.check(`${h.phase} ${label}: the drawn mask is clear through the glass and dark in the bands`, s.centre < 20 && s.inner < 60 && s.above > 200 && (s.below == null || s.below > 200) && s.corner > 200, { centre: s.centre, inner: s.inner, above: s.above, below: s.below, corner: s.corner });
     h.check(`${h.phase} ${label}: the map credit stays readable through the mask (its strip is left clear)`, s.credit === 0, { creditAlpha: s.credit });
   }
   const parts = await h.page.evaluate(binoParts);
@@ -442,9 +459,9 @@ module.exports = {
     await g.audit('spotter expanded', { insets });
     await h.shot('spotter-expanded');
     // Android Back: the expanded sheet folds first, then the selection clears.
-    await g.back('[data-testid="spotter-telemetry"]');
+    const foldBack = await g.back('[data-testid="spotter-telemetry"]');
     const afterBack1 = await g.watch();
-    h.check('portrait Back: Back folds the expanded spotter sheet first (the selection stays)', afterBack1.selected === 'a1b2c3' && !(await page.evaluate(() => !!document.querySelector('[data-testid="spotter-telemetry"]')?.offsetWidth)), afterBack1);
+    h.check('portrait Back: Back folds the expanded spotter sheet first (the selection stays)', foldBack && afterBack1.selected === 'a1b2c3' && !(await page.evaluate(() => !!document.querySelector('[data-testid="spotter-telemetry"]')?.offsetWidth)), { pressed: foldBack, ...afterBack1 });
 
     // Binoculars on the selection, from the spotter sheet's primary action. The
     // head swings to it first (the field stays wide while slewing), so the
@@ -470,12 +487,12 @@ module.exports = {
     await wheelGates(h, g, 'x');
     await h.shot('binoculars-20x');
     // Back lowers the glasses, then clears the selection.
-    await g.back('[data-testid="binocular-view"]');
+    const lowerBack = await g.back('[data-testid="binocular-view"]');
     const afterBack2 = await g.watch();
-    h.check('portrait Back: Back lowers the binoculars next (the selection stays)', !afterBack2.binocular && afterBack2.selected === 'a1b2c3' && afterBack2.active, afterBack2);
-    await g.back('[data-testid="spotter-card"]');
+    h.check('portrait Back: Back lowers the binoculars next (the selection stays)', lowerBack && !afterBack2.binocular && afterBack2.selected === 'a1b2c3' && afterBack2.active, { pressed: lowerBack, ...afterBack2 });
+    const clearBack = await g.back('[data-testid="spotter-card"]');
     const afterBack3 = await g.watch();
-    h.check('portrait Back: then Back clears the selection, still in the lounge', !afterBack3.selected && afterBack3.active, afterBack3);
+    h.check('portrait Back: then Back clears the selection, still in the lounge', clearBack && !afterBack3.selected && afterBack3.active, { pressed: clearBack, ...afterBack3 });
     h.check('portrait Back: at the root a lounge sentinel is still under the current entry (Back never leaves the app)', await page.evaluate(() => !!history.state?.__flyLounge));
 
     // The figure and the notice: binoculars raised where nothing flies. An
@@ -514,11 +531,11 @@ module.exports = {
     await g.tapEl('[data-testid="lounge-menu"]');
     const leave = await g.rect('[data-testid="lounge-leave"]');
     const airports = await g.rect('[data-testid="lounge-airports"]');
-    h.check('portrait menu: Leave and Airports are two taps away (header menu, then the button)', !!leave && !!airports && leave.w >= 44 && leave.h >= 44, { leave, airports });
+    h.check('portrait menu: Leave and Airports are two taps away (header menu, then the button; in view without scrolling)', !!leave && !!airports && leave.w >= 44 && leave.h >= 44 && (await g.inView('[data-testid="lounge-leave"]')) && (await g.inView('[data-testid="lounge-airports"]')), { leave, airports });
     await g.audit('menu sheet', { insets });
     await h.shot('menu');
-    await g.back('[data-testid="lounge-more-sheet"]');
-    h.check('portrait Back: Back closes the lounge menu first, still in the lounge', (await g.gone('[data-testid="lounge-more-sheet"]')) && (await g.watch()).active);
+    const menuBack = await g.back('[data-testid="lounge-more-sheet"]');
+    h.check('portrait Back: Back closes the lounge menu first, still in the lounge', menuBack && (await g.gone('[data-testid="lounge-more-sheet"]')) && (await g.watch()).active, { pressed: menuBack });
     // The dock's More opens the same sheet.
     await g.tapEl('[data-testid="lounge-more"]');
     h.check('portrait menu: the dock\'s More opens the lounge menu too', await g.appear('[data-testid="lounge-more-sheet"]'));
@@ -529,13 +546,13 @@ module.exports = {
     if (await page.evaluate(() => !!window.__fly.airportWatch.observatory)) {
       await g.tapEl('[data-testid="lounge-menu"]');
       await g.tapEl('[data-testid="observatory-open"]');
-      await h.wait(600);
-      const map = await g.rect('[data-testid="observatory-panel"]');
+      await g.appear('[data-testid="observatory-panel"]', 10000);
+      const map = await g.stableRect('[data-testid="observatory-panel"]');
       h.check('portrait airport map: a sheet between the header and the dock', !!map && map.y >= head.b && map.b <= dock.y + 1 && map.x >= 0 && map.r <= h.viewport.width, { map, headBottom: head.b, dockTop: dock.y });
       await g.audit('airport map', { insets });
       await h.shot('airport-map');
-      await g.back('[data-testid="observatory-panel"]');
-      h.check('portrait Back: Back closes the airport map', !(await g.shown('[data-testid="observatory-panel"]')) && (await g.watch()).active);
+      const mapBack = await g.back('[data-testid="observatory-panel"]');
+      h.check('portrait Back: Back closes the airport map', mapBack && !(await g.shown('[data-testid="observatory-panel"]')) && (await g.watch()).active, { pressed: mapBack });
     } else h.info('portrait airport map', 'no instruments in this room');
 
     // The airport browser on the phone, from the lounge menu.
@@ -561,8 +578,8 @@ module.exports = {
     h.check('portrait browser: the featured lounges show on open, region chips scroll on one line, rows >= 44 px', browser && browser.featuredVisible && browser.regionsScroll && browser.rowH >= 44, browser);
     await g.audit('airport browser', { insets });
     await h.shot('browser-from-lounge');
-    await g.back('[data-testid="airport-browser"]');
-    h.check('portrait Back: Back closes the airport browser, still in the lounge', !(await g.shown('[data-testid="airport-browser"]')) && (await g.watch()).active);
+    const browserBack = await g.back('[data-testid="airport-browser"]');
+    h.check('portrait Back: Back closes the airport browser, still in the lounge', browserBack && !(await g.shown('[data-testid="airport-browser"]')) && (await g.watch()).active, { pressed: browserBack });
 
     // Seats: the menu as a sheet; standing keeps the thumb zone clear.
     await g.tapEl('[data-testid="lounge-seats"]');
@@ -642,10 +659,10 @@ module.exports = {
     await h.shot('binoculars');
     await wheelGates(h, g, 'y');
     await h.shot('binoculars-20x');
-    await g.back('[data-testid="binocular-view"]');
-    h.check('landscape Back: Back lowers the binoculars', !(await g.watch()).binocular && (await g.watch()).active);
-    await g.back('[data-testid="spotter-card"]');
-    h.check('landscape Back: then clears the selection', !(await g.watch()).selected && (await g.watch()).active);
+    const lowerBack = await g.back('[data-testid="binocular-view"]');
+    h.check('landscape Back: Back lowers the binoculars', lowerBack && !(await g.watch()).binocular && (await g.watch()).active, { pressed: lowerBack });
+    const clearBack = await g.back('[data-testid="spotter-card"]');
+    h.check('landscape Back: then clears the selection', clearBack && !(await g.watch()).selected && (await g.watch()).active, { pressed: clearBack });
     // The twin-lens figure, raised where nothing flies.
     await page.evaluate(() => {
       const w = window.__fly.airportWatch;
@@ -663,7 +680,8 @@ module.exports = {
     await page.evaluate(() => window.__fly.airportWatch.resetLook());
     // Menu.
     await g.tapEl('[data-testid="lounge-menu"]');
-    h.check('landscape menu: Leave is two taps away', await g.shown('[data-testid="lounge-leave"]'));
+    await g.stableRect('[data-testid="lounge-more-sheet"]');
+    h.check('landscape menu: Leave and Airports are two taps away (in view without scrolling)', (await g.inView('[data-testid="lounge-leave"]')) && (await g.inView('[data-testid="lounge-airports"]')));
     await g.audit('menu sheet', { insets });
     await h.shot('menu');
     await g.back('[data-testid="lounge-more-sheet"]');
@@ -677,8 +695,8 @@ module.exports = {
     h.check('landscape browser: a full-height sheet inside the width, the featured lounges in view', !!browser && browser.x >= -1 && browser.r <= h.viewport.width + 1 && browser.b >= h.viewport.height - 2 && !!featured && featured.y < h.viewport.height, { browser, featured });
     await g.audit('airport browser', { insets });
     await h.shot('browser');
-    await g.back('[data-testid="airport-browser"]');
-    h.check('landscape Back: Back closes the airport browser, still in the lounge', !(await g.shown('[data-testid="airport-browser"]')) && (await g.watch()).active);
+    const browserBack = await g.back('[data-testid="airport-browser"]');
+    h.check('landscape Back: Back closes the airport browser, still in the lounge', browserBack && !(await g.shown('[data-testid="airport-browser"]')) && (await g.watch()).active, { pressed: browserBack });
     // Seats.
     await g.tapEl('[data-testid="lounge-seats"]');
     const seats = await g.rect('[data-testid="lounge-seat-menu"]');
