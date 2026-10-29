@@ -9,8 +9,9 @@ import { MOBILE_GLASS } from '@/lib/fly/observation-config';
  *  - SheetGrabber: the handle at a sheet's top edge. A tap toggles it, a swipe
  *    up expands it, a swipe down collapses (or closes) it; a 44 px tall strip
  *    so a thumb finds it without aiming.
- *  - CardToggle: the spotter sheet's More / Less, beside its primary actions
- *    (the route, the live figures and the minor actions are its "more").
+ *  - CardToggle: the spotter sheet's Expand / Collapse, beside its primary
+ *    actions (the route, the live figures and the minor actions are what it
+ *    opens). Never "More": that is the dock's lounge menu, a thumb away.
  */
 export function SheetGrabber({ expanded, onToggle, onExpand, onCollapse, label }) {
   const start = useRef(null);
@@ -51,7 +52,7 @@ export function CardToggle({ expanded, onToggle }) {
   return (
     <button type="button" className="lc-chip lc-more" data-testid="spotter-expand" aria-expanded={expanded} aria-label={expanded ? 'Show less' : 'Show the route, the live figures and more'} onClick={onToggle}>
       {expanded ? <ChevronDown size={18} aria-hidden="true" /> : <ChevronUp size={18} aria-hidden="true" />}
-      <span>{expanded ? 'Less' : 'More'}</span>
+      <span>{expanded ? 'Collapse' : 'Expand'}</span>
     </button>
   );
 }

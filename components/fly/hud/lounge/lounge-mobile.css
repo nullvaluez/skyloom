@@ -21,7 +21,11 @@
    The thumb zone contract (FLY_LOUNGE_MOBILE.md contract 2):
    --lounge-stick-left / --lounge-stick-bottom on the .lounge section; the
    lower-left zone above that line carries no persistent chrome while
-   standing.
+   standing. While the walk stick shows (seated: its Walk ring; standing: the
+   zone a thumb may start it in) the transient floats keep out of it too —
+   the coach marks, the status line and the director's lower thirds sit
+   above it in portrait and right of it in landscape (--lounge-zone-w /
+   --lounge-zone-h mirror the stick's zone, FLOATS below).
    ===================================================================== */
 
 /* ---------------------------------------------------------------------
@@ -65,6 +69,11 @@
   /* A lane under the header kept free of sheets: the status line and the
      director's lower thirds move there while a sheet is up. */
   --lounge-lane-h: 62px;
+  /* The walk stick's zone (lounge-touch.css .lounge-stick-zone, from
+     MOBILE_TOUCH.stick.zone; verify-lounge-glass.mjs keeps the three in
+     step): lower-left, this wide and this tall above --lounge-stick-bottom. */
+  --lounge-zone-w: min(50vw, 260px);
+  --lounge-zone-h: min(42vh, 300px);
   -webkit-touch-callout: none;
 }
 .lounge[data-layout^='phone'][data-peek='1'] {
@@ -291,6 +300,11 @@
 .ldk-btn:disabled {
   opacity: 0.38;
 }
+/* The spotter sheet is up: Follow is the card's (its slot stays, so the
+   primary stays centred). */
+.lounge-dock[data-selection='1'] .ldk-follow {
+  visibility: hidden;
+}
 .ldk-btn em {
   position: absolute;
   top: 5px;
@@ -399,7 +413,7 @@
 .lounge[data-layout='phone-landscape'] .lounge-peek {
   right: var(--lounge-side-right);
   bottom: var(--lounge-chrome-bottom);
-  width: min(380px, calc(100% - var(--lounge-side-right) - 230px));
+  width: min(380px, calc(100% - var(--lounge-side-right) - var(--lounge-zone-w) - 8px));
 }
 .lpk-main {
   display: flex;
@@ -504,11 +518,14 @@
   right: var(--lounge-gutter-r);
   max-height: calc(100% - var(--lounge-head-bottom) - var(--lounge-lane-h) - var(--lounge-chrome-bottom));
 }
+/* A side sheet never reaches into the walk stick's zone: in landscape the
+   board, the lounge menu and the spotter card leave the stick up (the left
+   thumb walks while the right one reads; LoungeHud's `blocked`). */
 .lounge[data-layout='phone-landscape'] :is(.lounge-sheet, .lounge-board[data-sheet], .lounge-card[data-sheet], .lounge-seat-menu, .lounge-decor-card, .observatory-panel, .observatory-window-panel) {
   left: auto;
   right: var(--lounge-side-right);
   top: auto;
-  width: min(360px, calc(100% - var(--lounge-side-right) - var(--lounge-safe-l) - 12px));
+  width: min(360px, calc(100% - var(--lounge-side-right) - var(--lounge-zone-w) - 8px));
   max-height: calc(100% - var(--lounge-safe-t) - 6px - var(--lounge-chrome-bottom));
 }
 /* The airport map keeps its full height (the diagram and the list). */
@@ -884,12 +901,16 @@
   bottom: var(--lounge-float-bottom);
   transform: none;
   min-height: 48px;
-  max-width: calc(100% - var(--lounge-gutter-r) - 172px);
+  max-width: calc(100% - var(--lounge-gutter-r) - var(--lounge-zone-w) - 8px);
   z-index: 3;
+  /* Solid, like every phone surface (no framebuffer blur per frame). */
+  background: var(--lounge-solid);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 .lounge[data-layout='phone-landscape'] :is(.lounge-sit, .lounge-decor-prompt, .observatory-prompt, .observatory-nearby) {
   right: var(--lounge-side-right);
-  max-width: min(340px, calc(100% - var(--lounge-side-right) - 200px));
+  max-width: min(340px, calc(100% - var(--lounge-side-right) - var(--lounge-zone-w) - 8px));
 }
 .lounge[data-layout^='phone'] .lounge-sit {
   height: auto;
@@ -943,8 +964,10 @@
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
+/* Landscape: centred in the span between the stick's zone and the rail. */
 .lounge[data-layout='phone-landscape'] .lounge-status {
-  max-width: min(440px, calc(100% - var(--lounge-side-right) - 32px));
+  left: calc(var(--lounge-zone-w) + 8px + (100% - var(--lounge-zone-w) - 8px - var(--lounge-side-right)) / 2);
+  max-width: min(440px, calc(100% - var(--lounge-zone-w) - var(--lounge-side-right) - 24px));
 }
 /* With a sheet up the line moves under the header, never over the sheet
    (in landscape: centred in the open view left of the side sheet). */
@@ -978,15 +1001,23 @@
 .lounge[data-layout^='phone']:has(:is(.lounge-sit, .lounge-decor-prompt, .observatory-prompt, .observatory-nearby)) .lounge-coach {
   display: none;
 }
+/* Portrait: in the lane under the header, clear of the thumb's corner (the
+   seated Walk ring, the standing stick), which is where the first tip points
+   and where a first touch lands; a status line that rises above the stick on
+   a short screen takes the space while it is up (one float at a time).
+   Landscape: right of the stick's zone. */
 .lounge[data-layout='phone-portrait'] .lounge-coach {
   left: var(--lounge-gutter-l);
   right: var(--lounge-gutter-r);
-  bottom: var(--lounge-float-bottom);
+  top: calc(var(--lounge-head-bottom) + 8px);
+}
+.lounge[data-layout='phone-portrait']:has(> .lounge-status) .lounge-coach {
+  display: none;
 }
 .lounge[data-layout='phone-landscape'] .lounge-coach {
   right: var(--lounge-side-right);
   bottom: var(--lounge-float-bottom);
-  width: min(420px, calc(100% - var(--lounge-side-right) - 200px));
+  width: min(420px, calc(100% - var(--lounge-side-right) - var(--lounge-zone-w) - 8px));
 }
 .lounge-coach ul {
   display: grid;
@@ -1066,8 +1097,29 @@
 .lounge[data-layout^='phone'][data-binocular='1'] .dir-lower-slot {
   display: none;
 }
+.lounge[data-layout='phone-landscape']:not([data-sheet='1']) .dir-lower-slot {
+  left: calc(var(--lounge-zone-w) + 8px);
+  max-width: calc(100% - var(--lounge-zone-w) - 8px - var(--lounge-side-right));
+}
 .lounge[data-layout^='phone'] .dir-lower {
   max-width: 100%;
+  background: var(--lounge-solid);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+/* Portrait, while the walk stick shows (and no sheet has the foot of the
+   screen): the status line and the lower thirds rise clear of it — seated,
+   above the Walk ring and the base a push from it draws (120 px); standing,
+   above the whole zone a thumb may start the stick in. */
+.lounge[data-layout='phone-portrait']:has(.lounge-touch[data-show='1']) {
+  --lounge-float-up: calc(var(--lounge-stick-bottom) + 128px);
+}
+.lounge[data-layout='phone-portrait']:is([data-posture='standing'], [data-posture='gliding']):has(.lounge-touch[data-show='1']) {
+  --lounge-float-up: calc(var(--lounge-stick-bottom) + var(--lounge-zone-h) + 8px);
+}
+.lounge[data-layout='phone-portrait']:not([data-sheet='1']):not([data-auto='1']):has(.lounge-touch[data-show='1']) :is(.lounge-status, .dir-lower-slot) {
+  top: auto;
+  bottom: var(--lounge-float-up);
 }
 
 /* ---------------------------------------------------------------------
@@ -1086,6 +1138,11 @@
   -webkit-user-select: none;
   user-select: none;
 }
+/* The top band is read-only (the tape, the identity, then the figures or a
+   notice; the toggles are the thumb's, in the bottom band) and sized for the
+   tallest of them (MOBILE_GLASS.bino.portrait.top). Should it ever overflow,
+   `safe` keeps it starting under the inset (it runs onto the glass instead
+   of under the notch). */
 .bino-phone .bp-top {
   position: absolute;
   top: 0;
@@ -1095,9 +1152,12 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
-  padding: calc(env(safe-area-inset-top, 0px) + 8px) calc(env(safe-area-inset-right, 0px) + 12px) 10px calc(env(safe-area-inset-left, 0px) + 12px);
+  justify-content: safe flex-end;
+  gap: 4px;
+  padding: calc(env(safe-area-inset-top, 0px) + 8px) calc(env(safe-area-inset-right, 0px) + 12px) 8px calc(env(safe-area-inset-left, 0px) + 12px);
+}
+.bino-phone .bp-top > * {
+  flex-shrink: 0;
 }
 .bino-phone .bp-tape-row {
   display: grid;
@@ -1129,7 +1189,7 @@
 }
 .bp-tape {
   position: relative;
-  height: 40px;
+  height: 36px;
   overflow: hidden;
   -webkit-mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent);
   mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent);
@@ -1186,17 +1246,20 @@
   background: rgba(1, 3, 8, 0.96);
   box-shadow: inset 0 0 0 1px rgba(79, 227, 255, 0.4);
 }
+/* One line: the type gives way (ellipsis) before the line wraps. */
 .bp-ident {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: baseline;
   justify-content: center;
-  gap: 4px 10px;
+  gap: 10px;
+  min-width: 0;
   max-width: 100%;
   text-align: center;
 }
 .bp-status {
   display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 6px;
   font: 700 9.5px/1 var(--t-sans);
@@ -1228,6 +1291,7 @@
   max-width: 100%;
 }
 .bp-callsign strong {
+  flex-shrink: 0;
   font: 400 19px/1 var(--t-display);
   letter-spacing: 0.04em;
   color: var(--t-ice);
@@ -1240,12 +1304,17 @@
   font: 600 11.5px/1 var(--t-sans);
   color: var(--t-dim);
 }
+/* Two lines at most (the band's budget). */
 .bp-notice,
 .bp-hint {
-  flex-basis: 100%;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
   max-width: 340px;
-  margin: 2px auto 0;
-  font: 600 12.5px/1.4 var(--t-sans);
+  margin: 0 auto;
+  font: 600 12.5px/1.35 var(--t-sans);
+  text-align: center;
   text-wrap: balance;
   color: var(--t-ice);
 }
@@ -1270,7 +1339,7 @@
   align-items: baseline;
   gap: 3px 3px;
   min-width: 0;
-  padding: 6px 8px 7px;
+  padding: 5px 8px 6px;
 }
 .bp-figures span + span {
   box-shadow: inset 1px 0 0 rgba(186, 222, 255, 0.1);
@@ -1333,15 +1402,23 @@
 .bp-round:active {
   transform: scale(0.92);
 }
+/* The Readouts switch as a labelled chip (landscape's left column, when
+   motion look holds the right column's side slot). */
 .bp-chip {
-  display: grid;
-  place-items: center;
-  width: 44px;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  align-self: flex-start;
+  gap: 7px;
+  min-width: 44px;
   height: 44px;
-  margin: -4px 0 0 auto;
+  padding: 0 14px 0 12px;
   border: 0;
   border-radius: 14px;
   pointer-events: auto;
+  font: 700 9px/1 var(--t-sans);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
   color: var(--t-ice);
   background: rgba(186, 222, 255, 0.08);
   box-shadow: inset 0 0 0 1px var(--t-edge-strong);
@@ -1355,6 +1432,17 @@
 .bp-spacer {
   visibility: hidden;
   pointer-events: none;
+}
+/* Lower, the wheel, Readouts and Motion: with both toggles the rounds go
+   compact (MOBILE_GLASS.bino.portrait.controls) so the wheel keeps its reach. */
+.bp-controls[data-side='2'] .bp-round {
+  width: 52px;
+  height: 52px;
+}
+.bp-controls[data-side='2'] .bp-round span,
+.bp-round[data-testid='binocular-readouts'] span {
+  font-size: 7.5px;
+  letter-spacing: 0.02em;
 }
 
 /* The focus wheel. */
@@ -1569,6 +1657,14 @@
   background: rgba(3, 6, 12, 0.86);
   box-shadow: inset 0 0 0 1px var(--t-edge-strong);
 }
+/* Portrait: a notice that comes while the figures are up (their place in the
+   top band) floats over the foot of the lens, above the thumb's band. */
+.bino-phone[data-layout='portrait'] .bp-float-notice {
+  left: 12px;
+  right: 12px;
+  bottom: calc(var(--bino-bottom, 30%) + 12px);
+  max-width: min(340px, calc(100% - 24px));
+}
 
 /* ---------------------------------------------------------------------
    TABLETS: the desktop HUD, touch-sized
@@ -1646,10 +1742,17 @@
 /* ---------------------------------------------------------------------
    MOTION
    --------------------------------------------------------------------- */
+/* The OS setting, and the game's own (Settings > Reduced motion,
+   `fly-reduced-motion`, which LoungeHud stamps as data-reduced on a phone or
+   a tablet; its framer-motion springs and slides go through MotionConfig). */
 @media (prefers-reduced-motion: reduce) {
   .lounge[data-layout] *,
   .bino-phone * {
     transition: none !important;
     animation: none !important;
   }
+}
+.lounge[data-layout][data-reduced] * {
+  transition: none !important;
+  animation: none !important;
 }

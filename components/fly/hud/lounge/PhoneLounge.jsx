@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotionConfig } from 'framer-motion';
 import { Binoculars, Camera, ChevronUp, Clapperboard, Crosshair, Ellipsis, Eye, Hand, ListOrdered, LocateFixed, Map as MapIcon, Moon, MousePointerClick, Move, RotateCcw, Sun, Volume2, VolumeX, X, ZoomIn } from 'lucide-react';
 import { useFlyStore } from '@/stores/fly-store';
 import { MOBILE_GLASS } from '@/lib/fly/observation-config';
@@ -21,7 +21,11 @@ import { SheetGrabber } from './LoungeSheet';
  *  - PhoneDock: Board, Seats (with walking), the Binoculars as the big primary
  *    action, Follow, More. A bar along the bottom in portrait; a rail down the
  *    right edge in landscape (the left thumb looks and walks, the right one
- *    acts).
+ *    acts). While the spotter sheet is up (`selection`, its callsign) the
+ *    selection's own actions are the card's: the dock's Follow steps aside
+ *    (its slot kept, so the primary stays centred) and the primary says it
+ *    raises the binoculars on that aircraft, the same action as the card's;
+ *    the card's expand control is "Expand", never a second "More".
  *  - LoungeMenuSheet: Face the runway, the airport map and lighting (the
  *    instruments), Photo, Sound, Watch for me (the director), then the field's
  *    conditions and Airports / Leave.
@@ -40,13 +44,14 @@ import { SheetGrabber } from './LoungeSheet';
  */
 
 /** The thumb dock. */
-export function PhoneDock({ runtime, watch, sheet, onBoard, onMore, onAction, boardCount }) {
+export function PhoneDock({ runtime, watch, sheet, selection, onBoard, onMore, onAction, boardCount }) {
   const w = runtime.airportWatch;
   return (
     <nav
       className="lounge-dock"
       data-testid="lounge-dock"
       aria-label="Lounge controls"
+      data-selection={selection ? '1' : undefined}
       data-lounge-avoid=""
       // Any action other than the two sheet toggles folds an open sheet away.
       onClickCapture={(e) => {
@@ -75,11 +80,11 @@ export function PhoneDock({ runtime, watch, sheet, onBoard, onMore, onAction, bo
           haptic('raise');
           w?.binoculars();
         }}
-        aria-label="Binoculars"
+        aria-label={selection ? `Binoculars on ${selection}` : 'Binoculars'}
       >
         <Binoculars size={26} aria-hidden="true" />
       </button>
-      <button type="button" className="ldk-btn" data-testid="lounge-follow" aria-pressed={!!watch.tracking} disabled={!watch.selected} onClick={() => w?.track()}>
+      <button type="button" className="ldk-btn ldk-follow" data-testid="lounge-follow" aria-pressed={!!watch.tracking} disabled={!watch.selected} aria-hidden={selection ? 'true' : undefined} tabIndex={selection ? -1 : undefined} onClick={() => w?.track()}>
         <Crosshair size={20} aria-hidden="true" />
         <span>{watch.tracking ? 'Following' : 'Follow'}</span>
       </button>
@@ -94,6 +99,8 @@ export function PhoneDock({ runtime, watch, sheet, onBoard, onMore, onAction, bo
 /** The lounge menu sheet: the rest of the controls, the conditions, Airports and Leave. */
 export function LoungeMenuSheet({ runtime, watch, observatory, director, sound, savingPhoto, onPhoto, faceLabel, conditions, feed, airport, leaveLabel, onAirports, onLeave, onClose }) {
   const w = runtime.airportWatch;
+  // Reduced motion (LoungeHud's MotionConfig): the sheet is simply there.
+  const still = useReducedMotionConfig();
   const act = (fn) => () => {
     fn();
     onClose();
@@ -106,7 +113,7 @@ export function LoungeMenuSheet({ runtime, watch, observatory, director, sound, 
       role="dialog"
       aria-label="Lounge menu"
       data-lounge-avoid=""
-      initial={{ opacity: 0, y: 24 }}
+      initial={still ? false : { opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 24 }}
       transition={{ type: 'spring', stiffness: 420, damping: 36 }}
@@ -238,17 +245,25 @@ function rememberCoach() {
 /**
  * First-visit coach marks. They never take a touch from the view (only the
  * dismiss button does), go away on a tap of it, after a few touches of the
- * view (remembered either way), or after a while (shown again next visit).
+ * view or the walk stick (remembered either way), or after a while (shown
+ * again next visit). Standing, the first push of the stick puts them away
+ * (the player has found the thing the first tip names). On a phone held
+ * upright they sit under the header, clear of the stick's corner
+ * (lounge-mobile.css).
  */
-export function CoachMarks({ posture, hidden }) {
+export function CoachMarks({ posture, walk, hidden }) {
   const [open, setOpen] = useState(() => !coachSeen());
+  const standing = walk && posture === 'standing';
+  const still = useReducedMotionConfig();
   // The clock and the touch count run only while the tips are on screen.
   useEffect(() => {
     if (!open || hidden) return undefined;
     let touches = 0;
     const onDown = (e) => {
-      if (!(e.target instanceof Element) || !e.target.closest('[data-testid="lounge-surface"]')) return;
-      if (++touches >= MOBILE_GLASS.coach.autoHideTouches) {
+      if (!(e.target instanceof Element)) return;
+      const stick = !!e.target.closest('.lounge-touch');
+      if (!stick && !e.target.closest('[data-testid="lounge-surface"]')) return;
+      if ((stick && standing) || ++touches >= MOBILE_GLASS.coach.autoHideTouches) {
         rememberCoach();
         setOpen(false);
       }
@@ -259,7 +274,7 @@ export function CoachMarks({ posture, hidden }) {
       clearTimeout(timer);
       window.removeEventListener('pointerdown', onDown, true);
     };
-  }, [open, hidden]);
+  }, [open, hidden, standing]);
   // Dev only: probes reopen the tips (an earlier probe's touches may have
   // faded them) to check their words and their dismissal.
   useEffect(() => {
@@ -277,7 +292,7 @@ export function CoachMarks({ posture, hidden }) {
           className="lounge-coach"
           data-testid="lounge-coach"
           aria-label="How to look around"
-          initial={{ opacity: 0, y: 10 }}
+          initial={still ? false : { opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 6 }}
           transition={{ duration: 0.28 }}
