@@ -114,7 +114,9 @@ no page scroll or overscroll bounce while dragging.
    blocked />` once, right after the look surface. GLASS sets `blocked` true
    while a sheet or panel covers the thumb zone (the board sheet expanded, the
    spotter sheet, the seat menu, a décor card, the airport map, inspect, the
-   Atlas, the airport browser, pause).
+   Atlas, the airport browser, pause). Held sideways, the board, the lounge
+   menu and the spotter card are side sheets clamped clear of the zone, so
+   there they leave the stick up (cross-review fix, 2026-10-29).
 2. **The thumb zone.** GLASS publishes two CSS custom properties on the
    `.lounge` section (phones and tablets): `--lounge-stick-bottom` (the
    distance from the viewport's bottom edge to where the free thumb zone
@@ -123,7 +125,12 @@ no page scroll or overscroll bounce while dragging.
    stick's ring at `left: var(--lounge-stick-left, 20px); bottom:
    var(--lounge-stick-bottom, 96px)` and lets a thumb start it anywhere in the
    lower-left zone above that line. While standing, GLASS keeps that zone free
-   of persistent chrome.
+   of persistent chrome; while the stick shows (seated: its Walk ring and the
+   base a push draws; standing: the whole zone) the transient floats (coach
+   marks, status line, lower thirds) keep out of it too. For that GLASS
+   mirrors the zone's extent (`--lounge-zone-w` / `--lounge-zone-h` in
+   lounge-mobile.css, from `MOBILE_TOUCH.stick.zone` as lounge-touch.css
+   draws it); `scripts/verify-lounge-glass.mjs` fails if the three part ways.
 3. **Motion look.** TOUCH exposes `runtime.airportWatch.motionLook`, either
    `null` (no device orientation) or `{ supported, active, needsPermission,
    enable(): Promise<boolean>, disable() }`. `enable()` must be called from
