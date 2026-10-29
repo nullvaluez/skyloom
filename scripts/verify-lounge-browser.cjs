@@ -98,8 +98,18 @@ const seed = () => {
     await p2.addInitScript(seed);
     await p2.goto(url, { waitUntil: 'domcontentloaded' });
     await p2.getByTestId('title-screen').waitFor({ state: 'visible', timeout: 120000 });
-    check('phone keeps the existing lounge exclusion', await p2.getByTestId('watch-airport').count() === 0);
+    // LOUNGE MOBILE (2026-10-29, sanctioned move): phones have the lounge now;
+    // the -LOUNGE_MOBILE pin restores the old exclusion.
+    check('phone offers the lounge (LOUNGE_MOBILE)', await p2.getByTestId('watch-airport').first().waitFor({ state: 'visible', timeout: 60000 }).then(() => true, () => false));
     await phone.close();
+    const pinned = await browser.newContext({ ...devices['iPhone 13'] });
+    const p3 = await pinned.newPage();
+    await p3.addInitScript(() => { window.__flyLoungeMobileOverride = { enabled: false }; });
+    await p3.addInitScript(seed);
+    await p3.goto(url, { waitUntil: 'domcontentloaded' });
+    await p3.getByTestId('title-screen').waitFor({ state: 'visible', timeout: 120000 });
+    check('-LOUNGE_MOBILE keeps the phone exclusion', await p3.getByTestId('watch-airport').count() === 0);
+    await pinned.close();
     check('no page errors', report.errors.length === 0, report.errors);
   } catch (error) {
     report.errors.push(error.stack || error.message);

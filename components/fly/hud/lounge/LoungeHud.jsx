@@ -29,6 +29,9 @@ import { decorTurn, pierPlace } from '@/lib/fly/lounge/lounge-life.mjs';
 // director and its lower thirds. Nothing of it renders while the flag is off.
 import { playPassOn } from '@/lib/fly/play-pass';
 import { DirectorCue, DirectorLower, useDirector } from './DirectorHud';
+// LOUNGE MOBILE (FLY_LOUNGE_MOBILE.md): the touch-only controls (the walk
+// stick). The TOUCH stream owns the component; this file mounts it once.
+import { LoungeTouchControls } from './LoungeTouchControls';
 
 const DIRECTOR_ON = playPassOn('LOUNGE_DIRECTOR');
 
@@ -196,6 +199,9 @@ export function LoungeHud({ runtime, watch }) {
     >
       <LoungeSurface runtime={runtime} picker={picker} onNotice={flash} />
       <LoungeOverlay runtime={runtime} picker={picker} />
+      {/* LOUNGE MOBILE slot: `blocked` is true while a sheet or panel covers
+          the thumb zone (the GLASS stream wires it). */}
+      <LoungeTouchControls runtime={runtime} watch={watch} blocked={false} />
 
       <LoungeHeader
         code={airport?.ident || watch.id}
