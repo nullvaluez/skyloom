@@ -31,6 +31,12 @@
     touch-action: none;
     overscroll-behavior: contain;
   }
+  /* A field you type in keeps its text (WebKit will not type into a
+     user-select: none field). */
+  .lounge :is(input, textarea, [contenteditable='true']) {
+    -webkit-user-select: text;
+    user-select: text;
+  }
 }
 
 .lounge-touch {

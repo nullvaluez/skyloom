@@ -179,7 +179,11 @@ module.exports = {
       const s0 = await h.state();
       const f0 = await field(h);
       const across = (2 * Math.atan(Math.tan((s0.fov * DEG) / 2) * s0.aspect)) / DEG;
-      h.check('portrait: the naked eye spans the horizontal floor (>= 50 deg across, not the 58 deg vertical slit)', s0.fov > 58 && across >= 49.99 && Math.abs(f0?.h - across) < 1e-6,
+      // MOBILE_TOUCH.portrait: 50 deg across, the vertical capped at 86 deg
+      // (a 390 x 844 screen reaches the cap and keeps ~46.6 deg across).
+      const need = (2 * Math.atan(Math.tan(25 * DEG) / s0.aspect)) / DEG, naked = Math.min(86, Math.max(58, need));
+      const floor = Math.min(50, (2 * Math.atan(Math.tan(43 * DEG) * s0.aspect)) / DEG);
+      h.check('portrait: the naked eye spans the horizontal floor (50 deg across, vertical capped at 86), not the 58 deg vertical slit', s0.fov > 58 && Math.abs(s0.fov - naked) < 1e-6 && across >= floor - 1e-6 && Math.abs(f0?.h - across) < 1e-6,
         { fov: +s0.fov.toFixed(3), aspect: +s0.aspect.toFixed(4), horizontal: +across.toFixed(3), slitWas: +((2 * Math.atan(Math.tan(29 * DEG) * s0.aspect)) / DEG).toFixed(2) });
       await h.shot('field');
 
