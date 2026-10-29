@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronsDown, Gauge, Smartphone } from 'lucide-react';
 import { useFlyStore } from '@/stores/fly-store';
@@ -130,21 +130,34 @@ function DesktopBinocularHud({ runtime }) {
  * The readouts live in the dark of the figure the mask draws
  * (lib/fly/lounge/glass-layout.mjs binocularFigure, from the same viewport and
  * safe-area insets), never over the glass:
- *  - portrait: information up, controls down. The top band carries the
+ *  - portrait: information up, controls down. The top band is read-only: the
  *    bearing tape (a compass ribbon, moved per frame), the elevation and the
- *    live power, the identity line (lock status, callsign, type) and the
- *    rangefinder figures (ALT / SPD / RNG / V-S in large tabular numerals) —
- *    or the notice ("No aircraft near your line of sight…") as a readable
- *    line. The bottom band is the thumb's: Lower, the focus wheel, and motion
- *    look when the device has it (else the observatory's Readouts toggle). A
- *    thumb on the wheel never covers a number it is reading. In the pier
- *    room the figures follow the instruments' Readouts switch, as on desktop;
- *    the lock status and callsign always show;
+ *    live power, the identity line (lock status, callsign, type), then the
+ *    rangefinder figures (ALT / SPD / RNG / V-S in large tabular numerals) or
+ *    a notice of up to two lines ("No aircraft near your line of sight…") or
+ *    the hint; a notice that comes while the figures are up floats over the
+ *    foot of the glass. Its budget (MOBILE_GLASS.bino.portrait.top) holds the
+ *    tallest of these, and it never climbs under the top inset (safe
+ *    flex-end). The
+ *    bottom band is the thumb's: Lower, the focus wheel, then the side
+ *    toggles as labelled rounds — the instruments' Readouts switch (the pier
+ *    room) and motion look (a device with an orientation sensor), compact when
+ *    both are there (glass-layout.mjs portraitControls). A thumb on the wheel
+ *    never covers a number it is reading. In the pier room the figures follow
+ *    the instruments' Readouts switch, as on desktop; the lock status and
+ *    callsign always show;
  *  - landscape: the twin lenses with the identity and figures in the left
- *    column, the power, a vertical wheel and Lower in the right one.
+ *    column (and the Readouts switch, a labelled chip, when motion look holds
+ *    the right column's side slot), the power, a vertical wheel, Lower and the
+ *    side toggle in the right one.
  * Test ids: binocular-view, binocular-readout, binocular-mag (as on desktop),
  * binocular-ident, binocular-notice, binocular-lower, binocular-motion,
- * binocular-tape, binocular-wheel.
+ * binocular-readouts, binocular-tape, binocular-wheel.
+ *
+ * Cost (the hero view of the slowest devices): the tape and the wheel move per
+ * frame and write only what changed; the 8 Hz poll commits only when a figure
+ * the bands show has changed (phoneView's key), and the tape's 145 marks are a
+ * memoised list that never re-renders.
  */
 const motionState = (runtime) => {
   const m = runtime.airportWatch?.motionLook;
@@ -159,24 +172,36 @@ const TAPE_MARKS = Array.from({ length: 145 }, (_, i) => {
   return { deg, label: deg % 30 === 0 ? CARDINAL[n] ?? String(n).padStart(3, '0') : null };
 });
 
-/** The bearing tape: a ribbon of 5° ticks under a fixed caret, its digits and the elevation, moved per frame. */
-function BearingTape({ runtime, elvRef }) {
+/** The tape's ticks and labels: static, rendered once. */
+const TapeMarks = memo(function TapeMarks() {
+  return TAPE_MARKS.map((m) => (
+    <i key={m.deg} style={{ left: `${((m.deg + 180) * TAPE_PX).toFixed(1)}px` }} data-major={m.label ? '1' : '0'}>
+      {m.label && <span>{m.label}</span>}
+    </i>
+  ));
+});
+
+/** The bearing tape: a ribbon of 5° ticks under a fixed caret, its readout and the elevation, moved per frame. */
+const BearingTape = memo(function BearingTape({ runtime, elvRef }) {
   const strip = useRef(null);
-  const digits = useRef(null);
+  const readout = useRef(null);
   const box = useRef(null);
   useEffect(() => {
-    let raf = 0, lastB = NaN, lastE = NaN, lastW = 0;
+    let raf = 0, lastB = NaN, lastE = NaN, lastW = -1;
+    // The box's width, measured when it changes (never read per frame).
+    let width = box.current?.clientWidth ?? 0;
+    const ro = typeof ResizeObserver === 'undefined' || !box.current ? null : new ResizeObserver(() => { width = box.current?.clientWidth ?? width; });
+    ro?.observe(box.current);
     const tick = () => {
       raf = requestAnimationFrame(tick);
       const w = runtime.airportWatch;
       if (!w?.active || !strip.current || !box.current) return;
       const b = (((-(w.roomHeading + w.yaw) / DEG) % 360) + 360) % 360;
-      const width = box.current.clientWidth;
       if (!(Math.abs(b - lastB) <= 0.02) || width !== lastW) {
         lastB = b;
         lastW = width;
         strip.current.style.transform = `translate3d(${(width / 2 - (b + 180) * TAPE_PX).toFixed(1)}px,0,0)`;
-        digits.current.textContent = `${String(Math.round(b) % 360).padStart(3, '0')}°`;
+        readout.current.textContent = `${String(Math.round(b) % 360).padStart(3, '0')}°`;
       }
       const e = w.pitch / DEG;
       if (elvRef.current && !(Math.abs(e - lastE) <= 0.04)) {
@@ -185,22 +210,21 @@ function BearingTape({ runtime, elvRef }) {
       }
     };
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      ro?.disconnect();
+    };
   }, [runtime, elvRef]);
   return (
     <div className="bp-tape" ref={box} data-testid="binocular-tape" aria-hidden="true">
       <div className="bp-tape-strip" ref={strip}>
-        {TAPE_MARKS.map((m) => (
-          <i key={m.deg} style={{ left: `${((m.deg + 180) * TAPE_PX).toFixed(1)}px` }} data-major={m.label ? '1' : '0'}>
-            {m.label && <span>{m.label}</span>}
-          </i>
-        ))}
+        <TapeMarks />
       </div>
       <b className="bp-tape-caret" />
-      <output className="bp-tape-digits" ref={digits} />
+      <output className="bp-tape-digits" ref={readout} />
     </div>
   );
-}
+});
 
 function lockFigures(lock) {
   return [
@@ -211,16 +235,38 @@ function lockFigures(lock) {
   ];
 }
 
+/**
+ * What the phone's bands show, as displayed (the power to 0.1, the figures as
+ * formatted, the status, the label), with a key: the 8 Hz poll keeps the
+ * previous object, and commits nothing, while the key is unchanged.
+ */
+function phoneView(runtime) {
+  const s = read(runtime);
+  if (!s) return null;
+  const lock = s.lock;
+  const status = !lock ? 'search' : lock.stale === 2 ? 'lost' : lock.locked ? 'lock' : lock.tracking ? 'acquire' : 'free';
+  const view = {
+    mag: `${s.mag.toFixed(s.mag < 9.95 ? 1 : 0)}×`,
+    status,
+    lock: lock ? { label: lock.label, type: lock.type, figures: lockFigures(lock) } : null,
+  };
+  view.key = `${view.mag}|${status}|${lock ? `${lock.label}|${lock.type}|${view.lock.figures.map((f) => f[1]).join('|')}` : '-'}`;
+  return view;
+}
+
 function PhoneBinocularHud({ runtime, layout, insets, notice }) {
   const observatory = useObservatory(runtime, runtime.airportWatch?.airport?.id);
-  const [s, setS] = useState(() => read(runtime));
+  const [s, setS] = useState(() => phoneView(runtime));
   const [motionLook, setMotionLook] = useState(() => motionState(runtime));
   const [motionNote, setMotionNote] = useState('');
   const elv = useRef(null);
   const vp = useViewportSize(true);
   useEffect(() => {
     const id = setInterval(() => {
-      setS(read(runtime));
+      setS((prev) => {
+        const next = phoneView(runtime);
+        return prev && next && prev.key === next.key ? prev : next;
+      });
       setMotionLook((prev) => {
         const next = motionState(runtime);
         return !prev === !next && prev?.active === next?.active && prev?.needsPermission === next?.needsPermission ? prev : next;
@@ -232,7 +278,7 @@ function PhoneBinocularHud({ runtime, layout, insets, notice }) {
   const w = runtime.airportWatch;
   const fig = binocularFigure(layout, vp.w, vp.h, insets);
   const lock = s.lock;
-  const status = !lock ? 'search' : lock.stale === 2 ? 'lost' : lock.locked ? 'lock' : lock.tracking ? 'acquire' : 'free';
+  const status = s.status;
   const statusText = status === 'lock' ? 'Locked' : status === 'acquire' ? 'Acquiring' : status === 'lost' ? 'Signal lost' : status === 'free' ? 'Free look' : 'Searching';
   const readouts = !observatory || observatory.readouts;
   const line = notice || motionNote;
@@ -275,19 +321,11 @@ function PhoneBinocularHud({ runtime, layout, insets, notice }) {
           <small>{lock.type}</small>
         </span>
       )}
-      {line && layout !== 'landscape' ? <p className="bp-notice" data-testid="binocular-notice">{line}</p> : !lock && !line && <p className="bp-hint">Drag to search · tap an aircraft to lock on</p>}
     </div>
-  );
-  // Landscape has no band wide enough for a sentence: the notice floats over
-  // the foot of the glass instead, clear of the centre and the side columns.
-  const floatNotice = layout === 'landscape' && line && (
-    <p className="bp-float-notice" data-testid="binocular-notice" data-lounge-avoid="">
-      {line}
-    </p>
   );
   const figures = readouts && lock && (
     <div className="bino-readout bp-figures" data-testid="binocular-readout">
-      {lockFigures(lock).map(([k, v, u]) => (
+      {lock.figures.map(([k, v, u]) => (
         <span key={k}>
           <small>{k}</small>
           <b>{v}</b>
@@ -296,31 +334,47 @@ function PhoneBinocularHud({ runtime, layout, insets, notice }) {
       ))}
     </div>
   );
-  const mag = <span className="bp-mag" data-testid="binocular-mag">{s.mag.toFixed(s.mag < 9.95 ? 1 : 0)}×</span>;
+  // The notice, or the hint. Portrait: a line of the top band (two at most),
+  // in the place the figures take — so with the figures up it floats over
+  // the foot of the glass instead, as it always does in landscape, whose
+  // columns have no width for a sentence: clear of the centre either way.
+  const floats = !!line && (layout === 'landscape' || !!figures);
+  const lineEl = line && !floats ? (
+    <p className="bp-notice" data-testid="binocular-notice" aria-live="polite">
+      {line}
+    </p>
+  ) : !lock && !line ? (
+    <p className="bp-hint">Drag to search · tap an aircraft to lock on</p>
+  ) : null;
+  const floatNotice = floats && (
+    <p className="bp-float-notice" data-testid="binocular-notice" data-lounge-avoid="" aria-live="polite">
+      {line}
+    </p>
+  );
+  const mag = <span className="bp-mag" data-testid="binocular-mag">{s.mag}</span>;
   const lower = (
     <button type="button" className="bp-round bp-lower" data-testid="binocular-lower" onClick={() => { haptic('lower'); w?.binoculars(false); }} aria-label="Lower the binoculars">
       <ChevronsDown size={20} aria-hidden="true" />
       <span>Lower</span>
     </button>
   );
-  // The instruments' Readouts toggle (the pier room): beside the wheel, or in
-  // the top band when motion look holds that place.
-  const readoutsToggle = observatory && (
-    <button type="button" className={motionLook ? 'bp-chip' : 'bp-round'} data-testid="binocular-readouts" aria-pressed={observatory.readouts} onClick={() => w?.observatory?.setReadouts(!observatory.readouts)} aria-label={observatory.readouts ? 'Hide the readouts' : 'Show the readouts'}>
-      <Gauge size={motionLook ? 17 : 19} aria-hidden="true" />
-      {!motionLook && <span>Readouts</span>}
+  // The instruments' Readouts switch (the pier room), always labelled: a
+  // round beside the wheel in portrait; in landscape a round in the right
+  // column, or a chip in the left one when motion look holds that slot.
+  const readoutsButton = (chip) => observatory && (
+    <button type="button" className={chip ? 'bp-chip' : 'bp-round'} data-testid="binocular-readouts" aria-pressed={observatory.readouts} onClick={() => w?.observatory?.setReadouts(!observatory.readouts)} aria-label={observatory.readouts ? 'Hide the readouts' : 'Show the readouts'}>
+      <Gauge size={chip ? 16 : 19} aria-hidden="true" />
+      <span>Readouts</span>
     </button>
   );
-  const side = motionLook ? (
+  const motionButton = motionLook && (
     <button type="button" className="bp-round bp-motion" data-testid="binocular-motion" aria-pressed={motionLook.active} onClick={toggleMotion} aria-label={motionLook.active ? 'Turn motion look off' : 'Look by moving the phone'}>
       <Smartphone size={19} aria-hidden="true" />
       <span>{motionLook.active ? 'Motion on' : 'Motion'}</span>
     </button>
-  ) : observatory ? (
-    readoutsToggle
-  ) : (
-    <span className="bp-round bp-spacer" aria-hidden="true" />
   );
+  const spacer = <span className="bp-round bp-spacer" aria-hidden="true" />;
+  const side = (observatory ? 1 : 0) + (motionLook ? 1 : 0);
   return (
     <motion.div className="bino-hud bino-phone" data-layout={layout} data-testid="binocular-view" data-status={status} style={vars || undefined} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
       {layout === 'landscape' ? (
@@ -331,15 +385,16 @@ function PhoneBinocularHud({ runtime, layout, insets, notice }) {
             </div>
             <BearingTape runtime={runtime} elvRef={elv} />
             {ident}
+            {lineEl}
             {figures}
-            {motionLook && readoutsToggle}
+            {motionLook && readoutsButton(true)}
           </div>
           <div className="bp-col bp-col-right" data-lounge-avoid="">
             {mag}
             <FocusWheel runtime={runtime} axis="y" />
             <div className="bp-col-actions">
               {lower}
-              {side}
+              {motionButton || readoutsButton(false) || spacer}
             </div>
           </div>
           {floatNotice}
@@ -353,14 +408,17 @@ function PhoneBinocularHud({ runtime, layout, insets, notice }) {
               {mag}
             </div>
             {ident}
+            {lineEl}
             {figures}
-            {motionLook && readoutsToggle}
           </div>
+          {floatNotice}
           <div className="bp-bottom" data-lounge-avoid="">
-            <div className="bp-controls">
+            <div className="bp-controls" data-side={side}>
               {lower}
               <FocusWheel runtime={runtime} axis="x" />
-              {side}
+              {readoutsButton(false)}
+              {motionButton}
+              {!side && spacer}
             </div>
           </div>
         </>
