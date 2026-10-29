@@ -8,10 +8,12 @@
 // The layout auditor (audit()) runs in the page in every state: every visible
 // interactive control of the lounge (and of the map credit and the airport
 // browser) is at least 44 x 44 CSS px or on the justified list; no two
-// visible chrome boxes overlap except the intended layering; nothing sits
-// outside the viewport horizontally; no control sits under an emulated
-// safe-area inset; and the status line and the binocular notice never wrap
-// one word per line. Safe areas are emulated through CDP
+// visible chrome boxes overlap except the intended layering (the walk stick's
+// ring and label count as chrome); nothing sits outside the viewport
+// horizontally; no control sits under an emulated safe-area inset; the
+// status line and the binocular notice never wrap one word per line; and on
+// a phone nothing over the live canvas carries a backdrop blur. Safe areas
+// are emulated through CDP
 // (Emulation.setSafeAreaInsetsOverride, an iPhone 13 held upright or sideways)
 // for the audited states and cleared before the runner continues.
 //
@@ -87,6 +89,8 @@ function pageAudit({ insets, label }) {
     '.lounge .observatory-panel', '.lounge .observatory-window-panel', '.lounge .observatory-prompt', '.lounge .observatory-nearby', '.lounge .observatory-direction',
     '.lounge .lounge-status', '.lounge .lounge-coach', '.lounge .dir-cue', '.lounge .dir-lower', '.lounge .lounge-bar', '.lounge .lounge-help',
     '.lounge .bp-top', '.lounge .bp-bottom', '.lounge .bp-col-left', '.lounge .bp-col-right', '.lounge .bp-float-notice', '[data-zone="attribution"] > div',
+    // The walk stick (TOUCH's): the seated Walk ring and its label, the standing ring.
+    '.lounge .lounge-stick', '.lounge .lounge-stick-label',
   ];
   const chrome = [];
   for (const sel of CHROME) for (const el of document.querySelectorAll(sel)) if (visible(el)) chrome.push({ sel, name: name(el), el, ...box(el) });
@@ -124,7 +128,19 @@ function pageAudit({ insets, label }) {
     const lines = tops.size;
     if (lines > 2 && lines > words / 3) wraps.push(`${name(el)}: ${words} words on ${lines} lines`);
   }
-  return { label, vw, vh, controls: controls.length, small, overlaps, overflow, inSafe, wraps };
+  // Phones: nothing over the live canvas blurs it (a backdrop-filter re-reads
+  // the framebuffer every frame; lounge-mobile.css's header).
+  const blurred = [];
+  const phone = document.querySelector('.lounge[data-layout^="phone"]');
+  if (phone) {
+    for (const el of phone.querySelectorAll('*')) {
+      const cs = getComputedStyle(el);
+      const f = cs.backdropFilter || cs.webkitBackdropFilter || 'none';
+      if (f === 'none' || !visible(el)) continue;
+      blurred.push(`${name(el)}: ${f}`);
+    }
+  }
+  return { label, vw, vh, controls: controls.length, small, overlaps, overflow, inSafe, wraps, blurred, phone: !!phone, sit: !!document.querySelector('.lounge .lounge-sit') };
 }
 
 /* ------------------------------------------------------------------- driver */
@@ -191,6 +207,7 @@ function glass(h) {
     h.check(`${h.phase} ${label}: nothing outside the viewport (no chrome off an edge, no page scroll)`, a.overflow.length === 0, a.overflow.slice(0, 6));
     if (insets) h.check(`${h.phase} ${label}: no control under the safe-area insets`, a.inSafe.length === 0, { insets, under: a.inSafe.slice(0, 6) });
     h.check(`${h.phase} ${label}: no text wraps one word per line`, a.wraps.length === 0, a.wraps);
+    if (a.phone) h.check(`${h.phase} ${label}: no backdrop blur over the live canvas (phone)`, a.blurred.length === 0, { blurred: a.blurred.slice(0, 6), sitPrompt: a.sit });
     return a;
   };
   const watch = () => page.evaluate(() => {
@@ -442,11 +459,426 @@ async function wheelGates(h, g, axis) {
   h.check(`${h.phase} focus wheel: a release within ${WHEEL.snapPx} px of the 20x detent snaps to exactly 20`, Math.abs(t2 - 20) < 1e-6, { target: t2, draggedPx: Math.round(toward20) });
 }
 
+/*
+ * One sub-section of a phase: a throw records a FAIL and the phase goes on
+ * (one stuck step must not drop every gate after it), and `after` puts the
+ * lounge back to a calm state whatever happened.
+ */
+async function section(h, name, fn, after) {
+  try {
+    await fn();
+  } catch (e) {
+    h.check(`${h.phase} ${name}: ran to the end`, false, String(e?.message || e).slice(0, 300));
+  }
+  if (after) {
+    try {
+      await after();
+    } catch (e) {
+      h.info(`${h.phase} ${name}: the clean-up after it threw`, String(e?.message || e).slice(0, 200));
+    }
+  }
+}
+
+/** The phone's resting pose, nudged: a real phone keeps reporting while motion look listens. */
+function orient(page, alpha = 2, beta = 88, gamma = 0) {
+  return page.evaluate(([a, b, c]) => window.dispatchEvent(new DeviceOrientationEvent('deviceorientation', { alpha: a, beta: b, gamma: c })), [alpha, beta, gamma]).catch(() => {});
+}
+
+/**
+ * Motion look end to end (FLY_LOUNGE_MOBILE.md contract 3), from the toggle:
+ * enabled from the tap itself, the active state on the button, off from the
+ * button, off when the glasses come down, and the notice when the browser
+ * refuses the permission (iOS's requestPermission, stubbed to 'denied'). A
+ * toggle that went away (a sensorless device: no orientation within the
+ * probe) is the withdrawal path, never a crash.
+ */
+async function motionGates(h, g) {
+  const { page } = h;
+  const w0 = await g.watch();
+  const shown = await g.shown('[data-testid="binocular-motion"]');
+  h.check(`${h.phase} binoculars: the motion-look toggle is drawn exactly when runtime motionLook.supported`, shown === !!w0.motion?.supported, { motionLook: w0.motion, shown });
+  if (!shown) return;
+  const pressed = () => page.evaluate(() => document.querySelector('[data-testid="binocular-motion"]')?.getAttribute('aria-pressed') ?? null);
+  const withdrawn = async () => {
+    const m = (await g.watch()).motion;
+    const notice = await page.evaluate(() => document.querySelector('[data-testid="binocular-notice"]')?.textContent ?? '');
+    return !m?.supported && /does not report its orientation/.test(notice);
+  };
+  // Refused first (iOS asks once a session: after a grant, enable() never
+  // asks again): the prompt answers 'denied', the toggle stays off and the
+  // band says why. Chromium has requestPermission too and grants it, so the
+  // stub stands in for the person tapping Don't Allow.
+  if (await page.evaluate(() => !!window.__fly.airportWatch.motionLook?.needsPermission)) {
+    await page.evaluate(() => {
+      window.__glassPermission = window.DeviceOrientationEvent.requestPermission;
+      window.DeviceOrientationEvent.requestPermission = () => Promise.resolve('denied');
+    });
+    try {
+      await g.tapEl('[data-testid="binocular-motion"]');
+      await h.wait(400);
+      const denied = await g.watch();
+      const notice = await page.evaluate(() => {
+        const el = document.querySelector('[data-testid="binocular-notice"]');
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        return { text: el.textContent, y: r.top, b: r.bottom, h: r.height };
+      });
+      h.check(`${h.phase} binoculars: a refused permission leaves motion look off and says why`, !denied.motion?.active && (await pressed()) === 'false' && !!notice && /motion|orientation/i.test(notice.text), { motion: denied.motion, notice });
+    } finally {
+      await page.evaluate(() => {
+        if (window.__glassPermission) window.DeviceOrientationEvent.requestPermission = window.__glassPermission;
+        else delete window.DeviceOrientationEvent.requestPermission;
+        delete window.__glassPermission;
+      });
+    }
+  } else h.info(`${h.phase} binoculars: motion look's permission was already granted this session (iOS asks once); the refusal path is not re-askable here`);
+  // On.
+  await g.tapEl('[data-testid="binocular-motion"]');
+  await orient(page);
+  await h.wait(500);
+  const on = await g.watch();
+  if (!(await g.shown('[data-testid="binocular-motion"]'))) {
+    h.check(`${h.phase} binoculars: a motion toggle that went away is the sensorless path (the notice says so)`, await withdrawn(), on.motion);
+    await page.evaluate(() => window.__fly.airportWatch.motionLook?.disable?.());
+    return;
+  }
+  h.check(`${h.phase} binoculars: a tap on Motion turns motion look on (enabled from the tap) and the toggle shows it`, !!on.motion?.active && (await pressed()) === 'true', { motion: on.motion, pressed: await pressed() });
+  // Off from the button.
+  await g.tapEl('[data-testid="binocular-motion"]');
+  const off = await g.watch();
+  h.check(`${h.phase} binoculars: a second tap turns it off`, !off.motion?.active && (await pressed()) === 'false', { motion: off.motion, pressed: await pressed() });
+  // Off when the glasses come down (and the next raise starts with it off).
+  await g.tapEl('[data-testid="binocular-motion"]');
+  await orient(page, 3);
+  await h.wait(300);
+  const again = (await g.watch()).motion;
+  await page.evaluate(() => window.__fly.airportWatch.binoculars(false));
+  await h.until(() => !window.__fly.airportWatch.motionLook?.active, undefined, 6000);
+  const down = await g.watch();
+  h.check(`${h.phase} binoculars: lowering the glasses turns motion look off`, !!again?.active && !down.motion?.active && !down.binocular, { before: again, after: down.motion });
+  await page.evaluate(() => window.__fly.airportWatch.select('a1b2c3', { binoculars: true }));
+  await g.appear('[data-testid="binocular-view"]');
+  await h.wait(600);
+}
+
+/**
+ * The portrait top band with everything in it: the pier room's Readouts on, a
+ * lock, motion look supported (its toggle in the bottom band too). Every
+ * piece of the band starts at or below the top inset + 8 and ends above the
+ * glass; the Readouts switch is a labelled control of >= 44 px; and a notice
+ * that comes now (motion look refused: two lines) floats over the foot of the
+ * glass instead of pushing the band up.
+ */
+async function topBandGates(h, g, label, insets) {
+  const { page } = h;
+  const safeTop = insets?.top ?? 0;
+  const m = await page.evaluate(() => {
+    const fig = JSON.parse(document.querySelector('[data-testid="binocular-mask"]')?.dataset.figure || 'null');
+    const top = document.querySelector('.bp-top');
+    if (!top || !fig) return null;
+    const parts = [];
+    for (const el of top.querySelectorAll('*')) {
+      const r = el.getBoundingClientRect();
+      if (r.width < 1 || r.height < 1 || getComputedStyle(el).visibility === 'hidden') continue;
+      // The tape's ribbon runs off both ends by design (masked): its height is what counts.
+      parts.push({ name: el.getAttribute('data-testid') || String(el.className || el.tagName).split(' ')[0], y: Math.round(r.top * 10) / 10, b: Math.round(r.bottom * 10) / 10 });
+    }
+    const ro = document.querySelector('[data-testid="binocular-readouts"]');
+    const rr = ro?.getBoundingClientRect();
+    return {
+      glassTop: fig.lenses[0][1] - fig.R,
+      parts,
+      motion: !!document.querySelector('[data-testid="binocular-motion"]'),
+      readouts: ro ? { w: rr.width, h: rr.height, text: ro.textContent.trim(), inTop: top.contains(ro), pressed: ro.getAttribute('aria-pressed') } : null,
+      figures: !!document.querySelector('[data-testid="binocular-readout"]'),
+    };
+  });
+  if (!m) return h.check(`portrait ${label}: the top band and the figure are there`, false);
+  const high = m.parts.filter((p) => p.y < safeTop + 8 - 0.5);
+  const low = m.parts.filter((p) => p.b > m.glassTop + 2);
+  h.check(`portrait ${label}: with Motion and Readouts both there, nothing in the top band sits above the inset + 8 px`, m.motion && !!m.readouts && high.length === 0, { safeTop, motion: m.motion, readouts: !!m.readouts, high: high.slice(0, 6) });
+  h.check(`portrait ${label}: ... and nothing in it runs onto the glass`, low.length === 0, { glassTop: m.glassTop, low: low.slice(0, 6) });
+  h.check(`portrait ${label}: the Readouts switch is a labelled control (>= 44 px, "Readouts") in the thumb's band, not the top band`, !!m.readouts && m.readouts.w >= 43.5 && m.readouts.h >= 43.5 && /readouts/i.test(m.readouts.text) && !m.readouts.inTop, m.readouts);
+  h.check(`portrait ${label}: the figures show (Readouts on)`, m.figures);
+}
+
+/**
+ * The thumb's corner while the walk stick shows: the coach marks (forced open
+ * through the dev handle), a status line and a director lower third (each a
+ * probe element with the real classes, measured through the real cascade and
+ * removed) never cover the stick — seated, its Walk ring and its label;
+ * standing, the zone a thumb may start it in — and the coach's first tip has
+ * no stick under it.
+ */
+async function floatsClearOfStick(h, g, label, { dismiss = true } = {}) {
+  const { page } = h;
+  // Standing by a chair the Sit prompt is itself the hint and the tips step
+  // aside for it (by design): walk off with the stick until no place prompt
+  // is up, so the tips can be measured standing.
+  if ((await g.watch()).posture === 'standing') {
+    const prompt = () => page.evaluate(() => !!document.querySelector('.lounge :is(.lounge-sit, .lounge-decor-prompt, .observatory-prompt, .observatory-nearby)'));
+    for (const [dx, dy] of [[0, 46], [-40, 30], [40, 30], [0, 46]]) {
+      if (!(await prompt())) break;
+      const z = await g.rect('.lounge-stick-zone');
+      if (!z) break;
+      await h.touch.push(z.x + 80, z.b - 80, z.x + 80 + dx, z.b - 80 + dy, 1600);
+      await h.wait(600);
+    }
+    h.info(`${h.phase} ${label}: walked clear of the place prompts for the tips`, { prompt: await prompt() });
+  }
+  await page.evaluate(() => window.__flyLoungeCoach?.open());
+  await g.appear('[data-testid="lounge-coach"]', 4000);
+  await h.wait(400);
+  const m = await page.evaluate(() => {
+    const box = (el) => {
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return r.width < 1 ? null : { x: r.left, y: r.top, r: r.right, b: r.bottom };
+    };
+    const s = document.querySelector('.lounge');
+    const stick = document.querySelector('[data-testid="lounge-stick"]');
+    const ring = box(stick);
+    const label = box(stick?.querySelector('.lounge-stick-label'));
+    const zone = box(document.querySelector('.lounge-stick-zone'));
+    const posture = s.getAttribute('data-posture');
+    const probe = (cls, inner) => {
+      const el = document.createElement(inner ? 'div' : 'p');
+      el.className = cls;
+      el.style.transform = cls.includes('lounge-status') ? 'translateX(-50%)' : '';
+      if (inner) el.innerHTML = `<div class="dir-lower"><span>Touchdown · QAL101 on runway 28L</span></div>`;
+      else el.textContent = 'A status line long enough to take most of a phone’s width';
+      s.appendChild(el);
+      const r = box(el);
+      el.remove();
+      return r;
+    };
+    const coachEl = document.querySelector('[data-testid="lounge-coach"]');
+    const tip = coachEl?.querySelector('li');
+    const tr = tip?.getBoundingClientRect();
+    const under = tr ? document.elementsFromPoint(tr.left + tr.width / 2, tr.top + tr.height / 2).map((e) => e.getAttribute('data-testid') || String(e.className || '').split(' ')[0]) : [];
+    return {
+      posture,
+      show: document.querySelector('.lounge-touch')?.getAttribute('data-show'),
+      ring, label, zone,
+      coach: box(coachEl),
+      status: probe('lounge-status airport-status'),
+      lower: probe('dir-lower-slot', true),
+      under,
+    };
+  });
+  const hit = (a, b) => !!a && !!b && Math.min(a.r, b.r) - Math.max(a.x, b.x) > 1 && Math.min(a.b, b.b) - Math.max(a.y, b.y) > 1;
+  const standing = m.posture === 'standing';
+  const guard = standing ? [m.zone, m.ring] : [m.ring, m.label];
+  const floats = { coach: m.coach, status: m.status, lower: m.lower };
+  const over = Object.entries(floats).filter(([, r]) => guard.some((gd) => hit(r, gd))).map(([k]) => k);
+  h.check(`${h.phase} ${label}: the walk stick shows, and the coach marks, the status line and the lower thirds keep out of its ${standing ? 'zone' : 'Walk ring'}`, m.show === '1' && !!m.ring && !!m.coach && over.length === 0, { posture: m.posture, show: m.show, over, ring: m.ring, zone: standing ? m.zone : undefined, ...floats });
+  h.check(`${h.phase} ${label}: no part of the stick lies under the coach's first tip (a first touch there is a look, not a walk)`, !m.under.some((n) => /lounge-stick/.test(n)), m.under.slice(0, 6));
+  if (dismiss) await page.evaluate(() => document.querySelector('[data-testid="lounge-coach-dismiss"]')?.click());
+}
+
+/**
+ * A wheel flick then Lower straight away: the glide stops with the glasses
+ * (it used to keep setting the power and raise them again). The flick is a
+ * burst of synthetic touch pointer events on the wheel, and Lower is clicked
+ * in the same task, before the glide's first frame.
+ */
+async function wheelGlideGate(h, g, axis) {
+  const { page } = h;
+  const r = await page.evaluate((ax) => {
+    const wheel = document.querySelector('[data-testid="binocular-wheel"]');
+    const lower = document.querySelector('[data-testid="binocular-lower"]');
+    if (!wheel || !lower) return { ran: false };
+    window.__fly.airportWatch.setMagnification(7);
+    const b = wheel.getBoundingClientRect();
+    const cx = b.left + b.width / 2, cy = b.top + b.height / 2;
+    const ev = (type, d) => wheel.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, pointerId: 71, pointerType: 'touch', isPrimary: true, clientX: ax === 'x' ? cx - d : cx, clientY: ax === 'x' ? cy : cy + d }));
+    ev('pointerdown', 0);
+    for (let i = 1; i <= 8; i++) ev('pointermove', i * 6);
+    ev('pointerup', 48);
+    lower.click();
+    return { ran: true, after: window.__fly.airportWatch.binocular };
+  }, axis);
+  await h.wait(700);
+  const w = await g.watch();
+  h.check(`${h.phase} focus wheel: a flick then Lower at once — the glasses stay down (the glide stops with them)`, r.ran && r.after === false && !w.binocular && w.target === 1, { ...r, binocular: w.binocular, target: w.target });
+}
+
+/**
+ * The game's own reduced-motion setting (Settings, `fly-reduced-motion`),
+ * with the OS setting off: the phone HUD stamps data-reduced and the lounge
+ * menu sheet arrives without its spring (no transform on its first frame).
+ */
+async function reducedMotionGate(h, g) {
+  const { page } = h;
+  await page.evaluate(() => localStorage.setItem('fly-reduced-motion', '1'));
+  try {
+    const stamped = await h.until(() => document.querySelector('.lounge')?.getAttribute('data-reduced') === '1', undefined, 5000);
+    const more = await g.rect('[data-testid="lounge-more"]');
+    if (!more) return h.check(`${h.phase} reduced motion: the dock's More is there to open the menu`, false);
+    const first = await page.evaluate(() => new Promise((resolve) => {
+      document.querySelector('[data-testid="lounge-more"]').click();
+      requestAnimationFrame(() => {
+        const el = document.querySelector('[data-testid="lounge-more-sheet"]');
+        resolve(el ? { transform: getComputedStyle(el).transform, inline: el.style.transform || '' } : null);
+      });
+    }));
+    h.check(`${h.phase} reduced motion (the game's setting): data-reduced is stamped and the menu sheet has no slide on its first frame`, stamped && !!first && (first.transform === 'none' || /^matrix\(1, 0, 0, 1, 0, 0\)$/.test(first.transform)), { stamped, first });
+    await g.back('[data-testid="lounge-more-sheet"]');
+  } finally {
+    await page.evaluate(() => localStorage.setItem('fly-reduced-motion', '0'));
+    await h.until(() => !document.querySelector('.lounge')?.hasAttribute('data-reduced'), undefined, 5000);
+  }
+}
+
+/** No two visible buttons of the dock and the spotter sheet answer to the same name (two "More"s did two different things). */
+async function labelsGate(h, label) {
+  const m = await h.page.evaluate(() => {
+    const seen = [];
+    for (const el of document.querySelectorAll('[data-testid="lounge-dock"] button, [data-testid="spotter-card"] button')) {
+      const cs = getComputedStyle(el);
+      const r = el.getBoundingClientRect();
+      if (r.width < 1 || cs.visibility === 'hidden' || cs.display === 'none') continue;
+      const strong = el.querySelector('strong')?.textContent;
+      const name = (el.getAttribute('aria-label') || strong || el.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
+      seen.push({ id: el.getAttribute('data-testid'), name });
+    }
+    return seen;
+  });
+  const dupes = m.filter((a, i) => m.findIndex((b) => b.name === a.name) !== i);
+  h.check(`${h.phase} ${label}: no two visible dock / card buttons share a name`, m.length > 0 && dupes.length === 0, { buttons: m, dupes });
+  return m;
+}
+
+/**
+ * A phone held sideways, standing, with a side sheet up (the spotter card,
+ * then the board): the sheet keeps clear of the walk stick's zone, so the
+ * stick stays up (data-thumb-blocked 0) and a push walks.
+ */
+async function sideSheetStickGates(h, g) {
+  const { page } = h;
+  await page.evaluate(() => window.__fly.airportWatch.stand());
+  await h.until(() => window.__fly.airportWatch.posture === 'standing', undefined, 30000);
+  await h.wait(600);
+  for (const [label, open, sel] of [
+    ['the spotter card', () => page.evaluate(() => window.__fly.airportWatch.select('a1b2c3')), '[data-testid="spotter-card"]'],
+    ['the board', async () => {
+      await page.evaluate(() => window.__fly.airportWatch.clearSelection());
+      await g.tapEl('[data-testid="lounge-board-toggle"]');
+    }, '[data-testid="lounge-board"]'],
+  ]) {
+    await open();
+    await g.appear(sel);
+    const sheet = await g.stableRect(sel);
+    const m = await page.evaluate(() => {
+      const z = document.querySelector('.lounge-stick-zone')?.getBoundingClientRect();
+      return {
+        blocked: document.querySelector('.lounge')?.getAttribute('data-thumb-blocked'),
+        stick: !!document.querySelector('[data-testid="lounge-stick"]')?.getBoundingClientRect().width,
+        zone: z && z.width ? { x: z.left, y: z.top, r: z.right, b: z.bottom } : null,
+      };
+    });
+    const clear = !!sheet && !!m.zone && (sheet.x >= m.zone.r - 1 || sheet.b <= m.zone.y + 1);
+    h.check(`landscape standing with ${label} open: the side sheet keeps clear of the stick's zone and the stick stays up`, m.blocked === '0' && m.stick && clear, { ...m, sheet });
+    if (label === 'the spotter card' && m.zone) {
+      const before = await h.state();
+      const x = m.zone.x + 80, y = m.zone.b - 80;
+      await h.touch.push(x, y, x, y - 46, 1400);
+      await h.wait(300);
+      const after = await h.state();
+      const moved = before?.eye && after?.eye ? Math.hypot(after.eye.x - before.eye.x, after.eye.z - before.eye.z) : 0;
+      h.check('landscape standing with the spotter card open: a push on the stick walks', moved > 0.15 && after.selected === 'a1b2c3', { moved: Number(moved.toFixed(3)), selected: after?.selected });
+    }
+    await h.shot(`standing-${label === 'the board' ? 'board' : 'spotter'}`);
+  }
+  await page.evaluate(() => window.__fly.airportWatch.clearSelection());
+  if (await g.shown('[data-testid="lounge-board"]')) await g.tapEl('[data-testid="lounge-board-toggle"]');
+}
+
+/**
+ * The flight HUD's Back chain and the lounge's together (the blocker: the
+ * Atlas's "Watch an airport" pill dropped the player on the title). From
+ * flight (the harness skip: airborne by the field), on the phone:
+ *  (b) Atlas -> the pill -> the browser's X: the Atlas stays, and one Back
+ *      then closes it;
+ *  (c) Atlas -> the pill -> Back: the browser closes, the Atlas stays; Back
+ *      closes the Atlas;
+ *  (a) Atlas -> the pill -> KCMH: the lounge is still up 3 s after it
+ *      validates, a lounge sentinel on top, and one Back follows the lounge's
+ *      order (the menu sheet first), still in the lounge.
+ * It ends back in the KCMH lounge, so the runner's closing checks hold.
+ */
+async function atlasEntryGates(h, g) {
+  const { page } = h;
+  const atlasOpen = () => page.evaluate(() => !!window.__flyStore.getState().atlasOpen);
+  const top = () => page.evaluate(() => ({ overlay: !!history.state?.__flyOverlay, lounge: !!history.state?.__flyLounge }));
+  // Leave for the title, then fly from the field.
+  await page.evaluate(() => window.__fly.airportWatch.exit?.());
+  await page.getByTestId('title-screen').waitFor({ state: 'visible', timeout: 120000 });
+  await page.evaluate(() => {
+    const rt = window.__fly, st = window.__flyStore.getState();
+    rt.operations.phase = 'airborne';
+    rt.operations.profile = null;
+    rt.operations.warp(rt.flight);
+    st.setHangarOpen(false);
+    rt.warpToGeo(39.9980, -82.8919, { altM: 900, headingRad: 0, name: null });
+  });
+  const flying = await h.until(() => window.__flyStore.getState().screen === 'flight' && !window.__flyStore.getState().airportWatch, undefined, 60000);
+  h.check(`${h.phase} Back chains: in flight on the phone (the harness's airborne skip)`, flying);
+  await h.wait(2500);
+  const openAtlas = async () => {
+    await page.evaluate(() => window.__flyStore.getState().setAtlasOpen(true));
+    await g.appear('[data-testid="watch-airport"]', 20000);
+    await h.wait(600);
+  };
+  const openPill = async () => {
+    await g.tapEl('[data-testid="watch-airport"]');
+    await g.appear('[data-testid="airport-browser"]', 20000);
+    await h.wait(700);
+  };
+  // (b) the browser's X keeps the Atlas.
+  await openAtlas();
+  await openPill();
+  await g.tapEl('[aria-label="Close airport search"]');
+  await g.gone('[data-testid="airport-browser"]');
+  await h.wait(900);
+  const bOpen = await atlasOpen(), bTop = await top();
+  h.check(`${h.phase} Back chains: Atlas -> browser -> X keeps the Atlas open, its own entry current`, bOpen && bTop.overlay && !bTop.lounge, { atlasOpen: bOpen, top: bTop });
+  await page.evaluate(() => history.back());
+  await h.until(() => !window.__flyStore.getState().atlasOpen, undefined, 6000);
+  h.check(`${h.phase} Back chains: ... and one Back then closes the Atlas`, !(await atlasOpen()), await top());
+  // (c) Back with the browser over the Atlas closes the browser only.
+  await openAtlas();
+  await openPill();
+  await page.evaluate(() => history.back());
+  await g.gone('[data-testid="airport-browser"]');
+  await h.wait(900);
+  const cOpen = await atlasOpen();
+  h.check(`${h.phase} Back chains: Atlas -> browser -> Back closes the browser, the Atlas stays`, cOpen && !(await g.shown('[data-testid="airport-browser"]')), { atlasOpen: cOpen, top: await top() });
+  await page.evaluate(() => history.back());
+  await h.until(() => !window.__flyStore.getState().atlasOpen, undefined, 6000);
+  h.check(`${h.phase} Back chains: ... and the next Back closes the Atlas`, !(await atlasOpen()));
+  // (a) pick KCMH from the pill: the lounge stays.
+  await openAtlas();
+  await openPill();
+  await g.tapEl('[data-testid="airport-featured-KCMH"]');
+  const entered = await h.until(() => window.__fly.airportWatch?.validated && !!window.__flyStore.getState().airportWatch, undefined, 240000);
+  await h.wait(3000);
+  const aState = await page.evaluate(() => ({ active: !!window.__fly.airportWatch?.active, watch: !!window.__flyStore.getState().airportWatch, screen: window.__flyStore.getState().screen, lounge: !!history.state?.__flyLounge }));
+  h.check(`${h.phase} Back chains: Atlas -> "Watch an airport" -> KCMH: still in the lounge 3 s after it validates, a lounge entry on top`, entered && aState.active && aState.watch && aState.screen !== 'title' && aState.lounge, { entered, ...aState });
+  await g.tapEl('[data-testid="lounge-menu"]');
+  await g.appear('[data-testid="lounge-more-sheet"]');
+  await page.evaluate(() => history.back());
+  await g.gone('[data-testid="lounge-more-sheet"]');
+  await h.wait(1200);
+  const after = await page.evaluate(() => ({ active: !!window.__fly.airportWatch?.active, screen: window.__flyStore.getState().screen, lounge: !!history.state?.__flyLounge, sheet: !!document.querySelector('[data-testid="lounge-more-sheet"]') }));
+  h.check(`${h.phase} Back chains: ... then one Back closes the menu sheet first, still in the lounge, its entry back on top`, after.active && !after.sheet && after.screen !== 'title' && after.lounge, after);
+}
+
 module.exports = {
   name: 'glass',
   // Shared with scratch probes (tablet, desktop); the runner reads only name /
   // portrait / landscape.
-  helpers: { pageAudit, maskSample, glass, binoParts },
+  helpers: { pageAudit, maskSample, glass, binoParts, section, motionGates, topBandGates, floatsClearOfStick, wheelGlideGate, reducedMotionGate, labelsGate, sideSheetStickGates, atlasEntryGates, figureGates, readoutGates, raiseWhereNothingFlies, settleBinoculars },
 
   // Each phase runs with the inbound re-staged on its own clock (restage()).
   async portrait(h) {
@@ -465,6 +897,75 @@ module.exports = {
     } finally {
       restore();
     }
+  },
+
+  // --device ipad: an iPad mini, upright then sideways (h.phase).
+  async tablet(h) {
+    const restore = await restage(h);
+    try {
+      await this.tabletPhase(h);
+    } finally {
+      restore();
+    }
+  },
+
+  /**
+   * A coarse-touch tablet gets the desktop HUD with touch-sized targets, the
+   * phone's single-lens binocular figure when upright (the desktop's twin
+   * lenses sized from the height are each wider than an upright screen) and
+   * the desktop's twin lenses sideways, and the same Back chain as a phone.
+   * The auditor runs in each state: idle, the spotter card, the binoculars
+   * (locked, then the bare figure), the airport browser.
+   */
+  async tabletPhase(h) {
+    const g = glass(h);
+    const { page } = h;
+    const upright = h.phase === 'portrait';
+    await g.lowerAll();
+    await page.evaluate(() => {
+      const w = window.__fly.airportWatch;
+      if (w.posture !== 'seated') w.sit(w.seats?.[0]?.id ?? 'window');
+    });
+    await h.until(() => window.__fly.airportWatch.posture === 'seated', undefined, 15000);
+    await h.wait(800);
+    h.check(`tablet ${h.phase}: the lounge is laid out as a tablet (data-layout=tablet)`, (await g.section('data-layout')) === 'tablet');
+    await section(h, 'tablet idle', async () => {
+      h.check(`tablet ${h.phase} idle: the board, the header and the controls bar are there`, (await g.shown('[data-testid="lounge-board"]')) && (await g.shown('[data-testid="lounge-header"]')) && (await g.shown('.lounge-bar')));
+      await g.audit('tablet idle');
+      await h.shot('tablet-idle');
+    });
+    await section(h, 'tablet spotter', async () => {
+      await page.evaluate(() => window.__fly.airportWatch.select('a1b2c3'));
+      await g.appear('[data-testid="spotter-card"]');
+      await g.stableRect('[data-testid="spotter-card"]');
+      await g.audit('tablet spotter card');
+      await h.shot('tablet-spotter');
+    });
+    await section(h, 'tablet binoculars', async () => {
+      if (await g.shown('[data-testid="spotter-binoculars"]')) await g.tapEl('[data-testid="spotter-binoculars"]');
+      else await page.evaluate(() => window.__fly.airportWatch.select('a1b2c3', { binoculars: true }));
+      await g.appear('[data-testid="binocular-view"]');
+      await h.wait(1200);
+      const kind = await page.evaluate(() => ({ phone: !!document.querySelector('.bino-phone'), layout: document.querySelector('.bino-phone')?.getAttribute('data-layout') ?? 'desktop' }));
+      h.check(`tablet ${h.phase} binoculars: ${upright ? 'the phone\'s single-lens view (upright)' : 'the desktop view (sideways)'}`, upright ? kind.phone && kind.layout === 'portrait' : !kind.phone, kind);
+      await g.audit('tablet binoculars locked');
+      await h.shot('tablet-binoculars');
+      h.info(`tablet ${h.phase} binoculars: raised where nothing flies (drag)`, await raiseWhereNothingFlies(h));
+      h.info(`tablet ${h.phase} binoculars settled`, await settleBinoculars(h));
+      await h.wait(900);
+      if (upright) await figureGates(h, g, true, { label: 'tablet binoculars' });
+      await g.audit('tablet binoculars figure');
+      await h.shot('tablet-binoculars-figure');
+    }, () => g.lowerAll());
+    await section(h, 'tablet airport browser', async () => {
+      await page.evaluate(() => window.__flyStore.setState({ airportBrowserOpen: true }));
+      await g.appear('[data-testid="airport-browser"]');
+      await h.wait(700);
+      await g.audit('tablet airport browser');
+      await h.shot('tablet-browser');
+      const closed = await g.back('[data-testid="airport-browser"]');
+      h.check(`tablet ${h.phase} Back: Back closes the airport browser, still in the lounge`, closed && !(await g.shown('[data-testid="airport-browser"]')) && (await g.watch()).active);
+    });
   },
 
   async portraitPhase(h) {
@@ -499,6 +1000,8 @@ module.exports = {
     const coach = !!coachText;
     h.check('portrait: first-visit coach marks speak touch (drag, pinch, tap, double-tap)', coach && /Drag/.test(coachText) && /Pinch/.test(coachText) && /Tap/.test(coachText) && /Double-tap/.test(coachText) && !/click|scroll|WASD/i.test(coachText), coachText);
     await h.shot('coach');
+    // Seated with the board's peek: the tips (and any float) keep off the Walk ring.
+    await section(h, 'seated floats vs the Walk ring', () => floatsClearOfStick(h, g, 'seated, first visit', { dismiss: false }));
     // (They fade on their own after a while: bring them back if that just happened.)
     if (!(await g.shown('[data-testid="lounge-coach-dismiss"]'))) {
       await page.evaluate(() => window.__flyLoungeCoach?.open());
@@ -556,6 +1059,14 @@ module.exports = {
     }));
     h.check('portrait spotter: the selection opens a peek sheet (callsign, phase, Binoculars, Follow) above the dock', !!card && card.b <= dock.y + 1 && peekParts.title === 'QAL101' && peekParts.binoculars && peekParts.follow && peekParts.phase && !peekParts.tiles && !peekParts.join, { card, ...peekParts });
     h.check('portrait spotter: the board peek steps aside for it', !(await g.shown('[data-testid="lounge-board-peek"]')));
+    // One name, one action: Follow is the card's while it is up (the dock's
+    // slot steps aside), the dock's primary names the selection, and the
+    // card's expand control is not a second "More".
+    const dockFollow = await page.evaluate(() => getComputedStyle(document.querySelector('[data-testid="lounge-follow"]')).visibility);
+    const primaryName = await page.evaluate(() => document.querySelector('[data-testid="lounge-binoculars"]')?.getAttribute('aria-label'));
+    const expandText = await page.evaluate(() => document.querySelector('[data-testid="spotter-expand"]')?.textContent.trim());
+    h.check('portrait spotter: the dock\'s Follow steps aside for the card\'s, its primary names the selection, the card\'s toggle reads Expand', dockFollow === 'hidden' && /QAL101/.test(primaryName || '') && expandText === 'Expand', { dockFollow, primaryName, expandText });
+    await labelsGate(h, 'spotter peek');
     await g.audit('spotter peek', { insets });
     await h.shot('spotter-peek');
     await g.tapEl('[data-testid="spotter-expand"]');
@@ -579,21 +1090,30 @@ module.exports = {
     await readoutGates(h, g, true);
     await g.audit('binoculars locked', { insets });
     await h.shot('binoculars');
-    // Motion look: drawn exactly when the runtime says the device supports it.
-    const w0 = await g.watch();
-    const motionShown = await g.shown('[data-testid="binocular-motion"]');
-    h.check('portrait binoculars: the motion-look toggle is drawn exactly when runtime motionLook.supported', motionShown === !!w0.motion?.supported, { motionLook: w0.motion, shown: motionShown });
-    if (motionShown) {
-      await g.tapEl('[data-testid="binocular-motion"]');
-      await h.wait(600);
-      const m1 = await g.watch();
-      const pressed = await page.evaluate(() => document.querySelector('[data-testid="binocular-motion"]')?.getAttribute('aria-pressed'));
-      h.check('portrait binoculars: the motion toggle reflects motionLook.active after a tap', pressed === String(!!m1.motion?.active), { pressed, motion: m1.motion });
-      if (m1.motion?.active) await g.tapEl('[data-testid="binocular-motion"]');
-    }
-    await keepGlassesUp(h, g);
-    await wheelGates(h, g, 'x');
-    await h.shot('binoculars-20x');
+    // The top band with everything in it (Motion and Readouts both there, a
+    // lock, the figures), with the insets of a home-screen app and without.
+    await section(h, 'binocular top band', async () => {
+      await topBandGates(h, g, 'binoculars locked (Motion + Readouts, insets)', insets);
+      await h.shot('binoculars-band');
+      const r0 = await page.evaluate(() => JSON.parse(document.querySelector('[data-testid="binocular-mask"]')?.dataset.figure || 'null')?.R);
+      await g.setInsets(null);
+      // The mask follows in the overlay's frame loop (slow here): wait for it.
+      await h.until((r) => JSON.parse(document.querySelector('[data-testid="binocular-mask"]')?.dataset.figure || 'null')?.R !== r, r0, 8000);
+      await h.wait(500);
+      await topBandGates(h, g, 'binoculars locked (Motion + Readouts, no insets)', null);
+      await h.shot('binoculars-band-noinsets');
+    }, () => g.setInsets(insets));
+    // Motion look, end to end; whatever happens, it ends off with the glasses up.
+    await section(h, 'motion look', () => motionGates(h, g), async () => {
+      await page.evaluate(() => window.__fly.airportWatch.motionLook?.disable?.());
+      if (!(await g.watch()).binocular) await page.evaluate(() => window.__fly.airportWatch.select('a1b2c3', { binoculars: true }));
+      await g.appear('[data-testid="binocular-view"]');
+    });
+    await section(h, 'focus wheel', async () => {
+      await keepGlassesUp(h, g);
+      await wheelGates(h, g, 'x');
+      await h.shot('binoculars-20x');
+    });
     // Back lowers the glasses, then clears the selection.
     const lowerBack = await g.back('[data-testid="binocular-view"]');
     const afterBack2 = await g.watch();
@@ -636,6 +1156,13 @@ module.exports = {
     }
     await g.tapEl('[data-testid="binocular-lower"]');
     h.check('portrait binoculars: Lower (bottom band) lowers the glasses', !(await g.watch()).binocular);
+    // A wheel flick, then Lower at once: the glide must not raise them again.
+    await section(h, 'wheel glide vs Lower', async () => {
+      await page.evaluate(() => window.__fly.airportWatch.binoculars(true, { acquire: false }));
+      await g.appear('[data-testid="binocular-view"]');
+      await h.wait(600);
+      await wheelGlideGate(h, g, 'x');
+    }, () => page.evaluate(() => window.__fly.airportWatch.binoculars(false)));
     await page.evaluate(() => window.__fly.airportWatch.resetLook());
     await h.wait(500);
 
@@ -653,6 +1180,10 @@ module.exports = {
     h.check('portrait menu: the dock\'s More opens the lounge menu too', await g.appear('[data-testid="lounge-more-sheet"]'));
     await g.tapEl('[data-testid="lounge-more-sheet"] .lsheet-close');
     await g.gone('[data-testid="lounge-more-sheet"]');
+    // Reduced motion from the game's own setting (not only the OS's).
+    await section(h, 'reduced motion', () => reducedMotionGate(h, g), async () => {
+      if (await g.shown('[data-testid="lounge-more-sheet"]')) await g.tapEl('[data-testid="lounge-more-sheet"] .lsheet-close');
+    });
 
     // The instruments' airport map (the pier room), from the lounge menu.
     if (await page.evaluate(() => !!window.__fly.airportWatch.observatory)) {
@@ -709,12 +1240,9 @@ module.exports = {
     await h.wait(900);
     const free = await page.evaluate(() => {
       const s = document.querySelector('.lounge');
-      const probe = document.createElement('i');
-      probe.style.cssText = 'position:absolute;width:1px;height:1px;left:var(--lounge-stick-left);bottom:var(--lounge-stick-bottom)';
-      s.appendChild(probe);
-      const line = probe.getBoundingClientRect().bottom;
-      probe.remove();
-      const zone = { x: 0, y: line - 180, r: innerWidth * 0.42, b: line };
+      // The stick's own zone (TOUCH's .lounge-stick-zone), as drawn.
+      const z = document.querySelector('.lounge-stick-zone')?.getBoundingClientRect();
+      const zone = z ? { x: z.left, y: z.top, r: z.right, b: z.bottom } : { x: 0, y: 0, r: 0, b: 0 };
       const hits = [];
       for (const el of s.querySelectorAll('.lounge-header, .lounge-dock, .lounge-peek, .lounge-board, .lounge-card, .lounge-sit, .lounge-decor-prompt, .observatory-prompt, .observatory-nearby, .dir-cue, .lounge-menu-sheet, .lounge-seat-menu')) {
         const r = el.getBoundingClientRect();
@@ -723,9 +1251,10 @@ module.exports = {
       }
       return { zone, hits, posture: s.getAttribute('data-posture') };
     });
-    h.check('portrait standing: the lower-left thumb zone above the dock is free of persistent chrome', free.posture === 'standing' && free.hits.length === 0, free);
+    h.check('portrait standing: the lower-left thumb zone above the dock is free of persistent chrome', free.posture === 'standing' && free.zone.r > 0 && free.hits.length === 0, free);
     await g.audit('standing', { insets });
     await h.shot('standing');
+    await section(h, 'standing floats vs the stick zone', () => floatsClearOfStick(h, g, 'standing'));
     // A selection while standing: its sheet is the one thing at the foot of
     // the screen (the place prompts wait under it), and it blocks the stick.
     await page.evaluate(() => window.__fly.airportWatch.select('a1b2c3'));
@@ -773,6 +1302,7 @@ module.exports = {
     h.check('landscape: the binoculars sit at the foot of the rail, under the right thumb', !!fab && fab.y > rail.y + rail.h * 0.6, { fab, rail });
     await g.audit('seated idle', { insets });
     await h.shot('idle');
+    await section(h, 'seated floats vs the Walk ring', () => floatsClearOfStick(h, g, 'seated, first visit'));
     // Board as a side sheet.
     await g.tapEl('[data-testid="lounge-board-toggle"]');
     const board = await g.rect('[data-testid="lounge-board"]');
@@ -837,6 +1367,22 @@ module.exports = {
     await g.audit('seat menu', { insets });
     await h.shot('seats');
     await g.back('[data-testid="lounge-seat-menu"]');
+    // Standing with a side sheet: the left thumb still walks.
+    await section(h, 'standing with a side sheet', () => sideSheetStickGates(h, g), async () => {
+      await g.lowerAll();
+      await page.evaluate(() => {
+        const w = window.__fly.airportWatch;
+        if (w.posture !== 'seated') w.sit(w.seats?.[0]?.id ?? 'window');
+      });
+      await h.until(() => window.__fly.airportWatch.posture === 'seated', undefined, 15000);
+    });
     await g.setInsets(null);
+    // Last (it leaves the lounge and comes back): the two Back chains from flight.
+    await section(h, 'Back chains from flight', () => atlasEntryGates(h, g), async () => {
+      // Whatever happened, end in the KCMH lounge for the runner's closing checks.
+      if (await page.evaluate(() => !!window.__fly.airportWatch?.active)) return;
+      await page.evaluate(() => window.__fly.airportWatch?.enter?.('KCMH').catch(() => {}));
+      await h.until(() => !!window.__fly.airportWatch?.validated, undefined, 240000);
+    });
   },
 };
