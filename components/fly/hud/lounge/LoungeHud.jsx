@@ -1,6 +1,6 @@
 'use client';
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, MotionConfig, motion } from 'framer-motion';
 import { Binoculars, Camera, Crosshair, ListOrdered, Map as MapIcon, Moon, RotateCcw, Sun, Volume2, VolumeX } from 'lucide-react';
 import { useFlyStore } from '@/stores/fly-store';
 import { getRuntimeAction } from '@/lib/fly/runtime-bus';
@@ -41,6 +41,7 @@ import { LoungeHeaderPhone } from './LoungeHeader';
 import { BoardPeek, CoachMarks, LoungeMenuSheet, PhoneDock, peekMovement } from './PhoneLounge';
 import { binoLayoutOf, loungeLayoutOf, useSafeInsets } from './lounge-layout';
 import { useLoungeBack } from './use-lounge-back';
+import { prefersReducedMotion } from '@/lib/fly/airport-watch-camera.mjs';
 import './lounge-mobile.css';
 
 const DIRECTOR_ON = playPassOn('LOUNGE_DIRECTOR');
@@ -117,6 +118,11 @@ export function LoungeHud({ runtime, watch }) {
   const safeRef = useRef(null);
   const insets = useSafeInsets(safeRef, mobile);
   const paused = useFlyStore((s) => s.phase === 'paused');
+  // Reduced motion (FLY_LOUNGE_MOBILE.md rule 4: the game's own setting, else
+  // the OS), read each render (the 1 Hz tick re-renders, so a change in
+  // Settings lands within a second): data-reduced for the CSS, and
+  // MotionConfig for the framer-motion springs and slides of the phone HUD.
+  const reduced = mobile && prefersReducedMotion();
   const [sheetState, setSheetState] = useState(null);
   const [cardExpanded, setCardExpanded] = useState({ hex: null, open: false });
 
@@ -216,8 +222,14 @@ export function LoungeHud({ runtime, watch }) {
   const standing = watch.posture === 'standing' || watch.posture === 'gliding';
   const showPeek = phone && !watch.binocular && !auto && !inspecting && !covered && !sheet && !runtimeLayer && !spotterUp && !standing;
   // The thumb zone (FLY_LOUNGE_MOBILE.md contract 1): the walk stick hides
-  // while a sheet or panel covers the lower-left zone.
-  const blocked = mobile && (!!sheet || spotterUp || runtimeLayer || inspecting || covered || paused || !!watch.binocular);
+  // while a sheet or panel covers the lower-left zone. A phone held sideways
+  // opens the board, the lounge menu and the spotter card as side sheets on
+  // the right, clear of the zone (lounge-mobile.css), so there they leave the
+  // stick up: the left thumb walks while the right one reads. The seat menu,
+  // a décor card, the instruments, inspect, the full panels, pause and the
+  // binoculars block in every layout.
+  const sideSheets = layout === 'phone-landscape';
+  const blocked = mobile && ((!sideSheets && (!!sheet || spotterUp)) || runtimeLayer || inspecting || covered || paused || !!watch.binocular);
   const boardCount = board.arrivals.length + board.departures.length + board.ground.length + board.overhead.length + board.local.length;
 
   // Android Back on a touch device (use-lounge-back.js): the topmost lounge
@@ -311,6 +323,7 @@ export function LoungeHud({ runtime, watch }) {
       data-sheet={phone && (sheet || runtimeLayer || spotterUp) ? '1' : undefined}
       data-peek={showPeek ? '1' : undefined}
       data-thumb-blocked={mobile ? (blocked ? '1' : '0') : undefined}
+      data-reduced={reduced ? '1' : undefined}
       onKeyDown={(e) => {
         // Keyboard isolation: keys typed inside the lounge never steer.
         if (e.key !== 'Escape') e.stopPropagation();
@@ -318,6 +331,7 @@ export function LoungeHud({ runtime, watch }) {
       onPointerDownCapture={auto ? (e) => { if (!e.target.closest?.('[data-director-control]')) w?.director?.handBack(); } : undefined}
       onWheelCapture={auto ? () => w?.director?.handBack() : undefined}
     >
+      <PhoneMotion mobile={mobile} reduced={reduced}>
       <LoungeSurface runtime={runtime} picker={picker} onNotice={flash} />
       <LoungeOverlay runtime={runtime} picker={picker} binoLayout={binoLayout} insets={mobile ? insets : null} />
       {/* LOUNGE MOBILE slot: `blocked` is true while a sheet or panel covers
@@ -471,6 +485,7 @@ export function LoungeHud({ runtime, watch }) {
           watch={watch}
           sheet={sheet}
           boardCount={boardCount}
+          selection={spotterUp ? selectedRow?.label || watch.selected : null}
           onBoard={() => setSheet(sheet === 'board' ? null : 'board')}
           onMore={() => setSheet(sheet === 'more' ? null : 'more')}
           onAction={() => setSheetState(null)}
@@ -486,7 +501,7 @@ export function LoungeHud({ runtime, watch }) {
           ))}
         </p>
       )}
-      {phone && <CoachMarks posture={watch.posture} hidden={!watch.validated || !!watch.binocular || auto || inspecting || covered || !!sheet || runtimeLayer || spotterUp} />}
+      {phone && <CoachMarks posture={watch.posture} walk={!!watch.walk} hidden={!watch.validated || !!watch.binocular || auto || inspecting || covered || !!sheet || runtimeLayer || spotterUp} />}
 
       <AnimatePresence>
         {sheet === 'more' && (
@@ -517,11 +532,18 @@ export function LoungeHud({ runtime, watch }) {
       <AnimatePresence>
         {status && !(binoLayout !== 'desktop' && watch.binocular) && (
           // framer-motion owns `transform`, so the centring offset rides in x.
-          <motion.p key={status} className="lounge-status airport-status" role="status" initial={{ opacity: 0, y: -6, x: '-50%' }} animate={{ opacity: 1, y: 0, x: '-50%' }} exit={{ opacity: 0, x: '-50%' }} transition={{ duration: 0.2 }}>
+          <motion.p key={status} className="lounge-status airport-status" role="status" initial={reduced ? false : { opacity: 0, y: -6, x: '-50%' }} animate={{ opacity: 1, y: 0, x: '-50%' }} exit={{ opacity: 0, x: '-50%' }} transition={{ duration: 0.2 }}>
             {status}
           </motion.p>
         )}
       </AnimatePresence>
+      </PhoneMotion>
     </section>
   );
+}
+
+/** Phones and tablets: the HUD's framer-motion follows the reduced-motion preference. Desktop: no wrapper, today's tree. */
+function PhoneMotion({ mobile, reduced, children }) {
+  if (!mobile) return children;
+  return <MotionConfig reducedMotion={reduced ? 'always' : 'never'}>{children}</MotionConfig>;
 }

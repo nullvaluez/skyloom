@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotionConfig } from 'framer-motion';
 import { ArrowUpRight, Binoculars, Camera, Crosshair, Info, Plane, PlaneLanding, PlaneTakeoff, X } from 'lucide-react';
 import { useFlyStore } from '@/stores/fly-store';
 import { useRoute } from '@/hooks/use-route';
@@ -114,6 +114,9 @@ export function SpotterCard({ runtime, hex, boardRow, fieldElev, airportIdent, o
   const tracking = useFlyStore((s) => s.airportWatch?.tracking);
   const binocular = useFlyStore((s) => s.airportWatch?.binocular);
   const validated = useFlyStore((s) => s.airportWatch?.validated);
+  // LOUNGE MOBILE: under a phone's reduced motion (LoungeHud's MotionConfig;
+  // false on desktop, which has none) the card is simply there.
+  const still = useReducedMotionConfig();
   const [live, setLive] = useState(() => readLive(runtime, hex, fieldElev));
   const [notice, setNotice] = useState('');
   const track = runtime.traffic?.tracks.get(hex);
@@ -165,7 +168,7 @@ export function SpotterCard({ runtime, hex, boardRow, fieldElev, airportIdent, o
       aria-label={`Selected aircraft ${title}`}
       data-sheet={sheet ? (sheet.expanded ? 'expanded' : 'peek') : undefined}
       data-lounge-avoid={sheet ? '' : undefined}
-      initial={{ opacity: 0, y: 14, scale: 0.985 }}
+      initial={still ? false : { opacity: 0, y: 14, scale: 0.985 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ type: 'spring', stiffness: 340, damping: 30 }}
     >
