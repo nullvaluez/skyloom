@@ -10,6 +10,9 @@ import { goldenHourNow } from '@/lib/fly/airport-watch-sky.mjs';
 import { FeaturedAirportCard, GoldenHourRow, goldenAirports, sunNow } from './airports/browser-parts';
 import { LoungeAirportRow } from './airports/LoungeAirportRow';
 import { LoungeHud } from './lounge/LoungeHud';
+import { useDeviceLayout } from '@/hooks/use-device-layout';
+import { isMobileGraphicsClass } from '@/lib/fly/device-class';
+import { useLoungeBack } from './lounge/use-lounge-back';
 import './target-ui.css';
 import './airport-watch.css';
 
@@ -90,7 +93,18 @@ export function AirportExperience({ runtime }) {
   );
 }
 
+// LOUNGE MOBILE — GLASS: on a touch device the browser opens without raising
+// the keyboard (the search field waits for a tap; focus goes to the dialog),
+// and opened from the title it answers Back (Android) by closing, never by
+// leaving the app (lounge/use-lounge-back.js; over the lounge the lounge's own
+// Back chain closes it first). Its phone layout is airport-watch.css's
+// [data-device='phone'] block: a full-height sheet whose featured lounges
+// scroll sideways and whose region chips stay on one scrolling line.
+const browserUp = () => !!useFlyStore.getState().airportBrowserOpen;
+
 function AirportBrowser({ runtime }) {
+  const { isTouch } = useDeviceLayout();
+  const lounging = useFlyStore((s) => !!s.airportWatch);
   const [query, setQuery] = useState('');
   const [region, setRegion] = useState('all');
   const [visible, setVisible] = useState(12);
@@ -119,7 +133,8 @@ function AirportBrowser({ runtime }) {
   useEffect(() => {
     const previous = document.activeElement;
     const requests = generation;
-    ref.current?.querySelector('input')?.focus();
+    if (isMobileGraphicsClass()) ref.current?.focus({ preventScroll: true });
+    else ref.current?.querySelector('input')?.focus();
     return () => {
       requests.current++;
       previous?.focus?.();
@@ -162,6 +177,8 @@ function AirportBrowser({ runtime }) {
       clearInterval(id);
     };
   }, []);
+
+  useLoungeBack(isTouch && !lounging, close, browserUp);
 
   async function choose(id) {
     const token = ++generation.current;
@@ -206,7 +223,7 @@ function AirportBrowser({ runtime }) {
         }
       }}
     >
-      <section className="tgt airport-browser" ref={ref} role="dialog" aria-modal="true" aria-labelledby="airport-browser-title" data-testid="airport-browser">
+      <section className="tgt airport-browser" ref={ref} role="dialog" aria-modal="true" aria-labelledby="airport-browser-title" data-testid="airport-browser" tabIndex={isTouch ? -1 : undefined}>
         <header className="ab-head">
           <div>
             <small className="ab-kicker">

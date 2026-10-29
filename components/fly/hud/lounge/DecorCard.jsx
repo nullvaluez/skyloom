@@ -60,7 +60,8 @@ export function DecorPrompt({ runtime, offer }) {
   );
 }
 
-export function DecorCard({ runtime, item }) {
+/** `touch` (LOUNGE MOBILE): a touch device, so the close hint names the button, not the keys. */
+export function DecorCard({ runtime, item, touch = false }) {
   const card = useRef(null);
   // Focus moves into the card and returns, on close, to what had it (or to
   // the look surface when that was the prompt, which the card replaces).
@@ -97,7 +98,7 @@ export function DecorCard({ runtime, item }) {
       <Icon size={20} aria-hidden="true" className="lounge-decor-icon" />
       <h2 id="lounge-decor-title">{item.label}</h2>
       <p id="lounge-decor-text">{item.text}</p>
-      <small>Enter or Esc to close</small>
+      <small>{touch ? 'Tap × to close' : 'Enter or Esc to close'}</small>
     </section>
   );
 }

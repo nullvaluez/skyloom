@@ -1786,3 +1786,115 @@
     animation: none !important;
   }
 }
+
+/* ---------------------------------------------------------------------
+   LOUNGE MOBILE — GLASS: the airport browser on a phone (the fly root's
+   data-device='phone'; desktops and tablets never match). A full-height
+   sheet inside the safe areas: no keyboard on open (AirportExperience.jsx),
+   the featured lounges as a sideways carousel so the directory is reachable
+   without a long scroll, region chips on one scrolling line, 44 px targets.
+   --------------------------------------------------------------------- */
+[data-device='phone'] .airport-browser-backdrop {
+  padding: calc(env(safe-area-inset-top, 0px) + 8px) calc(env(safe-area-inset-right, 0px) + 6px) 0 calc(env(safe-area-inset-left, 0px) + 6px);
+  place-items: stretch;
+  background: rgba(2, 4, 9, 0.86);
+}
+[data-device='phone'] .airport-browser {
+  width: 100%;
+  max-height: none;
+  padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 20px);
+  border-radius: 24px 24px 0 0;
+  border-bottom: 0;
+  background-image: linear-gradient(162deg, rgba(14, 22, 42, 0.99), rgba(4, 7, 15, 1));
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+[data-device='phone'] .airport-browser:focus {
+  outline: none;
+}
+[data-device='phone'] .airport-browser h1 {
+  margin: 8px 0 6px;
+  font-size: 27px;
+}
+[data-device='phone'] .ab-head p {
+  font-size: 13px;
+  line-height: 1.5;
+}
+[data-device='phone'] .ab-search {
+  margin-top: 14px;
+  height: 50px;
+}
+[data-device='phone'] .ab-search input {
+  font-size: 16px; /* 16 px: iOS Safari zooms the page into a smaller field */
+}
+[data-device='phone'] .ab-section {
+  margin: 18px 0 10px;
+  flex-wrap: wrap;
+  line-height: 1.5;
+}
+[data-device='phone'] .ab-featured {
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(148px, 46%);
+  margin: 0 -16px;
+  padding: 2px 16px 6px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scroll-padding: 0 16px;
+  scrollbar-width: none;
+}
+[data-device='phone'] .ab-featured button {
+  min-height: 116px;
+  scroll-snap-align: start;
+}
+[data-device='phone'] .airport-browser .ab-regions {
+  flex-wrap: nowrap;
+  margin: 0 -16px 12px;
+  padding: 0 16px 2px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+[data-device='phone'] .airport-browser .ab-regions button {
+  flex-shrink: 0;
+  min-height: 44px;
+  white-space: nowrap;
+}
+[data-device='phone'] .airport-browser .ab-lounge-list,
+[data-device='phone'] .ab-golden {
+  grid-template-columns: minmax(0, 1fr);
+}
+[data-device='phone'] .airport-browser .ab-lounge-row {
+  min-height: 64px;
+}
+[data-device='phone'] .airport-browser .ab-more,
+[data-device='phone'] .airport-browser .ab-catalog-error button {
+  min-height: 48px;
+}
+[data-device='phone'] .airport-browser .ab-head .tgt-iconbtn {
+  flex-shrink: 0;
+}
+/* Landscape phones: the short height goes to the lists. */
+[data-device='phone'][data-orient='landscape'] .airport-browser {
+  padding-top: 12px;
+}
+[data-device='phone'][data-orient='landscape'] .ab-head p {
+  display: none;
+}
+[data-device='phone'][data-orient='landscape'] .airport-browser h1 {
+  margin: 6px 0 0;
+  font-size: 22px;
+}
+[data-device='phone'][data-orient='landscape'] .ab-featured {
+  grid-auto-columns: minmax(170px, 30%);
+}
+[data-device='phone'][data-orient='landscape'] .ab-featured button {
+  min-height: 98px;
+}
+[data-device='phone'][data-orient='landscape'] .airport-browser .ab-lounge-list,
+[data-device='phone'][data-orient='landscape'] .ab-golden {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
