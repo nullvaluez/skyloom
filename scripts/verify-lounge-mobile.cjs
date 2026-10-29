@@ -15,7 +15,7 @@
 // Check modules (one file per stream, so the streams never edit one file):
 //   scripts/lounge-mobile/touch-checks.cjs  the TOUCH stream
 //   scripts/lounge-mobile/glass-checks.cjs  the GLASS stream
-// Each exports { name, portrait(h), landscape(h) }. The harness object `h`:
+// Each exports { name, portrait(h), landscape(h), tablet?(h) }. The harness object `h`:
 //   page, cdp           the Playwright page and its CDP session
 //   touch               scripts/lounge-mobile/touch-driver.cjs (tap, doubleTap,
 //                       hold, drag, push, pinch, send) in CSS px
@@ -26,6 +26,7 @@
 //   state()             a snapshot of window.__fly.airportWatch
 //   contacts            the mocked traffic (hex, flight, ...)
 //   phase, viewport     'portrait' | 'landscape' and { width, height }
+//   device              'phone' | 'tablet' (--device ipad)
 //   out, report         the out dir and the JSON report being written
 //
 // The container this was written in has no GPU (SwiftShader at a few fps) and
@@ -33,8 +34,12 @@
 // frame-rate or look verdict. Those belong to the owner's iPhone.
 //
 //   FLY_URL=http://localhost:3421/ FLY_CHROMIUM=/opt/pw-browsers/chromium \
-//     node scripts/verify-lounge-mobile.cjs [--out <dir>] [--dpr 2] [--only touch|glass] [--tall]
-//   (--tall: the full 390 x 844 screen, as a home-screen web app sees it)
+//     node scripts/verify-lounge-mobile.cjs [--out <dir>] [--dpr 2] [--only touch|glass] [--tall] [--device ipad]
+//   (--tall: the full 390 x 844 screen, as a home-screen web app sees it.
+//   --device ipad: an iPad mini, 768 x 1024 then 1024 x 768, a coarse-touch
+//   TABLET (short side 768, so not phone-class): each module's tablet(h) runs
+//   in both orientations instead of portrait / landscape, with h.device
+//   'tablet'; a module without tablet(h) is reported as an INFO line.)
 const { chromium, devices } = require('playwright');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -62,8 +67,11 @@ const info = (name, detail) => {
 };
 const modules = [require('./lounge-mobile/touch-checks.cjs'), require('./lounge-mobile/glass-checks.cjs')].filter((m) => !only || m.name === only);
 
-const PORTRAIT = has('tall') ? { width: 390, height: 844 } : { ...devices['iPhone 13'].viewport };
-const LANDSCAPE = { ...devices['iPhone 13 landscape'].viewport };
+const DEVICE = arg('device', 'iphone') === 'ipad' ? 'tablet' : 'phone';
+const BASE = DEVICE === 'tablet' ? devices['iPad Mini'] : devices['iPhone 13'];
+const SCREEN = DEVICE === 'tablet' ? { width: 768, height: 1024 } : { width: 390, height: 844 };
+const PORTRAIT = DEVICE === 'tablet' ? { width: 768, height: 1024 } : has('tall') ? { width: 390, height: 844 } : { ...devices['iPhone 13'].viewport };
+const LANDSCAPE = DEVICE === 'tablet' ? { width: 1024, height: 768 } : { ...devices['iPhone 13 landscape'].viewport };
 const seed = () => {
   localStorage.setItem('fly-map-style-2', 'satellite');
   localStorage.setItem('fly-controls-seen', '1');
@@ -85,8 +93,17 @@ const fixtures = () => {
 };
 
 async function newPhone(browser, extra = {}) {
-  const base = devices['iPhone 13'];
-  return browser.newContext({ ...base, viewport: PORTRAIT, screen: { width: 390, height: 844 }, deviceScaleFactor: dpr, ...extra });
+  return browser.newContext({ ...BASE, viewport: PORTRAIT, screen: SCREEN, deviceScaleFactor: dpr, ...extra });
+}
+/** One module phase: portrait / landscape on a phone, tablet(h) on a tablet. */
+async function runPhase(m, h, phase) {
+  const fn = DEVICE === 'tablet' ? m.tablet : m[phase];
+  console.log(`--- ${m.name}: ${DEVICE === 'tablet' ? 'tablet ' : ''}${phase}`);
+  if (typeof fn !== 'function') {
+    info(`${m.name} has no ${DEVICE === 'tablet' ? 'tablet' : phase} phase`);
+    return;
+  }
+  try { await fn.call(m, h); } catch (e) { check(`${m.name} ${DEVICE === 'tablet' ? 'tablet ' : ''}${phase} phase ran to the end`, false, e.message); }
 }
 
 (async () => {
@@ -105,7 +122,7 @@ async function newPhone(browser, extra = {}) {
       await p.goto(URL_, { timeout: 240000, waitUntil: 'domcontentloaded' });
       await p.getByTestId('title-screen').waitFor({ state: 'visible', timeout: 240000 });
       await p.waitForTimeout(1500);
-      check('-LOUNGE_MOBILE: the phone title offers no lounge', (await p.getByTestId('watch-airport').count()) === 0);
+      check(`-LOUNGE_MOBILE: the ${DEVICE} title offers no lounge`, (await p.getByTestId('watch-airport').count()) === 0);
       await ctx.close();
     }
 
@@ -134,8 +151,8 @@ async function newPhone(browser, extra = {}) {
     await page.goto(URL_, { timeout: 240000, waitUntil: 'domcontentloaded' });
     const card = page.getByTestId('watch-airport').first();
     const offered = await card.waitFor({ state: 'visible', timeout: 300000 }).then(() => true, () => false);
-    check('the phone title offers "Watch an airport"', offered);
-    if (!offered) throw new Error('no lounge entry on the phone title');
+    check(`the ${DEVICE} title offers "Watch an airport"`, offered);
+    if (!offered) throw new Error(`no lounge entry on the ${DEVICE} title`);
     await page.screenshot({ path: path.join(out, 'title.png') });
     await card.tap();
     const featured = page.getByTestId('airport-featured-KCMH');
@@ -143,7 +160,7 @@ async function newPhone(browser, extra = {}) {
     await page.screenshot({ path: path.join(out, 'browser.png') });
     await featured.tap();
     const ready = await page.waitForFunction(() => window.__fly?.airportWatch?.validated && window.__flyBoot?.pct === 100 && !window.__fly.worldLoading, undefined, { timeout: 480000 }).then(() => true, () => false);
-    check('KCMH lounge validates on the phone', ready, { seconds: Math.round((Date.now() - boot) / 1000) });
+    check(`KCMH lounge validates on the ${DEVICE}`, ready, { seconds: Math.round((Date.now() - boot) / 1000) });
     if (!ready) throw new Error('the lounge never validated');
     await page.getByTestId('warp-hold').waitFor({ state: 'hidden', timeout: 120000 }).catch(() => {});
     await page.waitForFunction(() => document.querySelectorAll('.lounge-status').length === 0, undefined, { timeout: 180000 }).catch(() => {});
@@ -170,13 +187,10 @@ async function newPhone(browser, extra = {}) {
 
     const h = {
       page, cdp, touch: touchDriver(cdp), check, info, wait, until, state, contacts, out, report,
-      phase: 'portrait', viewport: PORTRAIT,
+      phase: 'portrait', viewport: PORTRAIT, device: DEVICE,
       shot: (name) => page.screenshot({ path: path.join(out, `${h.phase}-${name}.png`) }),
     };
-    for (const m of modules) {
-      console.log(`--- ${m.name}: portrait`);
-      try { await m.portrait(h); } catch (e) { check(`${m.name} portrait phase ran to the end`, false, e.message); }
-    }
+    for (const m of modules) await runPhase(m, h, 'portrait');
 
     // Landscape, then back.
     h.phase = 'landscape';
@@ -184,10 +198,7 @@ async function newPhone(browser, extra = {}) {
     await page.setViewportSize(LANDSCAPE);
     await wait(2500);
     await h.shot('turned');
-    for (const m of modules) {
-      console.log(`--- ${m.name}: landscape`);
-      try { await m.landscape(h); } catch (e) { check(`${m.name} landscape phase ran to the end`, false, e.message); }
-    }
+    for (const m of modules) await runPhase(m, h, 'landscape');
     h.phase = 'portrait';
     h.viewport = PORTRAIT;
     await page.setViewportSize(PORTRAIT);
