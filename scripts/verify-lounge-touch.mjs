@@ -94,6 +94,8 @@ await check('recognizer: a still, short touch is ONE tap at the touch-down point
   assert.equal(g.state, 'idle');
   g.down(2, 300, 300, 1000);
   assert.deepEqual(g.up(2, 300, 300, 1000 + G.tapMs + 20), [], 'a slow press is not a tap');
+  g.down(3, 100, 200, 2000);
+  assert.deepEqual(g.up(3, 100 + G.slopPx + 30, 200, 2060), [], 'a finger that lifts far from where it landed (no moves in between) is not a tap');
 });
 
 await check('recognizer: a drag grabs at the touch-down point, follows the finger, never taps, and releases with the finger\'s velocity', () => {

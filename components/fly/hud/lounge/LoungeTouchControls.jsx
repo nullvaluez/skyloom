@@ -94,6 +94,17 @@ export function LoungeTouchControls({ runtime, watch, blocked = false }) {
   useEffect(() => () => {
     if (press.current) runtime.airportWatch?.setMoveAnalog?.(0, 0, false);
   }, [runtime]);
+  // A thumb on the stick never scrolls or bounces the page (touch-action
+  // covers most browsers; a non-passive touchmove covers the rest).
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return undefined;
+    const hold = (e) => {
+      if (e.cancelable) e.preventDefault();
+    };
+    el.addEventListener('touchmove', hold, { passive: false });
+    return () => el.removeEventListener('touchmove', hold);
+  }, [ready]);
 
   if (!ready) return null;
 
