@@ -46,7 +46,7 @@ function read(runtime) {
       gsKt: Math.hypot(t.fix1.vE, t.fix1.vN) * MPS_TO_KT,
       rangeKm: Math.hypot(dx, dy, dz) / 1000,
       vsFpm: (t.fix1.vUp || 0) * M_TO_FT * 60,
-      locked: w.tracking && w.lockError() < fov / 8,
+      locked: w.tracking && w.lockError() < (w.lockTolerance?.() ?? fov / 8), // the runtime's lock tolerance (contract 5)
       tracking: w.tracking,
       stale: t.stale,
     };
