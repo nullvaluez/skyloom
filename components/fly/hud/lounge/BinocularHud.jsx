@@ -147,9 +147,10 @@ function DesktopBinocularHud({ runtime }) {
  *    the instruments' Readouts switch, as on desktop; the lock status and
  *    callsign always show;
  *  - landscape: the twin lenses with the identity and figures in the left
- *    column (and the Readouts switch, a labelled chip, when motion look holds
- *    the right column's side slot), the power, a vertical wheel, Lower and the
- *    side toggle in the right one.
+ *    column; the power, a vertical wheel, Lower and the side toggle in the
+ *    right one (with motion look in the side slot, the Readouts switch is a
+ *    labelled chip across the right column, above Lower: the left column is
+ *    full with the figures, and a chip under them ran onto the map credit).
  * Test ids: binocular-view, binocular-readout, binocular-mag (as on desktop),
  * binocular-ident, binocular-notice, binocular-lower, binocular-motion,
  * binocular-readouts, binocular-tape, binocular-wheel.
@@ -360,7 +361,8 @@ function PhoneBinocularHud({ runtime, layout, insets, notice }) {
   );
   // The instruments' Readouts switch (the pier room), always labelled: a
   // round beside the wheel in portrait; in landscape a round in the right
-  // column, or a chip in the left one when motion look holds that slot.
+  // column's side slot, or a chip across that column (above Lower) when
+  // motion look holds the slot.
   const readoutsButton = (chip) => observatory && (
     <button type="button" className={chip ? 'bp-chip' : 'bp-round'} data-testid="binocular-readouts" aria-pressed={observatory.readouts} onClick={() => w?.observatory?.setReadouts(!observatory.readouts)} aria-label={observatory.readouts ? 'Hide the readouts' : 'Show the readouts'}>
       <Gauge size={chip ? 16 : 19} aria-hidden="true" />
@@ -387,11 +389,11 @@ function PhoneBinocularHud({ runtime, layout, insets, notice }) {
             {ident}
             {lineEl}
             {figures}
-            {motionLook && readoutsButton(true)}
           </div>
           <div className="bp-col bp-col-right" data-lounge-avoid="">
             {mag}
             <FocusWheel runtime={runtime} axis="y" />
+            {motionLook && readoutsButton(true)}
             <div className="bp-col-actions">
               {lower}
               {motionButton || readoutsButton(false) || spacer}

@@ -91,6 +91,9 @@ function pageAudit({ insets, label }) {
     '.lounge .bp-top', '.lounge .bp-bottom', '.lounge .bp-col-left', '.lounge .bp-col-right', '.lounge .bp-float-notice', '[data-zone="attribution"] > div',
     // The walk stick (TOUCH's): the seated Walk ring and its label, the standing ring.
     '.lounge .lounge-stick', '.lounge .lounge-stick-label',
+    // The binocular bands' own pieces (a piece that overflows its band or
+    // column lands on the glass, the credit or the other band).
+    '.lounge .bp-ident', '.lounge .bp-figures', '.lounge .bp-chip', '.lounge .bp-round', '.lounge .bp-notice',
   ];
   const chrome = [];
   for (const sel of CHROME) for (const el of document.querySelectorAll(sel)) if (visible(el)) chrome.push({ sel, name: name(el), el, ...box(el) });
@@ -434,8 +437,12 @@ async function wheelGates(h, g, axis) {
   const wheel = await g.rect('[data-testid="binocular-wheel"]');
   if (!wheel) return h.check(`${h.phase} focus wheel: present`, false);
   const target = async () => (await g.watch()).target;
+  // A steady power first: the director's range framing (or the raise) eases
+  // the power, and the scale rolls with it under a finger aimed a moment ago.
+  await h.page.evaluate(() => window.__fly.airportWatch.setMagnification(7));
+  await h.until(() => Math.abs((window.__fly.airportWatch.optics?.mag ?? 0) - 7) < 0.02, undefined, 30000);
   // A preset label is a button: a tap goes straight there.
-  const p12 = await g.rect('[data-testid="binocular-preset-12"]');
+  const p12 = await g.stableRect('[data-testid="binocular-preset-12"]', 3000);
   if (p12 && p12.x > wheel.x && p12.r < wheel.r && p12.y >= wheel.y - 1 && p12.b <= wheel.b + 1) await h.touch.tap(p12.x + p12.w / 2, p12.y + p12.h / 2);
   else await h.page.evaluate(() => window.__fly.airportWatch.setMagnification(12));
   await h.wait(500);
@@ -610,13 +617,13 @@ async function topBandGates(h, g, label, insets) {
  * standing, the zone a thumb may start it in — and the coach's first tip has
  * no stick under it.
  */
-async function floatsClearOfStick(h, g, label, { dismiss = true } = {}) {
+async function floatsClearOfStick(h, g, label, { dismiss = true, coach = true } = {}) {
   const { page } = h;
   // Standing by a chair the Sit prompt is itself the hint and the tips step
   // aside for it (by design): walk off with the stick until no place prompt
   // is up, so the tips can be measured standing.
   if ((await g.watch()).posture === 'standing') {
-    const prompt = () => page.evaluate(() => !!document.querySelector('.lounge :is(.lounge-sit, .lounge-decor-prompt, .observatory-prompt, .observatory-nearby)'));
+    const prompt = () => page.evaluate(() => [...document.querySelectorAll('.lounge :is(.lounge-sit, .lounge-decor-prompt, .observatory-prompt, .observatory-nearby)')].some((el) => el.getBoundingClientRect().width > 0));
     for (const [dx, dy] of [[0, 46], [-40, 30], [40, 30], [0, 46]]) {
       if (!(await prompt())) break;
       const z = await g.rect('.lounge-stick-zone');
@@ -626,9 +633,11 @@ async function floatsClearOfStick(h, g, label, { dismiss = true } = {}) {
     }
     h.info(`${h.phase} ${label}: walked clear of the place prompts for the tips`, { prompt: await prompt() });
   }
-  await page.evaluate(() => window.__flyLoungeCoach?.open());
-  await g.appear('[data-testid="lounge-coach"]', 4000);
-  await h.wait(400);
+  if (coach) {
+    await page.evaluate(() => window.__flyLoungeCoach?.open());
+    await g.appear('[data-testid="lounge-coach"]', 4000);
+    await h.wait(400);
+  }
   const m = await page.evaluate(() => {
     const box = (el) => {
       if (!el) return null;
@@ -669,10 +678,10 @@ async function floatsClearOfStick(h, g, label, { dismiss = true } = {}) {
   const hit = (a, b) => !!a && !!b && Math.min(a.r, b.r) - Math.max(a.x, b.x) > 1 && Math.min(a.b, b.b) - Math.max(a.y, b.y) > 1;
   const standing = m.posture === 'standing';
   const guard = standing ? [m.zone, m.ring] : [m.ring, m.label];
-  const floats = { coach: m.coach, status: m.status, lower: m.lower };
+  const floats = coach ? { coach: m.coach, status: m.status, lower: m.lower } : { status: m.status, lower: m.lower };
   const over = Object.entries(floats).filter(([, r]) => guard.some((gd) => hit(r, gd))).map(([k]) => k);
-  h.check(`${h.phase} ${label}: the walk stick shows, and the coach marks, the status line and the lower thirds keep out of its ${standing ? 'zone' : 'Walk ring'}`, m.show === '1' && !!m.ring && !!m.coach && over.length === 0, { posture: m.posture, show: m.show, over, ring: m.ring, zone: standing ? m.zone : undefined, ...floats });
-  h.check(`${h.phase} ${label}: no part of the stick lies under the coach's first tip (a first touch there is a look, not a walk)`, !m.under.some((n) => /lounge-stick/.test(n)), m.under.slice(0, 6));
+  h.check(`${h.phase} ${label}: the walk stick shows, and ${coach ? 'the coach marks, ' : ''}the status line and the lower thirds keep out of its ${standing ? 'zone' : 'Walk ring'}`, m.show === '1' && !!m.ring && (!coach || !!m.coach) && over.length === 0, { posture: m.posture, show: m.show, over, ring: m.ring, zone: standing ? m.zone : undefined, ...floats });
+  if (coach) h.check(`${h.phase} ${label}: no part of the stick lies under the coach's first tip (a first touch there is a look, not a walk)`, !m.under.some((n) => /lounge-stick/.test(n)), m.under.slice(0, 6));
   if (dismiss) await page.evaluate(() => document.querySelector('[data-testid="lounge-coach-dismiss"]')?.click());
 }
 
@@ -728,6 +737,64 @@ async function reducedMotionGate(h, g) {
     await page.evaluate(() => localStorage.setItem('fly-reduced-motion', '0'));
     await h.until(() => !document.querySelector('.lounge')?.hasAttribute('data-reduced'), undefined, 5000);
   }
+}
+
+/**
+ * The phone surfaces that only show in some states (the Sit / décor /
+ * instrument prompts near a chair, a director lower third at a touchdown)
+ * are solid too: a probe element with each one's real classes, measured
+ * through the real cascade and removed, computes no backdrop blur.
+ */
+async function solidProbes(h) {
+  const m = await h.page.evaluate(() => {
+    const s = document.querySelector('.lounge[data-layout^="phone"]');
+    if (!s) return null;
+    const out = {};
+    for (const [name, html] of [
+      ['sit', '<div class="lounge-sit lounge-panel">Sit</div>'],
+      ['decor', '<button class="lounge-decor-prompt">Look</button>'],
+      ['instrument', '<div class="observatory-prompt lounge-panel">Use</div>'],
+      ['nearby', '<div class="observatory-nearby lounge-panel">Near</div>'],
+      ['lower third', '<div class="dir-lower-slot"><div class="dir-lower">Touchdown</div></div>'],
+    ]) {
+      const t = document.createElement('div');
+      t.innerHTML = html;
+      const el = t.firstElementChild;
+      s.appendChild(el);
+      const target = el.querySelector('.dir-lower') || el;
+      const cs = getComputedStyle(target);
+      out[name] = cs.backdropFilter || cs.webkitBackdropFilter || 'none';
+      el.remove();
+    }
+    return out;
+  });
+  const blurred = m ? Object.entries(m).filter(([, f]) => f !== 'none') : [['layout', 'not a phone']];
+  h.check(`${h.phase} solid surfaces: the Sit / décor / instrument prompts and the lower thirds never blur the canvas`, blurred.length === 0, m);
+}
+
+/**
+ * Steady glasses, nothing changing: the wheel writes nothing per frame (its
+ * aria value and its scale's transform change only with the power).
+ */
+async function steadyWheelGate(h) {
+  const m = await h.page.evaluate(() => new Promise((resolve) => {
+    const wheel = document.querySelector('[data-testid="binocular-wheel"]');
+    if (!wheel) return resolve(null);
+    let records = 0, frames = 0;
+    const mo = new MutationObserver((list) => { records += list.length; });
+    mo.observe(wheel, { attributes: true, subtree: true, attributeFilter: ['aria-valuenow', 'style'] });
+    const t0 = performance.now();
+    const tick = () => {
+      frames++;
+      if (performance.now() - t0 < 2500) requestAnimationFrame(tick);
+      else {
+        mo.disconnect();
+        resolve({ records, frames, mag: window.__fly.airportWatch?.optics?.mag });
+      }
+    };
+    requestAnimationFrame(tick);
+  }));
+  h.check(`${h.phase} focus wheel: steady glasses, the wheel writes nothing per frame`, !!m && m.frames >= 3 && m.records <= 2, m);
 }
 
 /** No two visible buttons of the dock and the spotter sheet answer to the same name (two "More"s did two different things). */
@@ -788,6 +855,8 @@ async function sideSheetStickGates(h, g) {
       const moved = before?.eye && after?.eye ? Math.hypot(after.eye.x - before.eye.x, after.eye.z - before.eye.z) : 0;
       h.check('landscape standing with the spotter card open: a push on the stick walks', moved > 0.15 && after.selected === 'a1b2c3', { moved: Number(moved.toFixed(3)), selected: after?.selected });
     }
+    // A status line or a lower third that comes now keeps out of the zone too.
+    await floatsClearOfStick(h, g, `standing with ${label} open`, { dismiss: false, coach: false });
     await h.shot(`standing-${label === 'the board' ? 'board' : 'spotter'}`);
   }
   await page.evaluate(() => window.__fly.airportWatch.clearSelection());
@@ -878,7 +947,7 @@ module.exports = {
   name: 'glass',
   // Shared with scratch probes (tablet, desktop); the runner reads only name /
   // portrait / landscape.
-  helpers: { pageAudit, maskSample, glass, binoParts, section, motionGates, topBandGates, floatsClearOfStick, wheelGlideGate, reducedMotionGate, labelsGate, sideSheetStickGates, atlasEntryGates, figureGates, readoutGates, raiseWhereNothingFlies, settleBinoculars },
+  helpers: { pageAudit, maskSample, glass, binoParts, section, solidProbes, steadyWheelGate, motionGates, topBandGates, floatsClearOfStick, wheelGlideGate, reducedMotionGate, labelsGate, sideSheetStickGates, atlasEntryGates, figureGates, readoutGates, raiseWhereNothingFlies, settleBinoculars },
 
   // Each phase runs with the inbound re-staged on its own clock (restage()).
   async portrait(h) {
@@ -1034,6 +1103,7 @@ module.exports = {
     h.check('portrait idle: the thumb zone is published (--lounge-stick-left / --lounge-stick-bottom) above the dock and the peek', zone.left > 0 && zone.left < 60 && zone.line <= peek.y - 4 && zone.line > h.viewport.height * 0.45 && zone.blocked === '0', { ...zone, peekTop: peek?.y });
     await g.audit('seated idle', { insets });
     await h.shot('idle');
+    await section(h, 'solid surfaces', () => solidProbes(h));
 
     // The board: peek -> sheet.
     await g.tapEl('[data-testid="lounge-board-peek"] .lpk-main');
@@ -1132,6 +1202,7 @@ module.exports = {
     await h.wait(900);
     h.info('portrait binoculars settled (glasses fully up)', settled);
     await figureGates(h, g, true);
+    await section(h, 'steady wheel', () => steadyWheelGate(h));
     const notice = await g.rect('[data-testid="binocular-notice"]');
     const noticeText = notice ? await page.evaluate(() => document.querySelector('[data-testid="binocular-notice"]').textContent) : null;
     const fig = (await page.evaluate(maskSample)).fig;

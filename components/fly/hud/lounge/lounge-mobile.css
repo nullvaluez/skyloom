@@ -1121,6 +1121,19 @@
   top: auto;
   bottom: var(--lounge-float-up);
 }
+/* Landscape with a side sheet up and the stick with it: they sit in the strip
+   between the header and the stick's zone, left of the sheet (the status
+   line two lines at most: the strip is all a 342 px tall screen has). */
+.lounge[data-layout='phone-landscape'][data-sheet='1']:not([data-auto='1']):has(.lounge-touch[data-show='1']) :is(.lounge-status, .dir-lower-slot) {
+  top: auto;
+  bottom: calc(var(--lounge-stick-bottom) + var(--lounge-zone-h) + 8px);
+}
+.lounge[data-layout='phone-landscape'][data-sheet='1']:not([data-auto='1']):has(.lounge-touch[data-show='1']) .lounge-status {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
 
 /* ---------------------------------------------------------------------
    THE PHONE BINOCULAR VIEW (BinocularHud PhoneBinocularHud). The bands are
@@ -1402,8 +1415,8 @@
 .bp-round:active {
   transform: scale(0.92);
 }
-/* The Readouts switch as a labelled chip (landscape's left column, when
-   motion look holds the right column's side slot). */
+/* The Readouts switch as a labelled chip (landscape: across the right
+   column above Lower, when motion look holds the column's side slot). */
 .bp-chip {
   display: inline-flex;
   flex-shrink: 0;
@@ -1624,6 +1637,10 @@
 .bino-phone .bp-col-right .bino-wheel {
   flex: 1;
   min-height: 0;
+}
+.bino-phone .bp-col-right .bp-chip {
+  align-self: stretch;
+  justify-content: center;
 }
 .bp-col-actions {
   display: flex;
