@@ -1,0 +1,205 @@
+/* =====================================================================
+   LOUNGE MOBILE — the touch layer (FLY_LOUNGE_MOBILE.md; the TOUCH stream
+   owns this file): the walk stick (LoungeTouchControls.jsx) and the iOS
+   gestures a lounge must not have. Everything here is touch-only: the stick
+   renders on touch devices only, and the surface rules sit under a
+   coarse-pointer query, so a fine-pointer desktop sees none of it.
+
+   Ink glass, ice type, cyan for the action, amber for the run (target-ui
+   tokens, inherited from the .lounge.tgt section). Solid alpha fills, no
+   backdrop-filter: over the live canvas a blur re-reads the framebuffer
+   every frame (R17's most expensive piece of phone chrome).
+
+   Geometry contract (FLY_LOUNGE_MOBILE.md "Cross-stream contracts" 2): the
+   HUD publishes --lounge-stick-bottom (dock + safe area + a gap) and
+   --lounge-stick-left (the left inset, safe area included) on .lounge. The
+   resting ring sits at left: var(--lounge-stick-left, 20px); bottom:
+   var(--lounge-stick-bottom, 96px), and a thumb may start the stick
+   anywhere in the zone above that line.
+   ===================================================================== */
+
+/* No long-press callout, no text selection, no double-tap zoom on the
+   lounge for a finger; the look surface and the stick never scroll the page. */
+@media (pointer: coarse) {
+  .lounge {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .lounge .lounge-surface {
+    touch-action: none;
+    overscroll-behavior: contain;
+  }
+}
+
+.lounge-touch {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.lounge-stick-zone {
+  position: absolute;
+  left: 0;
+  bottom: var(--lounge-stick-bottom, 96px);
+  width: min(50vw, 260px);
+  height: min(42vh, 300px);
+  pointer-events: auto;
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.lounge-stick-zone[data-passive] {
+  pointer-events: none;
+}
+
+/* The stick. At rest it is a faint ring in the zone's corner; pushed, its
+   base sits under the thumb (left / top set inline, centred). */
+.lounge-stick {
+  --stick-size: 120px;
+  --stick-tone: rgba(238, 245, 255, 0.34);
+  position: absolute;
+  left: calc(var(--lounge-stick-left, 20px) + var(--stick-size) / 2);
+  top: calc(100% - var(--lounge-stick-bottom, 96px) - var(--stick-size) / 2);
+  width: var(--stick-size);
+  height: var(--stick-size);
+  margin: calc(var(--stick-size) / -2) 0 0 calc(var(--stick-size) / -2);
+  pointer-events: none;
+  touch-action: none;
+  opacity: 0.5;
+  transition: opacity 180ms ease, transform 180ms ease;
+  animation: lounge-stick-in 220ms ease-out both;
+}
+.lounge-stick-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--stick-tone);
+  background: radial-gradient(circle, rgba(5, 9, 19, 0.06) 0 52%, rgba(5, 9, 19, 0.32) 100%);
+  box-shadow: inset 0 0 0 6px rgba(5, 9, 19, 0.12);
+  transition: border-color 140ms ease, box-shadow 140ms ease, transform 160ms ease;
+}
+.lounge-stick-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 52px;
+  height: 52px;
+  margin: -26px 0 0 -26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--t-ice, #eef5ff);
+  background: rgba(238, 245, 255, 0.16);
+  border: 1px solid rgba(238, 245, 255, 0.28);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  transition: transform 160ms cubic-bezier(0.2, 0.9, 0.3, 1.2), background-color 140ms ease, border-color 140ms ease;
+  will-change: transform;
+}
+.lounge-stick-run {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translate(-50%, 4px);
+  padding: 3px 9px 3px 10px;
+  border-radius: 999px;
+  font: 700 10px/1.2 var(--t-mono, ui-monospace, monospace);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--t-ink, #050913);
+  background: var(--t-amber, #ffc561);
+  opacity: 0;
+  transition: opacity 120ms ease, transform 160ms ease;
+}
+.lounge-stick-run::after {
+  content: ' \00BB';
+}
+
+/* Pushed: the base under the thumb, crisp, the knob tracking it 1:1. */
+.lounge-stick[data-state='active'],
+.lounge-stick[data-state='run'] {
+  opacity: 1;
+}
+.lounge-stick[data-state='active'] .lounge-stick-ring {
+  border-color: rgba(79, 227, 255, 0.62);
+  box-shadow: inset 0 0 0 6px rgba(79, 227, 255, 0.08), 0 0 0 1px rgba(5, 9, 19, 0.35);
+}
+.lounge-stick:is([data-state='active'], [data-state='run']) .lounge-stick-knob {
+  transition: background-color 140ms ease, border-color 140ms ease;
+  background: rgba(79, 227, 255, 0.3);
+  border-color: rgba(79, 227, 255, 0.85);
+}
+/* Running: amber, a slightly wider ring and the RUN tag. */
+.lounge-stick[data-state='run'] .lounge-stick-ring {
+  border-color: rgba(255, 197, 97, 0.9);
+  box-shadow: inset 0 0 0 6px rgba(255, 197, 97, 0.12), 0 0 18px rgba(255, 197, 97, 0.28);
+  transform: scale(1.06);
+}
+.lounge-stick[data-state='run'] .lounge-stick-knob {
+  color: var(--t-ink, #050913);
+  background: var(--t-amber, #ffc561);
+  border-color: var(--t-amber, #ffc561);
+}
+.lounge-stick[data-state='run'] .lounge-stick-run {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+/* Seated: a small "Walk" ring in the same corner, the only part that takes
+   a touch (44 px+ target with its label). */
+.lounge-stick[data-mode='seated'] {
+  --stick-size: 64px;
+  left: calc(var(--lounge-stick-left, 20px) + 32px);
+  top: calc(100% - var(--lounge-stick-bottom, 96px) - 32px - 14px);
+  pointer-events: auto;
+  opacity: 0.78;
+  -webkit-tap-highlight-color: transparent;
+}
+.lounge-stick[data-pushed] {
+  pointer-events: auto;
+}
+.lounge-stick[data-mode='seated'] .lounge-stick-ring {
+  background: rgba(5, 9, 19, 0.38);
+}
+.lounge-stick[data-mode='seated'] .lounge-stick-knob {
+  width: 40px;
+  height: 40px;
+  margin: -20px 0 0 -20px;
+  background: rgba(238, 245, 255, 0.1);
+  box-shadow: none;
+}
+.lounge-stick-label {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 4px);
+  transform: translateX(-50%);
+  font: 600 10px/1.2 var(--t-sans, system-ui, sans-serif);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(238, 245, 255, 0.82);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+  white-space: nowrap;
+}
+
+@keyframes lounge-stick-in {
+  from { opacity: 0; transform: scale(0.92); }
+}
+
+/* Reduced motion: no fades, no springs, no pop-in. */
+.lounge-touch[data-reduced] .lounge-stick,
+.lounge-touch[data-reduced] .lounge-stick * {
+  animation: none !important;
+  transition: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lounge-stick,
+  .lounge-stick * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
