@@ -97,7 +97,10 @@ export function AirportExperience({ runtime }) {
 // the keyboard (the search field waits for a tap; focus goes to the dialog),
 // and opened from the title it answers Back (Android) by closing, never by
 // leaving the app (lounge/use-lounge-back.js; over the lounge the lounge's own
-// Back chain closes it first). Its phone layout is airport-watch.css's
+// Back chain closes it first). Opened from the Atlas pill in flight it is the
+// top layer: Back closes it and the Atlas stays, and picking an airport hands
+// its history entry to the lounge (the Atlas's own entry, left under it, is
+// unwound by the flight chain once Back reaches it). Its phone layout is airport-watch.css's
 // [data-device='phone'] block: a full-height sheet whose featured lounges
 // scroll sideways and whose region chips stay on one scrolling line.
 const browserUp = () => !!useFlyStore.getState().airportBrowserOpen;
