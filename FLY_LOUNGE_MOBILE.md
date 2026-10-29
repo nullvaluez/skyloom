@@ -320,7 +320,7 @@ interior probe's occasional six-face refresh.
 | `verify-lounge-glass.mjs` (node: lens and band geometry, wheel, the two Back chains together, CSS contracts) | 56/56 (in the suite) |
 | `verify-mobile-actions-node.mjs` (the flight HUD's Back chain, which the lounge now shares) | 17/17 |
 | `verify-lounge-mobile.cjs` (iPhone 13, portrait + landscape, both modules) | Before the fix round: 136/140 (the four reds are the cross-review's findings, fixed). **On the merged tree: 266/267, no page errors.** The one red ("landscape Back chains from flight") was the check's timing, not the app: it tapped the Atlas's pill 2.5 s after a far warp, while the arrival curtain (`warp-hold`, pre-existing, it takes every tap until the area streams) was still up under SwiftShader; a lead probe on the same flow shows the curtain lifting after 15 s and the pill then opening the browser over the Atlas. The check now waits for the curtain. |
-| `verify-lounge-mobile.cjs --device ipad` | Running at the merge, recorded below when it lands (the streams' tablet probes: 12/12 per orientation). |
+| `verify-lounge-mobile.cjs --device ipad` | First merged-tree run 67/72: three real tablet layout reds (the airport browser's 40 px region chips and 43 px close; the desktop spotter card touching the taller tablet bar at 1024 x 768), fixed in `4ab14f7`, plus two touch-check timing reds. **Rerun: 70/72, every GLASS tablet check green.** The two reds are the TOUCH tablet phase's own staging, not the app: "a tap on QAL101 selects it" (upright) found no aircraft from the check's own fixture, while a lead probe on the same upright iPad shows the overlay registering QAL101 on screen and a fingertip tap selecting it; "a one-finger drag turns the view" (landscape) read 0 degrees once and passed on the previous run (and upright on both). Open for the TOUCH check: stage the aircraft from the runner's fixture on a tablet. |
 | Desktop 1280 x 800, fine pointer: the lounge's visible controls (test id, class, box, label) in four states (seated, selected, binoculars, standing), W0 vs final | Every control present in both, no page errors in either; the only differences are live content (the feed count, the director's next movement, status lines, the weather item when the forecast has or has not arrived, the spotter card mid-entry). The 1920 x 1080 leg did not validate under the box's load. |
 
 All browser evidence is SwiftShader in a container whose map hosts are
@@ -365,5 +365,8 @@ blocked: layout, gestures and state only.
   load; 1280 x 800 is the desktop evidence, with each stream's own W0 A/B.
 - **Pre-existing lint errors** (`LoungeHud.jsx` set-state-in-effect,
   `SpotterCard.jsx` two) are W0's, untouched.
+- **Two TOUCH tablet checks are flaky** (see the iPad row): the upright tap
+  check stages its own aircraft and missed it twice; the app picks it (lead
+  probe).
 - `next dev` (16.4.0) prints a Next.js security-upgrade notice; nothing was
   upgraded in this pass.
