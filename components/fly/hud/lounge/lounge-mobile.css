@@ -272,6 +272,12 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* A touch leaves :hover on the last control tapped (sticky hover): the dock
+   shows only pressed state and the press itself. */
+.lounge-dock .lounge-btn:hover:not(:disabled):not([aria-pressed='true']) {
+  background: transparent;
+  box-shadow: none;
+}
 .ldk-btn:active:not(:disabled),
 .lounge-dock .lounge-btn:active:not(:disabled) {
   transform: scale(0.94);
@@ -841,6 +847,11 @@
   align-items: stretch;
   gap: 2px;
 }
+/* A chair (or a décor piece) and the window's instruments can both be in
+   reach: the instruments stack above the Sit prompt, on the same side. */
+.lounge[data-layout^='phone']:has(:is(.lounge-sit, .lounge-decor-prompt)) .observatory-nearby {
+  bottom: calc(var(--lounge-float-bottom) + 56px);
+}
 .lounge[data-layout^='phone'] .observatory-nearby button {
   min-height: 44px;
 }
@@ -875,10 +886,18 @@
 .lounge[data-layout='phone-landscape'] .lounge-status {
   max-width: min(440px, calc(100% - var(--lounge-side-right) - 32px));
 }
-/* With a sheet up the line moves under the header, never over the sheet. */
+/* With a sheet up the line moves under the header, never over the sheet
+   (in landscape: centred in the open view left of the side sheet). */
 .lounge[data-layout^='phone'][data-sheet='1'] .lounge-status {
   top: calc(var(--lounge-head-bottom) + 8px);
   bottom: auto;
+}
+.lounge[data-layout='phone-landscape'][data-sheet='1'] .lounge-status {
+  left: calc((100% - var(--lounge-side-right) - 368px) / 2);
+  max-width: calc(100% - var(--lounge-side-right) - 384px);
+}
+.lounge[data-layout='phone-landscape'][data-sheet='1'] .dir-lower-slot {
+  max-width: calc(100% - var(--lounge-side-right) - 384px);
 }
 
 .lounge-coach {
@@ -1180,12 +1199,10 @@
   box-shadow: inset 0 0 0 1px rgba(186, 222, 255, 0.1);
 }
 .bp-figures span {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  grid-template-rows: auto auto;
+  display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  column-gap: 3px;
-  row-gap: 3px;
+  gap: 3px 3px;
   min-width: 0;
   padding: 6px 8px 7px;
 }
@@ -1193,18 +1210,16 @@
   box-shadow: inset 1px 0 0 rgba(186, 222, 255, 0.1);
 }
 .bp-figures small {
-  grid-column: 1 / -1;
+  flex-basis: 100%;
   font: 700 8.5px/1 var(--t-sans);
   letter-spacing: 0.18em;
   color: var(--t-faint);
 }
 .bp-figures b {
-  overflow: hidden;
   font: 600 17px/1 var(--t-mono);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
   white-space: nowrap;
-  text-overflow: clip;
   color: var(--t-ice);
 }
 .bp-figures em {
@@ -1461,8 +1476,8 @@
   gap: 8px;
 }
 .bino-phone .bp-col-actions .bp-round {
-  width: 52px;
-  height: 52px;
+  width: 50px;
+  height: 50px;
 }
 .bino-phone .bp-col-actions .bp-spacer {
   display: none;

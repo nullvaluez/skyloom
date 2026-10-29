@@ -47,9 +47,14 @@ export function useSafeInsets(ref, on) {
       setInsets((prev) => (prev.top === next.top && prev.right === next.right && prev.bottom === next.bottom && prev.left === next.left ? prev : next));
     };
     read();
+    // The probe's padding IS the insets, so its box changes size exactly when
+    // they do (rotation, a standalone web app's bars, an emulator override).
+    const ro = typeof ResizeObserver === 'undefined' || !ref.current ? null : new ResizeObserver(read);
+    ro?.observe(ref.current, { box: 'border-box' });
     window.addEventListener('resize', read);
     window.addEventListener('orientationchange', read);
     return () => {
+      ro?.disconnect();
       window.removeEventListener('resize', read);
       window.removeEventListener('orientationchange', read);
     };

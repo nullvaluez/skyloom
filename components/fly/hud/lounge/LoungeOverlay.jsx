@@ -658,6 +658,10 @@ export function LoungeOverlay({ runtime, picker, binoLayout = 'desktop', insets 
         }
       }
 
+      // LOUNGE MOBILE: the phone's binocular figure (null on desktop).
+      const { mode } = layoutRef.current;
+      const figure = mode === 'desktop' ? null : binocularFigure(mode, W, H, layoutRef.current.insets || undefined);
+
       // Selection out of frame: an edge arrow toward it (only while it is
       // visible through the glazing — the overlay never points at a wall).
       if (selectedTrack && !(selectedHit?.onScreen)) {
@@ -670,7 +674,13 @@ export function LoungeOverlay({ runtime, picker, binoLayout = 'desktop', insets 
         const len = Math.hypot(ux, uy) || 1;
         ux /= len; uy /= len;
         const inset = 46, hx = W / 2 - inset, hy = H / 2 - inset - 40;
-        const s = Math.min(hx / Math.max(1e-6, Math.abs(ux)), hy / Math.max(1e-6, Math.abs(uy)));
+        let s = Math.min(hx / Math.max(1e-6, Math.abs(ux)), hy / Math.max(1e-6, Math.abs(uy)));
+        // Phone, glasses up: the arrow rides the inside of the glass (an
+        // ellipse over the fused field), never the dark bands of readouts.
+        if (figure && amount > 0.5) {
+          const rx = ((figure.right - figure.left) / 2) * 0.84, ry = figure.R * 0.84;
+          s = 1 / Math.hypot(ux / rx, uy / ry);
+        }
         const ex = W / 2 + ux * s, ey = H / 2 - uy * s;
         const ang = Math.atan2(-uy, ux);
         ctx.save();
@@ -687,13 +697,12 @@ export function LoungeOverlay({ runtime, picker, binoLayout = 'desktop', insets 
         ctx.shadowBlur = 10;
         ctx.fill();
         ctx.restore();
-        pill(ctx, ex - ux * 34 - 40, ey + uy * 34 - 12, [contactLabel(selectedTrack.meta, selectedTrack.hex)], { w: W, h: H, accent: C.cyan, alpha: 0.9 });
+        if (figure) pillClear(ctx, ex - ux * 34 - 40, ey + uy * 34 - 12, [contactLabel(selectedTrack.meta, selectedTrack.hex)], { w: W, h: H, accent: C.cyan, alpha: 0.9 }, avoid);
+        else pill(ctx, ex - ux * 34 - 40, ey + uy * 34 - 12, [contactLabel(selectedTrack.meta, selectedTrack.hex)], { w: W, h: H, accent: C.cyan, alpha: 0.9 });
       }
 
       // Binocular lock box: hugs the aircraft once the glasses are up (on a
       // phone its smallest size follows the lens radius).
-      const { mode } = layoutRef.current;
-      const figure = mode === 'desktop' ? null : binocularFigure(mode, W, H, layoutRef.current.insets || undefined);
       if (selectedHit && amount > 0.3) {
         const locked = w.tracking && w.lockError() < fovRad / 8;
         const a = smoothstep(0.3, 0.9, amount);

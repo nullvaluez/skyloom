@@ -338,9 +338,9 @@ export function LoungeHud({ runtime, watch }) {
 
       {!observatory?.prompt && !instrumentOpen && !decorOpen && !sheet && <SitPrompt runtime={runtime} watch={watch} />}
       {!sheet && <DecorPrompt runtime={runtime} offer={decorOffer} />}
-      {decorOpen && <DecorCard key={decorOpen.id} runtime={runtime} item={decorOpen} />}
+      {decorOpen && <DecorCard key={decorOpen.id} runtime={runtime} item={decorOpen} touch={mobile || undefined} />}
       <ObservatoryHud runtime={runtime} state={observatory} hidden={inspecting || covered || watch.seatMenu || !!decorOpen || !!sheet} />
-      <SeatMenu runtime={runtime} watch={watch} />
+      <SeatMenu runtime={runtime} watch={watch} touch={mobile || undefined} />
 
       {DIRECTOR_ON && !phone && !inspecting && !covered && !instrumentOpen && !watch.seatMenu && !decorOpen && <DirectorCue runtime={runtime} state={director} binocular={!!watch.binocular} card={!!watch.selected && !watch.binocular && !auto} />}
       {/* Phone: the next movement rides the board's peek; the cue itself only
