@@ -324,6 +324,94 @@ async function readoutGates(h, g, portrait) {
   }
 }
 
+/*
+ * The runner flies QAL101 in from 7 km on its own clock (t0), so it passes
+ * over the lounge about two minutes after arrival. A GLASS phase that starts
+ * later than that (after the TOUCH module, or on a slow machine) would find
+ * nothing ahead to lock onto, and the director would lower the glasses on a
+ * session that ended mid-check. For the length of each GLASS phase the
+ * inbound is re-staged on the phase's own clock: 8 km out on the same bearing,
+ * level at the same height, and slow (18 m/s), so it stays in the glass for
+ * the whole phase. The runner's own fixture comes back when the phase ends, so
+ * whatever runs after this module sees the feed the runner wrote. (The
+ * runner's fixture reads each contact's lat / lon / altFt on every poll, so
+ * getters move the contact on the phase's clock.)
+ */
+async function restage(h, hex = 'a1b2c3') {
+  const c = (h.contacts || []).find((x) => x.hex === hex);
+  if (!c) return () => {};
+  const g = await h.page.evaluate(() => {
+    const r = window.__fly, w = r.airportWatch, k = w.frame.k, e = w.eyeWorld();
+    const facing = ((-w.roomHeading * 180) / Math.PI + 360) % 360;
+    const a = w.roomHeading + 0.12, range = 8000;
+    const geo = r.engine.worldToGeo({ x: e.x - Math.sin(a) * range * k, y: 0, z: e.z - Math.cos(a) * range * k });
+    const track = (facing + 180) % 360, tr = (track * Math.PI) / 180, gs = 18;
+    return { lat: geo.y, lon: geo.x, vLat: (gs * Math.cos(tr)) / 111320, vLon: (gs * Math.sin(tr)) / (111320 * Math.cos((geo.y * Math.PI) / 180)), altFt: (e.y + 380) * 3.28084, gsKt: gs * 1.943844, track };
+  }).catch(() => null);
+  if (!g) return () => {};
+  const saved = { lat: c.lat, lon: c.lon, dLat: c.dLat, dLon: c.dLon, altFt: c.altFt, vsFpm: c.vsFpm, gsKt: c.gsKt, track: c.track };
+  const t1 = Date.now();
+  const at = () => (Date.now() - t1) / 1000;
+  Object.defineProperties(c, {
+    lat: { get: () => g.lat + g.vLat * at(), configurable: true, enumerable: true },
+    lon: { get: () => g.lon + g.vLon * at(), configurable: true, enumerable: true },
+  });
+  Object.assign(c, { dLat: 0, dLon: 0, altFt: g.altFt, vsFpm: 0, gsKt: g.gsKt, track: g.track });
+  h.info(`${h.phase}: QAL101 re-staged for this phase (8 km out on the same bearing, level, 18 m/s inbound)`);
+  return () => {
+    Object.defineProperties(c, {
+      lat: { value: saved.lat, writable: true, configurable: true, enumerable: true },
+      lon: { value: saved.lon, writable: true, configurable: true, enumerable: true },
+    });
+    Object.assign(c, saved);
+  };
+}
+
+/**
+ * Raise the glasses where nothing flies. A drag turns by the live field of
+ * view and the head springs after it, so: lower and face the runway, let the
+ * field come back to the naked eye, turn well away, let the head arrive (the
+ * auto-acquire looks where the head IS), then raise. If the glasses still
+ * found an aircraft (it was on that side), the other way. Returns the drag
+ * that left nothing in the cone (null if neither did).
+ */
+async function raiseWhereNothingFlies(h) {
+  const { page } = h;
+  for (const dx of [-2600, 2600]) {
+    await page.evaluate(() => {
+      const w = window.__fly.airportWatch;
+      w.binoculars(false);
+      w.clearSelection();
+      w.resetLook();
+    });
+    await h.until(() => (window.__fly.airportWatch.optics?.mag ?? 1) < 1.05, undefined, 20000);
+    await page.evaluate((d) => window.__fly.airportWatch.dragLook(d, 0, innerHeight), dx);
+    let last = null;
+    for (let i = 0; i < 40; i++) {
+      await h.wait(400);
+      const yaw = await page.evaluate(() => window.__fly.airportWatch.yaw);
+      if (last != null && Math.abs(yaw - last) < 0.002) break;
+      last = yaw;
+    }
+    await page.evaluate(() => window.__fly.airportWatch.binoculars(true));
+    if (!(await page.evaluate(() => window.__fly.airportWatch.selected))) return dx;
+  }
+  return null;
+}
+
+/**
+ * Before the wheel gates: the glasses must still be up. Anything in the scene
+ * that lowered them (the director ending a session on the selection) is
+ * reported, and the glasses go back up without a target.
+ */
+async function keepGlassesUp(h, g) {
+  if ((await g.watch()).binocular) return;
+  h.info(`${h.phase}: the scene lowered the glasses before the wheel gates (raised again, no target)`, await h.page.evaluate(() => window.__fly.airportWatch.notice ?? null));
+  await h.page.evaluate(() => window.__fly.airportWatch.binoculars(true, { acquire: false }));
+  await g.appear('[data-testid="binocular-view"]');
+  await h.wait(600);
+}
+
 /** The focus wheel: a preset tap, a continuous drag, a release that settles on a detent. */
 async function wheelGates(h, g, axis) {
   const wheel = await g.rect('[data-testid="binocular-wheel"]');
@@ -360,7 +448,26 @@ module.exports = {
   // portrait / landscape.
   helpers: { pageAudit, maskSample, glass, binoParts },
 
+  // Each phase runs with the inbound re-staged on its own clock (restage()).
   async portrait(h) {
+    const restore = await restage(h);
+    try {
+      await this.portraitPhase(h);
+    } finally {
+      restore();
+    }
+  },
+
+  async landscape(h) {
+    const restore = await restage(h);
+    try {
+      await this.landscapePhase(h);
+    } finally {
+      restore();
+    }
+  },
+
+  async portraitPhase(h) {
     const g = glass(h);
     const { page } = h;
     const insetsOk = await g.setInsets(INSETS.portrait);
@@ -384,12 +491,12 @@ module.exports = {
     // has already used the view, the dev handle brings them back to be read.
     const onArrival = await g.shown('[data-testid="lounge-coach"]');
     h.info('portrait: coach marks visible when the GLASS phase began', { onArrival, remembered: await page.evaluate(() => localStorage.getItem('fly-lounge-coach-v1')) });
-    if (!onArrival) {
+    if (!(await g.shown('[data-testid="lounge-coach"]'))) {
       await page.evaluate(() => window.__flyLoungeCoach?.open());
-      await h.wait(600);
+      await g.appear('[data-testid="lounge-coach"]');
     }
-    const coach = await g.shown('[data-testid="lounge-coach"]');
-    const coachText = coach ? await page.evaluate(() => document.querySelector('[data-testid="lounge-coach"]').textContent) : '';
+    const coachText = await page.evaluate(() => document.querySelector('[data-testid="lounge-coach"]')?.textContent ?? '');
+    const coach = !!coachText;
     h.check('portrait: first-visit coach marks speak touch (drag, pinch, tap, double-tap)', coach && /Drag/.test(coachText) && /Pinch/.test(coachText) && /Tap/.test(coachText) && /Double-tap/.test(coachText) && !/click|scroll|WASD/i.test(coachText), coachText);
     await h.shot('coach');
     // (They fade on their own after a while: bring them back if that just happened.)
@@ -484,6 +591,7 @@ module.exports = {
       h.check('portrait binoculars: the motion toggle reflects motionLook.active after a tap', pressed === String(!!m1.motion?.active), { pressed, motion: m1.motion });
       if (m1.motion?.active) await g.tapEl('[data-testid="binocular-motion"]');
     }
+    await keepGlassesUp(h, g);
     await wheelGates(h, g, 'x');
     await h.shot('binoculars-20x');
     // Back lowers the glasses, then clears the selection.
@@ -499,12 +607,7 @@ module.exports = {
     // upright Safari page has no insets (its bars hold them), so the figure is
     // sized without; the insets of a home-screen app come back after.
     await g.setInsets(null);
-    await page.evaluate(() => {
-      const w = window.__fly.airportWatch;
-      w.resetLook();
-      w.dragLook(-2600, 0, innerHeight); // turn well away from both contacts
-      w.binoculars(true);
-    });
+    h.info('portrait binoculars: raised where nothing flies (drag)', await raiseWhereNothingFlies(h));
     const settled = await settleBinoculars(h);
     await h.wait(900);
     h.info('portrait binoculars settled (glasses fully up)', settled);
@@ -516,8 +619,17 @@ module.exports = {
     await g.audit('binoculars notice');
     await h.shot('binoculars-notice');
     if (insets) {
+      const r0 = fig?.R;
       await g.setInsets(insets);
-      await h.wait(900);
+      // The mask is redrawn in the overlay's frame loop, a frame or more after
+      // the bands move (seconds at SwiftShader's frame rate): wait for the
+      // figure itself to follow, not for a clock.
+      const followed = await h.until((r) => {
+        const f = JSON.parse(document.querySelector('[data-testid="binocular-mask"]')?.dataset.figure || 'null');
+        return !!f && f.R !== r;
+      }, r0, 15000);
+      h.info('portrait binoculars: the mask figure followed the insets', { followed, R: r0 });
+      await h.wait(600);
       await figureGates(h, g, true, { label: 'binoculars under safe-area insets', sizeGates: false });
       await g.audit('binoculars under safe-area insets', { insets });
       await h.shot('binoculars-insets');
@@ -591,6 +703,7 @@ module.exports = {
     await h.shot('seats');
     const seatBack = await g.back('[data-testid="lounge-seat-menu"]');
     h.check('portrait Back: Back closes the seat menu', seatBack && !(await g.shown('[data-testid="lounge-seat-menu"]')) && (await g.watch()).active);
+    await g.lowerAll();
     await page.evaluate(() => window.__fly.airportWatch.stand());
     await h.until(() => window.__fly.airportWatch.posture === 'standing', undefined, 30000);
     await h.wait(900);
@@ -613,6 +726,30 @@ module.exports = {
     h.check('portrait standing: the lower-left thumb zone above the dock is free of persistent chrome', free.posture === 'standing' && free.hits.length === 0, free);
     await g.audit('standing', { insets });
     await h.shot('standing');
+    // A selection while standing: its sheet is the one thing at the foot of
+    // the screen (the place prompts wait under it), and it blocks the stick.
+    await page.evaluate(() => window.__fly.airportWatch.select('a1b2c3'));
+    await g.appear('[data-testid="spotter-card"]');
+    await g.stableRect('[data-testid="spotter-card"]');
+    h.check('portrait standing with a selection: the sheet blocks the thumb zone', (await g.section('data-thumb-blocked')) === '1');
+    await g.audit('standing with a selection', { insets });
+    // The overlay (labels, the out-of-frame arrow and its callsign pill) never
+    // draws over the dock or the map credit.
+    const marks = await page.evaluate(() => {
+      const c = document.querySelector('[data-testid="lounge-marks"]');
+      const dock = document.querySelector('[data-testid="lounge-dock"]')?.getBoundingClientRect();
+      const credit = document.querySelector('[data-zone="attribution"] > div')?.getBoundingClientRect();
+      if (!c || !c.width || !dock) return null;
+      const k = c.width / c.clientWidth;
+      const top = Math.round(Math.min(dock.top, credit?.height ? credit.top : Infinity) * k);
+      const d = c.getContext('2d').getImageData(0, top, c.width, c.height - top).data;
+      let max = 0;
+      for (let i = 3; i < d.length; i += 4) if (d[i] > max) max = d[i];
+      return { top: top / k, maxAlpha: max };
+    });
+    h.check('portrait standing with a selection: the overlay draws nothing over the dock or the map credit', !!marks && marks.maxAlpha < 8, marks);
+    await h.shot('standing-selected');
+    await g.lowerAll();
     // Back to the window seat for the landscape phase.
     await page.evaluate(() => {
       const w = window.__fly.airportWatch;
@@ -622,7 +759,7 @@ module.exports = {
     await g.setInsets(null);
   },
 
-  async landscape(h) {
+  async landscapePhase(h) {
     const g = glass(h);
     const { page } = h;
     const insetsOk = await g.setInsets(INSETS.landscape);
@@ -657,6 +794,7 @@ module.exports = {
     await readoutGates(h, g, false);
     await g.audit('binoculars locked', { insets });
     await h.shot('binoculars');
+    await keepGlassesUp(h, g);
     await wheelGates(h, g, 'y');
     await h.shot('binoculars-20x');
     const lowerBack = await g.back('[data-testid="binocular-view"]');
@@ -664,12 +802,7 @@ module.exports = {
     const clearBack = await g.back('[data-testid="spotter-card"]');
     h.check('landscape Back: then clears the selection', clearBack && !(await g.watch()).selected && (await g.watch()).active, { pressed: clearBack });
     // The twin-lens figure, raised where nothing flies.
-    await page.evaluate(() => {
-      const w = window.__fly.airportWatch;
-      w.resetLook();
-      w.dragLook(-2600, 0, innerHeight);
-      w.binoculars(true);
-    });
+    h.info('landscape binoculars: raised where nothing flies (drag)', await raiseWhereNothingFlies(h));
     h.info('landscape binoculars settled (glasses fully up)', await settleBinoculars(h));
     await h.wait(900);
     await figureGates(h, g, false);

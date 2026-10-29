@@ -166,15 +166,20 @@ function edgeArrow(ctx, W, H, ux, uy, inset, rgb, avoid) {
   return { ex, ey, ux, uy };
 }
 
-/** DIRECTOR: a pill at (x, y) moved clear of the panels (below one it would cover, else above). */
+/**
+ * DIRECTOR: a pill at (x, y) moved clear of the panels (below one it would
+ * cover, else above). `opts.floor` (a phone): the top of the bottom chrome —
+ * the dock, a sheet, the map credit — which the pill stays above.
+ */
 function pillClear(ctx, x, y, lines, opts, avoid) {
   const [w, h] = measurePill(ctx, lines, !!opts.accent);
-  const rect = [clamp(x, 8, opts.w - w - 8), clamp(y, 8, opts.h - h - 8), w, h];
+  const bottom = (opts.floor ?? opts.h) - h - 8;
+  const rect = [clamp(x, 8, opts.w - w - 8), clamp(y, 8, bottom), w, h];
   for (let i = 0; i < 3; i++) {
     const r = avoid.find((o) => overlaps(o, rect));
     if (!r) break;
     const below = r[1] + r[3] + 6;
-    rect[1] = below + h < opts.h - 8 ? below : Math.max(8, r[1] - h - 6);
+    rect[1] = (opts.floor == null ? below + h < opts.h - 8 : below < bottom) ? below : Math.max(8, r[1] - h - 6);
   }
   drawPill(ctx, rect, lines, opts);
   return rect;
@@ -382,6 +387,9 @@ export function LoungeOverlay({ runtime, picker, binoLayout = 'desktop', insets 
     // Screen rectangles of the lounge's own panels (header, board, card,
     // control bar), re-read at 4 Hz: labels are placed clear of them.
     let avoid = [], avoidAt = -1e9;
+    // A phone: the top of the bottom chrome (dock, bar, peek, a sheet, the map
+    // credit), which the out-of-frame arrow and its pill stay above.
+    let floor = null;
     const readAvoid = (now) => {
       if (now - avoidAt < 250) return;
       avoidAt = now;
@@ -393,6 +401,17 @@ export function LoungeOverlay({ runtime, picker, binoLayout = 'desktop', insets 
       for (const el of root.querySelectorAll('.lounge-panel, .lh-actions, .lounge-help, .dir-lower, [data-lounge-avoid]')) {
         const r = el.getBoundingClientRect();
         if (r.width > 0 && r.height > 0) avoid.push([r.left - base.left - 6, r.top - base.top - 6, r.width + 12, r.height + 12]);
+      }
+      floor = null;
+      if (layoutRef.current.mode !== 'desktop') {
+        const tops = [];
+        const credit = document.querySelector('[data-zone="attribution"] > div')?.getBoundingClientRect();
+        if (credit?.height) tops.push(credit.top - base.top);
+        for (const el of root.querySelectorAll('.lounge-dock, .lounge-bar, .lounge-peek, .lounge-sheet, [data-sheet]')) {
+          const r = el.getBoundingClientRect();
+          if (r.width > 0 && r.height > 0 && r.top - base.top > base.height * 0.45) tops.push(r.top - base.top);
+        }
+        if (tops.length) floor = Math.min(...tops) - 6;
       }
     };
 
@@ -681,7 +700,11 @@ export function LoungeOverlay({ runtime, picker, binoLayout = 'desktop', insets 
           const rx = ((figure.right - figure.left) / 2) * 0.84, ry = figure.R * 0.84;
           s = 1 / Math.hypot(ux / rx, uy / ry);
         }
-        const ex = W / 2 + ux * s, ey = H / 2 - uy * s;
+        const ex = W / 2 + ux * s;
+        // A phone, glasses down: the arrow and its pill stay above the bottom
+        // chrome (the dock, a sheet, the credit).
+        const low = figure && floor != null && amount <= 0.5 ? floor : null;
+        const ey = low != null ? Math.min(H / 2 - uy * s, low - 14) : H / 2 - uy * s;
         const ang = Math.atan2(-uy, ux);
         ctx.save();
         ctx.translate(ex, ey);
@@ -697,7 +720,7 @@ export function LoungeOverlay({ runtime, picker, binoLayout = 'desktop', insets 
         ctx.shadowBlur = 10;
         ctx.fill();
         ctx.restore();
-        if (figure) pillClear(ctx, ex - ux * 34 - 40, ey + uy * 34 - 12, [contactLabel(selectedTrack.meta, selectedTrack.hex)], { w: W, h: H, accent: C.cyan, alpha: 0.9 }, avoid);
+        if (figure) pillClear(ctx, ex - ux * 34 - 40, ey + uy * 34 - 12, [contactLabel(selectedTrack.meta, selectedTrack.hex)], { w: W, h: H, accent: C.cyan, alpha: 0.9, floor: low }, avoid);
         else pill(ctx, ex - ux * 34 - 40, ey + uy * 34 - 12, [contactLabel(selectedTrack.meta, selectedTrack.hex)], { w: W, h: H, accent: C.cyan, alpha: 0.9 });
       }
 
