@@ -137,7 +137,9 @@ function DesktopBinocularHud({ runtime }) {
  *    or the notice ("No aircraft near your line of sight…") as a readable
  *    line. The bottom band is the thumb's: Lower, the focus wheel, and motion
  *    look when the device has it (else the observatory's Readouts toggle). A
- *    thumb on the wheel never covers a number it is reading;
+ *    thumb on the wheel never covers a number it is reading. In the pier
+ *    room the figures follow the instruments' Readouts switch, as on desktop;
+ *    the lock status and callsign always show;
  *  - landscape: the twin lenses with the identity and figures in the left
  *    column, the power, a vertical wheel and Lower in the right one.
  * Test ids: binocular-view, binocular-readout, binocular-mag (as on desktop),
@@ -267,7 +269,7 @@ function PhoneBinocularHud({ runtime, layout, insets, notice }) {
         <i aria-hidden="true" />
         {statusText}
       </span>
-      {lock && readouts && (
+      {lock && (
         <span className="bp-callsign">
           <strong>{lock.label}</strong>
           <small>{lock.type}</small>
@@ -294,16 +296,21 @@ function PhoneBinocularHud({ runtime, layout, insets, notice }) {
       <span>Lower</span>
     </button>
   );
+  // The instruments' Readouts toggle (the pier room): beside the wheel, or in
+  // the top band when motion look holds that place.
+  const readoutsToggle = observatory && (
+    <button type="button" className={motionLook ? 'bp-chip' : 'bp-round'} data-testid="binocular-readouts" aria-pressed={observatory.readouts} onClick={() => w?.observatory?.setReadouts(!observatory.readouts)} aria-label={observatory.readouts ? 'Hide the readouts' : 'Show the readouts'}>
+      <Gauge size={motionLook ? 17 : 19} aria-hidden="true" />
+      {!motionLook && <span>Readouts</span>}
+    </button>
+  );
   const side = motionLook ? (
     <button type="button" className="bp-round bp-motion" data-testid="binocular-motion" aria-pressed={motionLook.active} onClick={toggleMotion} aria-label={motionLook.active ? 'Turn motion look off' : 'Look by moving the phone'}>
       <Smartphone size={19} aria-hidden="true" />
       <span>{motionLook.active ? 'Motion on' : 'Motion'}</span>
     </button>
   ) : observatory ? (
-    <button type="button" className="bp-round" aria-pressed={observatory.readouts} onClick={() => w?.observatory?.setReadouts(!observatory.readouts)} aria-label={observatory.readouts ? 'Hide the readouts' : 'Show the readouts'}>
-      <Gauge size={19} aria-hidden="true" />
-      <span>Readouts</span>
-    </button>
+    readoutsToggle
   ) : (
     <span className="bp-round bp-spacer" aria-hidden="true" />
   );
@@ -318,6 +325,7 @@ function PhoneBinocularHud({ runtime, layout, insets, notice }) {
             <BearingTape runtime={runtime} elvRef={elv} />
             {ident}
             {figures}
+            {motionLook && readoutsToggle}
           </div>
           <div className="bp-col bp-col-right" data-lounge-avoid="">
             {mag}
@@ -338,6 +346,7 @@ function PhoneBinocularHud({ runtime, layout, insets, notice }) {
             </div>
             {ident}
             {figures}
+            {motionLook && readoutsToggle}
           </div>
           <div className="bp-bottom" data-lounge-avoid="">
             <div className="bp-controls">

@@ -10,6 +10,7 @@ import { M_TO_FT, MPS_TO_KT } from '@/lib/fly/coords';
 import { LOUNGE_ROOM } from '@/lib/fly/observation-config';
 import { trackPhase } from '@/lib/fly/flight-phase';
 import { airlineFor, contactLabel, phaseLabel, typeNameFor } from '@/lib/fly/airport-watch-board.mjs';
+import { CardToggle, SheetGrabber } from './LoungeSheet';
 
 /*
  * SPOTTER CARD — the selected aircraft, in the target-ui language: the real
@@ -103,7 +104,13 @@ function RouteLine({ route, loading, conflict }) {
   );
 }
 
-export function SpotterCard({ runtime, hex, boardRow, fieldElev, airportIdent, onPhoto, savingPhoto }) {
+/**
+ * `sheet` (LOUNGE MOBILE, phones only): { expanded, onToggle, onClose } makes
+ * the card a bottom sheet — a grabber on top, the identity, phase and the
+ * primary actions as its peek, and the route, figures and minor actions once
+ * expanded (lounge-mobile.css). Without it the card is today's, unchanged.
+ */
+export function SpotterCard({ runtime, hex, boardRow, fieldElev, airportIdent, onPhoto, savingPhoto, sheet }) {
   const tracking = useFlyStore((s) => s.airportWatch?.tracking);
   const binocular = useFlyStore((s) => s.airportWatch?.binocular);
   const validated = useFlyStore((s) => s.airportWatch?.validated);
@@ -156,10 +163,13 @@ export function SpotterCard({ runtime, hex, boardRow, fieldElev, airportIdent, o
       data-testid="spotter-card"
       data-overlay="airport-spotter"
       aria-label={`Selected aircraft ${title}`}
+      data-sheet={sheet ? (sheet.expanded ? 'expanded' : 'peek') : undefined}
+      data-lounge-avoid={sheet ? '' : undefined}
       initial={{ opacity: 0, y: 14, scale: 0.985 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ type: 'spring', stiffness: 340, damping: 30 }}
     >
+      {sheet && <SheetGrabber expanded={sheet.expanded} onToggle={sheet.onToggle} onExpand={sheet.expanded ? () => {} : sheet.onToggle} onCollapse={sheet.expanded ? sheet.onToggle : sheet.onClose} label={sheet.expanded ? 'Show less of the selected aircraft' : 'Show more of the selected aircraft'} />}
       <div className="lc-hero">
         <div className="lc-photo" data-empty={photoSrc ? '0' : '1'}>
           {photoSrc ? (
@@ -240,6 +250,7 @@ export function SpotterCard({ runtime, hex, boardRow, fieldElev, airportIdent, o
           {tracking ? 'Following' : 'Follow'}
           <span className="tgt-kbd">F</span>
         </button>
+        {sheet && <CardToggle expanded={sheet.expanded} onToggle={sheet.onToggle} />}
       </div>
       <div className="lc-actions lc-actions-minor">
         <button type="button" className="lc-chip" data-testid="spotter-details" onClick={() => useFlyStore.getState().setInspectHex(hex)} title="Open the full dossier (T)">

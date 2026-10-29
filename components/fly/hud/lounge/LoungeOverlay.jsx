@@ -714,6 +714,11 @@ export function LoungeOverlay({ runtime, picker, binoLayout = 'desktop', insets 
         maskKey = key;
         if (figure) {
           drawPhoneMask(mctx, W, H, amount, DIRECTOR ? Math.round(posts * 24) / 24 : 1, figure);
+          // The map credit (AttributionBar, under the lounge) stays readable
+          // through the dark: its strip is left clear (licensing).
+          const credit = document.querySelector('[data-zone="attribution"] > div')?.getBoundingClientRect();
+          const base = mask.getBoundingClientRect();
+          if (credit?.width) mctx.clearRect(credit.left - base.left, credit.top - base.top, credit.width, credit.height);
           // The figure the mask was drawn with, for the readouts' probes.
           mask.dataset.figure = JSON.stringify({ mode, R: Math.round(figure.R), lenses: figure.lenses.map((l) => [Math.round(l.cx), Math.round(l.cy)]) });
         } else {
