@@ -27,6 +27,17 @@
 //   contacts            the mocked traffic (hex, flight, ...)
 //   phase, viewport     'portrait' | 'landscape' and { width, height }
 //   device              'phone' | 'tablet' (--device ipad)
+//   reset()             the runtime back to a calm start (binoculars down and
+//                       eased to 1x, motion look off, no selection, details
+//                       closed); the runner calls it before every phase
+//
+// THE SENSOR. Headless Chromium has DeviceOrientationEvent but no sensor, so
+// the lounge's motion look (rightly) withdraws its toggle 1.6 s after an
+// enable that hears nothing. A real phone always reports, so by default the
+// page gets a phone resting still on a table: a deviceorientation event every
+// 250 ms repeating the last pose anyone dispatched (a check that dispatches
+// its own pose moves the "phone", which then holds there). --no-sensor turns
+// it off (a sensorless device: the toggle is withdrawn).
 //   out, report         the out dir and the JSON report being written
 //
 // The container this was written in has no GPU (SwiftShader at a few fps) and
@@ -34,7 +45,7 @@
 // frame-rate or look verdict. Those belong to the owner's iPhone.
 //
 //   FLY_URL=http://localhost:3421/ FLY_CHROMIUM=/opt/pw-browsers/chromium \
-//     node scripts/verify-lounge-mobile.cjs [--out <dir>] [--dpr 2] [--only touch|glass] [--tall] [--device ipad]
+//     node scripts/verify-lounge-mobile.cjs [--out <dir>] [--dpr 2] [--only touch|glass] [--tall] [--device ipad] [--no-sensor]
 //   (--tall: the full 390 x 844 screen, as a home-screen web app sees it.
 //   --device ipad: an iPad mini, 768 x 1024 then 1024 x 768, a coarse-touch
 //   TABLET (short side 768, so not phone-class): each module's tablet(h) runs
@@ -92,6 +103,39 @@ const fixtures = () => {
   }));
 };
 
+/** The resting phone (see THE SENSOR in the header): an init script. */
+function restingSensor() {
+  if (typeof window.DeviceOrientationEvent !== 'function') return;
+  let pose = { alpha: 0, beta: 90, gamma: 0, absolute: false };
+  let mine = false;
+  window.addEventListener('deviceorientation', (e) => {
+    if (!mine && e.beta != null) pose = { alpha: e.alpha, beta: e.beta, gamma: e.gamma, absolute: e.absolute };
+  }, true);
+  setInterval(() => {
+    mine = true;
+    try { window.dispatchEvent(new DeviceOrientationEvent('deviceorientation', pose)); } finally { mine = false; }
+  }, 250);
+}
+
+/** h.reset(): binoculars down and eased to 1x, motion off, no selection, details closed. */
+async function calmRuntime(page) {
+  await page.evaluate(() => {
+    const w = window.__fly?.airportWatch;
+    if (!w?.active) return;
+    w.motionLook?.disable?.();
+    if (w.binocular) w.binoculars(false);
+    else if ((w.optics?.target ?? 1) !== 1) w.setMagnification(1);
+    if (w.selected) w.clearSelection();
+    window.__flyStore.getState().setInspectHex?.(null);
+  });
+  // The optics ease to exactly 1 (easeMag snaps when it lands); the frame loop
+  // can be a budgeted 'demand' loop here, so wait on the value, not frames.
+  await page.waitForFunction(() => {
+    const w = window.__fly?.airportWatch;
+    return !w?.active || ((w.optics?.mag ?? 1) === 1 && (w.optics?.target ?? 1) === 1 && !w.binocular);
+  }, undefined, { timeout: 60000, polling: 250 }).catch(() => {});
+}
+
 async function newPhone(browser, extra = {}) {
   return browser.newContext({ ...BASE, viewport: PORTRAIT, screen: SCREEN, deviceScaleFactor: dpr, ...extra });
 }
@@ -99,6 +143,7 @@ async function newPhone(browser, extra = {}) {
 async function runPhase(m, h, phase) {
   const fn = DEVICE === 'tablet' ? m.tablet : m[phase];
   console.log(`--- ${m.name}: ${DEVICE === 'tablet' ? 'tablet ' : ''}${phase}`);
+  await h.reset();
   if (typeof fn !== 'function') {
     info(`${m.name} has no ${DEVICE === 'tablet' ? 'tablet' : phase} phase`);
     return;
@@ -131,6 +176,7 @@ async function runPhase(m, h, phase) {
     const page = await ctx.newPage();
     page.on('pageerror', (e) => report.errors.push(e.message));
     await page.addInitScript(seed);
+    if (!has('no-sensor')) await page.addInitScript(restingSensor);
     await page.route('**/api/aircraft?**', (route) => route.fulfill({ json: { ac: fixtures(), now: Date.now(), source: 'QA lounge fixture' } }));
     const cdp = await ctx.newCDPSession(page);
     const wait = (ms) => page.waitForTimeout(ms);
@@ -187,7 +233,7 @@ async function runPhase(m, h, phase) {
 
     const h = {
       page, cdp, touch: touchDriver(cdp), check, info, wait, until, state, contacts, out, report,
-      phase: 'portrait', viewport: PORTRAIT, device: DEVICE,
+      phase: 'portrait', viewport: PORTRAIT, device: DEVICE, reset: () => calmRuntime(page),
       shot: (name) => page.screenshot({ path: path.join(out, `${h.phase}-${name}.png`) }),
     };
     for (const m of modules) await runPhase(m, h, 'portrait');
