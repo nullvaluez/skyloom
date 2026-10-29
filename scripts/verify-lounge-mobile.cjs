@@ -21,7 +21,9 @@
 //                       hold, drag, push, pinch, send) in CSS px
 //   check(name, pass, detail)   one gate (a FAIL sets the exit code)
 //   info(name, detail)  an informational line (never fails)
-//   shot(name)          a screenshot into the out dir (<phase>-<name>.png)
+//   shot(name)          a screenshot into the out dir (<phase>-<name>.png); a
+//                       capture that times out under load is an INFO line, never
+//                       a failed run (evidence, not a gate)
 //   wait(ms), until(fn, arg, ms)   sleep / page.waitForFunction on raf
 //   state()             a snapshot of window.__fly.airportWatch
 //   contacts            the mocked traffic (hex, flight, ...)
@@ -102,6 +104,19 @@ const fixtures = () => {
     gs: c.gsKt, track: c.track, baro_rate: c.vsFpm, seen: 0, seen_pos: 0,
   }));
 };
+
+/**
+ * A screenshot as evidence: SwiftShader under load can take longer than
+ * Playwright's 30 s default to hand over a frame, and a slow capture must never
+ * abort the run (a gate is h.check, not a picture).
+ */
+async function capture(page, name) {
+  try {
+    await page.screenshot({ path: path.join(out, name), timeout: 120000 });
+  } catch (e) {
+    info(`capture ${name} skipped`, e.message.split('\n')[0]);
+  }
+}
 
 /** The resting phone (see THE SENSOR in the header): an init script. */
 function restingSensor() {
@@ -199,11 +214,11 @@ async function runPhase(m, h, phase) {
     const offered = await card.waitFor({ state: 'visible', timeout: 300000 }).then(() => true, () => false);
     check(`the ${DEVICE} title offers "Watch an airport"`, offered);
     if (!offered) throw new Error(`no lounge entry on the ${DEVICE} title`);
-    await page.screenshot({ path: path.join(out, 'title.png') });
+    await capture(page, 'title.png');
     await card.tap();
     const featured = page.getByTestId('airport-featured-KCMH');
     await featured.waitFor({ state: 'visible', timeout: 60000 });
-    await page.screenshot({ path: path.join(out, 'browser.png') });
+    await capture(page, 'browser.png');
     await featured.tap();
     const ready = await page.waitForFunction(() => window.__fly?.airportWatch?.validated && window.__flyBoot?.pct === 100 && !window.__fly.worldLoading, undefined, { timeout: 480000 }).then(() => true, () => false);
     check(`KCMH lounge validates on the ${DEVICE}`, ready, { seconds: Math.round((Date.now() - boot) / 1000) });
@@ -229,12 +244,12 @@ async function runPhase(m, h, phase) {
     const traffic = await until(() => window.__fly.traffic.tracks.get('a1b2c3')?.stale === 0, undefined, 60000);
     check('mocked traffic reaches the lounge', traffic);
     await wait(4000);
-    await page.screenshot({ path: path.join(out, 'portrait-arrived.png') });
+    await capture(page, 'portrait-arrived.png');
 
     const h = {
       page, cdp, touch: touchDriver(cdp), check, info, wait, until, state, contacts, out, report,
       phase: 'portrait', viewport: PORTRAIT, device: DEVICE, reset: () => calmRuntime(page),
-      shot: (name) => page.screenshot({ path: path.join(out, `${h.phase}-${name}.png`) }),
+      shot: (name) => capture(page, `${h.phase}-${name}.png`),
     };
     for (const m of modules) await runPhase(m, h, 'portrait');
 
