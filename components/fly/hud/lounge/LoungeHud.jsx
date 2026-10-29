@@ -277,6 +277,24 @@ export function LoungeHud({ runtime, watch }) {
     };
   }, [mobile, layout]);
 
+  // Tablet: the desktop header wraps on a narrower screen (the conditions strip
+  // takes two rows), so the cue, the board and the status line below it follow
+  // its measured height (--lounge-head-h) instead of the desktop's fixed tops.
+  useEffect(() => {
+    const section = sectionRef.current;
+    if (layout !== 'tablet' || !section || typeof ResizeObserver === 'undefined') return undefined;
+    const header = section.querySelector('.lounge-header');
+    if (!header) return undefined;
+    const set = () => section.style.setProperty('--lounge-head-h', `${Math.ceil(header.getBoundingClientRect().height)}px`);
+    set();
+    const ro = new ResizeObserver(set);
+    ro.observe(header);
+    return () => {
+      ro.disconnect();
+      section.style.removeProperty('--lounge-head-h');
+    };
+  }, [layout]);
+
   return (
     <section
       ref={sectionRef}

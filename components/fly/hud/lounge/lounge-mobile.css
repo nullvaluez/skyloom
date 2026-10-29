@@ -1555,11 +1555,39 @@
   width: 44px;
   height: 44px;
 }
+.lounge[data-layout='tablet'] :is(.dir-btn, .dir-stop, .dir-next) {
+  min-height: 44px;
+}
+/* The header's place card keeps to one line per row on a tablet: wrapped, it
+   grows down into the director's cue and the board below it. */
+.lounge[data-layout='tablet'] :is(.lh-text h1, .lh-text p) {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.lounge[data-layout='tablet'] .lh-place {
+  max-width: 34%;
+}
+/* Everything the desktop hangs under the header at a fixed top follows the
+   header's measured height on a tablet (its strip wraps to two rows there). */
+.lounge[data-layout='tablet'] {
+  --lounge-under-head: max(98px, calc(20px + var(--lounge-head-h, 78px) + 10px));
+}
+.lounge[data-layout='tablet'] .lounge-board {
+  top: var(--lounge-under-head);
+  max-height: calc(100% - var(--lounge-under-head) - 186px);
+}
+.lounge[data-layout='tablet'] .dir-cue {
+  top: var(--lounge-under-head);
+}
+.lounge[data-layout='tablet'] .lounge-status {
+  top: calc(var(--lounge-under-head) + 2px);
+}
 /* A portrait tablet: the board keeps to the upper half and the card to the
    lower, so the two never meet. */
 @media (orientation: portrait) {
   .lounge[data-layout='tablet'] .lounge-board {
-    max-height: calc(50% - 98px - 12px);
+    max-height: calc(50% - var(--lounge-under-head) - 12px);
   }
   .lounge[data-layout='tablet'] .lounge-card {
     max-height: calc(50% - 88px - 12px);
@@ -1574,6 +1602,11 @@
   .lounge[data-layout='tablet'] .lounge-status {
     top: 42%;
     max-width: min(520px, calc(100% - 48px));
+  }
+  /* Upright, the conditions strip keeps the feed and the clock (the sun and
+     the weather fold away) so the header stays one row. */
+  .lounge[data-layout='tablet'] .lh-strip .lh-item:not([data-testid='lounge-clock']) {
+    display: none;
   }
 }
 
