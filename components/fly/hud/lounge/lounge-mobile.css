@@ -507,9 +507,13 @@
 .lounge[data-layout='phone-landscape'] :is(.lounge-sheet, .lounge-board[data-sheet], .lounge-card[data-sheet], .lounge-seat-menu, .lounge-decor-card, .observatory-panel, .observatory-window-panel) {
   left: auto;
   right: var(--lounge-side-right);
-  top: calc(var(--lounge-safe-t) + 6px);
+  top: auto;
   width: min(360px, calc(100% - var(--lounge-side-right) - var(--lounge-safe-l) - 12px));
-  max-height: none;
+  max-height: calc(100% - var(--lounge-safe-t) - 6px - var(--lounge-chrome-bottom));
+}
+/* The airport map keeps its full height (the diagram and the list). */
+.lounge[data-layout='phone-landscape'] .observatory-panel {
+  top: calc(var(--lounge-safe-t) + 6px);
 }
 /* The seat menu and the décor card are centred panels on desktop. */
 .lounge[data-layout^='phone'] :is(.lounge-seat-menu, .lounge-decor-card) {
@@ -790,9 +794,6 @@
 }
 .lounge[data-layout^='phone'] .lounge-seat-menu[data-grouped] .lsm-row {
   min-height: 48px;
-}
-.lounge[data-layout='phone-landscape'] .lounge-seat-menu[data-grouped] {
-  max-height: none;
 }
 .lounge[data-layout^='phone'] .lounge-decor-close,
 .lounge[data-layout^='phone'] .observatory-close {
@@ -1481,6 +1482,23 @@
 }
 .bino-phone .bp-col-actions .bp-spacer {
   display: none;
+}
+.bp-float-notice {
+  position: absolute;
+  left: var(--bino-left, 140px);
+  right: var(--bino-right, 140px);
+  bottom: calc(var(--lounge-base, 24px) + 10px);
+  width: fit-content;
+  max-width: calc(100% - var(--bino-left, 140px) - var(--bino-right, 140px));
+  margin: 0 auto;
+  padding: 8px 14px;
+  border-radius: 12px;
+  font: 600 12px/1.4 var(--t-sans);
+  text-align: center;
+  text-wrap: balance;
+  color: var(--t-ice);
+  background: rgba(3, 6, 12, 0.86);
+  box-shadow: inset 0 0 0 1px var(--t-edge-strong);
 }
 
 /* ---------------------------------------------------------------------

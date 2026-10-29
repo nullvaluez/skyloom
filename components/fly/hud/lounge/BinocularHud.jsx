@@ -275,8 +275,15 @@ function PhoneBinocularHud({ runtime, layout, insets, notice }) {
           <small>{lock.type}</small>
         </span>
       )}
-      {line ? <p className="bp-notice" data-testid="binocular-notice">{line}</p> : !lock && <p className="bp-hint">Drag to search · tap an aircraft to lock on</p>}
+      {line && layout !== 'landscape' ? <p className="bp-notice" data-testid="binocular-notice">{line}</p> : !lock && !line && <p className="bp-hint">Drag to search · tap an aircraft to lock on</p>}
     </div>
+  );
+  // Landscape has no band wide enough for a sentence: the notice floats over
+  // the foot of the glass instead, clear of the centre and the side columns.
+  const floatNotice = layout === 'landscape' && line && (
+    <p className="bp-float-notice" data-testid="binocular-notice" data-lounge-avoid="">
+      {line}
+    </p>
   );
   const figures = readouts && lock && (
     <div className="bino-readout bp-figures" data-testid="binocular-readout">
@@ -335,6 +342,7 @@ function PhoneBinocularHud({ runtime, layout, insets, notice }) {
               {side}
             </div>
           </div>
+          {floatNotice}
         </>
       ) : (
         <>
