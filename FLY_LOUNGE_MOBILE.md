@@ -315,12 +315,13 @@ interior probe's occasional six-face refresh.
 
 | Gate | Result |
 |---|---|
-| `node --no-warnings scripts/lounge-pass-gates.mjs` | NODE_SUITE |
-| `verify-lounge-touch.mjs` (node: recognizer, field identity table, grab, pinch, stick, motion math, haptics) | in the suite |
-| `verify-lounge-glass.mjs` (node: lens and band geometry, wheel) | in the suite |
-| `verify-lounge-mobile.cjs` (iPhone 13, portrait + landscape, both modules) | PHONE_RUN |
-| `verify-lounge-mobile.cjs --device ipad` | IPAD_RUN |
-| Desktop 1280 x 800, fine pointer: the lounge's visible controls (test id, class, box, label) in four states, W0 vs final | DESKTOP_CENSUS |
+| `node --no-warnings scripts/lounge-pass-gates.mjs` | PASS all 31 on the merged tree (W0: 29), the classic room's invariant unchanged (12 draws, 120,198 triangles) |
+| `verify-lounge-touch.mjs` (node: recognizer, field identity table, grab, pinch, stick, motion math, haptics) | PASS (in the suite) |
+| `verify-lounge-glass.mjs` (node: lens and band geometry, wheel, the two Back chains together, CSS contracts) | 56/56 (in the suite) |
+| `verify-mobile-actions-node.mjs` (the flight HUD's Back chain, which the lounge now shares) | 17/17 |
+| `verify-lounge-mobile.cjs` (iPhone 13, portrait + landscape, both modules) | Integrated before the fix round: 136/140 (the four reds are the cross-review's findings, fixed). On the merged tree: running at the merge, recorded below when it lands. |
+| `verify-lounge-mobile.cjs --device ipad` | Running at the merge, recorded below when it lands (the streams' tablet probes: 12/12 per orientation). |
+| Desktop 1280 x 800, fine pointer: the lounge's visible controls (test id, class, box, label) in four states (seated, selected, binoculars, standing), W0 vs final | Every control present in both, no page errors in either; the only differences are live content (the feed count, the director's next movement, status lines, the weather item when the forecast has or has not arrived, the spotter card mid-entry). The 1920 x 1080 leg did not validate under the box's load. |
 
 All browser evidence is SwiftShader in a container whose map hosts are
 blocked: layout, gestures and state only.
@@ -343,4 +344,26 @@ blocked: layout, gestures and state only.
 
 ### Known issues
 
-KNOWN_ISSUES
+- **iPhone haptics are silent**: iOS Safari has no `navigator.vibrate`
+  (Android Chrome vibrates). An undocumented iOS 18 workaround exists and was
+  deliberately not used.
+- **Motion look** was exercised with synthetic `deviceorientation` events
+  only (the harness's resting sensor and the node math gates). The real iOS
+  permission prompt, sensor noise and the 0.22 degree deadband's feel are the
+  owner's checkpoint.
+- **Lifting one finger mid-pinch** is proven in node only: CDP releases every
+  finger on `touchEnd`.
+- **The portrait field applies to touch devices only** (rule 1: a desktop
+  never reads `LOUNGE_MOBILE`), so a desktop portrait monitor keeps the 58
+  degree vertical field. One line in `airport-watch-runtime.js`
+  (`touchDevice`) if that should change.
+- **The auto director frames against the 58 degree base**, so in portrait an
+  auto-framed aircraft fills a slightly different share of the screen.
+- **The binoculars' masked fill** (above): a measured experiment on the
+  owner's phone, not a blind change.
+- **The 1920 x 1080 desktop census** did not validate under the container's
+  load; 1280 x 800 is the desktop evidence, with each stream's own W0 A/B.
+- **Pre-existing lint errors** (`LoungeHud.jsx` set-state-in-effect,
+  `SpotterCard.jsx` two) are W0's, untouched.
+- `next dev` (16.4.0) prints a Next.js security-upgrade notice; nothing was
+  upgraded in this pass.
