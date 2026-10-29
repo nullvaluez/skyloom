@@ -1,5 +1,9 @@
 # Render optimization and satellite atmosphere — 2026-10-04
 
+Latest mobile follow-up: [Mobile Enhanced visuals](MOBILE_ENHANCED_VISUALS.md)
+(2026-10-29), covering the aircraft/cloud edge repair, sky cadence, and the
+`MOBILE_ENHANCED` bloom/depth preview. Physical-phone certification remains open.
+
 This pass separates scenery detail from the cost of atmospheric effects on
 mobile, removes redundant render/streaming work, and improves Enhanced daylight
 contrast. The release contains this optimization pass; existing local adventure

@@ -1,4 +1,5 @@
 'use client';
+/* eslint-disable react-hooks/immutability -- R3F owns this imperative frame driver and the shared runtime; neither is React state. */
 import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { AtmosphereLuts } from '@/lib/fly/atmosphere/gpu';
@@ -50,12 +51,11 @@ export function AtmosphereRig({ runtime }) {
     const sun = CINEMA_UNIFORMS.uCinemaSun.value;
     // Scene y is metres above sea level (origin rebasing moves x/z only).
     const h = Math.min(80, Math.max(0.001, camera.position.y / 1000));
-    luts.update(gl, { h, muS: sun.y, maxKm: tier.aerialKm, nowSec: clock.elapsedTime, aerialHz: tier.aerialHz });
+    luts.update(gl, { h, muS: sun.y, maxKm: tier.aerialKm, nowSec: clock.elapsedTime, aerialHz: tier.aerialHz, skyHz: tier.skyHz });
     // Consumers look up with what each table holds, not with this frame's eye.
     const hl = Math.hypot(sun.x, sun.z);
     PSKY_UNIFORMS.uPskyEye.value.set(luts.skyState.h, luts.skyState.muS, hl > 1e-6 ? sun.x / hl : 1, hl > 1e-6 ? sun.z / hl : 0);
     PSKY_UNIFORMS.uPskyAp.value.set(luts.aerialState.maxKm, luts.aerialState.h, 0, 0);
-    // eslint-disable-next-line react-hooks/immutability -- runtime is the imperative simulation/telemetry handle, not React state.
     runtime.physSky = { ...luts.stats, eyeKm: h, aerialKm: tier.aerialKm };
   }, -20);
   return null;

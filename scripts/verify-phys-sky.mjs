@@ -225,7 +225,7 @@ const sinD = (d) => Math.sin((d * Math.PI) / 180);
   if (!chromium) {
     check('(6) GPU tables (playwright unavailable)', false);
   } else {
-    const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+    const browser = await chromium.launch({ ...(process.env.PLAYWRIGHT_CHANNEL ? { channel: process.env.PLAYWRIGHT_CHANNEL } : {}), args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
     const page = await browser.newPage();
     await page.setContent('<canvas></canvas>');
     const view = { h: 0.5, muS: sinD(30), maxKm: 450 };

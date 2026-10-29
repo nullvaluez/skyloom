@@ -15,9 +15,11 @@ import { r25On } from '@/lib/fly/visuals-profile';
 import { R25_SKY } from '@/lib/fly/fly-constants';
 import { releaseBloomTargets } from '@/lib/fly/release-bloom-targets';
 import { HDRGradeEffect } from '@/lib/fly/hdr-grade';
+import { mobileEnhancedOn, resolveMobileEnhanced } from '@/lib/fly/mobile-enhanced';
+import { MobileBloomEffect } from '@/lib/fly/mobile-bloom';
 
 
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { forwardRef, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { Vector2 } from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
 import {
@@ -94,6 +96,19 @@ const TONE_MODES = {
 };
 
 const lerp = (a, b, t) => a + (b - a) * t;
+
+// Keep raw()/el() on the same effect constructor. In particular, the normal
+// <Bloom> wrapper cannot resize its mipmap targets with resolutionScale.
+const MobileBloom = forwardRef(function MobileBloom({ intensity, luminanceThreshold, luminanceSmoothing, resolutionScale, levels }, ref) {
+  const effect = useMemo(() => new MobileBloomEffect({
+    blendFunction: BlendFunction.ADD,
+    intensity,
+    luminanceThreshold,
+    luminanceSmoothing,
+  }, { scale: resolutionScale, levels }), [intensity, luminanceThreshold, luminanceSmoothing, resolutionScale, levels]);
+  useEffect(() => () => effect.dispose(), [effect]);
+  return <primitive object={effect} ref={ref} dispose={null} />;
+});
 
 // ---------------------------------------------------------------------------
 // R24 C (DEPTH_FIX, recon L2 / FL-07) — the reversed-depth DOUBLE CONVERSION.
@@ -177,6 +192,8 @@ export function buildPassList(style, tier, ctx = {}) {
   const sat = style === 'satellite';
   const bloomScale = BLOOM_SCALE[tier] ?? 0.5;
   const bloom = BLOOM_BY_STYLE[style] ?? BLOOM_BY_STYLE.satellite;
+  const mobileBloom = sat && mobileEnhancedOn() && resolveMobileEnhanced().bloom;
+  const mobileBloomBudget = mobileBloom ? resolveMobileEnhanced() : null;
   const toneName = ctx.toneName ?? (cinemaOn()?'AgX':SKY.toneMapping.byStyle[style]) ?? 'ACES';
   const toneMode = TONE_MODES[toneName];
   const aerialOn = sat && AERIAL_PERSPECTIVE.enabled && (tier === 'high' || immersiveOn('lighting'));
@@ -239,7 +256,17 @@ export function buildPassList(style, tier, ctx = {}) {
   if (bloomScale > 0) {
     list.push({
       id: 'bloom',
-      el: () => (
+      el: () => mobileBloom ? (
+        <MobileBloom
+          key="bloom"
+          ref={ctx.setBloom}
+          intensity={bloom.intensity}
+          luminanceThreshold={bloom.threshold}
+          luminanceSmoothing={0.2}
+          resolutionScale={mobileBloomBudget.bloomScale}
+          levels={mobileBloomBudget.bloomLevels}
+        />
+      ) : (
         <Bloom
           key="bloom"
           ref={ctx.setBloom}
@@ -251,15 +278,19 @@ export function buildPassList(style, tier, ctx = {}) {
         />
       ),
       // wrapEffect(BloomEffect, { blendFunction: BlendFunction.ADD })
-      raw: () =>
-        new BloomEffect({
+      raw: () => {
+        const options = {
           blendFunction: BlendFunction.ADD,
           mipmapBlur: true,
           intensity: bloom.intensity,
           luminanceThreshold: bloom.threshold,
           luminanceSmoothing: 0.2,
           resolutionScale: bloomScale,
-        }),
+        };
+        return mobileBloom
+          ? new MobileBloomEffect(options, { scale: mobileBloomBudget.bloomScale, levels: mobileBloomBudget.bloomLevels })
+          : new BloomEffect(options);
+      },
     });
   }
   if (speedOn) {

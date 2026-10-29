@@ -15,12 +15,13 @@ const check=(name,ok,data)=>{report.checks.push({name,pass:!!ok,data});save();as
    const page=await browser.newPage({viewport:phone?{width:390,height:844}:mobile?{width:1024,height:768}:{width:1440,height:900},hasTouch:mobile,isMobile:mobile,deviceScaleFactor:phone?3:mobile?2:1});
    page.on('pageerror',e=>report.errors.push({device,phase,message:e.message}));
    page.on('console',m=>{if(m.type()==='error'&&/shader|WebGL|GL_INVALID/.test(m.text()))report.errors.push({device,phase,message:m.text().slice(0,1400)});});
-   await page.addInitScript(()=>{
+   await page.addInitScript(preset=>{
     localStorage.setItem('fly-map-style-2','satellite');localStorage.setItem('fly-visuals','enhanced');
+    localStorage.setItem('fly-quality-tier',preset);
     localStorage.setItem('fly-controls-seen','1');localStorage.setItem('fly-sound-on','0');localStorage.setItem('fly-crash-mode','forgiving');
     window.__flySunOverride=Date.UTC(2026,8,27,17);window.__flyWeatherOverride='baseline';
-   });
-   await page.goto((args.url||'http://localhost:3086')+'/?graphicsReview=1',{waitUntil:'domcontentloaded'});
+   },args.preset||'high');
+   await page.goto((args.url||'http://localhost:3086')+'/?graphicsReview=1&flags='+encodeURIComponent(args.flags||''),{waitUntil:'domcontentloaded'});
    await enterFlight(page,{lat:40.72,lon:-74.02,altM:900,headingRad:.3,name:null},{timeoutMs:180000,waitReveal:true});
    await page.evaluate(()=>{
     window.__renderSavedStep=window.__fly.flight.step;window.__fly.flight.step=function(){};
@@ -34,14 +35,17 @@ const check=(name,ok,data)=>{report.checks.push({name,pass:!!ok,data});save();as
    const snapshot=()=>page.evaluate(()=>{
     const rt=window.__fly,composer=window.__flyComposer,gl=composer.getRenderer();let scene=rt.engine.map;while(scene.parent)scene=scene.parent;
     const shadows=[],domes=[];scene.traverse(o=>{if(o.name==='cinema-cascade')shadows.push({format:o.shadow.map?.texture.format,depth:!!o.shadow.map?.depthTexture,size:o.shadow.map?.width});if(o.geometry?.parameters?.radius===450000)domes.push(o.visible);});
+    const bloom=composer.passes.flatMap(p=>p.effects||[]).find(e=>e.name==='BloomEffect');
     return {preset:window.__flyStore.getState().qualityPreset,tier:window.__flyStore.getState().qualityTier,profile:rt.cinemaProfile,
       governor:window.__flyGov.state(),clouds:rt.immersiveClouds,shadows,domes,programs:gl.info.programs.length,
       canvas:[gl.domElement.width,gl.domElement.height],composer:[composer.inputBuffer.width,composer.inputBuffer.height],contextLost:gl.getContext().isContextLost(),
-      ibl:rt.cinemaIBL,environment:rt.cinemaEnvironment,resources:rt.cinemaResources};
+      ibl:rt.cinemaIBL,environment:rt.cinemaEnvironment,resources:rt.cinemaResources,
+      bloom:bloom?{scale:bloom.mobileBloomScale??1,levels:bloom.mipmapBlurPass.levels,width:bloom.luminancePass.renderTarget.width,height:bloom.luminancePass.renderTarget.height}:null};
    });
    let state=await snapshot();
    check(`${device}: High scenery boots with independent effects`,state.preset==='high'&&state.profile&&(mobile?state.profile.cascades<=1:state.profile.cascades===2),state);
    check(`${device}: no drawing-buffer/composer mismatch`,JSON.stringify(state.canvas)===JSON.stringify(state.composer));
+   if(mobile&&args.flags?.split(',').includes('MOBILE_ENHANCED'))check(`${device}: mobile bloom budgets the actual luminance target`,state.bloom?.scale===.3&&state.bloom.levels===5&&state.bloom.width===Math.round(state.canvas[0]*.3),state.bloom);
    check(`${device}: shadow depth retained with R8 color attachments`,state.shadows.length>0&&state.shadows.every(s=>s.depth&&s.format===1028),state.shadows);
    check(`${device}: discarded sky draw is hidden`,state.domes.length===1&&state.domes[0]===false);
    // Explicit quality choices, profile changes, and returning from Neon must

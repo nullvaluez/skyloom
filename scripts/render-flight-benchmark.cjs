@@ -27,9 +27,10 @@ const percentile = (values, fraction) => [...values].sort((a,b) => a-b)[Math.min
         if(preset) localStorage.setItem('fly-quality-tier',preset);
         localStorage.setItem('fly-controls-seen','1'); localStorage.setItem('fly-sound-on','0'); localStorage.setItem('fly-crash-mode','forgiving');
         window.__flySunOverride=Date.UTC(2026,8,27,17); window.__flyWeatherOverride='baseline';
+        localStorage.setItem('fly-explorer-preferences-v1', JSON.stringify({version:1,settings:{tutorial:'skipped'}}));
       }, { visuals, preset:args.preset || null });
       try {
-        await page.goto((args.url || 'http://localhost:3084')+'/?graphicsReview=1',{waitUntil:'domcontentloaded',timeout:90000});
+        await page.goto((args.url || 'http://localhost:3084')+'/?graphicsReview=1&flags='+encodeURIComponent(args.flags||''),{waitUntil:'domcontentloaded',timeout:90000});
         await enterFlight(page,{lat:40.72,lon:-74.02,altM:900,headingRad:.3,name:null},{timeoutMs:180000,waitReveal:true});
         row.boot = await page.evaluate(() => ({ preset:window.__flyStore.getState().qualityPreset, tier:window.__flyStore.getState().qualityTier, visuals:window.__flyStore.getState().visuals }));
         // Handles are installed at boot. Removing the review query now measures

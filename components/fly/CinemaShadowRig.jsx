@@ -1,19 +1,22 @@
 'use client';
+/* eslint-disable react-hooks/immutability -- R3F frame callbacks update owned Three objects and shared runtime telemetry, not React state. */
 import { useEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { CinemaShadows } from '@/lib/fly/cinema-shadows';
 import { cinemaOn, cinemaProfile } from '@/lib/fly/cinema-policy';
 import { compactDepthShadowTarget } from '@/lib/fly/compact-shadow-target';
 import { toSceneDir } from '@/lib/fly/true-scale';
+import { mobileEnhancedOn, mobileShadowRange, resolveMobileEnhanced, stepMobileShadowRange } from '@/lib/fly/mobile-enhanced';
+import { useFlyStore } from '@/stores/fly-store';
 
 export function CinemaShadowRig({runtime,sunRef}){
-  const rig=useRef(null),legacyShadow=useRef(false);
+  const rig=useRef(null),legacyShadow=useRef(false),mobileRange=useRef(null);
   useEffect(()=>{
     const sun=sunRef.current,castShadow=sun?.castShadow;
     legacyShadow.current=!!castShadow;
     return ()=>{rig.current?.dispose();rig.current=null;delete runtime.cinemaShadows;delete runtime.adoptCinematicWarmScene;if(sun)sun.castShadow=castShadow;};
   },[runtime,sunRef]);
-  useFrame(({scene,camera,gl})=>{
+  useFrame(({scene,camera,gl},dt)=>{
     const e=runtime.cinemaEnvironment;
     // The store can switch styles before React removes this frame subscriber.
     // Retire its lights immediately: otherwise outgoing terrain compiles the
@@ -32,7 +35,17 @@ export function CinemaShadowRig({runtime,sunRef}){
     r?.setMapSize(profile.shadowSize);
     if(sunRef.current){sunRef.current.castShadow=false;sunRef.current.intensity=r?0:e.sun;}
     if(!r){runtime.cinemaShadows={cascades:0};delete runtime.adoptCinematicWarmScene;return;}
-    const range=profile.shadowRangeM*(runtime.cinemaGeography?.worldUnitsPerMetre??1);
+    const state=useFlyStore.getState();
+    let rangeM=profile.shadowRangeM;
+    if(mobileEnhancedOn(state)){
+      const config=resolveMobileEnhanced();
+      const ground=runtime.cinemaGeography?.groundVisualM;
+      const agl=Number.isFinite(ground)?camera.position.y-ground:NaN;
+      mobileRange.current=stepMobileShadowRange(mobileRange.current,
+        mobileShadowRange(rangeM,agl,config),state.warpEpoch,dt,config.shadowResponseSec);
+      rangeM=mobileRange.current.rangeM;
+    }else mobileRange.current=null;
+    const range=rangeM*(runtime.cinemaGeography?.worldUnitsPerMetre??1);
     // Camera.reverseDepth becomes authoritative when the renderer initializes.
     if(r.fov!==camera.fov||r.aspect!==camera.aspect||r.reverse!==gl.capabilities.reversedDepthBuffer||Math.abs(r.maxFar-range)>5){
       r.maxFar=range;
@@ -60,8 +73,8 @@ export function CinemaShadowRig({runtime,sunRef}){
     runtime.adoptCinematicWarmScene=r.adoptWarmScene;
     const scanMs=performance.now()-scanStart;r.scanMs=r.scanMs==null?scanMs:r.scanMs+(scanMs-r.scanMs)*.05;
     camera.updateMatrixWorld();r.update();
-    runtime.shadowRadiusM=profile.shadowRangeM;
-    Object.assign(runtime.cinemaShadows??={}, {cascades:r.cascades,size:profile.shadowSize,rangeM:profile.shadowRangeM,materials:r.owned.size,bytes:r.cascades*profile.shadowSize**2*5,scanObjects:r.scanObjects,scanMs:r.scanMs});
+    runtime.shadowRadiusM=rangeM;
+    Object.assign(runtime.cinemaShadows??={}, {cascades:r.cascades,size:profile.shadowSize,rangeM,baseRangeM:profile.shadowRangeM,materials:r.owned.size,bytes:r.cascades*profile.shadowSize**2*5,scanObjects:r.scanObjects,scanMs:r.scanMs});
   },-.9);
   return null;
 }
