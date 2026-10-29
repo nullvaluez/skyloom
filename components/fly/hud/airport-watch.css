@@ -1877,6 +1877,19 @@
 [data-device='phone'] .airport-browser .ab-head .tgt-iconbtn {
   flex-shrink: 0;
 }
+/* Tablets (coarse touch, not phone-class) keep the desktop browser, with
+   touch-sized chips, buttons and close (the merged tree's iPad run read the
+   region chips at 40 px and the close at 43 px). */
+[data-device='tablet'] .airport-browser .ab-regions button,
+[data-device='tablet'] .airport-browser .ab-more,
+[data-device='tablet'] .airport-browser .ab-catalog-error button {
+  min-height: 44px;
+}
+[data-device='tablet'] .airport-browser .ab-head .tgt-iconbtn {
+  flex-shrink: 0;
+  min-width: 44px;
+  min-height: 44px;
+}
 /* Landscape phones: the short height goes to the lists. */
 [data-device='phone'][data-orient='landscape'] .airport-browser {
   padding-top: 12px;

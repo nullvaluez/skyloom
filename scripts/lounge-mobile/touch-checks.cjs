@@ -724,6 +724,10 @@ module.exports = {
       const ps = await clearSpot(h, cands);
       if (ps) await h.touch.pinch(ps.cx, ps.cy, 60, 180, { steps: 12, ms: 420 });
       await settled(h);
+      // Under load settled() can run out of time with the optics a hair short
+      // of their target (the merged tree's first iPad run read 2.999 / 3):
+      // the gate is about the target, so give the ease its landing first.
+      await h.until(() => { const w = window.__fly.airportWatch; return w.optics.mag === w.optics.target; }, undefined, 60000);
       const s2 = await h.state();
       h.check(`${tag}: a pinch out raises the binoculars with mag = the gap ratio (3x)`, !!ps && s2.binocular && Math.abs(s2.target - 3) < 0.08 && s2.mag === s2.target && Math.abs(s2.fov - naked / s2.mag) < 1e-9, { mag: +s2.mag.toFixed(3), target: +s2.target.toFixed(3), fov: +s2.fov.toFixed(4) });
       await h.shot('tablet-pinched');
@@ -738,7 +742,14 @@ module.exports = {
       h.check(`${tag}: a pinch in lowers the binoculars`, !!pin && !s3.binocular && s3.target < 1.5, { mag: +s3.mag.toFixed(3), target: +s3.target.toFixed(3), binocular: s3.binocular });
       // Tap: select QAL101 a fingertip away.
       await calm(h);
-      const a = await aircraftReady(h);
+      let a = await aircraftReady(h);
+      if (!a) {
+        // The merged tree's first iPad run found QAL101 off screen here once:
+        // face the runway (the fixture places it ahead of the glass) and look again.
+        await h.page.evaluate(() => window.__fly.airportWatch.resetLook());
+        await settled(h);
+        a = await aircraftReady(h);
+      }
       let at = null;
       if (a) {
         for (const ang of [0, Math.PI, Math.PI / 2, -Math.PI / 2]) {

@@ -1773,3 +1773,11 @@
   transition: none !important;
   animation: none !important;
 }
+
+/* Tablets, from the merged tree's first iPad run (verify-lounge-mobile.cjs
+   --device ipad): the desktop spotter card sat 98 px up while the tablet's
+   48 px dock buttons make the bar taller, so at 1024 x 768 the two touched
+   (600 px²); lift the card clear of the bar. */
+.lounge[data-layout='tablet'] .lounge-card:not([data-sheet]) {
+  bottom: 112px;
+}
