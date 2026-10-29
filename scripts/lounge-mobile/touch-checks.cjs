@@ -23,20 +23,39 @@
 //
 // PORTRAIT: the naked eye spans the horizontal floor; a tap a fingertip away
 // from QAL101 (past the mouse's radius) selects it; a double-tap on it
-// raises the binoculars on it, one on empty glass lowers them; a still
+// raises the binoculars on it; with them up and locked, a double-tap on
+// empty glass inside GLASS's real lens lowers them (picked where the old
+// naked-eye finger reach still covered the locked aircraft: the integrated
+// failure), and so does one on the locked aircraft itself; a quick
+// corrective re-tap on the Motion control after a near miss on the glass is
+// the control's (motion on, glasses up), not a double-tap; a still
 // long-press opens its details (closed again by their own button), no text
 // selected; a one-finger drag turns the view the finger's way by the
 // finger's angle (the exact grab) and a flick glides on; a pinch out raises
 // the binoculars with mag = the gap ratio (a mid-zoom capture), the stick
 // hides, a pinch in lowers them; the seated Walk ring, pushed, stands you up
 // and walks, further runs (faster, its run state), the other thumb looks at
-// the same time, release stops, standing it rests in the zone; motionLook
-// has the contract's shape, enables with the binoculars, steers the head 1:1
-// from synthetic orientation and goes off with them; the page never zooms,
-// scrolls or selects text; no flight key leaks.
+// the same time, release stops, standing it rests in the zone; standing, a
+// pinch with a finger in the thumb zone zooms (zone finger first, glass
+// finger first, both in the zone) and never walks, and the stick still
+// walks after; motionLook has the contract's shape, enables with the
+// binoculars, steers the head 1:1 from synthetic orientation and goes off
+// with them; the page never zooms, scrolls or selects text; no flight key
+// leaks.
 // LANDSCAPE: the field is exactly today's 58 degrees; drag and pinch work.
+// TABLET (--device ipad, both orientations): the field (portrait: the touch
+// floor; landscape: exactly today's), a drag looks by the finger's angle, a
+// pinch raises the binoculars at the gap ratio and pinching back lowers them,
+// a tap selects.
+//
+// The pick radii, the portrait field and the double-tap rule are read from
+// the real modules (lib/fly/airport-watch-camera.mjs), not copied.
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
 const DEG = Math.PI / 180;
 const AIRCRAFT = '**/api/aircraft?**';
+let camModule = null;
+const cam = () => (camModule ||= import(pathToFileURL(path.join(__dirname, '../../lib/fly/airport-watch-camera.mjs')).href));
 
 /** Is every CSS px point on the look surface (no HUD element over it)? */
 const onSurface = (h, pts) => h.page.evaluate((list) => list.every(([x, y]) => {
@@ -62,18 +81,53 @@ const stick = (h) => h.page.evaluate(() => {
   return el ? { mode: el.getAttribute('data-mode'), state: el.getAttribute('data-state'), x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, zone: !!document.querySelector('[data-testid="lounge-stick-zone"]') } : null;
 });
 
-/** Wait until the head and the optics stop moving (the spring and any glide have landed). */
-function settled(h, ms = 30000) {
-  return h.until(() => {
+/**
+ * Wait until the head and the optics have landed: the optics exactly on their
+ * target (easeMag lands on it), the head unchanged across three LOUNGE
+ * FRAMES. The lounge's frame loop is budgeted ('demand'), so two rAF polls
+ * can read the same values only because no frame ran between them: every
+ * sample must follow a new frame, counted from the runtime's own
+ * updateCamera (wrapped once per page; FlyScene calls it through the property).
+ */
+async function settled(h, ms = 30000) {
+  await h.page.evaluate(() => {
     const w = window.__fly.airportWatch;
-    const s = (window.__touchSettle ||= { yaw: NaN, pitch: NaN, mag: NaN, n: 0 });
-    const still = Math.abs(w.yaw - s.yaw) < 2e-5 && Math.abs(w.pitch - s.pitch) < 2e-5 && Math.abs(w.optics.mag - s.mag) < 1e-5;
-    s.yaw = w.yaw; s.pitch = w.pitch; s.mag = w.optics.mag;
+    if (!w.__touchFrames) {
+      const update = w.updateCamera;
+      w.__touchFrames = { n: 0 };
+      w.updateCamera = function counted(...args) {
+        w.__touchFrames.n++;
+        return update.apply(this, args);
+      };
+    }
+    window.__touchSettle = { yaw: NaN, pitch: NaN, frame: w.__touchFrames.n, n: 0 };
+  });
+  return h.until(() => {
+    const w = window.__fly.airportWatch, s = window.__touchSettle, frame = w.__touchFrames.n;
+    if (frame === s.frame) return false; // no frame since the last sample: nothing to judge
+    const still = w.optics.mag === w.optics.target && Math.abs(w.yaw - s.yaw) < 2e-5 && Math.abs(w.pitch - s.pitch) < 2e-5;
+    s.yaw = w.yaw; s.pitch = w.pitch; s.frame = frame;
     s.n = still ? s.n + 1 : 0;
-    if (s.n >= 3) { window.__touchSettle = null; return true; }
-    return false;
+    return s.n >= 3;
   }, undefined, ms);
 }
+/**
+ * Wait for the binoculars to hold their lock: up, tracking, inside the
+ * runtime's lock tolerance (the director may keep reframing the power, so the
+ * optics are not required to have landed).
+ */
+function lockHeld(h, ms = 60000) {
+  return h.until(() => {
+    const w = window.__fly.airportWatch;
+    const tol = w.lockTolerance ? w.lockTolerance() : (window.__fly.camera.fov * Math.PI) / 180 / 8;
+    return w.binocular && w.tracking && w.lockError() < tol;
+  }, undefined, ms);
+}
+/** GLASS's binocular figure as the mask drew it ({ mode, R, lenses: [[x, y]] }), or null. */
+const maskFigure = (h) => h.page.evaluate(() => {
+  const c = document.querySelector('[data-testid="binocular-mask"]');
+  return c?.dataset.figure ? JSON.parse(c.dataset.figure) : null;
+});
 /** Back to a known pose: naked eye, nothing selected or open, facing the view. */
 async function calm(h) {
   await h.page.evaluate(() => {
@@ -155,6 +209,133 @@ async function aircraftReady(h) {
   return null;
 }
 
+/**
+ * Empty glass inside GLASS's binocular lens (the mask's own figure): on the
+ * look surface and clear of every aircraft's binocular touch reach
+ * (touchPickRadius(mag, true) + its half-span, plus a margin). With
+ * `preferNear`, a point that the naked-eye finger's reach (touchPickRadius
+ * (mag) + half) of that aircraft still covered comes first.
+ */
+async function emptyGlass(h, { preferNear = null } = {}) {
+  const c = await cam();
+  const fig = await maskFigure(h);
+  if (!fig) return null;
+  const hits = await hitsAll(h);
+  const mag = (await h.state()).mag;
+  const near = [], far = [];
+  for (const [lx, ly] of fig.lenses) {
+    for (const f of [0.55, 0.7, 0.4, 0.8]) {
+      for (let k = 0; k < 24; k++) {
+        const a = (k / 24) * Math.PI * 2;
+        const q = [Math.round(lx + Math.cos(a) * fig.R * f), Math.round(ly + Math.sin(a) * fig.R * f)];
+        if (hits.some((t) => Math.hypot(t.x - q[0], t.y - q[1]) <= c.touchPickRadius(mag, true) + t.half + 10)) continue;
+        const target = preferNear && hits.find((t) => t.hex === preferNear);
+        (target && Math.hypot(target.x - q[0], target.y - q[1]) <= c.touchPickRadius(mag) + target.half ? near : far).push(q);
+      }
+    }
+  }
+  for (const q of [...near, ...far]) {
+    if (await onSurface(h, [q])) return { at: q, withinOldReach: near.includes(q), lens: fig, mag: +mag.toFixed(2) };
+  }
+  return null;
+}
+/**
+ * A near miss beside a control (by test id): a point on the glass just
+ * outside its round (31-34 px from its centre, inside the double-tap's
+ * doublePx), and the control's centre.
+ */
+async function nearMiss(h, testid) {
+  const r = await h.page.evaluate((id) => {
+    const el = document.querySelector(`[data-testid="${id}"]`);
+    const b = el?.getBoundingClientRect();
+    return b && b.width ? { x: b.left + b.width / 2, y: b.top + b.height / 2, r: Math.min(b.width, b.height) / 2 } : null;
+  }, testid);
+  if (!r) return null;
+  for (const d of [r.r + 3, r.r + 4, r.r + 5]) {
+    if (d > 34) break;
+    for (let k = 0; k < 16; k++) {
+      const a = -Math.PI / 2 + (k / 16) * Math.PI * 2;
+      const q = [Math.round(r.x + Math.cos(a) * d), Math.round(r.y + Math.sin(a) * d)];
+      if (Math.hypot(q[0] - r.x, q[1] - r.y) > 34) continue;
+      if (await onSurface(h, [q])) return { glass: q, control: [Math.round(r.x), Math.round(r.y)], gapPx: +Math.hypot(q[0] - r.x, q[1] - r.y).toFixed(1) };
+    }
+  }
+  return null;
+}
+/**
+ * Standing: a pinch with a finger in the walk stick's thumb zone zooms (the
+ * zone relays it to the glass) and never walks. Three ways a pinch lands:
+ * the zone finger first, the glass finger first, both in the zone. Then the
+ * stick still walks (nothing left relaying).
+ */
+async function zonePinches(h, W, H) {
+  const zoneRect = () => h.page.evaluate(() => {
+    const b = document.querySelector('[data-testid="lounge-stick-zone"]')?.getBoundingClientRect();
+    return b && b.width ? { l: b.left, t: b.top, r: b.right, b: b.bottom } : null;
+  });
+  const calmUp = async () => {
+    await h.page.evaluate(() => { const w = window.__fly.airportWatch; if (w.binocular) w.binoculars(false); w.clearSelection(); });
+    await settled(h);
+    await h.until(() => !!document.querySelector('[data-testid="lounge-stick-zone"]') && !document.querySelector('.lounge-stick-zone[data-relay]'), undefined, 15000);
+  };
+  const variants = [
+    { name: 'the zone finger first', fingers: (z, y) => [{ x: z.r - 70, y, dx: -40 }, { x: z.r + 40, y, dx: 80, glass: true }] },
+    { name: 'the glass finger first', fingers: (z, y) => [{ x: z.r + 40, y, dx: 80, glass: true }, { x: z.r - 70, y, dx: -40 }] },
+    { name: 'both in the zone', fingers: (z, y) => [{ x: z.l + 40, y, dx: -20 }, { x: z.l + 40 + 100, y, dx: 90 }] },
+  ];
+  for (const v of variants) {
+    await calmUp();
+    const z = await zoneRect();
+    let fingers = null;
+    if (z) {
+      for (const fy of [0.55, 0.4, 0.7]) {
+        const y = Math.round(z.t + (z.b - z.t) * fy);
+        const f = v.fingers(z, y).map((p) => ({ ...p, x: Math.round(p.x) }));
+        const ok = await h.page.evaluate((list) => list.every((p) => {
+          const el = document.elementFromPoint(p.x, p.y);
+          return p.glass ? el?.getAttribute('data-testid') === 'lounge-surface' : !!el?.closest('[data-testid="lounge-stick-zone"]');
+        }), f);
+        if (ok) { fingers = f; break; }
+      }
+    }
+    const eye0 = (await h.state()).eye;
+    let ratio = null;
+    if (fingers) {
+      const at = (i) => fingers.map((p, id) => ({ x: p.x + (p.dx * i) / 10, y: p.y, id }));
+      const gap = (i) => Math.abs(at(i)[0].x - at(i)[1].x);
+      ratio = gap(10) / gap(0);
+      await h.touch.send('touchStart', at(0));
+      for (let i = 1; i <= 10; i++) { await h.wait(40); await h.touch.send('touchMove', at(i)); }
+      await h.wait(200);
+      await h.touch.send('touchEnd', []);
+      await h.until(() => window.__fly.airportWatch.binocular, undefined, 15000);
+      await settled(h);
+    }
+    const s = await h.state();
+    const walked = eye0 && s.eye ? Math.hypot(s.eye.x - eye0.x, s.eye.z - eye0.z) : null;
+    h.check(`stick: standing, a pinch with a finger in the thumb zone zooms and never walks (${v.name})`, !!fingers && s.binocular && Math.abs(s.target - ratio) < 0.1 && walked != null && walked < 0.05,
+      { fingers: fingers && fingers.map((p) => [p.x, p.y]), ratio: ratio && +ratio.toFixed(3), target: +s.target.toFixed(3), binocular: s.binocular, walkedM: walked != null ? +walked.toFixed(3) : null });
+    if (v === variants[0]) await h.shot('zone-pinch');
+  }
+  // Nothing left relaying: the stick walks again.
+  await calmUp();
+  const z = await zoneRect();
+  let speed = 0;
+  if (z) {
+    const x = Math.round(z.l + (z.r - z.l) * 0.45), y = Math.round(z.t + (z.b - z.t) * 0.6);
+    const eye0 = (await h.state()).eye;
+    await h.touch.send('touchStart', [{ x, y, id: 0 }]);
+    for (let i = 1; i <= 6; i++) { await h.wait(30); await h.touch.send('touchMove', [{ x, y: y - (30 * i) / 6, id: 0 }]); }
+    await h.until(() => (window.__fly.airportWatch.walk?.speed ?? 0) > 0.2, undefined, 20000);
+    await h.wait(1200);
+    speed = await h.page.evaluate(() => window.__fly.airportWatch.walk?.speed ?? 0);
+    await h.touch.send('touchEnd', []);
+    await h.until(() => (window.__fly.airportWatch.walk?.speed ?? 1) < 0.02, undefined, 20000);
+    const eye1 = (await h.state()).eye;
+    h.check('stick: after the pinches the thumb zone walks again (nothing left relaying)', speed > 0.2 && Math.hypot(eye1.x - eye0.x, eye1.z - eye0.z) > 0.1, { speed: +speed.toFixed(2) });
+  } else h.check('stick: after the pinches the thumb zone walks again (nothing left relaying)', false, { zone: null });
+}
+
 module.exports = {
   name: 'touch',
 
@@ -218,27 +399,55 @@ module.exports = {
         }
         const s = await h.state();
         h.check('portrait: a double-tap on QAL101 raises the binoculars on it (selected and followed)', s.binocular && s.selected === 'a1b2c3' && s.tracking, { at: p, binocular: s.binocular, selected: s.selected, tracking: s.tracking, mag: +s.mag.toFixed(2) });
-        // The capture once the glasses hold the lock (BinocularHud's reading: within an eighth of the field).
-        const locked = await h.until(() => { const w = window.__fly.airportWatch; return w.tracking && w.lockError() < (window.__fly.camera.fov * Math.PI) / 180 / 8; }, undefined, 60000);
-        h.info('portrait: the binoculars settle on QAL101 (lock within an eighth of the field)', { locked });
+        // The capture once the glasses hold the lock (the runtime's lock tolerance).
+        const locked = await lockHeld(h);
+        h.info('portrait: the binoculars settle on QAL101 (inside the lock tolerance)', { locked });
         await h.shot('binoculars-on-aircraft');
-        const hits = await hitsAll(h);
-        let empty = null;
-        for (const fy of [0.3, 0.7, 0.45, 0.8, 0.2]) {
-          for (const fx of [0.2, 0.5, 0.35, 0.65, 0.8]) {
-            const q = [Math.round(W * fx), Math.round(H * fy)];
-            if (hits.some((t) => Math.hypot(t.x - q[0], t.y - q[1]) < 150 + t.half)) continue;
-            if (await onSurface(h, [q])) { empty = q; break; }
-          }
-          if (empty) break;
-        }
+        // Empty glass inside GLASS's real lens, picked where the naked-eye
+        // finger's reach (MOBILE_TOUCH.pick.maxPx + the half-span: the
+        // integrated failure) still covered the locked aircraft, but clear of
+        // the binocular reach of every aircraft.
+        const empty = await emptyGlass(h, { preferNear: 'a1b2c3' });
         if (empty) {
-          await touch.doubleTap(empty[0], empty[1]);
+          await touch.doubleTap(empty.at[0], empty.at[1]);
           await h.until(() => !window.__fly.airportWatch.binocular, undefined, 20000);
         }
         const e = await h.state();
-        h.check('portrait: a double-tap on empty glass with the binoculars up lowers them (the selection stays)', !!empty && !e.binocular && e.selected === 'a1b2c3', { at: empty, binocular: e.binocular, selected: e.selected });
+        h.check('portrait: a double-tap on empty glass with the binoculars up lowers them (the selection stays) — inside GLASS\'s lens, within the old finger reach of the locked aircraft', !!empty?.withinOldReach && !e.binocular && e.selected === 'a1b2c3', { ...empty, binocular: e.binocular, selected: e.selected });
         await sample('double-tap');
+
+        // Up again on it (set up directly: with the glasses down a phone's
+        // spotter sheet covers the screen centre where the follow holds it).
+        // Then a near miss on the glass by the Motion control and a quick
+        // corrective re-tap ON the control (within doubleMs / doublePx) is
+        // the control's tap, not a double-tap: the glasses stay up and
+        // motion look turns on.
+        await h.page.evaluate(() => window.__fly.airportWatch.select('a1b2c3', { binoculars: true }));
+        const relocked = await lockHeld(h);
+        h.info('portrait: binoculars up on QAL101 again (set up directly)', { relocked });
+        const miss = await nearMiss(h, 'binocular-motion');
+        if (miss) {
+          await touch.run([[0, 'touchStart', [{ x: miss.glass[0], y: miss.glass[1] }]], [50, 'touchEnd', []], [170, 'touchStart', [{ x: miss.control[0], y: miss.control[1] }]], [220, 'touchEnd', []]]);
+          await h.until(() => window.__fly.airportWatch.motionLook?.active, undefined, 15000);
+          await h.wait(800);
+        }
+        const m = await h.page.evaluate(() => ({ binocular: window.__fly.airportWatch.binocular, motion: !!window.__fly.airportWatch.motionLook?.active }));
+        h.check('portrait: a quick corrective re-tap on a binocular control after a near miss on the glass is the control\'s (motion look on, the glasses stay up), not a double-tap', !!miss && m.binocular && m.motion, { ...miss, ...m });
+        await h.page.evaluate(() => window.__fly.airportWatch.motionLook?.disable?.());
+
+        // A double-tap on the locked aircraft itself lowers them too (the gesture table).
+        await h.page.evaluate(() => { const w = window.__fly.airportWatch; if (!w.binocular) w.select('a1b2c3', { binoculars: true }); });
+        const held = await lockHeld(h);
+        const b = await hitOf(h, 'a1b2c3');
+        const pre = await h.state();
+        const onIt = !!b && (await onSurface(h, [[Math.round(b.x), Math.round(b.y)]]));
+        if (onIt && pre.binocular) {
+          await touch.doubleTap(Math.round(b.x), Math.round(b.y));
+          await h.until(() => !window.__fly.airportWatch.binocular, undefined, 20000);
+        }
+        const d = await h.state();
+        h.check('portrait: a double-tap on the aircraft the binoculars hold lowers them (the selection stays)', onIt && pre.binocular && pre.tracking && !d.binocular && d.selected === 'a1b2c3', { at: b && [Math.round(b.x), Math.round(b.y)], held, before: { binocular: pre.binocular, tracking: pre.tracking }, binocular: d.binocular, selected: d.selected });
+        await sample('double-tap-locked');
       }
 
       // --- long-press: the details ---------------------------------------------------------
@@ -274,6 +483,10 @@ module.exports = {
         const spot = await clearSpot(h, rows);
         const y = spot?.y ?? Math.round(H * 0.6), x0 = Math.round(W * 0.3), x1 = Math.round(W * 0.7);
         const before = await h.state();
+        // Paced like a finger (each move awaits the page): when this box's
+        // frames are slower than a long-press (under 2 fps), the moves wait
+        // for the next frame after the long-press timer has come due. The
+        // press is judged at that frame (createHoldTimer), so it stays a drag.
         await h.touch.drag(x0, y, x1, y, { steps: 12, ms: 360, release: false });
         await settled(h);
         const held = await h.state();
@@ -377,6 +590,7 @@ module.exports = {
           const standing = await stick(h);
           h.check('stick: standing, it rests in the thumb zone, and a thumb anywhere in the zone starts it', standing?.mode === 'standing' && standing.state === 'rest' && standing.zone, standing);
           await sample('stick');
+          if (standing?.mode === 'standing') await zonePinches(h, W, H);
         }
       }
       await h.page.evaluate(() => window.__fly.airportWatch.sit?.('window', { instant: true }));
@@ -452,5 +666,77 @@ module.exports = {
     h.check('landscape: a pinch out raises the binoculars with mag = the gap ratio (3x) at today\'s field (58 / mag)', !!ps && s2.binocular && Math.abs(s2.target - 3) < 0.08 && Math.abs(s2.fov - 58 / s2.mag) < 1e-9, { mag: +s2.mag.toFixed(3), target: +s2.target.toFixed(3), fov: s2.fov });
     await h.shot('pinched');
     await calm(h);
+  },
+
+  /** A tablet (--device ipad), once per orientation (h.phase). */
+  async tablet(h) {
+    const { width: W, height: H } = h.viewport;
+    const tag = `tablet ${h.phase}`;
+    const c = await cam();
+    const restoreTraffic = await holdTraffic(h);
+    try {
+      await calm(h);
+      // The field: a portrait tablet (aspect 0.75) gets the touch floor, a landscape one exactly today's.
+      const s0 = await h.state();
+      const f0 = await field(h);
+      const naked = c.nakedFovDeg(s0.aspect);
+      if (h.phase === 'portrait') {
+        h.check(`${tag}: the naked eye spans the touch floor (50 deg across), not the 58 deg vertical`, s0.fov > 58 && Math.abs(s0.fov - naked) < 1e-9 && Math.abs(f0?.h - 50) < 1e-6, { fov: +s0.fov.toFixed(3), aspect: +s0.aspect.toFixed(4), horizontal: f0 && +f0.h.toFixed(3) });
+      } else {
+        h.check(`${tag}: the naked-eye field is exactly today's (58 deg vertical, desktop-identical)`, s0.fov === 58 && naked === 58, { fov: s0.fov, aspect: +s0.aspect.toFixed(4) });
+      }
+      // Drag look by the finger's angle.
+      const rows = [0.55, 0.62, 0.48, 0.7, 0.4].map((fy) => ({ y: Math.round(H * fy), points: [[Math.round(W * 0.38), Math.round(H * fy)], [Math.round(W * 0.62), Math.round(H * fy)]] }));
+      const spot = await clearSpot(h, rows);
+      const y = spot?.y ?? Math.round(H * 0.55);
+      await h.touch.drag(Math.round(W * 0.4), y, Math.round(W * 0.6), y, { steps: 10, ms: 300, release: false });
+      await settled(h);
+      const s1 = await h.state();
+      await h.touch.send('touchEnd', []);
+      const tanH = Math.tan((s0.fov * DEG) / 2) * s0.aspect;
+      const finger = (Math.atan(0.2 * tanH) - Math.atan(-0.2 * tanH)) / DEG;
+      const turned = (s1.yaw - s0.yaw) / DEG;
+      h.check(`${tag}: a one-finger drag turns the view by the finger's angle`, !!spot && Math.abs(turned / finger - 1) < 0.12, { turnedDeg: +turned.toFixed(2), fingerAngleDeg: +finger.toFixed(2) });
+      // Pinch out into the binoculars (mag = the gap ratio), then back out of them.
+      await calm(h);
+      const cands = [0.5, 0.42, 0.58, 0.35].map((fx) => {
+        const cx = Math.round(W * fx), cy = Math.round(H * 0.55);
+        return { cx, cy, points: [[cx - 30, cy], [cx + 30, cy], [cx - 90, cy], [cx + 90, cy]] };
+      });
+      const ps = await clearSpot(h, cands);
+      if (ps) await h.touch.pinch(ps.cx, ps.cy, 60, 180, { steps: 12, ms: 420 });
+      await settled(h);
+      const s2 = await h.state();
+      h.check(`${tag}: a pinch out raises the binoculars with mag = the gap ratio (3x)`, !!ps && s2.binocular && Math.abs(s2.target - 3) < 0.08 && s2.mag === s2.target && Math.abs(s2.fov - naked / s2.mag) < 1e-9, { mag: +s2.mag.toFixed(3), target: +s2.target.toFixed(3), fov: +s2.fov.toFixed(4) });
+      await h.shot('tablet-pinched');
+      const ins = [0.5, 0.4, 0.6, 0.3].map((fx) => {
+        const cx = Math.round(W * fx), cy = Math.round(H * 0.55);
+        return { cx, cy, points: [[cx - 110, cy], [cx + 110, cy]] };
+      });
+      const pin = await clearSpot(h, ins);
+      if (pin) await h.touch.pinch(pin.cx, pin.cy, 220, 40, { steps: 12, ms: 420 });
+      await settled(h);
+      const s3 = await h.state();
+      h.check(`${tag}: a pinch in lowers the binoculars`, !!pin && !s3.binocular && s3.target < 1.5, { mag: +s3.mag.toFixed(3), target: +s3.target.toFixed(3), binocular: s3.binocular });
+      // Tap: select QAL101 a fingertip away.
+      await calm(h);
+      const a = await aircraftReady(h);
+      let at = null;
+      if (a) {
+        for (const ang of [0, Math.PI, Math.PI / 2, -Math.PI / 2]) {
+          const q = [Math.round(a.x + Math.cos(ang) * (8 + a.half)), Math.round(a.y + Math.sin(ang) * (8 + a.half))];
+          if (await onSurface(h, [q])) { at = q; break; }
+        }
+      }
+      if (at) {
+        await stamped(h).tap(at[0], at[1]);
+        await h.until(() => window.__fly.airportWatch.selected === 'a1b2c3', undefined, 20000);
+      }
+      const s4 = await h.state();
+      h.check(`${tag}: a tap on QAL101 selects it`, !!at && s4.selected === 'a1b2c3' && !s4.binocular, { hit: a && { x: Math.round(a.x), y: Math.round(a.y), half: Math.round(a.half) }, tappedAt: at, selected: s4.selected });
+      await calm(h);
+    } finally {
+      await restoreTraffic();
+    }
   },
 };
