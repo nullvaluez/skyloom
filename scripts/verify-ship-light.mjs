@@ -10,9 +10,9 @@
  * with `git archive` into a temporary directory (nothing is checked out) and
  * the SAME probe builds the live terrain material chain there and here. With
  * every LIGHT flag off, the shader text and program key must be byte-identical
- * (sha256). The base is the merge-base with --base (default main); on a tree
- * that IS main (after the lead's merge) the comparison is to itself and still
- * holds the flag-on rows to their anchors.
+ * (sha256). The base is the merge-base with --base, by default the Ship Pass
+ * W0 commit (scripts/_ship-pass-base.mjs), so the comparison still means
+ * "unchanged since W0" on main after the streams are merged.
  *
  * FLAG ARMS run as child processes (`--probe=<json>`), because the Ship Pass
  * flags resolve once at module load: each arm sets its pins on a stub window
@@ -28,6 +28,7 @@ import { mkdtempSync, rmSync, symlinkSync, existsSync, mkdirSync } from 'node:fs
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { shipPassBase } from './_ship-pass-base.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const sha = (s) => createHash('sha256').update(String(s).replace(/\r\n/g, '\n')).digest('hex').slice(0, 16);
@@ -192,10 +193,11 @@ const count = (s, sub) => s.split(sub).length - 1;
 const ON = (name) => ({ [`__fly${name.toLowerCase().split('_').map((w) => w[0].toUpperCase() + w.slice(1)).join('')}Override`]: { enabled: true } });
 
 // --- base snapshot ----------------------------------------------------------
-const baseArg = process.argv.find((a) => a.startsWith('--base='))?.slice(7) ?? 'main';
+const baseArg = process.argv.find((a) => a.startsWith('--base='))?.slice(7) ?? null;
 let baseRef = null;
 try {
-  baseRef = execFileSync('git', ['-C', ROOT, 'merge-base', 'HEAD', baseArg], { encoding: 'utf8' }).trim();
+  baseRef = baseArg ? execFileSync('git', ['-C', ROOT, 'merge-base', 'HEAD', baseArg], { encoding: 'utf8' }).trim() : shipPassBase(ROOT);
+  if (!baseRef) throw new Error('no base');
 } catch {
   try {
     baseRef = execFileSync('git', ['-C', ROOT, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();

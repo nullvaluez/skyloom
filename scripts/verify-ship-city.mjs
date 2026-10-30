@@ -28,8 +28,11 @@ import crypto from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { shipPassBase } from './_ship-pass-base.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+// The identity base: the Ship Pass W0 commit ("main" in the row labels is W0's tree).
+const BASE_REF = shipPassBase(ROOT) ?? 'main';
 const SELF = fileURLToPath(import.meta.url);
 const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8').replace(/\r\n/g, '\n');
 
@@ -532,7 +535,7 @@ async function main() {
     let baseWorker = null;
     let tmp = null;
     try {
-      const text = execFileSync('git', ['-C', ROOT, 'show', 'main:lib/fly/toy-world/vector-tile.worker.js'], { encoding: 'utf8', maxBuffer: 64 << 20 });
+      const text = execFileSync('git', ['-C', ROOT, 'show', `${BASE_REF}:lib/fly/toy-world/vector-tile.worker.js`], { encoding: 'utf8', maxBuffer: 64 << 20 });
       tmp = mkdtempSync(path.join(os.tmpdir(), 'ship-city-'));
       baseWorker = path.join(tmp, 'vector-tile.worker.main.js');
       writeFileSync(baseWorker, text);
@@ -710,8 +713,8 @@ async function main() {
     const nlMain = path.join(tmp, 'night-lights-atlas.js');
     let haveMain = true;
     try {
-      writeFileSync(archMain, execFileSync('git', ['-C', ROOT, 'show', 'main:lib/fly/satellite-architecture-material.js'], { encoding: 'utf8' }));
-      writeFileSync(nlMain, execFileSync('git', ['-C', ROOT, 'show', 'main:lib/fly/night-lights-atlas.js'], { encoding: 'utf8' }));
+      writeFileSync(archMain, execFileSync('git', ['-C', ROOT, 'show', `${BASE_REF}:lib/fly/satellite-architecture-material.js`], { encoding: 'utf8' }));
+      writeFileSync(nlMain, execFileSync('git', ['-C', ROOT, 'show', `${BASE_REF}:lib/fly/night-lights-atlas.js`], { encoding: 'utf8' }));
     } catch (e) {
       haveMain = false;
       check("CT-5 main's architecture / night-lights sources are readable", false, String(e.message).slice(0, 120));

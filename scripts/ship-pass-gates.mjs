@@ -2,7 +2,7 @@
  * SHIP PASS (FLY_SHIP_PASS.md 3.5) — the shared node battery every landing
  * on `main` runs, in one command:
  *
- *   node scripts/ship-pass-gates.mjs [--stream=FRAME] [--base=main] [--quick]
+ *   node scripts/ship-pass-gates.mjs [--stream=FRAME] [--base=<ref>] (default the W0 commit) [--quick]
  *                                    [--also=verify-x.mjs,verify-y.cjs] [--require-stream-gates]
  *
  * Rows print PASS / KNOWN-RED / FAIL / SKIP. A failing gate listed in
@@ -25,6 +25,7 @@
 import { spawnSync, execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import { SHIP_PASS_W0 } from './_ship-pass-base.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const STREAMS = ['FRAME', 'SKY', 'CITY', 'LIGHT', 'RELEASE'];
@@ -230,7 +231,7 @@ const HOT = {
 };
 
 if (stream) {
-  const baseRef = typeof args.base === 'string' ? args.base : 'main';
+  const baseRef = typeof args.base === 'string' ? args.base : SHIP_PASS_W0;
   let base = null;
   try {
     base = git('merge-base', 'HEAD', baseRef).trim();

@@ -26,6 +26,7 @@ import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import vm from 'node:vm';
+import { shipPassBase } from './_ship-pass-base.mjs';
 
 register('./_node-resolve.mjs', import.meta.url);
 
@@ -51,13 +52,8 @@ function assert(ok, msg) {
 }
 const eq = (a, b, msg) => assert(JSON.stringify(a) === JSON.stringify(b), `${msg ?? 'not equal'}: ${JSON.stringify(a)} vs ${JSON.stringify(b)}`);
 
-/** The base of this branch (merge-base with main), or null outside a git checkout. */
-let BASE = null;
-try {
-  BASE = git('merge-base', 'HEAD', 'main').trim();
-} catch {
-  BASE = null;
-}
+/** The Ship Pass base (W0; scripts/_ship-pass-base.mjs), or null outside a git checkout. */
+const BASE = shipPassBase(ROOT);
 /**
  * FRAME's own changes, so the diff-based checks hold on a merged tree too
  * (the lead's trial merge of all five streams put LIGHT's shader edits in a

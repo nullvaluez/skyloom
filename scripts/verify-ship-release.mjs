@@ -261,19 +261,21 @@ console.log('SHIP PASS RELEASE gate (verify-ship-release)\n');
     /if \(s !== 'forgiving'\) window\.__flyChallengeOverride = true;/.test(crash) && (juiceGate.match(/window\.__flyChallengeOverride = true;/g) || []).length === 2);
 }
 
-// === R  RL-3 PLAYER_SURFACE ON ================================================
+// === R  RL-3 PLAYER_SURFACE (built; OFF at the merge to main) ===================
 {
   console.log('\n[R] One look (PLAYER_SURFACE)');
   const c = read('lib/fly/fly-constants.js');
   const blk = c.slice(c.indexOf('export const PLAYER_SURFACE = {'), c.indexOf('};', c.indexOf('export const PLAYER_SURFACE = {')));
-  gate('R1 PLAYER_SURFACE ships enabled:true', /\n  enabled: true,\n/.test(blk));
+  // The owner turned every Ship Pass flag off at the merge to main (2026-10-30);
+  // R2 pins the flag on (what `?flags=PLAYER_SURFACE` gives) and R3 is the shipped default.
+  gate('R1 PLAYER_SURFACE ships enabled:false (every Ship Pass flag off at the merge to main)', /\n  enabled: false,(\n|$)/.test(blk));
   // A second boot after the migration: the stored Day / Enhanced simply stay.
-  const leg = (saved) => {
+  const leg = (saved, on = true) => {
     const code = `
       import { register } from 'node:module';
       register(${JSON.stringify(pathToFileURL(path.join(ROOT, 'scripts/_node-resolve.mjs')).href)});
       const store = new Map(${JSON.stringify(Object.entries(saved))});
-      globalThis.window = { location: { search: '' }, localStorage: { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k) } };
+      globalThis.window = { ${on ? "__flyPlayerSurfaceOverride: { enabled: true }, " : ''}location: { search: '' }, localStorage: { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k) } };
       Object.defineProperty(globalThis, 'navigator', { value: { webdriver: false }, configurable: true });
       const imp = (r) => import(${JSON.stringify(pathToFileURL(ROOT).href)} + '/' + r);
       const { resolveInitialMapStyle } = await imp('lib/fly/map-style.js');
@@ -291,6 +293,10 @@ console.log('SHIP PASS RELEASE gate (verify-ship-release)\n');
     first.mapStyle === 'satellite' && first.visuals === 'enhanced' && second.mapStyle === 'satellite' && second.visuals === 'enhanced' &&
       second.saved?.['fly-map-style-2'] === 'satellite' && second.saved?.['fly-visuals'] === 'enhanced',
     JSON.stringify({ first: [first.mapStyle, first.visuals], second: [second.mapStyle, second.visuals] }));
+  const shipped = leg({ 'fly-map-style-2': 'toy', 'fly-visuals': 'classic' }, false);
+  gate('R3 shipped default (flag off): a saved Neon + Classic player keeps both, and storage is untouched',
+    shipped.mapStyle === 'toy' && shipped.visuals === 'classic' && shipped.saved?.['fly-map-style-2'] === 'toy' && shipped.saved?.['fly-visuals'] === 'classic',
+    JSON.stringify(shipped));
 }
 
 // === T  RL-11 title copy ======================================================
@@ -691,7 +697,9 @@ console.log('SHIP PASS RELEASE gate (verify-ship-release)\n');
     JSON.stringify(deleted) === '["skyloom-shell-v1"]' && ack === 'retired' && !afterRetire && fetched.length === 0 && /await retireWorker\(r\.active\);\s*if \(await r\.unregister\(\)\) n\+\+;/.test(offlineSrc), JSON.stringify({ deleted, ack, afterRetire, fetched }));
   const constants = read('lib/fly/fly-constants.js');
   const shellBlk = constants.slice(constants.indexOf('export const OFFLINE_SHELL = {'), constants.indexOf('};', constants.indexOf('export const OFFLINE_SHELL = {')));
-  gate('W13 OFFLINE_SHELL ships enabled:true (D6: production-only registration, the allowlist and an offline launch measured in the venue)', /\n  enabled: true,\n/.test(shellBlk + '\n'));
+  // Certified ON on its stream (D6: production-only registration, the allowlist and an offline
+  // launch measured in the venue); the owner turned every Ship Pass flag off at the merge to main.
+  gate('W13 OFFLINE_SHELL ships enabled:false at the merge to main (off never registers; W12 is its retire path)', /\n  enabled: false,\n/.test(shellBlk + '\n'));
   const offline = read('lib/fly/offline-shell.js');
   const host = read('components/fly/hud/OfflineShell.jsx');
   gate('W8 registration waits for the load event and an idle period (never inside the first minute\'s critical path)', /whenIdle\(\(\) => \{\s*syncOfflineShell\(action\)/.test(host) && /readyState === 'complete'/.test(offline) && /addEventListener\('load', go/.test(offline) && /requestIdleCallback\(run, \{ timeout \}\)/.test(offline));

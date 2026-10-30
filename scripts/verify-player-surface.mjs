@@ -87,14 +87,12 @@ const run = (leg) =>
   );
 const legacy = (r) => r.surface === true && r.mapStyle === 'toy' && r.visuals === 'classic' && r.savedStyle === 'toy' && r.savedVisuals === 'classic';
 
-// SHIP PASS RL-3 (D11): PLAYER_SURFACE ships ON, so the shipped default for
-// an ordinary player is leg (2): one migration to Day/Enhanced, rows hidden.
+// SHIP PASS RL-3 (D11) built PLAYER_SURFACE and certified it ON on its stream;
+// at the merge to main every Ship Pass flag ships OFF (owner, 2026-10-30), so
+// the shipped default for an ordinary player is leg (1): nothing moves. Leg (2)
+// is what `?flags=PLAYER_SURFACE` gives.
 const shipped = run({ webdriver: false, review: false });
-check(
-  'shipped ordinary-player settings migrate Neon/Classic to Day/Enhanced once and hide the look controls',
-  shipped.surface === false && shipped.mapStyle === 'satellite' && shipped.visuals === 'enhanced' && shipped.savedStyle === 'satellite' && shipped.savedVisuals === 'enhanced',
-  JSON.stringify(shipped),
-);
+check('shipped ordinary-player settings: flag off at the merge to main, nothing moves', legacy(shipped), JSON.stringify(shipped));
 
 const off = run({ flag: false, webdriver: false, review: false });
 check('(1) flag off: nothing moves', legacy(off), JSON.stringify(off));
