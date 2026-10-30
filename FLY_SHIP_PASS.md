@@ -1008,7 +1008,7 @@ refuses, so harnesses pin `window.__flyLightDeviceClass`. FRAME's
 both, so they work before and after integration.
 
 **Gates.** `verify-ship-light` 57/57; `ship-pass-gates` 32 PASS / 2 KNOWN-RED
-/ 0 FAIL, seam rule PASS; `lounge-pass-gates.mjs` PASS all 31; node:
+/ 0 FAIL, seam rule PASS (re-run at f67addb); `lounge-pass-gates.mjs` PASS all 31; node:
 verify-shadow-calm (35), verify-shadow-coverage, verify-fleet-airframes,
 verify-mobile-enhanced, verify-mobile-bloom, verify-attribution all green.
 ESLint: no new errors in any touched file (FlyScene.jsx 26/2 = main).
@@ -1025,10 +1025,22 @@ glance).
 **Contract requests (to FRAME, accepted, on its branch).** A general
 device-class pin, and touch PHOTO_HIRES `maxScale` 3.
 
-**Known issues.** (1) The heavy lock has been deadlocked since about 07:57
-by an orphaned RELEASE `next-server` (pid 28356, :3135) that inherited the
-lock fd. Killing it was denied to this agent, so the lead has been told.
-LIGHT's run script now starts its server with `3>&-`. (2) A pre-existing
+**Known issues.** (1) The heavy lock was still deadlocked at 09:20 (since
+about 07:57) by an orphaned RELEASE `next-server` (pid 28356, :3135) that
+inherited the lock fd. This agent was denied permission to kill it, and the
+lead has been told. LIGHT's run script now starts its server with `3>&-`.
+**Queued LIGHT browser batches** run on their own once the lock frees, each
+under 25 minutes. Stop one by killing its `flock ... run-session.sh <X>`
+process. Output goes to `.graphics-review/ship-pass/light/`:
+`sessionB.out` (verify-photo-hires desktop / phone / off, plus the
+terrain-off / terrain-on arms with the 60 s still diff and the phone-off /
+phone-mobile / phone-on arms, into `review/`), `sessionC.out` (desktop-on,
+medium-on, airframe-off / airframe-on, hangar-off / hangar-on into
+`review-c/`, plus verify-photo) and `sessionD.out` (lounge-off /
+lounge-casters / lounge-blobs at KJFK into `review-d/`, plus verify-hangar).
+Every arm's `report.json` records page and shader errors, LIGHT telemetry,
+sampler counts and context loss. For terrain-shadow luma, compare
+`review/terrain-off.png` with `review/terrain-on.png`. (2) A pre-existing
 venue harness defect: on desktop, `_boot.js`'s
 `.fixed.inset-0 canvas` wait resolves to a hidden first canvas and times out
 after the reveal (CITY hit it too). The LIGHT harnesses wrap bootFly, and
