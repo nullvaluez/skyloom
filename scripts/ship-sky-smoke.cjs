@@ -141,6 +141,12 @@ async function settle(page, first = false) {
   const wait = async (name, fn, ms = legTimeout) => { try { await page.waitForFunction(fn, undefined, { timeout: ms, polling: 1000 }); ready[name] = true; } catch { ready[name] = false; } };
   await wait('worldLoading', () => !window.__fly.worldLoading);
   await wait('terrainSharp', () => (window.__fly.terraStats ?? window.__fly.engine?.terraStats)?.sharp === true, Math.min(legTimeout, first ? firstSharp : sharpTimeout));
+  // After the far warp the terrain streams from nothing: wait (capped) until
+  // the camera tile is within three levels of target (see ship-sky-veil.cjs).
+  if (first) await wait('warmup', () => {
+    const t = window.__fly.terraStats ?? window.__fly.engine?.terraStats;
+    return !t || t.sharp === true || (Number.isFinite(t.camTileZ) && Number.isFinite(t.targetZ) && t.camTileZ >= t.targetZ - 3);
+  }, Number(args.warmup || 240000));
   ready.terra = await page.evaluate(() => {
     const t = window.__fly.terraStats ?? window.__fly.engine?.terraStats;
     return t ? { sharp: t.sharp, reason: t.sharpReason ?? null, camTileZ: t.camTileZ, targetZ: t.targetZ, downloading: t.downloading } : null;

@@ -103,6 +103,11 @@ const legTimeout = Number(args.legTimeout || 300000);
 const sharpTimeout = Number(args.sharpTimeout || (FIXTURE ? 20000 : 60000));
 const firstSharp = Number(args.firstSharp || (FIXTURE ? 45000 : 240000));
 const bootWait = Number(args.bootWait || 90000);
+const warmup = Number(args.warmup || 240000);
+// A pose whose lead arm moved more than this between its first capture and
+// its re-capture (`baseline-2`, `clarity-2`, `no-mist-2`) was still streaming:
+// it is measured once more at the end of its boot group (`--remeasure=0` off).
+const remeasureK = Number(args.remeasure ?? 0.05);
 const T0 = Date.now();
 const log = (...m) => console.log(`[+${Math.round((Date.now() - T0) / 1000)}s]`, ...m);
 const depressionDeg = Number(args.depression || 20);
@@ -129,7 +134,7 @@ const ARMS = {
   'clarity-k0': { boot: 'clarity', live: { set: 'window.__flySkyDiag = { clarity: 0 }', clear: 'delete window.__flySkyDiag', applied: 'clarity' } },
 };
 /** The lead arm of a boot group re-captured after its live arms: that pose's noise floor. */
-const RECAPTURE = { main: ['baseline', 'baseline-2'], clarity: ['clarity', 'clarity-2'] };
+const RECAPTURE = { main: ['baseline', 'baseline-2'], clarity: ['clarity', 'clarity-2'], 'no-mist': ['no-mist', 'no-mist-2'] };
 const SK1_ARMS = ['baseline', 'aerial-pin', 'air-off', 'no-mist', 'city-fade', 'city-premix'];
 const wanted = String(args.arms || SK1_ARMS.join(',')).split(',').filter((a) => ARMS[a]);
 if (wanted.includes('clarity') && !wanted.includes('clarity-k0')) wanted.push('clarity-k0');
@@ -228,7 +233,7 @@ function table() {
   // Δ against the control: live arms against their own pose's lead capture
   // (same page, same settled frame); boot arms against the baseline of the
   // same altitude (cross-boot: read against baseline-2's drift).
-  const CONTROL = { 'aerial-pin': 'baseline', 'air-off': 'baseline', 'baseline-2': 'baseline', 'clarity-k0': 'clarity', 'clarity-2': 'clarity', clarity: 'clarity-k0', 'no-mist': 'baseline', 'city-fade': 'baseline', 'city-premix': 'baseline' };
+  const CONTROL = { 'aerial-pin': 'baseline', 'air-off': 'baseline', 'baseline-2': 'baseline', 'clarity-k0': 'clarity', 'clarity-2': 'clarity', clarity: 'clarity-k0', 'no-mist': 'baseline', 'no-mist-2': 'no-mist', 'city-fade': 'baseline', 'city-premix': 'baseline' };
   const pct = (v, c) => (Number.isFinite(v) && Number.isFinite(c) && c ? `${v >= c ? '+' : ''}${(((v - c) / c) * 100).toFixed(1)}%` : '—');
   L.push('', 'Midtown contrast Δ against the control (clarity against its k = 0 control; no-mist and the city arms cross-boot against baseline)', '');
   L.push('| Arm (vs control) | ' + ALTS_FT.map((a) => `${a} ft`).join(' | ') + ' |');
@@ -332,6 +337,13 @@ async function settle(page, first = false) {
       return !s || ['queued', 'building', 'sampling'].every((f) => Number(s[f] ?? 0) === 0);
     });
   }, first ? sharpCap : Math.min(legTimeout, sharpTimeout));
+  // The first pose after the far warp: the terrain streams Manhattan from
+  // nothing (measured here: z3 of a z15 target 129 s after the warp, z11 by
+  // 210 s), so wait until the camera tile is within three levels of target.
+  if (first) await wait('warmup', () => {
+    const t = window.__fly.terraStats ?? window.__fly.engine?.terraStats;
+    return !t || t.sharp === true || (Number.isFinite(t.camTileZ) && Number.isFinite(t.targetZ) && t.camTileZ >= t.targetZ - 3);
+  }, warmup);
   ready.terra = await page.evaluate(() => {
     const t = window.__fly.terraStats ?? window.__fly.engine?.terraStats;
     return t ? { sharp: t.sharp, reason: t.sharpReason ?? null, camTileZ: t.camTileZ, targetZ: t.targetZ, downloading: t.downloading } : null;
@@ -428,8 +440,14 @@ async function runBootGroup(browser, group) {
       }
       report.arms[lead] = { applied };
     }
-    for (const [li, altFt] of RUN_ORDER.entries()) {
+    const order = [...RUN_ORDER];
+    const remeasured = new Set();
+    for (let li = 0; li < order.length; li++) {
+      const altFt = order[li];
       const p = poseFor(altFt);
+      const isRepeat = li >= RUN_ORDER.length; // a re-measure: keep the first reading
+      const firstPass = {};
+      if (isRepeat) for (const arm of Object.keys(report.arms)) if (report.arms[arm]?.[altFt]?.midtown) firstPass[arm] = report.arms[arm][altFt];
       log(`  ${group} ${altFt} ft: aircraft ${(p.dM / 1000).toFixed(2)} km from Midtown`);
       try {
       await place(page, p);
@@ -438,7 +456,7 @@ async function runBootGroup(browser, group) {
       await freeze(page, true);
       await page.waitForTimeout(2500);
       const pts = await project(page, p);
-      const again = RECAPTURE[group] && arms.includes(RECAPTURE[group][0]) && arms.length > 1 ? [RECAPTURE[group][1]] : [];
+      const again = RECAPTURE[group] && arms.includes(RECAPTURE[group][0]) ? [RECAPTURE[group][1]] : [];
       for (const arm of [...arms, ...again]) {
         const A = ARMS[arm] && arm !== lead && ARMS[arm].live ? ARMS[arm] : { live: null };
         try {
@@ -449,6 +467,7 @@ async function runBootGroup(browser, group) {
           const cell = await capture(page, arm, altFt, pts);
           cell.ready = ready; cell.pose = { ...p, agl: pts?.agl, cinema: pts?.cinema, visuals: pts?.visuals, tier: pts?.tier };
           if (A.live?.applied) cell.applied = await page.evaluate((k) => window.__flySkyDiagApplied?.[k] === true, A.live.applied);
+          if (firstPass[arm]) cell.firstPass = { midtown: firstPass[arm].midtown, far: firstPass[arm].far, ready: firstPass[arm].ready };
           (report.arms[arm] ??= {})[altFt] = cell;
           log(`    ${arm.padEnd(12)} midtown ${JSON.stringify(cell.midtown && { c: cell.midtown.contrast, chroma: cell.midtown.chroma, luma: cell.midtown.luma })} far ${cell.far?.contrast ?? '—'}`);
         } catch (e) {
@@ -464,6 +483,16 @@ async function runBootGroup(browser, group) {
         log(`  ${group} ${altFt} ft FAILED: ${e.message.split('\n')[0]}`);
       }
       save();
+      // An unsettled pose (its lead drifted past remeasureK before its
+      // re-capture) is queued once more at the end of the group; the first
+      // reading is kept under `firstPass` for the record.
+      const [leadArm, againArm] = RECAPTURE[group] ?? [];
+      const c1 = report.arms[leadArm]?.[altFt]?.midtown?.contrast, c2 = report.arms[againArm]?.[altFt]?.midtown?.contrast;
+      if (remeasureK > 0 && !remeasured.has(altFt) && Number.isFinite(c1) && Number.isFinite(c2) && Math.abs(c2 - c1) / Math.max(1e-6, c1) > remeasureK) {
+        remeasured.add(altFt);
+        order.push(altFt);
+        log(`  ${group} ${altFt} ft: lead drifted ${(((c2 - c1) / c1) * 100).toFixed(1)}% before its re-capture (still streaming) — measured again at the end`);
+      }
     }
   } catch (e) {
     report.errors.push({ arm: group, kind: 'fatal', message: e.message.split('\n')[0] });
