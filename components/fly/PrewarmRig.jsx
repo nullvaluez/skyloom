@@ -14,7 +14,7 @@ import { useFlyStore } from '@/stores/fly-store';
 // SHIP PASS FRAME (FR-3, SHADER_READY): the registry rescan triggers.
 import { queueRegistryWarm } from '@/lib/fly/prewarm';
 import { prewarmEntries } from '@/lib/fly/prewarm-registry';
-import { resetRegistryWarm } from '@/lib/fly/registry-warm';
+import { registryWarmState, resetRegistryWarm } from '@/lib/fly/registry-warm';
 import { shipPassOn } from '@/lib/fly/ship-pass';
 import { sliceBarSec } from '@/lib/fly/pace-adapt';
 import { cadenceState } from '@/lib/fly/frame-api';
@@ -236,6 +236,10 @@ export function PrewarmRig({ runtime }) {
     }, 2000);
     const lost = () => resetRegistryWarm();
     gl.domElement?.addEventListener('webglcontextrestored', lost);
+    // The consumer's live state for harnesses and the console, published now
+    // (the `prewarm` record itself appears only when the boot warm finishes,
+    // which verify-settle reads as its completion time).
+    if (typeof window !== 'undefined') (window.__flyStats ??= {}).prewarmRegistry = registryWarmState();
     return () => {
       unsub();
       clearInterval(id);

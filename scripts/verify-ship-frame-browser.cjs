@@ -6,14 +6,16 @@
  *   FLY_URL=http://localhost:3131 FLY_TILE_FIXTURE=1 node scripts/verify-ship-frame-browser.cjs [--arms=off,on,policy,player] [--style=toy]
  *
  * Arms (each a fresh page, Neon by default — the fastest reveal on the
- * fixture; `--style=satellite` for the Enhanced world):
- *   off     no FRAME flag (the shipped state of DEVICE_POLICY /
- *           ULTRA_SUPERSAMPLE, and the control for the others)
- *   on      ?flags=SHADER_READY,PACE_ADAPT
- *   policy  ?flags=SHADER_READY,PACE_ADAPT,DEVICE_POLICY,ULTRA_SUPERSAMPLE
- *   player  ?flags=SHADER_READY with navigator.webdriver hidden — against a
- *           PRODUCTION server this is the FR-2 production branch
- *           (checkShaderErrors false); against dev it must stay true.
+ * fixture; `--style=satellite` for the Enhanced world). Every arm names all
+ * four FRAME flags explicitly (`NAME` / `-NAME`), so it means the same thing
+ * whatever the shipped defaults are:
+ *   off      every FRAME flag off (the W0 behaviour, the control)
+ *   on       SHADER_READY + PACE_ADAPT on, DEVICE_POLICY + ULTRA_SUPERSAMPLE off
+ *   policy   all four on
+ *   player   as `on`, with navigator.webdriver hidden — against a PRODUCTION
+ *            server this is the FR-2 production branch (checkShaderErrors
+ *            false); against dev it must stay true.
+ *   default  no ?flags at all: the shipped state, read from fly-constants.js
  * Every arm boots with ?diag=1 (DiagFrameTotals owns gl.info, so the
  * census's per-layer sum can be checked against three's whole-frame
  * totals: FR-4's 2%). Per arm it asserts: the boot reveals, zero page
@@ -34,11 +36,28 @@ const STYLE = args.style || 'toy';
 const OUT = path.resolve('.graphics-review/ship-pass/frame');
 mkdirSync(OUT, { recursive: true });
 
+const FRAME_FLAGS = ['SHADER_READY', 'PACE_ADAPT', 'DEVICE_POLICY', 'ULTRA_SUPERSAMPLE'];
+const spec = (...on) => FRAME_FLAGS.map((f) => (on.includes(f) ? f : `-${f}`)).join(',');
 const FLAGS = {
-  off: null,
-  on: 'SHADER_READY,PACE_ADAPT',
-  policy: 'SHADER_READY,PACE_ADAPT,DEVICE_POLICY,ULTRA_SUPERSAMPLE',
-  player: 'SHADER_READY',
+  off: spec(),
+  on: spec('SHADER_READY', 'PACE_ADAPT'),
+  policy: spec(...FRAME_FLAGS),
+  player: spec('SHADER_READY', 'PACE_ADAPT'),
+  default: null,
+};
+// The shipped defaults (the `default` arm's expectation), read from the source.
+const SHIPPED = (() => {
+  const src = require('node:fs').readFileSync(path.resolve('lib/fly/fly-constants.js'), 'utf8').replace(/\r\n/g, '\n');
+  const out = {};
+  for (const f of FRAME_FLAGS) out[f] = new RegExp(`export const ${f} = \\{\\n\\s*enabled: true,`).test(src);
+  return out;
+})();
+/** Is `name` on in this arm (explicit token, else the shipped default)? */
+const flagOn = (arm, name) => {
+  const toks = (FLAGS[arm] ?? '').split(',').filter(Boolean);
+  if (toks.includes(name)) return true;
+  if (toks.includes(`-${name}`)) return false;
+  return SHIPPED[name];
 };
 
 let pass = 0;
@@ -61,10 +80,10 @@ async function runArm(browser, arm) {
     const t = m.text();
     if (m.type() === 'error' && /Shader Error|WebGLProgram|shader compile|getProgramInfoLog|VALIDATE_STATUS/i.test(t)) shaderErrors.push(t.slice(0, 300));
   });
-  if (arm === 'policy') {
-    const d = s.devicePolicy;
-    check(arm, 'DEVICE_POLICY: the boot benchmark ran inside the hold and chose a start (FR-10)', !!d?.score && !!d?.start?.tier && d.score.ms <= 1600, d ? `class ${d.cls}, score ${JSON.stringify(d.score)}, start ${JSON.stringify(d.start)}; tier ${s.tier}, preset ${s.preset}` : 'absent');
-  }
+  // FR-3: one harness-only registry entry (lib/fly/registry-warm.js REGISTRY_PROBE_KEY).
+  await page.addInitScript(() => {
+    window.__flyRegistryProbe = true;
+  });
   if (arm === 'player') {
     await page.addInitScript(() => {
       Object.defineProperty(Navigator.prototype, 'webdriver', { get: () => false, configurable: true });
@@ -98,24 +117,39 @@ async function runArm(browser, arm) {
       checkShaderErrors: c.shaderErrorsChecked ?? null,
       diag: st.diag ?? null,
       gov,
-      prewarm: st.prewarm ? { warmed: st.prewarm.warmed, passes: st.prewarm.passes, error: st.prewarm.error, registry: st.prewarm.registry ?? null } : null,
+      prewarm: { warmed: st.prewarm?.warmed, passes: st.prewarm?.passes, error: st.prewarm?.error, published: !!st.prewarm, pending: st.prewarm?.pending, registry: st.prewarmRegistry ?? st.prewarm?.registry ?? null },
       dpr: window.devicePixelRatio,
       tier: window.__flyStore?.getState?.().qualityTier,
       preset: window.__flyStore?.getState?.().qualityPreset,
       frameRateMode: window.__flyStore?.getState?.().frameRateMode,
       devicePolicy: st.devicePolicy ?? null,
+      flags: c.flags ?? null,
     };
   });
+  if (arm === 'policy') {
+    const d = s.devicePolicy;
+    check(arm, 'DEVICE_POLICY: the boot benchmark ran inside the hold and chose a start (FR-10)', !!d?.score && !!d?.start?.tier && d.score.ms <= 1600, d ? `class ${d.cls}, score ${JSON.stringify(d.score)}, start ${JSON.stringify(d.start)}; tier ${s.tier}, preset ${s.preset}` : 'absent');
+  }
   check(arm, 'zero page errors', errors.length === 0, errors.slice(0, 3).join(' | '));
   check(arm, 'zero shader compile/link errors in the console', shaderErrors.length === 0, shaderErrors.slice(0, 2).join(' | '));
   check(arm, 'program census published (FR-1)', !!s.programs && s.programs.total > 0, s.programs ? `${s.programs.total} programs, ${s.programs.afterRevealCount} first used after the reveal, worst first use ${s.programs.worstMs} ms, link failures ${s.programs.linkFailures}` : 'absent');
   const within = s.layers && s.layers.glCalls != null && s.layers.glCalls > 0 ? Math.abs(s.layers.calls - s.layers.glCalls) / s.layers.glCalls : null;
   check(arm, 'layer census matches gl.info within 2% (FR-4)', within != null && within <= 0.02, s.layers ? `census ${s.layers.calls} draws / ${s.layers.triangles} tris vs gl.info ${s.layers.glCalls} / ${s.layers.glTriangles}; top ${s.layers.rows.slice(0, 4).map((r) => `${r.key}:${r.calls}`).join(', ')}` : 'absent');
   check(arm, 'texture + renderbuffer bytes counted, RGBA16F audited (FR-4)', !!s.tex && s.tex.mib > 0, s.tex ? `${s.tex.mib.toFixed(1)} MiB in ${s.tex.textures} textures; RGBA16F ${s.tex.rgba16f.count} (${s.tex.rgba16f.mib.toFixed(1)} MiB); unknown ${s.tex.unknown}` : 'absent');
-  const paceOn = /PACE_ADAPT/.test(FLAGS[arm] ?? '');
+  const paceOn = flagOn(arm, 'PACE_ADAPT');
+  if (s.flags) check(arm, 'the page resolved the arm\'s FRAME flags', FRAME_FLAGS.every((f) => s.flags[f] === flagOn(arm, f)), FRAME_FLAGS.map((f) => `${f}:${+s.flags[f]}`).join(' '));
   if (s.gov) check(arm, `governor PACE_ADAPT ${paceOn ? 'on' : 'off'}`, s.gov.paceAdapt === paceOn, `refresh ${s.gov.refresh}, target ${s.gov.targetFps}, rung ${s.gov.rung}/${s.gov.rungs}, lock ${s.gov.cadenceLock}`);
-  const shaderReady = /SHADER_READY/.test(FLAGS[arm] ?? '');
-  check(arm, `prewarm registry consumer ${shaderReady ? 'published' : 'absent'} (FR-3)`, shaderReady ? !!s.prewarm?.registry : !s.prewarm?.registry, s.prewarm?.registry ? JSON.stringify({ entries: s.prewarm.registry.entries, reachable: s.prewarm.registry.reachable, warmed: s.prewarm.registry.warmed, failed: s.prewarm.registry.failed }) : '');
+  const shaderReady = flagOn(arm, 'SHADER_READY');
+  check(arm, `prewarm registry consumer ${shaderReady ? 'published' : 'absent'} (FR-3)`, shaderReady ? !!s.prewarm?.registry : !s.prewarm?.registry, s.prewarm?.registry ? JSON.stringify({ entries: s.prewarm.registry.entries, reachable: s.prewarm.registry.reachable, warmed: s.prewarm.registry.warmed, failed: s.prewarm.registry.failed, errors: s.prewarm.registry.errors }) : `prewarm ${JSON.stringify({ ...s.prewarm, flags: s.flags })}`);
+  if (shaderReady && s.prewarm?.registry) {
+    // The probe entry: seen, judged reachable, queued or compiled, never failed.
+    // Compiled pre-reveal on a real GPU; on SwiftShader the boot drain's 3 s
+    // budget can run out first and the post-reveal slice never gets a frame
+    // fast enough to take it, so "queued" is the venue's honest answer.
+    const r = s.prewarm.registry;
+    const warmed = (r.warmedKeys ?? []).includes('FRAME:registry-probe');
+    check(arm, 'the registry probe entry is seen, reachable and warmed or queued, with no failure (FR-3)', r.entries >= 1 && r.reachable >= 1 && r.failed === 0 && (warmed || r.queued >= 1), `entries ${r.entries}, reachable ${r.reachable}, ${warmed ? 'WARMED' : `not yet warmed (queued ${r.queued}, prewarm pending ${s.prewarm.pending ?? '?'})`}, failed ${r.failed}`);
+  }
   if (arm === 'player') {
     // FRAME_PROD=1 when FLY_URL is a `next start` of a production build.
     const prod = process.env.FRAME_PROD === '1';

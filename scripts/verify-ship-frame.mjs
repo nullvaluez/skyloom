@@ -31,7 +31,7 @@ register('./_node-resolve.mjs', import.meta.url);
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8').replace(/\r\n/g, '\n');
-const git = (...a) => execFileSync('git', ['-C', ROOT, ...a], { encoding: 'utf8', maxBuffer: 64 << 20 }).replace(/\r\n/g, '\n');
+const git = (...a) => execFileSync('git', ['-C', ROOT, ...a], { encoding: 'utf8', maxBuffer: 64 << 20, stdio: ['ignore', 'pipe', 'ignore'] }).replace(/\r\n/g, '\n');
 const mod = (rel) => import(path.join(ROOT, rel));
 
 let passed = 0;
@@ -669,23 +669,86 @@ const atBase = (rel) => {
     for (const need of ['SKY_LITE', 'NIGHT_LITE', 'TERRAIN_SHADOW', 'TRAFFIC_SHADOWS', 'AIRFRAME_DETAIL', 'BATTERY_SAVER', 'MATCH_DISPLAY', 'CADENCE_LOCK', 'DYNAMIC_NEAR', 'ULTRA_SUPERSAMPLE']) assert(dp.POLICY_FEATURES.includes(need), need);
     return `${dp.POLICY_FEATURES.length} features, ${n} answers`;
   });
-  await check('FR-11 (b) with no benchmark score every W0 seed row answers exactly what it answered at W0', () => {
+  // The ONE sanctioned seed-row move (a contract request, recorded in the
+  // FRAME report): LIGHT asked for PHOTO_HIRES touch maxScale 2 → 3 (at 2 a
+  // 585×1266 phone buffer exports 2,532 px, short of LT-6's 2,560 px). The
+  // gate applies exactly that move to the W0 answer and nothing else.
+  const SANCTIONED = {
+    PHOTO_HIRES: (cls, w0) => (cls === 'phone' || cls === 'tablet' ? { ...w0, budget: { ...w0.budget, maxScale: 3 } } : w0),
+  };
+  await check('FR-11 (b) with no benchmark score every W0 seed row answers exactly what it answered at W0 (one sanctioned move: PHOTO_HIRES touch maxScale 3)', () => {
     if (!seedSrc) return 'no merge-base (not a git checkout): skipped';
     const code = seedSrc.replace(/\r\n/g, '\n').replace(/^import[\s\S]*?;\n/gm, '').replace(/^export /gm, '');
     const ctx = vm.createContext({ isMobileGraphicsClass: () => false, isPhoneClass: () => false, sessionGpuClass: () => ({ cls: 'high' }), window: undefined });
     vm.runInContext(`${code}\nthis.__api = { deviceFeature, POLICY_FEATURES };`, ctx);
     const seed = ctx.__api;
     let n = 0;
+    let moved = 0;
     for (const f of seed.POLICY_FEATURES)
       for (const cls of dp.DEVICE_CLASSES)
         for (const tier of ['low', 'medium', 'high'])
           for (const preset of [tier, 'ultra']) {
-            const a = JSON.stringify(seed.deviceFeature(f, { cls, tier, preset }));
+            const w0 = JSON.parse(JSON.stringify(seed.deviceFeature(f, { cls, tier, preset })));
+            const want = SANCTIONED[f] ? SANCTIONED[f](cls, w0) : w0;
+            if (JSON.stringify(want) !== JSON.stringify(w0)) moved++;
+            const a = JSON.stringify(want);
             const b = JSON.stringify(dp.deviceFeature(f, { cls, tier, preset, score: null }));
             assert(a === b, `${f} ${cls} ${tier}/${preset}: W0 ${a} now ${b}`);
             n++;
           }
-    return `${seed.POLICY_FEATURES.length} seed rows, ${n} answers identical`;
+    // 2 touch classes × 3 tiers × 2 presets — and only if W0 still had 2 there.
+    assert(moved === 0 || moved === 12, `sanctioned move touched ${moved} answers, want 12`);
+    return `${seed.POLICY_FEATURES.length} seed rows, ${n} answers identical (${moved} by the sanctioned PHOTO_HIRES move)`;
+  });
+  await check('FR-11 (e) LIGHT contract: PHOTO_HIRES touch maxScale 3 reaches LT-6\'s 2,560 px from a 585x1266 phone buffer; maxLongPx stays 4096', () => {
+    for (const cls of dp.DEVICE_CLASSES) {
+      const r = dp.deviceFeature('PHOTO_HIRES', { cls, tier: 'medium' });
+      assert(r.allowed === (cls !== 'software'), `${cls} allowed ${r.allowed}`);
+      eq(r.budget, { maxScale: 3, maxLongPx: 4096 }, cls);
+    }
+    const { budget } = dp.deviceFeature('PHOTO_HIRES', { cls: 'phone' });
+    const long = Math.min(1266 * budget.maxScale, budget.maxLongPx);
+    assert(long >= 2560, `phone export long edge ${long}`);
+    return `phone 1266 px × ${budget.maxScale} → ${long} px (cap ${budget.maxLongPx})`;
+  });
+  await check('FR-11 (f) LIGHT contract: window.__flyDeviceClassOverride pins deviceClassOf() to any DEVICE_CLASSES value; anything else is ignored; ctx.cls still wins', async () => {
+    const had = Object.prototype.hasOwnProperty.call(globalThis, 'window');
+    const prev = globalThis.window;
+    const rows = [];
+    try {
+      for (const cls of dp.DEVICE_CLASSES) {
+        globalThis.window = { __flyDeviceClassOverride: cls };
+        assert(dp.deviceClassOf() === cls, `pin ${cls} → ${dp.deviceClassOf()}`);
+        // The table follows the pin (SwiftShader pinned to 'phone' gets the phone policy).
+        const sky = dp.deviceFeature('SKY_LITE', { tier: 'high' }).allowed;
+        assert(sky === (cls === 'phone' || cls === 'tablet'), `${cls} SKY_LITE at high ${sky}`);
+        assert(dp.deviceClassOf({ cls: 'dgpu' }) === 'dgpu', 'ctx.cls wins over the pin');
+        rows.push(cls);
+      }
+      // An unknown value falls through to the live classification (stubbed
+      // here: the classifier must be reached, i.e. the pin did not answer).
+      const src = read('lib/fly/device-policy.js');
+      const fn = src.slice(src.indexOf('export function deviceClassOf'), src.indexOf('\n}\n', src.indexOf('export function deviceClassOf')));
+      assert(/const pin = window\.__flyDeviceClassOverride;\n\s*if \(pin != null && CLASS_PINS\.has\(pin\)\) return pin;/.test(fn), 'pin read guarded by CLASS_PINS');
+      assert(fn.indexOf('CLASS_PINS.has(pin)') < fn.indexOf('isPhoneClass()'), 'the pin is read before the live classifiers');
+      const pins = src.match(/const CLASS_PINS = new Set\((\[[^\]]*\])\)/);
+      eq(JSON.parse(pins[1].replace(/'/g, '"')), [...dp.DEVICE_CLASSES], 'CLASS_PINS === DEVICE_CLASSES');
+      globalThis.window = { __flyDeviceClassOverride: 'gpu-of-the-future' };
+      let got;
+      try {
+        got = dp.deviceClassOf();
+      } catch {
+        got = '(the live classifier ran and needs a browser)'; // the pin did not answer
+      }
+      assert(got !== 'gpu-of-the-future', 'an unknown pin value must be ignored');
+      rows.push(`unknown → ${got}`);
+    } finally {
+      if (had) globalThis.window = prev;
+      else delete globalThis.window;
+    }
+    // Flag-off/unpinned identity: no window → 'dgpu', exactly W0.
+    assert(dp.deviceClassOf() === 'dgpu', 'node (no window) still dgpu');
+    return `pinned ${rows.join(', ')}`;
   });
   await check('FR-11 (c) a score changes only what FR-10 says: tablet sky, tablet airframe detail, Ultra supersample', () => {
     const hi = { grade: 'high' };

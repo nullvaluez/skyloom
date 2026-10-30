@@ -36,13 +36,16 @@ const legs=process.env.BETA_SOAK_ROUTE==='airports'?allLegs.filter(l=>l.ops).map
 const quantile=(rows,q)=>rows.length?[...rows].sort((a,b)=>a-b)[Math.min(rows.length-1,Math.floor(rows.length*q))]:null;
 (async()=>{
  let browser,server,page,log='',renderer,cpu,lastProgress=Date.now();const errors=[],samples=[],events=[],responses={};const began=Date.now();
- const watchdog=setInterval(()=>{if(Date.now()-lastProgress>90000){errors.push('Browser did not report progress for 90 seconds');writeFileSync(path.join(OUT,'soak-stalled.json'),JSON.stringify({at:new Date().toISOString(),errors,samples,events},null,2));browser?.close().catch(()=>{});server?.kill();}},10000);
+ // SHIP PASS FRAME (FR-7): SwiftShader boots in minutes, not seconds; the fixture proof waits STALL_MS for progress.
+ const STALL_MS=FIXTURE?600000:90000;
+ const watchdog=setInterval(()=>{if(Date.now()-lastProgress>STALL_MS){errors.push(`Browser did not report progress for ${STALL_MS/1000} seconds`);writeFileSync(path.join(OUT,'soak-stalled.json'),JSON.stringify({at:new Date().toISOString(),errors,samples,events},null,2));browser?.close().catch(()=>{});server?.kill();}},10000);
  try {
   const {BUDGET_TABLE,missedShare}=await import('../lib/fly/tier-budgets.js');
   if(!FIXTURE){server=spawn(process.execPath,['node_modules/next/dist/bin/next','start','-p',String(PORT)],{env:{...process.env,FLY_BUILD_DIR:'.next-explorer',NEXT_TELEMETRY_DISABLED:'1'},stdio:['ignore','pipe','pipe'],windowsHide:true});server.stdout.on('data',b=>log+=b);server.stderr.on('data',b=>log+=b);}
   for(let i=0;i<120;i++){try{if((await fetch(base)).ok)break;}catch{}if(i===119)throw Error('Server unavailable');await delay(500);}
-  browser=await chromium.launch({args:[...(process.platform==='win32'?['--use-angle=d3d11']:[]),'--ignore-gpu-blocklist']});
-  const context=await browser.newContext({viewport:{width:1920,height:1080},deviceScaleFactor:1});
+  browser=await chromium.launch({args:[...(process.platform==='win32'?['--use-angle=d3d11']:[]),'--ignore-gpu-blocklist',...(FIXTURE?['--enable-unsafe-swiftshader','--use-angle=swiftshader']:[])]});
+  // FIXTURE: a quarter of the pixels, so the software rasterizer reports at all.
+  const context=await browser.newContext({viewport:FIXTURE?{width:960,height:540}:{width:1920,height:1080},deviceScaleFactor:1});
   if(FIXTURE){const {attachFixture,fixturePin}=require('./_fixture');const fx=await attachFixture(context);await context.addInitScript(pin=>{window.__flyTileFixture=pin;window.__flyWeatherOverride='baseline';},fixturePin(fx.url,15));}
   if(process.env.BETA_GPU_TRACE==='1')await context.addInitScript(()=>{
     const trace=window.__betaGpuCalls={totals:{},slow:[]};
@@ -52,7 +55,7 @@ const quantile=(rows,q)=>rows.length?[...rows].sort((a,b)=>a-b)[Math.min(rows.le
     }
   });
   await context.addInitScript(()=>{if(location.protocol!=='http:')return;localStorage.setItem('fly-sound-on','0');localStorage.setItem('fly-crash-mode','forgiving');localStorage.setItem('fly-explorer-preferences-v1',JSON.stringify({version:1,settings:{tutorial:'skipped'}}));});
-  page=await context.newPage();page.setDefaultTimeout(90000);page.on('pageerror',e=>errors.push(e.message));
+  page=await context.newPage();page.setDefaultTimeout(STALL_MS);page.on('pageerror',e=>errors.push(e.message));
   if(process.env.BETA_CPU_TRACE==='1'){cpu=await context.newCDPSession(page);await cpu.send('Profiler.enable');await cpu.send('Profiler.start');}
   page.on('response',res=>{const host=new URL(res.url()).hostname;if(host==='127.0.0.1')return;const key=`${host}:${res.status()}`;responses[key]=(responses[key]||0)+1;});
   await page.goto(base+'/?graphicsReview=1&diag=1',{waitUntil:'domcontentloaded'});
