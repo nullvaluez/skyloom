@@ -92,6 +92,13 @@ function generate(applyFn, args) {
   };
 }
 
+// SHIP PASS CITY (2026-10-30): world-bend.js imports again ('@/lib/...' and
+// extensionless relatives since TRUE_SCALE), so this gate crashed with
+// ERR_MODULE_NOT_FOUND on main before its first row. The shared app-module
+// resolve hook fixes that; every row and number below is unchanged.
+const { register } = await import('node:module');
+register('./_node-resolve.mjs', import.meta.url);
+
 const [{ applyBendRoadSat, applyBendAnchorSat }, constants] = await Promise.all([
   import(path.join(ROOT, 'lib/fly/toy-world/world-bend.js')),
   import(path.join(ROOT, 'lib/fly/fly-constants.js')),

@@ -41,6 +41,8 @@ import { eyeAglVis } from '@/lib/fly/ground-vis';
 import { CITY_FACADES_ON, updateCityFacades, cityFacadesState, setCityFacadesSky } from '@/lib/fly/city-facades';
 // SHIP PASS CITY (CT-2): CITY_RANGE resolved per tier through the device policy.
 import { cityRangeFor } from '@/lib/fly/city-range';
+// SHIP PASS CITY (CT-5): NIGHT_RHYTHM's occupancy / twilight uniform.
+import { NIGHT_RHYTHM_ON, updateNightRhythm } from '@/lib/fly/night-rhythm';
 
 const TIERS = ['low', 'medium', 'high']; // mirrors FlyCanvas's quality ladder
 const atLeastTier = (tier, min) => TIERS.indexOf(tier) >= TIERS.indexOf(min);
@@ -218,6 +220,7 @@ export function SatBuildingLayer({ runtime, flight }) {
     // Windows light up as the sun goes down (runtime.sun is the R13 day cycle,
     // republished on a 60s cadence — this just reads it; one uniform write).
     engine.setNightMix(runtime.sun?.frac);
+    if (NIGHT_RHYTHM_ON) updateNightRhythm(runtime.sun, runtime.geo?.y); // SHIP PASS CITY (CT-5): one shared uniform
     engine.update(clock.elapsedTime, flight.pos.x, flight.pos.z, eyeAgl);
     // PLAY PASS CITY: one region vote a second, a few uniform writes while easing.
     if (CITY_FACADES_ON) updateCityFacades(engine, clock.elapsedTime, runtime.origin?.anchor);

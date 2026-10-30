@@ -964,8 +964,9 @@ Severity and effort are the auditors' estimates. "Where" names the requirement t
 
 <!-- SHIP PASS CITY report begin -->
 **Status (2026-10-30, cloud venue, branch `ship/city`): IN PROGRESS.** CT-1,
-CT-6 (node half) and CT-4 (built, flag off) landed; CT-2 plumbing is in (flag
-off); the SK-1 city arms (browser), CT-3, CT-5 and CT-7 follow. Every number below is the offline
+CT-6 (node half), CT-4 and CT-5 (built, flags off) and CT-7 (the list) landed;
+CT-2 plumbing is in (flag off); the SK-1 city arms (browser), CT-3 and the
+browser smokes follow. Every number below is the offline
 fixture on SwiftShader or a node gate, never a device number (3.8).
 
 **CT-1 — diagnosis pins (P0, landed).** `window.__flyCityDiag = { fadeStartM?,
@@ -1036,7 +1037,54 @@ registered in the CITY prewarm block (`CITY:night-lite-pools`, flag-gated).
 `verify-sat-night` reconciliation and the phone-emulation capture at 3 km are
 pending browser runs.
 
-**Gates.** `scripts/verify-ship-city.mjs` (node, starts the fixture itself): 31/31. `ship-pass-gates`: 32 PASS, 2 KNOWN-RED, 0 FAIL, seam rule PASS.
+**CT-5 — NIGHT_RHYTHM (P2, built, flag `enabled:false`).** `lib/fly/night-rhythm.js`.
+(a) Seam: NIGHT_LIGHTS' lamps faded in across 0.3-1.4 x the road ring, so
+inside the ring both lit the same streets and just past it the lamps were still
+partial; with the flag they arrive across 0.8-1.05 x the ring at `seam.gain`
+(1 = the owner's 5080 calibration knob; the venue cannot draw VIIRS, GIBS is
+blocked), an anchored edit on `night-lights-atlas.js`'s text re-anchored to
+the ring through the shipped `uNLFade` (living-ground.js untouched).
+(b) Twilight: Enhanced window light followed the cinema night weight (0 above
+-2 deg, full at -12 deg), so a blue-hour city was unlit; window emission now
+takes at least an elevation-keyed weight (0 above +1 deg, full by civil dusk,
+-6 deg). (c) Occupancy: local SOLAR hour recovered from the published sun
+(hour angle from sinEl/decl/lat, sign from the azimuth; within 0.032 h of the
+clock in both azimuth conventions) drives ONE uniform `uNightRhythm` =
+(office, residential, other, twilight); a window stays lit while its stable
+per-cell hash is under its family's share, so windows go dark one by one after
+~23:00, offices empty through the evening, homes stay lit until bedtime.
+No new program: each edited material keeps one program under a `|night-rhythm-v1`
+key (gate counts them); flag off, the four architecture programs and the
+NIGHT_LIGHTS text are main's byte for byte. Prewarm: `prewarm.js` already
+builds these programs through the same factory, so the flag-on variant is
+warmed with no registry entry. Dusk/night capture pairs at 500 m and 3 km are
+owner rows (run list 6); VIIRS cannot render here.
+
+**CT-7 — NIGHT_CITY_R23's consumers (for the lead's deletion, 8.3).** NOT dead
+code in Enhanced: `nightCityOn(sub)` (`lib/fly/night-city.js`) is true for every
+sub-block but `windows` whenever `satelliteVisualsOn('lighting')`, so two
+sub-blocks are LIVE in the shipped frame: `.roads` (spread by
+`satelliteRoadLighting()` into the Enhanced road program, key
+`world-bend-road-satnight-r23`) and `.tier` (`.tier.nightMinTier` gates night
+windows in `SatBuildingLayer.jsx`). Deleting the block must move those values,
+not drop them. Consumers: `lib/fly/fly-constants.js` (the block, ~6711-6900,
+plus comments in NIGHT_TRUTH_R23's header); `lib/fly/night-city.js`
+(`nightCityOn`, `satelliteRoadLighting`, `NIGHT_CITY_SWEPT`,
+`installNightCityDevHandle`); `lib/fly/toy-world/sat-building-engine.js`
+(import + `nightCityOn('windows')` at the material, twin pool and
+`setNightCityWindows`); `lib/fly/toy-world/sat-road-engine.js`
+(`satelliteRoadLighting()` into `applyBendRoadSat`); `lib/fly/prewarm.js`
+(`nightCityOn('windows')`, `satelliteRoadLighting()`);
+`components/fly/SatBuildingLayer.jsx` (the `.tier` gate);
+`components/fly/SatRoadLayer.jsx` (`installNightCityDevHandle`);
+`lib/fly/toy-world/world-bend.js` (the r23 road/window variants and their
+uniforms, frozen this pass); `scripts/verify-night-city-identity.mjs` (the
+gate; it crashed on main with ERR_MODULE_NOT_FOUND since world-bend.js gained
+imports, fixed here with the shared resolve hook: 8/8 run, (1)/(3) need
+`R23_BASE_WORLDBEND`).
+
+**Gates.** `scripts/verify-ship-city.mjs` (node, starts the fixture itself): 42/42.
+`verify-play-city` 28/28, `verify-night-city-identity` PASS (8 rows). `ship-pass-gates`: 32 PASS, 2 KNOWN-RED, 0 FAIL, seam rule PASS.
 `FLY_TILE_FIXTURE=1 verify-worker-window` 4/4, `verify-true-areas` 7/7.
 
 **Contract requests.** None yet.

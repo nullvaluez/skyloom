@@ -21,6 +21,8 @@ import { satelliteVisualsOn, satelliteVisualProfile } from '@/lib/fly/satellite-
 import { useFlyStore } from '@/stores/fly-store';
 // SHIP PASS CITY (CT-2): CITY_RANGE resolved per tier through the device policy.
 import { cityRangeFor } from '@/lib/fly/city-range';
+// SHIP PASS CITY (CT-5): NIGHT_RHYTHM's occupancy / twilight uniform.
+import { NIGHT_RHYTHM_ON, updateNightRhythm } from '@/lib/fly/night-rhythm';
 // R24 B (GROUND_VIS, recon A6/T8) — AGL fade bands read the DAMPED ground.
 import { eyeAglVis, groundElevVis } from '@/lib/fly/ground-vis';
 
@@ -118,6 +120,7 @@ export function SatSkylineLayer({ runtime, flight }) {
     // groundElev rides along as the fallback for far DEM samples that have not
     // streamed yet — sea level would sink a mountain city's skyline.
     engine.setNightMix(runtime.sun?.frac);
+    if (NIGHT_RHYTHM_ON) updateNightRhythm(runtime.sun, runtime.geo?.y); // SHIP PASS CITY (CT-5): one shared uniform
     setSatelliteArchitectureCoverage(engine.material, runtime.satBuildings, runtime.origin?.anchor, getSatBldgFade());
     engine.update(t, flight.pos.x, flight.pos.z, eyeAgl, gVis);
     const ready = engine.stats.ready;

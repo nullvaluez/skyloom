@@ -256,10 +256,104 @@ async function childNight(windowJSON) {
   process.exit(0);
 }
 
+// CHILD: CITY's programs (CT-5) from given module files; argv:
+// --child=programs <windowJSON> <archPath> <nlPath>. A path outside the tree
+// (main's copy, from `git show`) resolves its imports as if it sat at the
+// real file's place, so only that one file differs between the two arms.
+async function childPrograms(windowJSON, archPath, nlPath) {
+  const { registerHooks } = await import('node:module');
+  const fs = await import('node:fs');
+  const real = {
+    [pathToFileURL(archPath).href]: pathToFileURL(path.join(ROOT, 'lib/fly/satellite-architecture-material.js')).href,
+    [pathToFileURL(nlPath).href]: pathToFileURL(path.join(ROOT, 'lib/fly/night-lights-atlas.js')).href,
+  };
+  const probe = (base) => {
+    for (const ext of ['', '.js', '.mjs', '.jsx', '/index.js']) {
+      try {
+        if (fs.statSync(base + ext).isFile()) return base + ext;
+      } catch {
+        /* next */
+      }
+    }
+    return null;
+  };
+  registerHooks({
+    resolve(spec, ctx, next) {
+      const parent = real[ctx.parentURL] ?? ctx.parentURL;
+      if (spec.startsWith('@/')) {
+        const hit = probe(path.join(ROOT, spec.slice(2)));
+        if (hit) return { url: pathToFileURL(hit).href, shortCircuit: true };
+      }
+      if (spec.startsWith('.') && parent?.startsWith('file:')) {
+        const hit = probe(path.resolve(path.dirname(fileURLToPath(parent)), spec));
+        if (hit) return { url: pathToFileURL(hit).href, shortCircuit: true };
+      }
+      return next(spec, { ...ctx, parentURL: parent });
+    },
+  });
+  globalThis.window = { location: { search: '' }, ...JSON.parse(windowJSON) };
+  const { ShaderLib, UniformsUtils } = await import('three');
+  const { createSatelliteArchitectureMaterial } = await import(pathToFileURL(archPath).href);
+  const { useFlyStore } = await import(pathToFileURL(path.join(ROOT, 'stores/fly-store.js')).href);
+  const NLmod = await import(pathToFileURL(nlPath).href);
+  delete globalThis.window; // pins are read once, at module load
+  const sha = (t) => crypto.createHash('sha256').update(t).digest('hex').slice(0, 16);
+  const out = { programs: {}, nl: { sha: sha(NLmod.NIGHT_LIGHTS_GLSL), text: NLmod.NIGHT_LIGHTS_GLSL } };
+  for (const visuals of ['enhanced', 'classic']) {
+    useFlyStore.setState({ mapStyle: 'satellite', visuals });
+    for (const distant of [false, true]) {
+      const m = createSatelliteArchitectureMaterial({ distant });
+      const sh = { uniforms: UniformsUtils.clone(ShaderLib.standard.uniforms), vertexShader: ShaderLib.standard.vertexShader, fragmentShader: ShaderLib.standard.fragmentShader };
+      let error = null;
+      try {
+        m.onBeforeCompile(sh, {});
+      } catch (e) {
+        error = e.message;
+      }
+      out.programs[`${visuals}-${distant ? 'far' : 'near'}`] = { vs: sha(sh.vertexShader), fs: sha(sh.fragmentShader), fsText: sh.fragmentShader, key: m.customProgramCacheKey(), uniforms: Object.keys(sh.uniforms), error };
+      m.dispose();
+    }
+  }
+  console.log(`@@JSON${JSON.stringify(out)}`);
+  process.exit(0);
+}
+
+// CHILD: the NIGHT_RHYTHM curves (pure); argv: --child=rhythm
+async function childRhythm() {
+  const { register } = await import('node:module');
+  register('./_node-resolve.mjs', import.meta.url);
+  globalThis.window = { __flyNightRhythmOverride: { enabled: true } };
+  const NR = await import(pathToFileURL(path.join(ROOT, 'lib/fly/night-rhythm.js')).href);
+  const SM = await import(pathToFileURL(path.join(ROOT, 'lib/fly/sun-model.js')).href);
+  const out = { on: NR.NIGHT_RHYTHM_ON, occ: {}, tw: {}, hours: [] };
+  for (const h of [12, 18, 19, 21, 22, 23, 23.5, 0, 1, 2, 4, 6]) out.occ[h] = NR.occupancyAt(h);
+  for (const el of [10, 1, 0, -2, -4, -6, -12]) out.tw[el] = NR.twilightK(el);
+  // solarHour recovered from computeSun at Manhattan across a day, both az conventions
+  const lon = -73.984;
+  const lat = 40.7549;
+  for (const trueAz of [false, true]) {
+    for (let utcH = 0; utcH < 24; utcH += 1.5) {
+      const t = Date.parse('2026-06-21T00:00:00Z') + utcH * 3600e3;
+      const sun = SM.computeSun(lon, lat, t, trueAz);
+      const expect = (((utcH + lon / 15) % 24) + 24) % 24;
+      const got = NR.solarHour(sun, lat);
+      let d = Math.abs(got - expect);
+      d = Math.min(d, 24 - d);
+      out.hours.push({ trueAz, utcH, expect: +expect.toFixed(2), got: +got.toFixed(2), d: +d.toFixed(3) });
+    }
+  }
+  const v = NR.updateNightRhythm(SM.computeSun(lon, lat, Date.parse('2026-06-22T03:30:00Z')), lat);
+  out.uniform = [v.x, v.y, v.z, v.w];
+  console.log(`@@JSON${JSON.stringify(out)}`);
+  process.exit(0);
+}
+
 const childArg = process.argv.find((a) => a.startsWith('--child='));
 if (childArg === '--child=worker') await childWorker(process.argv[3], process.argv[4], process.argv[5]);
 else if (childArg === '--child=logic') await childLogic(process.argv[3]);
 else if (childArg === '--child=night') await childNight(process.argv[3]);
+else if (childArg === '--child=programs') await childPrograms(process.argv[3], process.argv[4], process.argv[5]);
+else if (childArg === '--child=rhythm') await childRhythm();
 else await main();
 
 // ---------------------------------------------------------------------------
@@ -496,6 +590,77 @@ async function main() {
       comp.split('<instancedMesh').length === 2 && /mesh\.visible = n > 0;/.test(comp) && /if \(nightK <= 0\) \{\s*mesh\.visible = false;/.test(comp) &&
         /t - last\.t < block\.refreshSec/.test(comp) && !/console\./.test(comp) && /process\.env\.NODE_ENV === 'development'/.test(comp),
     );
+  }
+
+  // ===================== CT-5: NIGHT_RHYTHM ===================================
+  {
+    const tmp = mkdtempSync(path.join(os.tmpdir(), 'ship-city-prog-'));
+    const archMain = path.join(tmp, 'satellite-architecture-material.js');
+    const nlMain = path.join(tmp, 'night-lights-atlas.js');
+    let haveMain = true;
+    try {
+      writeFileSync(archMain, execFileSync('git', ['-C', ROOT, 'show', 'main:lib/fly/satellite-architecture-material.js'], { encoding: 'utf8' }));
+      writeFileSync(nlMain, execFileSync('git', ['-C', ROOT, 'show', 'main:lib/fly/night-lights-atlas.js'], { encoding: 'utf8' }));
+    } catch (e) {
+      haveMain = false;
+      check("CT-5 main's architecture / night-lights sources are readable", false, String(e.message).slice(0, 120));
+    }
+    const archCur = path.join(ROOT, 'lib/fly/satellite-architecture-material.js');
+    const nlCur = path.join(ROOT, 'lib/fly/night-lights-atlas.js');
+    const cur = runChild(['--child=programs', JSON.stringify({}), archCur, nlCur]);
+    const on = runChild(['--child=programs', JSON.stringify({ __flyNightRhythmOverride: { enabled: true } }), archCur, nlCur]);
+    if (haveMain) {
+      const base = runChild(['--child=programs', JSON.stringify({}), archMain, nlMain]);
+      const diff = Object.keys(base.programs).filter((k) => base.programs[k].vs !== cur.programs[k].vs || base.programs[k].fs !== cur.programs[k].fs || base.programs[k].key !== cur.programs[k].key || cur.programs[k].error);
+      check(
+        "CT-5 flag off: the four architecture programs (near/far x Enhanced/Classic) are main's text and keys, byte for byte",
+        diff.length === 0,
+        diff.length ? `differ: ${diff.join(', ')}` : Object.values(cur.programs).map((p) => `${p.fs}`).join(' '),
+      );
+      check("CT-5 flag off: NIGHT_LIGHTS' aerial-pass text is main's, byte for byte", base.nl.sha === cur.nl.sha, cur.nl.sha);
+    }
+    rmSync(tmp, { recursive: true, force: true });
+    const errs = Object.entries(on.programs).filter(([, p]) => p.error);
+    const keyed = Object.entries(on.programs).every(([k, p]) => p.key.includes('|night-rhythm-v1') && p.key.replace('|night-rhythm-v1', '') === cur.programs[k].key);
+    check(
+      'CT-5 flag on: every anchored edit lands in all four programs; each key gains |night-rhythm-v1 and only that (one program each: the count is unchanged)',
+      errs.length === 0 && keyed && new Set(Object.values(on.programs).map((p) => p.key)).size === new Set(Object.values(cur.programs).map((p) => p.key)).size,
+      errs.map(([k, p]) => `${k}: ${p.error}`).join('; '),
+    );
+    const fsOn = on.programs['enhanced-near'].fsText;
+    check(
+      'CT-5 flag on: one uniform (uNightRhythm, vec4) drives the window share per family and the twilight emission floor',
+      on.programs['enhanced-near'].uniforms.includes('uNightRhythm') && on.programs['enhanced-far'].uniforms.includes('uNightRhythm') &&
+        fsOn.includes('uniform vec4 uNightRhythm;') && fsOn.includes('max(uArchitectureNight,uNightRhythm.w)') && /occupied\*=mix\(step\(archHash\(/.test(fsOn),
+    );
+    const offNear = cur.programs['enhanced-near'].fsText;
+    const added = fsOn.split('\n').filter((l) => !offNear.split('\n').includes(l));
+    check(
+      'CT-5 flag on: the only changed lines are the uniform, the share and the emission weight (daylight albedo untouched)',
+      added.length > 0 && added.every((l) => /uNightRhythm|nrOffice|nrHome|nrShare|occupied\*=|float glow = paneMask/.test(l)),
+      `${added.length} lines`,
+    );
+    check(
+      'CT-5 flag on: the NIGHT_LIGHTS near fade is re-anchored to the road ring (band x ring, gain eased to 1 past it)',
+      on.nl.sha !== cur.nl.sha && /nrRing=uNLFade\.y\//.test(on.nl.text) && !on.nl.text.includes('float near=smoothstep(uNLFade.x,uNLFade.y,'),
+    );
+    const R = runChild(['--child=rhythm']);
+    const o = R.occ;
+    const share = (h) => (o[h].office + o[h].residential + o[h].other) / 3;
+    check(
+      'CT-5 occupancy curve: the window share falls after 23:00, offices empty through the evening, homes stay lit until bedtime',
+      share(22) >= share(23) && share(23) > share(0) && share(0) > share(2) && share(2) >= share(4) &&
+        o[18].office > o[21].office && o[21].office > o[23].office && o[23].office > o[2].office &&
+        o[22].residential === 1 && o[23].residential === 1 && o[23.5].residential < 1 && o[2].residential > o[4].residential && o[19].residential >= o[19].office,
+      [18, 21, 23, 0, 2, 4].map((h) => `${h}h o${o[h].office.toFixed(2)} r${o[h].residential.toFixed(2)} x${o[h].other.toFixed(2)}`).join(' · '),
+    );
+    const T = R.tw;
+    check('CT-5 twilight: 0 above +1 deg, rising through sunset, full by civil dusk (-6 deg)', T[10] === 0 && T[1] === 0 && T[0] > 0 && T[-2] > T[0] && T[-4] > T[-2] && T[-6] === 1 && T[-12] === 1, JSON.stringify(T));
+    const worst = Math.max(...R.hours.map((x) => x.d));
+    check('CT-5 local solar hour recovered from the published sun (legacy and true azimuth) within 0.05 h of the clock', R.on && worst < 0.05, `worst ${worst} h over ${R.hours.length} samples`);
+    check('CT-5 the uniform at 23:30 EDT over Manhattan: full twilight weight, offices thinning, homes still lit', R.uniform[3] === 1 && R.uniform[0] < 0.6 && R.uniform[1] > R.uniform[0], R.uniform.map((v) => v.toFixed(3)).join(', '));
+    const layers = read('components/fly/SatBuildingLayer.jsx') + read('components/fly/SatSkylineLayer.jsx');
+    check('CT-5 the layers write the uniform only behind NIGHT_RHYTHM_ON', (layers.match(/if \(NIGHT_RHYTHM_ON\) updateNightRhythm\(runtime\.sun, runtime\.geo\?\.y\);/g) || []).length === 2);
   }
 
   console.log(`\n${pass} passed, ${fail} failed`);
