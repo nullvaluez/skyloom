@@ -8,6 +8,11 @@ import { terrainArrivalCovered } from '@/lib/fly/critical-terrain-prewarm.mjs';
 import { cinemaOn } from '@/lib/fly/cinema-policy';
 import { bumpArrival, noteFrame, popinState, settleOn } from '@/lib/fly/settle';
 import { useFlyStore } from '@/stores/fly-store';
+// SHIP PASS FRAME (FR-3, SHADER_READY): the registry rescan triggers.
+import { queueRegistryWarm } from '@/lib/fly/prewarm';
+import { prewarmEntries } from '@/lib/fly/prewarm-registry';
+import { resetRegistryWarm } from '@/lib/fly/registry-warm';
+import { shipPassOn } from '@/lib/fly/ship-pass';
 
 /**
  * ROUND 21 (A GOVERNOR, §3.2) — the mount point for the boot shader pre-warm.
@@ -184,6 +189,49 @@ export function PrewarmRig({ runtime }) {
       }
     };
   }, [gl, camera, scene, runtime]);
+
+  // SHIP PASS FRAME (FR-3, SHADER_READY) — the registry consumer's other
+  // triggers (the boot drain is in runPrewarm): a tier or preset step queues
+  // what is still missing for the new tier; every 2 s it rescans for entries
+  // registered late (a stream's lazily loaded module, the title) and for a
+  // new scene.environment (the day/night bucket crossing re-bakes it). A
+  // lost context drops the retained registry programs. Flag off: no effect,
+  // no timer, no subscription.
+  useEffect(() => {
+    if (!PREWARM.enabled || !shipPassOn('SHADER_READY')) return undefined;
+    const run = (reason, tiers) => {
+      if (!prewarmState().started) return; // runPrewarm owns the boot warm
+      queueRegistryWarm({ gl, camera, scene, tiers, reason });
+    };
+    let prevTier = useFlyStore.getState().qualityTier;
+    let prevPreset = useFlyStore.getState().qualityPreset;
+    const unsub = useFlyStore.subscribe((st) => {
+      if (st.qualityTier === prevTier && st.qualityPreset === prevPreset) return;
+      prevTier = st.qualityTier;
+      prevPreset = st.qualityPreset;
+      run('tier', [st.qualityTier]);
+    });
+    let count = prewarmEntries().length;
+    let env = scene.environment;
+    const id = setInterval(() => {
+      const n = prewarmEntries().length;
+      if (n !== count) {
+        count = n;
+        run('rescan');
+      }
+      if (scene.environment && scene.environment !== env) {
+        env = scene.environment;
+        run('env');
+      }
+    }, 2000);
+    const lost = () => resetRegistryWarm();
+    gl.domElement?.addEventListener('webglcontextrestored', lost);
+    return () => {
+      unsub();
+      clearInterval(id);
+      gl.domElement?.removeEventListener('webglcontextrestored', lost);
+    };
+  }, [gl, camera, scene]);
 
   // R24 B (ENV_UNIFORM, recon A5) — the late-HDRI repair. When the warm ran
   // WITHOUT a scene.environment (a throttled network beat PREWARM.envWaitMs),

@@ -181,6 +181,97 @@ const atBase = (rel) => {
 }
 
 // ===========================================================================
+// FR-3 — the prewarm-registry consumer
+// ===========================================================================
+{
+  const reg = await mod('lib/fly/prewarm-registry.js');
+  const rw = await mod('lib/fly/registry-warm.js');
+  const { DEVICE_CLASSES } = await mod('lib/fly/device-policy.js');
+  const streamEntries = reg.prewarmEntries(); // what the streams registered (their blocks), before the gate's own
+  await check('FR-3 (a) registry coverage: every registered entry builds and is reachable somewhere', () => {
+    const tiers = ['low', 'medium', 'high', 'ultra'];
+    const bad = [];
+    for (const e of streamEntries) {
+      if (typeof e.build !== 'function') bad.push(`${e.key}: no build`);
+      const anywhere = tiers.some((t) => DEVICE_CLASSES.some((d) => reg.entryReachable(e, { tier: t === 'ultra' ? 'high' : t, preset: t, device: d, flagOn: () => true })));
+      if (!anywhere) bad.push(`${e.key}: reachable nowhere`);
+    }
+    assert(!bad.length, bad.join('; '));
+    return `${streamEntries.length} entr${streamEntries.length === 1 ? 'y' : 'ies'} registered by the streams on this tree`;
+  });
+  // The gate's own entries (FRAME keys, this process only).
+  const built = [];
+  const mk = (key, when, opts = {}) =>
+    reg.registerPrewarm({
+      stream: 'FRAME',
+      key: `FRAME:gate-${key}`,
+      when,
+      build: () => {
+        built.push(key);
+        if (opts.throws) throw new Error('boom');
+        return { isObject3D: true, key, parent: null, removeFromParent() {}, dispatchEvent() {}, children: [], layers: { test: () => true } };
+      },
+    });
+  mk('everywhere', {});
+  mk('high-only', { tiers: ['high'] });
+  mk('phone-only', { devices: ['phone'] });
+  mk('flag-on', { flags: ['SHADER_READY'] });
+  mk('broken', { tiers: ['low'] }, { throws: true });
+  const gateEntries = reg.prewarmEntries().filter((e) => e.key.startsWith('FRAME:gate-'));
+  const compiled = [];
+  const fakeScene = (env) => ({ environment: env, fog: null });
+  const compile = async (holder) => compiled.push(holder.children.map((c) => c.key).join(','));
+  // three's Scene.add() wants Object3D instances: give the consumer a plain holder instead.
+  await check('FR-3 (b) reachable-here only: tier, device and Ship Pass flags narrow; failures are counted, never thrown', async () => {
+    const { Object3D } = await import('three');
+    const realBuild = (key) => {
+      const o = new Object3D();
+      o.key = key;
+      return o;
+    };
+    // Re-register with real Object3Ds (same keys: registerPrewarm replaces).
+    for (const e of gateEntries) reg.registerPrewarm({ ...e, when: { ...e.when }, build: e.key.endsWith('broken') ? e.build : () => (built.push(e.key), realBuild(e.key.slice(11))) });
+    const entries = reg.prewarmEntries().filter((e) => e.key.startsWith('FRAME:gate-'));
+    const ctxHigh = rw.registryContext({ tier: 'high', preset: 'high', device: 'dgpu', flagOn: () => false });
+    const n = await rw.warmRegistry({ gl: { shadowMap: { enabled: true } }, scene: fakeScene(null), ctx: ctxHigh, compile, entries });
+    eq(compiled.sort(), ['everywhere', 'high-only'], 'dgpu/high/flags off');
+    assert(n === 2, `warmed ${n}`);
+    const ctxLow = rw.registryContext({ tier: 'low', preset: 'low', device: 'phone', flagOn: (f) => f === 'SHADER_READY' });
+    compiled.length = 0;
+    await rw.warmRegistry({ gl: { shadowMap: { enabled: true } }, scene: fakeScene(null), ctx: ctxLow, compile, entries });
+    eq(compiled.sort(), ['everywhere', 'flag-on', 'phone-only'], 'phone/low/flag on (+ the broken one counted)');
+    assert(rw.registryWarmState().failed === 1 && rw.registryWarmState().errors[0].includes('broken'), 'the throwing entry is counted');
+  });
+  await check('FR-3 (c) an entry warms once per compile signature; a new environment (day/night bucket) re-warms', async () => {
+    const entries = reg.prewarmEntries().filter((e) => e.key.startsWith('FRAME:gate-') && !e.key.endsWith('broken'));
+    const ctx = rw.registryContext({ tier: 'high', preset: 'high', device: 'dgpu', flagOn: () => false });
+    compiled.length = 0;
+    const gl = { shadowMap: { enabled: true } };
+    await rw.warmRegistry({ gl, scene: fakeScene(null), ctx, compile, entries });
+    assert(compiled.length === 0, `re-warmed under the same signature: ${compiled}`);
+    await rw.warmRegistry({ gl, scene: fakeScene({ mapping: 306, image: { height: 2048 } }), ctx, compile, entries });
+    eq(compiled.sort(), ['everywhere', 'high-only'], 'a new environment signature');
+  });
+  await check('FR-3 (d) an empty registry is a no-op; a lost context forgets every retained program', async () => {
+    const n = await rw.warmRegistry({ gl: {}, scene: fakeScene(null), ctx: rw.registryContext({ tier: 'high', device: 'dgpu' }), compile, entries: [] });
+    assert(n === 0);
+    rw.resetRegistryWarm();
+    assert(rw.registryWarmState().warmed === 0);
+  });
+  await check('FR-3 (e) wiring: boot tier rides the boot drain, the ladder queues after it, PrewarmRig rescans tier/env/late entries; flag-gated', () => {
+    const src = read('lib/fly/prewarm.js');
+    const run = src.slice(src.indexOf('export async function runPrewarm'));
+    const boot = run.indexOf("queueRegistryWarm({ gl, camera, scene, tiers: [tier], reason: 'boot' })");
+    const drainAt = run.indexOf('await drain(t0');
+    const ladder = run.indexOf("reason: 'ladder'");
+    assert(boot > 0 && drainAt > boot && ladder > drainAt, 'boot → drain → ladder');
+    assert(/if \(!PREWARM\.enabled \|\| !shipPassOn\('SHADER_READY'\)/.test(src), 'queueRegistryWarm is flag-gated');
+    const rig = read('components/fly/PrewarmRig.jsx');
+    for (const r of ["run('tier'", "run('rescan')", "run('env')", "addEventListener('webglcontextrestored', lost)"]) assert(rig.includes(r), `PrewarmRig: ${r}`);
+  });
+}
+
+// ===========================================================================
 // FR-4 — layers and GPU memory
 // ===========================================================================
 {
@@ -355,6 +446,64 @@ const atBase = (rel) => {
     assert(s.events.length > 0, 'released governor did not step');
     const src = read('lib/fly/perf-governor.js');
     assert(/window\.__flyGovPin === 'hold'\) \|\| governorHeld\(\)/.test(src), 'the React shell must OR the holds into `pinned`');
+  });
+}
+
+// ===========================================================================
+// FR-6 — the one budget table
+// ===========================================================================
+{
+  const tb = await mod('lib/fly/tier-budgets.js');
+  const { CINEMA_PROFILES } = await mod('lib/fly/cinema-profile.js');
+  await check('FR-6 (a) every consumer imports the one table (cinema-profile, device report, report gate, soak, soak analysis, this gate)', () => {
+    const want = {
+      'lib/fly/cinema-profile.js': /from '\.\/tier-budgets'/,
+      'lib/fly/device-report.js': /from '\.\/tier-budgets'/,
+      'scripts/verify-device-report.mjs': /import\('\.\.\/lib\/fly\/tier-budgets\.js'\)/,
+      'scripts/beta-soak.cjs': /import\('\.\.\/lib\/fly\/tier-budgets\.js'\)/,
+      'scripts/analyze-beta-soak.mjs': /from '\.\.\/lib\/fly\/tier-budgets\.js'/,
+      'scripts/derive-budget-table.mjs': /import\('\.\.\/lib\/fly\/tier-budgets\.js'\)/,
+    };
+    const missing = Object.entries(want).filter(([f, re]) => !re.test(read(f))).map(([f]) => f);
+    assert(!missing.length, `not reading the table: ${missing.join(', ')}`);
+    const cinema = read('lib/fly/cinema-profile.js');
+    assert(!/draws:\s*\d|triangles:\s*\d|textureBytes:\s*\d/.test(cinema), 'cinema-profile.js still carries a literal budget');
+    const soak = read('scripts/beta-soak.cjs');
+    assert(!/p95Draws:375|<=375|<=2200000/.test(soak), 'beta-soak.cjs still carries literal draw/triangle limits');
+  });
+  await check('FR-6 (b) cinema profiles carry exactly their table rows (verdict thresholds only)', () => {
+    const MiB = 1048576;
+    for (const [name, id] of [['ultra', 'ultra'], ['high', 'high'], ['medium', 'medium'], ['phone', 'phone'], ['low', 'low'], ['phoneLow', 'phone'], ['phoneLean', 'phone'], ['ultraBalanced', 'ultra'], ['highBalanced', 'high']]) {
+      const p = CINEMA_PROFILES[name];
+      const b = tb.BUDGET_TABLE[id];
+      assert(p.draws === b.draws && p.triangles === b.triangles && p.textureBytes === b.textureMiB * MiB, `${name} vs ${id}`);
+      assert(tb.budgetIdFor(p.name) === id, `budgetIdFor(${p.name}) = ${tb.budgetIdFor(p.name)}, want ${id}`);
+    }
+    assert(CINEMA_PROFILES.high.textureBytes === 300 * MiB, 'verify-cinema-overhaul\'s 300 MiB high texture budget');
+  });
+  await check('FR-6 (c) a synthetic 60 Hz report with no missed vblank grades as a pass; a 33.4 ms train fails', () => {
+    const sixty = Array.from({ length: 600 }, (_, i) => (i % 2 ? 16.6 : 16.8));
+    const base = { gpu: { class: 'high' }, quality: { preset: 'high' }, renderer: { trianglesPeak: 2e6, callsPeak: 360, textureBytes: 250 * 1048576 } };
+    const ok = tb.gradeReport({ ...base, frame: { p95: 16.8, p99: 16.8, long100PerMin: 0, missed: tb.missedShare(sixty, 60) } });
+    assert(ok.pass === true, JSON.stringify(ok.rows.filter((r) => r.pass !== true)));
+    const bad = tb.gradeReport({ ...base, frame: { p95: 33.4, p99: 33.4, long100PerMin: 0, missed: tb.missedShare(sixty.map((v, i) => (i % 10 ? v : 33.4)), 60) } });
+    assert(bad.pass === false && bad.rows[0].pass === false, 'a 10% miss share must fail');
+    const old = tb.gradeReport({ ...base, frame: { p95: 16.8, long100PerMin: 0 } });
+    assert(old.rows[0].pass === null && old.pass === false, 'a report without the share is unmeasured, never a pass');
+  });
+  await check('FR-6 (d) every row is provisional and cites its sources (no W0.6 report exists in this venue)', () => {
+    for (const [id, b] of Object.entries(tb.BUDGET_TABLE)) assert(b.provisional === true && b.sources.length > 0, id);
+    eq(tb.BUDGET_IDS, ['ultra', 'high', 'medium', 'phone', 'tablet', 'low']);
+  });
+  await check('FR-6 (e) derive-budget-table re-derives a row from a device report (peak + 5%), dry run', async () => {
+    const { mkdtempSync, writeFileSync } = await import('node:fs');
+    const os = await import('node:os');
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'ship-frame-'));
+    const f = path.join(dir, 'r.json');
+    writeFileSync(f, JSON.stringify({ at: '2026-10-30', gpu: { class: 'high', renderer: 'RTX 5080 (synthetic)' }, quality: { preset: 'high' }, frame: { long100PerMin: 0.5 }, renderer: { callsPeak: 340, trianglesPeak: 1.9e6, textureBytes: 280 * 1048576 } }));
+    const out = execFileSync(process.execPath, [path.join(ROOT, 'scripts/derive-budget-table.mjs'), f], { encoding: 'utf8' });
+    assert(/high\s+MEASURED\s+draws 375 → 357, triangles 2200000 → 1995000, textureMiB 300 → 294/.test(out), out.split('\n').find((l) => l.startsWith('high')) ?? out.slice(0, 200));
+    assert(/dry run/.test(out) && /ultra\s+provisional\s+unchanged/.test(out));
   });
 }
 

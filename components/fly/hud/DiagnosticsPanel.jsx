@@ -71,6 +71,11 @@ export function DiagnosticsPanel({ runtime }) {
         programs: getDiagRenderer()?.info?.programs?.length,
         tier: useFlyStore.getState().qualityTier,
         scanMs: runtime?.cinemaShadows?.scanMs,
+        // SHIP PASS FRAME (FR-1, FR-4, FR-7): the census row.
+        afterReveal: s.census?.programs?.afterRevealCount,
+        programsTotal: s.census?.programs?.total,
+        texMiB: s.census?.textureBytes ? s.census.textureBytes.totalBytes / 1048576 : null,
+        target: s.governor?.refresh != null ? window.__flyGov?.state?.()?.targetFps : null,
       });
     }, 500);
     return () => clearInterval(id);
@@ -221,6 +226,14 @@ export function DiagnosticsPanel({ runtime }) {
         <dd>{live?.tier ?? '—'}</dd>
         <dd>{live?.programs ?? '—'}</dd>
         <dd>{fmt(live?.scanMs, 2)} ms</dd>
+        {/* SHIP PASS FRAME (FR-1, FR-4): programs first used after the reveal
+            (0 is the first-minute goal), logical GPU texture memory, target fps. */}
+        <dt className="text-zinc-500">late shaders</dt>
+        <dt className="text-zinc-500">tex MiB</dt>
+        <dt className="text-zinc-500">target fps</dt>
+        <dd data-testid="diag-census-late">{live?.afterReveal ?? '—'}{live?.programsTotal != null ? ` / ${live.programsTotal}` : ''}</dd>
+        <dd>{fmt(live?.texMiB, 0)}</dd>
+        <dd>{live?.target ?? '—'}</dd>
       </dl>
       <div className="mb-2 grid grid-cols-2 gap-1">
         <Button primary onClick={runBenchmark} disabled={running}>
