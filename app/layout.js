@@ -12,9 +12,19 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// SHIP PASS RL-5: share metadata. Absolute URLs come from NEXT_PUBLIC_SITE_URL
+// (the owner sets the domain); with it unset, Next resolves them against the
+// serving origin. The legacy shadowadsb.app domain is gone, and the copy leads
+// with the real Earth (PLAYER_SURFACE: one look). The card is an in-game
+// capture (public/og/README.md).
+const SITE_URL = /^https?:\/\//.test(process.env.NEXT_PUBLIC_SITE_URL || "") ? process.env.NEXT_PUBLIC_SITE_URL : null;
+const SHARE_DESCRIPTION = "Fly the real Earth: satellite imagery and terrain of the whole planet, live air traffic, airports to watch, guided journeys and free flight over famous places.";
+const SHARE_IMAGE = { url: "/og/skyloom.jpg", width: 1200, height: 630, alt: "A Skyloom flight over the Grand Canyon, from the game's own renderer" };
+
 export const metadata = {
+  ...(SITE_URL ? { metadataBase: new URL(SITE_URL) } : {}),
   title: "Skyloom - Fly the living Earth",
-  description: "Fly the living Earth. Real satellite terrain or a neon world built from real map data, live ADS-B air traffic, takeoffs and landings, free flight over famous places, and a logbook of every plane you spot.",
+  description: "Fly the real Earth: satellite imagery and terrain of the whole planet, live air traffic from real flights, airports to watch, guided journeys, takeoffs and landings, free flight over famous places, and a logbook of every plane you spot.",
   keywords: ["Skyloom", "flying game", "flight game", "flight simulator", "satellite", "ADS-B", "aviation", "3D", "exploration"],
   manifest: "/manifest.json",
   appleWebApp: {
@@ -28,15 +38,17 @@ export const metadata = {
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://shadowadsb.app",
+    url: "/",
     title: "Skyloom - Fly the living Earth",
-    description: "Fly the living Earth: real satellite terrain, live ADS-B air traffic, takeoffs and landings, and free flight over famous places.",
+    description: SHARE_DESCRIPTION,
     siteName: "Skyloom",
+    images: [SHARE_IMAGE],
   },
   twitter: {
     card: "summary_large_image",
     title: "Skyloom - Fly the living Earth",
-    description: "Fly the living Earth: real satellite terrain, live ADS-B air traffic, takeoffs and landings, and free flight over famous places.",
+    description: SHARE_DESCRIPTION,
+    images: [SHARE_IMAGE.url],
   },
   icons: {
     icon: [

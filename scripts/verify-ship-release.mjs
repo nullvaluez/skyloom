@@ -500,5 +500,30 @@ console.log('SHIP PASS RELEASE gate (verify-ship-release)\n');
   gate('P5 PoiLetters writes no ref during render (the two react-hooks errors)', !/^\s*(pickedRef|styleRef)\.current = /m.test(pl.replace(/useLayoutEffect\(\(\) => \{\n\s*(pickedRef|styleRef)\.current = [^\n]*\n/g, '')));
 }
 
+// === M  RL-5 share metadata =====================================================
+{
+  console.log('\n[M] Share metadata');
+  const layout = read('app/layout.js');
+  gate('M1 the legacy shadowadsb.app domain is gone; metadataBase comes from NEXT_PUBLIC_SITE_URL',
+    !/shadowadsb\.app"/.test(layout) && !/url: "https:\/\/shadowadsb/.test(layout) && /metadataBase: new URL\(SITE_URL\)/.test(layout) && /process\.env\.NEXT_PUBLIC_SITE_URL/.test(layout));
+  gate('M2 Open Graph and Twitter carry the 1200×630 card', /images: \[SHARE_IMAGE\]/.test(layout) && /images: \[SHARE_IMAGE\.url\]/.test(layout) && /url: "\/og\/skyloom\.jpg", width: 1200, height: 630/.test(layout));
+  const jpg = readFileSync(path.join(ROOT, 'public/og/skyloom.jpg'));
+  // JPEG SOF0/SOF2 frame: height then width, big-endian.
+  let w = 0, h = 0;
+  for (let i = 2; i < jpg.length - 9; ) {
+    if (jpg[i] !== 0xff) break;
+    const marker = jpg[i + 1], len = jpg.readUInt16BE(i + 2);
+    if (marker >= 0xc0 && marker <= 0xc2) { h = jpg.readUInt16BE(i + 5); w = jpg.readUInt16BE(i + 7); break; }
+    i += 2 + len;
+  }
+  gate('M3 public/og/skyloom.jpg is a 1200×630 JPEG', w === 1200 && h === 630, `${w}×${h}`);
+  const man = JSON.parse(read('public/manifest.json'));
+  const icons = man.icons || [];
+  const has = (size) => icons.some((i) => i.sizes === size && existsSync(path.join(ROOT, 'public', i.src)));
+  gate('M4 the manifest validates (name, short_name, id, start_url, scope, display, 192 and 512 icons on disk) and leads with the real Earth',
+    man.name && man.short_name && man.id === '/' && man.start_url === '/' && man.scope === '/' && ['standalone', 'fullscreen'].includes(man.display) && has('192x192') && has('512x512') &&
+      /^Fly the real Earth/.test(man.description) && !/neon/i.test(man.description));
+}
+
 console.log(`\nverify-ship-release: ${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

@@ -35,7 +35,7 @@ const PH_HOST = process.env.SHIP_PH_HOST || 'http://127.0.0.1:3199';
 const LEG_MS = Number(process.env.LEG_MS || 480000);
 const ON = 'CHALLENGE_LAYER,DEEP_LINKS,ANALYTICS_V2,PLAYER_SURFACE';
 const OFF = '-CHALLENGE_LAYER,-DEEP_LINKS,-ANALYTICS_V2,-PLAYER_SURFACE';
-const wanted = (process.env.LEGS || 'off,fly,watch,journey,invalid,consent').split(',');
+const wanted = (process.env.LEGS || 'meta,off,fly,watch,journey,invalid,consent').split(',');
 
 let passed = 0;
 let failed = 0;
@@ -107,6 +107,17 @@ const booted = (page) => page.waitForFunction(() => window.__flyBoot?.pct === 10
   const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
   const fixture = await attachFixture(await browser.newContext());
   try {
+    // RL-5: the BUILT page carries the share card and no legacy domain.
+    if (wanted.includes('meta')) {
+      const html = await (await fetch(`${BASE}/`)).text();
+      const og = html.match(/<meta property="og:image" content="([^"]+)"/)?.[1];
+      const tw = html.match(/<meta name="twitter:image" content="([^"]+)"/)?.[1];
+      const img = og ? await fetch(new URL(og, BASE)).then((r) => (r.ok ? r.headers.get('content-type') : null)).catch(() => null) : null;
+      gate('meta: the built HTML has og:image and twitter:image, served as an image', !!og && !!tw && /^image\//.test(img || ''), { og, tw, img });
+      gate('meta: no legacy shadowadsb.app URL in the built HTML', !/shadowadsb\.app/.test(html));
+      const man = await (await fetch(`${BASE}/manifest.json`)).json();
+      gate('meta: the served manifest leads with the real Earth', /real Earth/.test(man.description) && !/neon/i.test(man.description), man.description);
+    }
     await leg(browser, fixture, 'off', `?graphicsReview=1&flags=${OFF}&fly=grand-canyon`, {
       async check(page, { analytics }) {
         await page.getByTestId('title-screen').waitFor();
