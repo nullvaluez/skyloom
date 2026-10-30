@@ -7,7 +7,10 @@
 >   Enhanced Satellite is the default on every device
 >   (`VISUALS.defaultProfile:'enhanced'`), and `R25_SKY` / `R25_GROUND` ship
 >   `enabled:true`.
-> - **Ship Pass (2026-10-30, PLANNED, W0 not started, owner-requested):**
+> - **Ship Pass (2026-10-30, IN PROGRESS, owner-requested; W0 landed on `main` in the
+>   cloud venue — FLY_SHIP_PASS.md 3.8 and 4.1 — and the five streams run in
+>   `/home/user/skyloom-<stream>` worktrees; look flags stay off until the owner's
+>   5080 motion bar):**
 >   [FLY_SHIP_PASS.md](FLY_SHIP_PASS.md) is the gap analysis (about 115 gaps
 >   with evidence), the owner's 16 decisions and the requirements for a
 >   five-agent polish and certify pass, run locally on the owner's RTX 5080:

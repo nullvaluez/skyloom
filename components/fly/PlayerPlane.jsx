@@ -42,6 +42,8 @@ import { cinemaOn } from '@/lib/fly/cinema-policy';
 import { groundHullOffset, idleBobAmplitude, poseAircraftRig } from '@/lib/fly/aircraft-pose';
 import { renderView } from '@/lib/fly/render-view';
 import { playerVisible } from '@/lib/fly/player-visibility';
+// SHIP PASS LIGHT imports begin
+// SHIP PASS LIGHT imports end
 
 /**
  * The player's aircraft: a CC-BY glTF airframe (poly.pizza, see
@@ -373,6 +375,10 @@ function PlayerModel({ flight, aircraft }) {
   }, [flight, aircraft, entry, cloned, correction, anchors, gradedMats]);
   useFrame((state, dt) => livingAirframe.current?.update(state, dt));
   // LIVING WORLD AIRFRAME — end
+  // SHIP PASS LIGHT begin
+  // FLY_SHIP_PASS.md LT-4 (AIRFRAME_SHADOW): receiveShadow and the cascade-0
+  // fit for the player aircraft. Every edit to this file stays in this block.
+  // SHIP PASS LIGHT end
   return (
     <group>
       <group rotation-y={correction.rotY} scale={correction.scale}>

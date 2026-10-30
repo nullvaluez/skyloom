@@ -1,6 +1,7 @@
 # Ship Pass — plan and record (2026-10-30)
 
-Status: **planned, W0 not started.** This file is the plan, the requirements
+Status: **W0 landed 2026-10-30 in the cloud venue (section 4.1); the five
+streams are running in worktrees (section 3.8).** This file is the plan, the requirements
 and (as the pass runs) the record for a five-agent parallel pass, in the
 FLY_PLAY_PASS.md format. Each stream adds its report under "Stream reports"
 in its first commit and updates it on every landing.
@@ -193,6 +194,46 @@ World SKY build that glitched in motion is the reason this bar exists.
   - LIGHT reviews FRAME's prewarm registry entries for its variants;
   - RELEASE reviews everyone's Settings and deep-link touchpoints.
 
+### 3.8 This run's venue (2026-10-30): the cloud container, not the RTX 5080
+
+The owner started the pass from a Claude Code cloud session, so it runs in the
+cloud container instead of on the owner's machine (a deviation from D5,
+recorded here rather than hidden). What that changes, and what it does not:
+
+- **What the venue cannot do.** No RTX 5080 and no iPhone: WebGL is
+  ANGLE/SwiftShader (correct pixels, about 1–3 fps), the tile, imagery and
+  ADS-B hosts are blocked, and the app runs on the R24 offline world fixture
+  (`scripts/_fixture.js`, `FLY_TILE_FIXTURE=1`). Every fps, frame-time,
+  stall, soak, motion and device number in section 2 belongs to the owner's
+  machines; nothing here certifies one.
+- **Look flags ship OFF.** D6 lands a flag ON *after* its 5080 still and
+  motion check (3.6), and CLAUDE.md's standing rule is that no look flag
+  ships on without that check. So every look flag (AERIAL_CLARITY,
+  REAL_MOON, SKY_LITE, CITY_RANGE, NIGHT_LITE, NIGHT_RHYTHM, TERRAIN_SHADOW,
+  TRAFFIC_SHADOWS, AIRFRAME_SHADOW, SHADOW_REACH, HANGAR_EXPOSURE,
+  ULTRA_SUPERSAMPLE, MOBILE_ENHANCED) is built, gated (node gates, flag-off
+  identity, a SwiftShader smoke flag on and off, fixture stills) and left
+  `enabled:false`; the owner previews each with `?flags=NAME` and flips it
+  after the motion bar (run list, section 9). Flags whose acceptance is
+  measurable here (behaviour, not pixels) land ON per D6 when their gates
+  pass; each stream report says which and why.
+- **Worktrees and ports.** `/home/user/skyloom-<stream>` on branch
+  `ship/<stream>`, created from the W0 commit; dev servers on the section
+  3.1 ports. `node_modules` is a hard-linked copy of the lead checkout's
+  (`cp -al`), so the five trees share disk; nobody runs `npm install` in a
+  stream tree (RELEASE owns `package.json`; no stream adds a dependency).
+- **The heavy lock replaces the GPU lock.** The container has 4 CPUs and
+  15 GB, so any `next build`, `next dev` session or browser harness runs
+  under `flock /home/user/ship-pass-shared/heavy.lock` (one at a time,
+  across all five streams), and a dev server is stopped when its run ends.
+- **Landing.** Streams commit only to their own branch. The lead merges each
+  `--no-ff` into `main` after the battery (8.1) and pushes the integration
+  branch for durability; `main` on origin moves only when the owner asks.
+- **Browser builds.** The project's Playwright (1.61.1) expects browser build
+  1228; the container ships 1243, aliased under `/opt/pw-browsers` so the
+  harnesses launch unchanged. With that alias the GPU halves of
+  `verify-phys-sky`, `verify-hdr-guard` and `verify-night-ground-gpu` pass.
+
 ## 4. W0 — the lead, before any stream branches
 
 | ID | Task | Acceptance |
@@ -236,6 +277,19 @@ The stream that owns each block flips it ON when its consumer lands (D6).
 
 Each stream lists P0 (week 1, blocking), P1 (core) and P2 (if time).
 Acceptance is measured unless marked "owner".
+
+### 4.1 W0 record (2026-10-30, the lead, cloud venue)
+
+| ID | Result |
+|---|---|
+| W0.1 | `next` and `eslint-config-next` pinned to **16.4.3** (`npm view` confirmed both), `dompurify` 3.4.16 → **3.4.17** through `posthog-js` (`npm update dompurify`). `npm audit --omit=dev --audit-level=high`: **0 vulnerabilities** (was 2 critical). Lockfile drift: the next / @next/* / eslint-config-next / dompurify / sharp entries plus npm's own metadata for them (`peer` flags that next 16.4.3 no longer implies, `libc` on the @next/swc-linux builds, devDependency order). `build:beta` passes (2 m 2 s); `smoke:beta` — see below. |
+| W0.2 | 20 SHIP PASS blocks seeded `enabled:false` after `MOBILE_ENHANCED`, under one header; `lib/fly/ship-pass.js` (`shipPassOn`, `shipPassBlock`, `shipPassFlags`, a literal `pinned(BLOCK, '__fly<Name>Override')` per block); the device-report FLAGS literal is one line per pass plus the SHIP PASS line. `verify-true-earth-flags` **8/8, 73 blocks**. |
+| W0.3 | Every section 7 block seeded empty, plus **import blocks** wherever a block sits inside a function body (a stream cannot otherwise import its own module there): `SettingsRows.jsx` FRAME rows imports, `fly-settings.js` FRAME and RELEASE imports, `front-door.js` and `flight-plan.js` RELEASE imports, `device-report.js` FRAME imports, `PlayerPlane.jsx` LIGHT imports. The SettingsRows FRAME block declares `frameRows` (rendered after the HUD row in both layouts; `null` until FRAME lands). The fly-store FRAME/RELEASE groups have a fields block and a setters block each. The marker gate counts **38 blocks in 10 files**, each exactly once. |
+| W0.4 | `lib/fly/prewarm-registry.js` (frozen `registerPrewarm({stream,key,build,when})`, `prewarmEntries()`, plus `entryReachable(entry, ctx)` so "reachable here" means one thing) with one block per stream; `lib/fly/device-policy.js` (frozen `deviceClassOf()` and `deviceFeature(name, ctx?)`, today's equivalents: a seed row per Ship Pass feature so SKY, CITY and LIGHT can consume the policy from day one while FRAME replaces the table with measured rows). Nothing consumes either yet; `verify-import-integrity` passes. **The section 6 contracts are seeded as frozen stubs too**, so a consumer stream can import a provider stream's function while both run in parallel: `lib/fly/frame-api.js` (FRAME: `FRAME_RATE_KEY`, `setFrameCadence`, `frameCadence`, `holdGovernor`, `governorHolds`, `frameSessionSummary`), `lib/fly/analytics.js` (RELEASE: `track`, a no-op), `lib/fly/challenge.js` (RELEASE: `CHALLENGE_KEY`, `challengeOn()` = today's true) and `moonState()` at the end of `lib/fly/sun-model.js` (SKY: today's full anti-solar moon). Each owner replaces its stub; the signatures stay. |
+| W0.5 | `scripts/ship-pass-gates.mjs` (PASS / KNOWN-RED / FAIL / SKIP; the seam-marker check; with `--stream` or on a `ship/<stream>` branch, the seam rule over the stream's diff from the merge-base) and `scripts/ship-pass-known-reds.json` (section 12.3, plus `verify-r25-front-door`, red here and on CI because the `r25-w0` tag is absent from shallow clones and from origin). On the W0 tree: **32 PASS, 2 KNOWN-RED (r25-front-door, encounters), 0 FAIL**, about 55 s. The seam rule was proven red on purpose (the W0 diff read as a SKY diff fails it). |
+| W0.5b | `smoke:beta` on the W0 build (fixture, SwiftShader, `BETA_SOFTWARE=1`) passes its first two checks and then **times out (90 s) clicking `Invert pitch`** in flight settings: Playwright resolves the checkbox and never completes the click while the page renders at 1–3 fps. Handed to RELEASE (RL-1) to settle venue vs product, since CI runs the same smoke on a SwiftShader runner. |
+| W0.6 | **Not run: no RTX 5080 and no iPhone in this venue (3.8).** It stays the first item of the owner run list. Venue baselines instead (fixture and SwiftShader, never device numbers): `verify:beta` source/gameplay/world as above; `test:shaders` 4/4 with the browser alias; `verify-ops-golden` 28/28; `FLY_TILE_FIXTURE=1 verify-worker-window` 4/4; `graphics-unit` PASS; ESLint on the W0-touched files 27 errors before and after (no new errors). |
+| W0.7 | This record, section 3.8, the CLAUDE.md banner, the five worktrees and the kickoff prompts (section 10.1). |
 
 ---
 
@@ -676,6 +730,21 @@ default flags, `verify-ops-golden`, and a 5080 still diff.
 > `node scripts/ship-pass-gates.mjs` is green; flip your flag ON only after
 > its 5080 motion bar. Never push to origin.
 
+### 10.1 This run's kickoff (W0.7, 2026-10-30)
+
+Each stream runs as one Opus agent in its own worktree, launched by the lead
+with the template above plus section 3.8 and these per-stream notes. Every
+stream's work then gets an independent review agent (correctness, seam rule,
+flag-off identity, honesty of the record) and a fix pass before it lands.
+
+| Stream | Worktree / port | Flags this venue can land ON | Notes |
+|---|---|---|---|
+| FRAME | `/home/user/skyloom-frame`, 3131 | SHADER_READY, PACE_ADAPT (sub-switches that only a 5080 soak can prove ship off) | DEVICE_POLICY and ULTRA_SUPERSAMPLE stay off (device evidence). FR-6 builds the one table with provisional rows and a re-derive script for the owner's W0.6 reports. FR-13 gates on the runtime's reversed-depth capability. Implements `frame-api.js`; FlyCanvas's context-lost path and the census's link failures call `track('client_error', …)`. |
+| SKY | `/home/user/skyloom-sky`, 3132 | none (all three are look flags) | SK-1: the atmosphere arms here; CITY measures the city arms with the `window.__flyCityDiag` pins; the lead joins the table on the merged tree. SK-5 deletes the lens-flare code with a default-frame sha256 proof. Implements `moonState()`. |
+| CITY | `/home/user/skyloom-city`, 3133 | none (all three are look flags) | CT-1 pins are `window.__flyCityDiag = { fadeStartM, fadeEndM, skylinePremix }`, honoured with CITY_RANGE off. CT-6 settles the F1 red. Any WORKER_PROTOCOL bump moves every pin site in one commit. |
+| LIGHT | `/home/user/skyloom-light`, 3134 | PHOTO_HIRES, only if desktop and iPhone-emulation exports pass without context loss | MOBILE_ENHANCED and every shadow and hangar flag stay off (owner glance / motion bar). Uses `holdGovernor` and `track('photo_taken')`. |
+| RELEASE | `/home/user/skyloom-release`, 3135 | CHALLENGE_LAYER, DEEP_LINKS, ANALYTICS_V2, OFFLINE_SHELL, PLAYER_SURFACE | RL-1 reproduces the CI steps locally (audit, verify:beta, build:beta, smoke:beta, smoke:ultra) and settles the W0.5b smoke timeout and the `r25-w0` baseline. Owns `ship-pass-known-reds.json`; FRAME and CITY report the reds they fix. |
+
 ## 11. Out of scope (the backlog, with gap IDs)
 
 | Item | Gap IDs |
@@ -877,14 +946,34 @@ Severity and effort are the auditors' estimates. "Where" names the requirement t
 
 ## Stream reports
 
-(Each stream writes its section here in its first commit: what landed, flag state, gates, 5080 evidence, owner checks, known issues.)
+(Each stream writes its section here in its first commit: what landed, flag state, gates, 5080 evidence, owner checks, known issues. A stream edits only between its own two markers.)
 
 ### FRAME
 
+<!-- SHIP PASS FRAME report begin -->
+(not started)
+<!-- SHIP PASS FRAME report end -->
+
 ### SKY
+
+<!-- SHIP PASS SKY report begin -->
+(not started)
+<!-- SHIP PASS SKY report end -->
 
 ### CITY
 
+<!-- SHIP PASS CITY report begin -->
+(not started)
+<!-- SHIP PASS CITY report end -->
+
 ### LIGHT
 
+<!-- SHIP PASS LIGHT report begin -->
+(not started)
+<!-- SHIP PASS LIGHT report end -->
+
 ### RELEASE
+
+<!-- SHIP PASS RELEASE report begin -->
+(not started)
+<!-- SHIP PASS RELEASE report end -->

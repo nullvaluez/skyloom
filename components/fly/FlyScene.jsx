@@ -237,6 +237,22 @@ import { ENCOUNTER_FEEL_ACTIVE } from '@/lib/fly/play-pass';
 // PLAY PASS APRON imports begin
 // PLAY PASS APRON imports end
 
+// SHIP PASS imports: one block per stream (FLY_SHIP_PASS.md section 7).
+// SHIP PASS FRAME imports begin
+// SHIP PASS FRAME imports end
+
+// SHIP PASS SKY imports begin
+// SHIP PASS SKY imports end
+
+// SHIP PASS CITY imports begin
+// SHIP PASS CITY imports end
+
+// SHIP PASS LIGHT imports begin
+// SHIP PASS LIGHT imports end
+
+// SHIP PASS RELEASE imports begin
+// SHIP PASS RELEASE imports end
+
 const SPAWN_ALT_M = 800;
 
 // Round 19 (Fable): scratch for the dusk key-color lerp — one module-scope
@@ -3581,6 +3597,15 @@ export function FlyScene({ runtime }) {
       scene.environmentRotation.set(0,0,0);scene.backgroundRotation.set(0,0,0);
     }
 
+    // SHIP PASS (FLY_SHIP_PASS.md section 7): per-frame blocks, the last
+    // writes of the simulation block before the camera refresh.
+    // SHIP PASS FRAME frame begin
+    // SHIP PASS FRAME frame end
+    // SHIP PASS SKY frame begin
+    // SHIP PASS SKY frame end
+    // SHIP PASS LIGHT frame begin
+    // SHIP PASS LIGHT frame end
+
     if (hudFramePriority) camera.updateMatrixWorld();
   }, -50);
 
@@ -3747,6 +3772,15 @@ export function FlyScene({ runtime }) {
 
       {/* PLAY PASS APRON begin */}
       {/* PLAY PASS APRON end */}
+
+      {/* SHIP PASS (FLY_SHIP_PASS.md section 7): one block per stream; a stream
+          edits only its own block. */}
+      {/* SHIP PASS CITY mounts begin */}
+      {/* SHIP PASS CITY mounts end */}
+      {/* SHIP PASS LIGHT mounts begin */}
+      {/* SHIP PASS LIGHT mounts end */}
+      {/* SHIP PASS SKY mounts begin */}
+      {/* SHIP PASS SKY mounts end */}
       {/* One-shot neon confetti burst masking the warp cut. TRUE EARTH
           (PLAYER_SURFACE): Neon's own look; satellite players don't get it. */}
       {(mapStyle === 'toy' || reviewSurfaceOn()) && <WarpBurst flight={flight} origin={origin} />}

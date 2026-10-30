@@ -44,7 +44,7 @@
     "earcut": "3.2.3",
     "framer-motion": "^12.23.26",
     "lucide-react": "^0.562.0",
-    "next": "16.4.0",
+    "next": "16.4.3",
     "pbf": "5.1.2",
     "posthog-js": "^1.435.6",
     "rbush": "^4.0.1",
@@ -58,7 +58,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "eslint": "^9",
-    "eslint-config-next": "16.4.0",
+    "eslint-config-next": "16.4.3",
     "geojson-vt": "^5.0.2",
     "playwright": "1.61.1",
     "tailwindcss": "^4",

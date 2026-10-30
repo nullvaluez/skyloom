@@ -138,6 +138,12 @@ const initialState = {
   // literal is the default; components/fly/hud/calm-hud.js restores the saved
   // pick when the HUD mounts. Unread with the flag off.
   hudMode: 'explorer',
+
+  // --- SHIP PASS (FLY_SHIP_PASS.md section 7): fields only, never renamed or removed.
+  // SHIP PASS FRAME fields begin
+  // SHIP PASS FRAME fields end
+  // SHIP PASS RELEASE fields begin
+  // SHIP PASS RELEASE fields end
 };
 
 /**
@@ -246,6 +252,11 @@ export const useFlyStore = create(
 
     // PLAY PASS (CALM_HUD): a state change only; calm-hud.js saveHudMode() persists a pick.
     setHudMode: (hudMode) => set((state) => (state.hudMode === hudMode ? state : { hudMode })),
+
+    // SHIP PASS FRAME setters begin
+    // SHIP PASS FRAME setters end
+    // SHIP PASS RELEASE setters begin
+    // SHIP PASS RELEASE setters end
 
     addTileStats: (requested = 0, evicted = 0) =>
       set((state) => ({

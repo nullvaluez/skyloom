@@ -73,6 +73,13 @@ import { ENCOUNTER_FEEL_ACTIVE } from '@/lib/fly/play-pass';
 // PLAY PASS DIRECTOR imports begin
 // PLAY PASS DIRECTOR imports end
 
+// SHIP PASS imports: one block per stream (FLY_SHIP_PASS.md section 7).
+// SHIP PASS RELEASE imports begin
+// SHIP PASS RELEASE imports end
+
+// SHIP PASS FRAME imports begin
+// SHIP PASS FRAME imports end
+
 // Last in-flight position, persisted ~10s + pagehide. R25 A: nothing reads it
 // at boot any more (the spawn is lib/fly/flight-plan.js resolveInitialSpawn;
 // the R9 geolocation → last-position → NYC resolver was dead code since the
@@ -421,6 +428,12 @@ export function FlyMode({ onClose }) {
 
       {/* PLAY PASS DIRECTOR begin */}
       {/* PLAY PASS DIRECTOR end */}
+
+      {/* SHIP PASS (FLY_SHIP_PASS.md section 7): one block per stream. */}
+      {/* SHIP PASS RELEASE mounts begin */}
+      {/* SHIP PASS RELEASE mounts end */}
+      {/* SHIP PASS FRAME mounts begin */}
+      {/* SHIP PASS FRAME mounts end */}
 
       {mobileNote && (
         <div className="pointer-events-none absolute left-1/2 top-16 z-20 -translate-x-1/2 rounded-md bg-zinc-900/85 px-3 py-2 text-xs text-zinc-200 shadow-lg">

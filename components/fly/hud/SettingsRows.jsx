@@ -21,6 +21,8 @@ import { GLASS_ON, GlassField, GlassToggle } from './LivingGlass';
 // PLAY PASS (CALM_HUD): the HUD mode row, glass only (the frozen zinc menu of
 // MENU_GLASS off stays the pre-pass menu; H still cycles the modes there).
 import { CALM, HUD_MODES, hudModeLabel, hudModeNote, saveHudMode } from './calm-hud';
+// SHIP PASS FRAME rows imports begin
+// SHIP PASS FRAME rows imports end
 
 const TIERS = ['low', 'medium', 'high', 'ultra'];
 const VISUALS_ROW = [
@@ -342,6 +344,10 @@ export function SettingsRows({ sheet = false, includeConditions = true }) {
     </GlassField>
   );
 
+  // SHIP PASS FRAME rows begin
+  const frameRows = null;
+  // SHIP PASS FRAME rows end
+
   return sheet ? (
     <>
       {includeConditions && conditionsRow}
@@ -354,6 +360,7 @@ export function SettingsRows({ sheet = false, includeConditions = true }) {
       {stakesRow}
       <GuestSaveControls />
       {hudRow}
+      {frameRows}
       {flightViewRows}
     </>
   ) : (
@@ -368,6 +375,7 @@ export function SettingsRows({ sheet = false, includeConditions = true }) {
       {stakesRow}
       <GuestSaveControls />
       {hudRow}
+      {frameRows}
       {flightViewRows}
     </>
   );
