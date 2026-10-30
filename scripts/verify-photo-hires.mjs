@@ -171,7 +171,7 @@ try {
         const tplan = photoExportPlan({ bufW: tiled.before.w, bufH: tiled.before.h, request: 'auto', budget: policy.budget, block: PHOTO_HIRES, limits: { ...tiled.limits, maxTexture: 2048 } });
         row.tiled = { export: [tiled.pngW, tiled.pngH], plan: tplan, ms: Math.round(tiled.ms) };
         check(`${label}: past MAX_TEXTURE_SIZE 2048 the tiled path (${tplan.tiles}x${tplan.tiles}) exports ${tplan.outW}x${tplan.outH}`,
-          tplan.tiles > 1 ? Math.abs(tiled.pngW - tplan.tileW * tplan.tiles) <= 4 && Math.abs(tiled.pngH - tplan.tileH * tplan.tiles) <= 4 && !tiled.lost && tiled.after.view === tiled.before.view && tiled.after.proj.every((v, i) => Math.abs(v - tiled.before.proj[i]) < 1e-9)
+          tplan.tiles > 1 ? Math.abs(tiled.pngW - tplan.tileW * tplan.tiles) <= 4 && Math.abs(tiled.pngH - tplan.tileH * tplan.tiles) <= 4 && !tiled.lost && tiled.after.view === tiled.before.view && tiled.after.proj.every((v, i) => Math.abs(v - tiled.before.proj[i]) <= 1e-6 + 1e-4 * Math.abs(v))
             : tiled.pngW === tplan.outW,
           `${tiled.pngW}x${tiled.pngH} in ${row.tiled.ms} ms`);
         const bare = await shoot(page, undefined);

@@ -10,12 +10,12 @@ import { adventurePhotoFrame } from '@/lib/fly/adventure-photo';
 import { encounterPhotoFrame } from '@/lib/fly/encounter-photo';
 import { saveMemoryPhoto } from '@/lib/fly/encounter-photo';
 import { useExplorationStore } from '@/stores/exploration-store';
-import { Vector2 } from 'three';
+import { Matrix4, Vector2 } from 'three';
 import { holdGovernor } from '@/lib/fly/frame-api';
 import { track } from '@/lib/fly/analytics';
 import { getComposer } from '@/lib/fly/step-safe';
 import { lightBlock, lightFeature } from '@/lib/fly/ship-light';
-import { glPhotoLimits, photoExportPlan, photoHiresActive } from '@/lib/fly/photo-hires';
+import { glPhotoLimits, photoExportPlan, photoHiresActive, photoTileMatrix } from '@/lib/fly/photo-hires';
 
 /**
  * Round 17 — the shutter.
@@ -181,7 +181,10 @@ function renderHires(gl, camera, plan, block) {
   const composer = getComposer() ?? (typeof window !== 'undefined' ? window.__flyComposer : null);
   if (!composer) throw new Error('No composer to render the photo.');
   const css = gl.getSize(new Vector2()), pr = gl.getPixelRatio();
-  const view = camera.view?.enabled ? { ...camera.view } : null;
+  // Tiles narrow the camera's OWN projection in clip space (whatever composed
+  // it: TRUE_SCALE, a view offset), and the exact matrices come back after.
+  const projection = camera.projectionMatrix.clone(), inverse = camera.projectionMatrixInverse.clone();
+  const tile = new Matrix4();
   const settle = Math.max(0, block.settleFrames ?? 1);
   const t0 = performance.now();
   const out = document.createElement('canvas');
@@ -196,15 +199,19 @@ function renderHires(gl, camera, plan, block) {
     ctx = out.getContext('2d');
     for (let ty = 0; ty < n; ty++) {
       for (let tx = 0; tx < n; tx++) {
-        if (n > 1) camera.setViewOffset(tw * n, th * n, tx * tw, ty * th, tw, th);
+        if (n > 1) {
+          photoTileMatrix(n, tx, ty, tile);
+          camera.projectionMatrix.multiplyMatrices(tile, projection);
+          camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
+        }
         for (let i = 0; i <= settle; i++) composer.render(0);
         if (gl.getContext().isContextLost()) throw new Error('The graphics context was lost while taking the photo.');
         ctx.drawImage(gl.domElement, tx * tw, ty * th);
       }
     }
   } finally {
-    if (view) camera.setViewOffset(view.fullWidth, view.fullHeight, view.offsetX, view.offsetY, view.width, view.height);
-    else if (plan.tiles > 1) camera.clearViewOffset();
+    camera.projectionMatrix.copy(projection);
+    camera.projectionMatrixInverse.copy(inverse);
     gl.setPixelRatio(pr);
     composer.setSize(css.x, css.y);
     // The visible frame: the canvas was resized (and so cleared) above.

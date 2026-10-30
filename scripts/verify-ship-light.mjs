@@ -432,6 +432,20 @@ try {
     check('(6b) phone: the policy caps the scale (2x -> 2532 px; 3x -> 3798 px, >= 2,560)', phone2.outH === 2532 && phone3.outH === 3798 && phone3.outH >= 2560);
     check('(6c) no request or scale 1: the drawing buffer exactly (verify-photo\'s contract)', one.every((o) => o.scale === 1 && o.outW === 800 && o.outH === 600 && o.tiles === 1));
     check('(6d) past MAX_TEXTURE_SIZE the export is tiled; the tile bound shrinks it rather than exceed', tiled.tiles === 2 && tiled.outW === 4000 && tiled.tileW <= 2048 && bounded.tiles === 1 && bounded.outW <= 2048, `${JSON.stringify(tiled)} ${JSON.stringify(bounded)}`);
+    {
+      // tiles: the tile's corners of the full frame land on the viewport's
+      // corners (top-left tile first, as the 2D canvas is drawn)
+      const P = new THREE.Matrix4().makePerspective(-1, 1, 0.6, -0.6, 1, 1000);
+      const ndc = (M, v) => v.clone().applyMatrix4(M);
+      const T = ph.photoTileMatrix(2, 0, 0, new THREE.Matrix4());
+      const M = new THREE.Matrix4().multiplyMatrices(T, P);
+      const topLeft = new THREE.Vector3(-1, 0.6, -1), centre = new THREE.Vector3(0, 0, -1);
+      const a = ndc(M, topLeft), b = ndc(M, centre);
+      const T2 = ph.photoTileMatrix(2, 1, 1, new THREE.Matrix4());
+      const c = ndc(new THREE.Matrix4().multiplyMatrices(T2, P), centre);
+      check('(6h) tile matrix: the top-left tile maps the frame corner to (-1, 1) and the centre to (1, -1); the bottom-right tile the centre to (-1, 1)',
+        Math.abs(a.x + 1) < 1e-9 && Math.abs(a.y - 1) < 1e-9 && Math.abs(b.x - 1) < 1e-9 && Math.abs(b.y + 1) < 1e-9 && Math.abs(c.x + 1) < 1e-9 && Math.abs(c.y - 1) < 1e-9);
+    }
     let rejected = false;
     try { await ph.capturePhoto({ scale: 2 }); } catch { rejected = true; }
     check('(6e) capturePhoto({scale}) -> Promise<Blob> rejects cleanly with no camera registered', rejected && ph.capturePhoto.length <= 1);
