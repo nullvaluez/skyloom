@@ -805,8 +805,12 @@ try {
     /data-testid="boot-screen"/.test(boot) && /data-testid="boot-caption"/.test(boot) && /data-stage=\{stage\}/.test(boot) && /window\.__flyBoot = \{ phase, pct \}/.test(boot));
   gate('(8f) Skyloom branding: layout metadata, manifest, loading, BootScreen wordmark; welcome moves to skippable flight tips',
     !/ShadowADSB/.test(layout) && /Skyloom/.test(layout) && /"short_name": "Skyloom"/.test(manifest) && /Skyloom/.test(loading) && /Sky\s*<span[^>]*>loom<\/span>/.test(boot) && /Welcome to Skyloom/.test(fs.readFileSync(path.join(ROOT,'components/fly/hud/ExplorerGuide.jsx'),'utf8')));
-  gate('(8g) ... the OG url and the passport storage key are unchanged',
-    /url: "https:\/\/shadowadsb\.app"/.test(layout) && /shadowadsb-passport/.test(rd('stores/passport-store.js')));
+  // SHIP PASS RL-5 (SANCTIONED, FLY_SHIP_PASS.md 5.5): the legacy
+  // shadowadsb.app OG url is REMOVED; absolute share URLs come from
+  // metadataBase = NEXT_PUBLIC_SITE_URL (unset: the serving origin). The
+  // passport storage key still never changes (a save key is a player contract).
+  gate('(8g) ... the OG url follows NEXT_PUBLIC_SITE_URL (no legacy domain) and the passport storage key is unchanged',
+    !/https?:\/\/(www\.)?shadowadsb\.app/.test(layout) && /metadataBase: new URL\(SITE_URL\)/.test(layout) && /NEXT_PUBLIC_SITE_URL/.test(layout) && /shadowadsb-passport/.test(rd('stores/passport-store.js')));
   gate('(8h) the dead geolocation spawn is gone; the fly-last-pos WRITER stays (verify-boot reads it)',
     !/navigator\.geolocation/.test(mode) && /'fly-last-pos'/.test(mode) && /localStorage\.setItem\(\s*LAST_POS_KEY/.test(mode));
   gate('(8i) no new <canvas> in the title layer (67 harness sites read .fixed.inset-0 canvas)', !/<canvas/.test(title));
