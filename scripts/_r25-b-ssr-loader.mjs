@@ -19,6 +19,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
+import { hasPinnedFixture, pinnedFixture } from './_r25-w0-baseline.mjs';
 
 const ROOT = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..');
 const W0 = '?r25bw0';
@@ -51,6 +52,9 @@ function w0Text(file) {
   try {
     return execFileSync('git', ['show', `r25-w0:${rel}`], { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
   } catch {
+    // SHIP PASS RL-1: no tag (a depth-1 clone) -> the committed, hash-verified
+    // fixture when there is one (scripts/_r25-w0-baseline.mjs).
+    if (hasPinnedFixture('r25-w0', rel)) return pinnedFixture('r25-w0', rel);
     return null; // the file did not exist at r25-w0
   }
 }
