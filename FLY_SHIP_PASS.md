@@ -1001,6 +1001,22 @@ the baked premix (above), so those two sub-items need no new code.
 Worker flag-off identity: byte-identical to `main`'s worker on 48 fixture
 builds (skyline, buildings, roads, Classic skyline).
 
+**CT-3 — city budget (P1, partly landed under CITY_RANGE).** Measured lever
+first: the building colour pass splits a partly visible chunk into one draw
+per contiguous run of visible 4x4 regions (`architecture-draw-range.js`), so a
+half-visible chunk costs 4 submissions (node test) and a portrait phone, where
+most chunks are partly visible, pays several draws per chunk. Under CITY_RANGE
+without the long band (Medium desktops and touch, i.e. exactly the phone
+budget's devices) the colour pass submits a visible chunk's body as ONE draw
+(`setArchitectureMergeColor`); the shadow pass keeps its split. The skyline is
+already merged per 2x2 tile group (`SAT_SKYLINE.groupN`), so "merge chunks per
+tile group" holds there; merging the DETAIL ring's z14 chunks into groups would
+rebuild its drape, heal, fade and collision bookkeeping and is not attempted
+this pass (recorded, not hidden). Thresholds import `TIER_BUDGETS` from
+`lib/fly/tier-budgets.js` (FRAME's FR-6 table replaces it at integration). The
+per-layer census (probe `--mode=census`, visibility toggles, an independent
+per-frame draw counter) is pending a heavy-lock slot.
+
 **CT-6 — the `verify-sat-buildings` F1 red (P0, re-derived, not re-baselined).**
 Cause, measured: since Living Earth the Enhanced builder keeps EVERY mapped
 footprint of a tile as a body (`vector-tile.worker.js`, "all mapped footprints
@@ -1083,7 +1099,7 @@ gate; it crashed on main with ERR_MODULE_NOT_FOUND since world-bend.js gained
 imports, fixed here with the shared resolve hook: 8/8 run, (1)/(3) need
 `R23_BASE_WORLDBEND`).
 
-**Gates.** `scripts/verify-ship-city.mjs` (node, starts the fixture itself): 42/42.
+**Gates.** `scripts/verify-ship-city.mjs` (node, starts the fixture itself): 45/45.
 `verify-play-city` 28/28, `verify-night-city-identity` PASS (8 rows). `ship-pass-gates`: 32 PASS, 2 KNOWN-RED, 0 FAIL, seam rule PASS.
 `FLY_TILE_FIXTURE=1 verify-worker-window` 4/4, `verify-true-areas` 7/7.
 
