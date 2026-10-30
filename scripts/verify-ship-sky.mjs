@@ -44,6 +44,7 @@ const LEGS = {
   shafts: { LIGHT_SHAFTS: true },
   lens: { LIGHT_SHAFTS: true, LENS_FLARE: true },
   'sky-lite': { SKY_LITE: true },
+  'aerial-clarity': { AERIAL_CLARITY: true },
 };
 
 async function buildLeg(name) {
@@ -88,8 +89,16 @@ async function buildLeg(name) {
   const LITE_RE = / {2}if \((\w*[uU]PskyAp)\.z > 0\.5\) \{\n {4}float dLast = [0-9.]+ \* range;\n {4}if \(distKm > dLast\) \{\n[^]*?\n {4}\}\n {2}\}\n/g;
   const liteCount = Object.fromEntries(Object.entries(texts).map(([k, v]) => [k, v == null ? 0 : (v.match(LITE_RE) ?? []).length]));
   const reverted = Object.fromEntries(Object.entries(texts).map(([k, v]) => [k, v == null ? null : sha(v.replace(LITE_RE, ''))]));
+  // AERIAL_CLARITY: the edit counted and reverted the same way.
+  const CL_RE = /\*(\w*[uU]PskySunIllum)\*\w*[sS]hipClarity\(length\((\w*[mM]etricRay|metricRay)\)\*\.001\)/g;
+  const CL_DECL = /uniform vec4 \w*[uU]ShipClarity;\n\/\/ SHIP PASS SKY \(AERIAL_CLARITY\)[^\n]*\n\/\/[^\n]*\nfloat \w*[sS]hipClarity\(float km\)\{[^\n]*\}\n/g;
+  const clarityCount = Object.fromEntries(Object.entries(texts).map(([k, v]) => [k, v == null ? 0 : (v.match(CL_RE) ?? []).length]));
+  const clarityReverted = Object.fromEntries(Object.entries(texts).map(([k, v]) => [k, v == null ? null : sha(v.replace(CL_RE, '*$1').replace(CL_DECL, ''))]));
   return {
     texts: process.env.DUMP_TEXTS ? texts : undefined,
+    clarityCount,
+    clarityReverted,
+    effectUniforms: [...enhanced.uniforms.keys()].sort(),
     hashes,
     liteCount,
     reverted,
@@ -403,6 +412,39 @@ const DEG = Math.PI / 180;
     && lc.includes("const farLite = skyLiteFarReachM(name, far.maxKm ?? 180, ctx.tier);") && lc.includes("const farMax = farLite ?? (name === 'phone' || name === 'low' ? 0 :"));
 }
 
+// ---- SK-2: AERIAL_CLARITY -----------------------------------------------------
+{
+  const AC = await import('../lib/fly/aerial-clarity.js');
+  const VM = await import('./ship-sky-veil-model.mjs');
+  const P = C.AERIAL_CLARITY;
+  row('SK-2 (a) flag off (shipped): the aerial text is the input, k = 0, the effect gains no uniform',
+    AC.AERIAL_CLARITY_ON === false && AC.aerialClarityShader('x+apS*uPskySunIllum+pskyNightAir(apDir)*(1.-apT);void mainImage(') === 'x+apS*uPskySunIllum+pskyNightAir(apDir)*(1.-apT);void mainImage('
+    && AC.aerialClarityK(3000, { day: 1, overcast: 0, fog: 0 }) === 0 && !legOut('default').effectUniforms.includes('uShipClarity'));
+  const cl = legOut('aerial-clarity'), def = legOut('default');
+  row('SK-2 (b) flag on: the clarity term is in the Enhanced aerial text and the merged pass, once, and is the ONLY change; every other SKY program is default',
+    cl.clarityCount.aerialEnhanced === 1 && cl.clarityCount.aerialMerged === 1 && cl.clarityReverted.aerialEnhanced === def.hashes.aerialEnhanced && cl.clarityReverted.aerialMerged === def.hashes.aerialMerged
+    && cl.effectUniforms.includes('uShipClarity') && ['march', 'composite', 'filter', 'classicMarch', 'classicComposite', 'classicFilter', 'aerialClassic'].every((k) => cl.hashes[k] === def.hashes[k]),
+    JSON.stringify({ enhanced: cl.clarityCount.aerialEnhanced, merged: cl.clarityCount.aerialMerged }));
+  const env = (o) => ({ day: 1, overcast: 0, fog: 0, ...o });
+  const kHigh = AC.aerialClarityK(3048, env(), true);
+  row('SK-2 (c) k: none below the eye ramp (a low-level frame is the previous frame), none at night, none in full overcast or fog, full strength in clear noon from altitude',
+    AC.aerialClarityK(P.eyeRampM[0] - 1, env(), true) === 0 && AC.aerialClarityK(3048, env({ day: 0 }), true) === 0 && AC.aerialClarityK(3048, env({ overcast: 1 }), true) === 0
+    && AC.aerialClarityK(3048, env({ fog: 1 }), true) === 0 && Math.abs(kHigh - P.strength) < 1e-12, `k(10,000 ft clear noon) = ${kHigh}`);
+  let mono = true;
+  for (const k of [0, 0.2, kHigh]) { let prev = 0; for (let km = 0.1; km < 120; km += 0.1) { const v = km * AC.clarityKeep(k, km); if (v < prev - 1e-12) mono = false; prev = v; } }
+  row('SK-2 (d) the far field keeps its depth by construction: S is untouched from farKm out (the 50 km band and the horizon), and S x keep still grows with distance (no ring)',
+    AC.clarityKeep(kHigh, P.farKm) === 1 && AC.clarityKeep(kHigh, 50) === 1 && AC.clarityKeep(kHigh, 200) === 1 && P.farKm <= 50 && mono);
+  const off = VM.veilModel(), on = VM.veilModel({ clarity: true });
+  const rel = (m, ft) => m.rows.find((r) => r.ft === ft).transfer / m.rows.find((r) => r.ft === 6000).transfer;
+  row('SK-2 (e) the atmosphere\'s own veil (CPU mirror, the harness geometry): 8,500 and 10,000 ft hold within 15% of 6,000 ft with clarity, and the 50 km sight line is the flag-off one (within 10%)',
+    rel(on, 8500) >= 0.85 && rel(on, 10000) >= 0.85 && Math.abs(on.far.transfer / off.far.transfer - 1) <= 0.1,
+    `off ${(100 * (rel(off, 8500) - 1)).toFixed(1)}% / ${(100 * (rel(off, 10000) - 1)).toFixed(1)}%, on ${(100 * (rel(on, 8500) - 1)).toFixed(1)}% / ${(100 * (rel(on, 10000) - 1)).toFixed(1)}% at 8,500 / 10,000 ft; 50 km ${off.far.transfer.toFixed(3)} -> ${on.far.transfer.toFixed(3)}`);
+  const ap = read('components/fly/AerialPerspective.jsx');
+  row('SK-2 (f) wiring: the Enhanced effect builds the clarity text and writes k only in the cinema (physical) branch',
+    ap.includes("const enhancedFragmentShaderClarity = aerialClarityShader(enhancedFragmentShaderLiving);") && ap.includes("r25 ? enhancedFragmentShaderClarity : fragmentShader")
+    && ap.includes('if(AERIAL_CLARITY_ON)updateAerialClarity(s.camPos[1]-s.groundY,cinemaEnvironment);'));
+}
+
 // ---- SK-6: the sky LUT cadence is kept ----------------------------------------
 {
   const t = C.PHYS_SKY.tiers;
@@ -425,8 +467,9 @@ const DEG = Math.PI / 180;
   const keys = sky.map((e) => e.key).sort();
   const reach = (flags) => sky.filter((e) => PR.entryReachable(e, { flagOn: (f) => flags.includes(f) })).map((e) => e.key).sort();
   row('PREWARM SKY registers its flag-on variants, reachable only with their flag',
-    JSON.stringify(keys) === JSON.stringify(['SKY:real-moon-composite', 'SKY:sky-lite-aerial', 'SKY:sky-lite-clouds'])
+    JSON.stringify(keys) === JSON.stringify(['SKY:aerial-clarity', 'SKY:real-moon-composite', 'SKY:sky-lite-aerial', 'SKY:sky-lite-clouds'])
     && reach([]).length === 0 && JSON.stringify(reach(['REAL_MOON'])) === '["SKY:real-moon-composite"]' && reach(['SKY_LITE']).length === 2
+    && JSON.stringify(reach(['AERIAL_CLARITY'])) === '["SKY:aerial-clarity"]'
     && sky.every((e) => { const o = e.build(); return o?.isObject3D === true; }), keys.join(', '));
 }
 

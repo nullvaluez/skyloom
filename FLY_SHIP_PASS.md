@@ -971,7 +971,7 @@ iPhone number.
 | SK-4 | built, flag OFF (look flag) | `lib/fly/sky-lite.js` + one anchored edit in `lib/fly/atmosphere/glsl.js`. What Medium and phones lost was REACH: the aerial volume is 450 km on High, 250 km on Medium, 160 km on touch devices and `pskyAerial()` clamped farther pixels to the last slice, so from altitude the outer band (and the clouds over it) stopped hazing where High keeps going; and the far cloud deck is 180 km on High, 90 km on Medium, none on phones. SKY_LITE, inside passes that already run: (1) past the last slice the optical depth continues linearly with distance and the in-scatter keeps its share of the opacity (continuous; a few ALU ops on the pixels beyond the range), switched per frame by `uPskyAp.z`, which `AtmosphereRig` sets from `deviceFeature('SKY_LITE')`; (2) phone profiles get the existing one-sample far deck at the policy's `cloudReach` (0.5 × 180 = 90 km) through the deck's existing reach uniform. Medium desktops keep their 90 km deck and get (1). | `verify-ship-sky` SK-4 (a)–(g): the policy (phones and tablets at any tier, desktops at Medium/Low, never a desktop at High); no raw device-class call, no GPU object; flag off = 0 switch and the old deck rule; flag on = the reach edit in the aerial pass, cloud march and composite, once each, and the ONLY difference (sha256 of each text with the edit reverted = default); the extrapolation continuous and monotone. Cost: **+0 draws, +0 passes, +0 targets, +0 programs at runtime** (structural, gated); GPU ms is the owner's (run list) |
 | SK-6 | kept | Nothing SKY added touches the LUT cadence. | `verify-ship-sky` SK-6 (a) PHYS_SKY `skyHz` 60/30/30 and `aerialHz` 30/15/10 unchanged and unwritten by SKY's modules; (b) `verify-mobile-enhanced` **6/6** (sky redraws 241 → 61 over 2 s at 120 Hz at the phone's 30 Hz budget, run from the gate) |
 | Prewarm | registered | SKY block of `lib/fly/prewarm-registry.js`: `SKY:real-moon-composite` (REAL_MOON), `SKY:sky-lite-clouds` and `SKY:sky-lite-aerial` (SKY_LITE). SKY's flag-on texts REPLACE default ones for the page load, so each entry builds clones of the live materials (the cloud pass's Enhanced pair; the composer's merged aerial pass), published through `lib/fly/sky-prewarm.js`; the existing chain prewarm (`prewarm.js` through `buildPassList`) builds the flag-on text by construction. | `verify-ship-sky` PREWARM row: three keys, each reachable only with its flag, each `build()` an Object3D |
-| SK-2 | not started (waits on SK-1's table) | | |
+| SK-2 | built, flag OFF (look flag) | `lib/fly/aerial-clarity.js`, from SK-1's model attribution (the atmosphere's veil is near-field Rayleigh in-scatter, not aerosol, not the mix space, not mist): in clear daylight from altitude the near and mid field's physical in-scatter is cut, S' = S·(1 − k·(1 − smoothstep(nearKm, farKm, d))), k = strength × (1 − overcast)(1 − fog) × day × eye ramp; extinction untouched; S' still grows with distance (no ring); from `farKm` (45 km) out S is the physical one, so distant ridges, the 50 km band and the horizon keep exactly their depth; nothing below 900 m eye AGL. One anchored edit on the final Enhanced aerial text (after PHYS_SKY, TRUE_SCALE and the ground edits) and one uniform; tunables in the `AERIAL_CLARITY` block (`strength` 0.45, `nearKm` 12, `farKm` 45, `eyeRampM` [900, 2600]). Prewarm: the aerial entry builds the live merged pass. | `verify-ship-sky` SK-2 (a)–(f): flag-off identity; the edit is the only change (sha256 with the edit reverted = default, Enhanced and merged pass); k law; far field identical by construction and monotone; **the atmosphere's veil on the model: 8,500 / 10,000 ft vs 6,000 ft from −6.8% / −10.2% to 0.0% / −2.3%, 50 km sight line 0.283 → 0.283**. The rendered fixture arm (`--arms=baseline,clarity`) and the 5080 motion bar are pending (lock queue / owner) |
 
 **SK-1 — the atmosphere's share of the veil (SKY's half of the table).**
 Two instruments. (1) `scripts/ship-sky-veil-model.mjs`: the shipped
@@ -1006,7 +1006,7 @@ flags; section 3.8 — the owner flips each after the 5080 motion bar).
 `REAL_MOON` tunables live in its block (`floorK`, `horizonBandDeg`,
 `minKeyElDeg`, `exposureAdapt`, `earthshine`, `terminatorSoft`).
 
-**Gates.** `node scripts/verify-ship-sky.mjs`: 34 passed, 0 failed (includes
+**Gates.** `node scripts/verify-ship-sky.mjs`: 40 passed, 0 failed (includes
 the default-flag program-text hashes vs main: cloud march / composite /
 filter, Classic and Enhanced; aerial Classic, Enhanced, merged pass and its
 defines). Existing: `verify-cinema-overhaul` 16/16, `verify-twilight` 6/6,
@@ -1026,8 +1026,9 @@ shape kept; additive `lightK` is the ground's moonlight relative to today's
 (1 with REAL_MOON off), the number a night exposure balance wants.
 
 **Files outside the listed ownership:** new and SKY's own — `lib/fly/sky-diag.js`,
-`lib/fly/sky-lite.js`, `lib/fly/sky-prewarm.js`, `scripts/ship-sky-veil.cjs`,
-`scripts/ship-sky-veil-model.mjs`; edited minimally — `scripts/verify-living-sky.mjs`
+`lib/fly/sky-lite.js`, `lib/fly/sky-prewarm.js`, `lib/fly/aerial-clarity.js`,
+`components/fly/ShipSkyDiag.jsx`, `scripts/ship-sky-veil.cjs`,
+`scripts/ship-sky-veil-model.mjs`, `scripts/ship-sky-smoke.cjs`; edited minimally — `scripts/verify-living-sky.mjs`
 (one marker line, SK-5).
 <!-- SHIP PASS SKY report end -->
 

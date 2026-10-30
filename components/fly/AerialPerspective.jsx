@@ -68,6 +68,8 @@ import {
 import { getEdgeFade, linearHazeOn } from '@/lib/fly/toy-world/world-bend';
 // SHIP PASS SKY (SK-1): the veil diagnosis pin (dev / ?graphicsReview=1 only).
 import { markSkyDiagApplied, skyDiag } from '@/lib/fly/sky-diag';
+// SHIP PASS SKY (SK-2): AERIAL_CLARITY, the atmosphere half of the grey-veil fix.
+import { AERIAL_CLARITY_ON, AERIAL_CLARITY_UNIFORMS, aerialClarityShader, updateAerialClarity } from '@/lib/fly/aerial-clarity';
 import { depthSubOn } from '@/lib/fly/depth-pass';
 import { daylightNearHazeMix } from '@/lib/fly/daylight-depth';
 import { LIVING_AIR_GLSL } from '@/lib/fly/living-atmosphere';
@@ -576,6 +578,14 @@ const enhancedFragmentShaderTS = trueScaleShader('aerial-enhanced', enhancedFrag
 const enhancedFragmentShaderLiving = livingGroundAerial(enhancedFragmentShaderTS);
 
 /**
+ * SHIP PASS SKY (SK-2, AERIAL_CLARITY; lib/fly/aerial-clarity.js): in clear
+ * daylight from altitude the near and mid field's physical in-scatter is cut,
+ * the far field untouched. An anchored edit on the final Enhanced text; flag
+ * off = the text above, unchanged.
+ */
+const enhancedFragmentShaderClarity = aerialClarityShader(enhancedFragmentShaderLiving);
+
+/**
  * R24 D: which pass ships. Read ONCE at construction, from a module const, so
  * production and the PREWARM twin (which builds through this same constructor)
  * can never compile different programs — the Effects.jsx el()/raw() rule.
@@ -591,7 +601,7 @@ export class AerialPerspectiveEffect extends Effect {
   constructor(opts = {}) {
     const law = LAW();
     const r25 = !law && opts?.r25 === true;
-    super('AerialPerspectiveEffect', law ? lawFragmentShader : r25 ? enhancedFragmentShaderLiving : fragmentShader, {
+    super('AerialPerspectiveEffect', law ? lawFragmentShader : r25 ? enhancedFragmentShaderClarity : fragmentShader, {
       // This is what makes the composer allocate + bind its depth texture.
       attributes: EffectAttribute.DEPTH,
       uniforms: new Map(law ? [
@@ -649,6 +659,7 @@ export class AerialPerspectiveEffect extends Effect {
     this._r25 = r25;
     if(r25)for(const[name,holder]of Object.entries(CINEMA_UNIFORMS))this.uniforms.set(name,holder);
     if(r25&&LIVING_GROUND_ACTIVE)for(const[name,holder]of Object.entries(LIVING_GROUND_UNIFORMS))this.uniforms.set(name,holder);
+    if(r25&&AERIAL_CLARITY_ON)for(const[name,holder]of Object.entries(AERIAL_CLARITY_UNIFORMS))this.uniforms.set(name,holder);
     // Resolved from the live renderer on the first update() — see the shader.
     this._reversed = null;
   }
@@ -702,6 +713,9 @@ export class AerialPerspectiveEffect extends Effect {
       // PHYS_SKY: the physical volume carries clear air; the law adds weather only.
       u.get('uLivingAir').value.z=PHYS_SKY_TEXT_ACTIVE?physWeatherExtinction(cinemaEnvironment):cinemaEnvironment.extinction;u.get('uLivingAir').value.w=cinemaEnvironment.heightM;
       u.get('uMaxMix').value=.55;
+      // SHIP PASS SKY (AERIAL_CLARITY): this frame's clear-air k (eye AGL off
+      // the same ground reference the height term uses).
+      if(AERIAL_CLARITY_ON)updateAerialClarity(s.camPos[1]-s.groundY,cinemaEnvironment);
     }
     // R24 C (LINEAR_HAZE): Color.setRGB's default colorSpace is the WORKING
     // space, i.e. no conversion — which is exactly the L1 defect. Naming
