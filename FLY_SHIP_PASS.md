@@ -1024,15 +1024,26 @@ blocked until the lead or RELEASE stops it. The scripts are `sessionA.sh` / `ses
 agent's scratchpad; each is the heavy-lock template running the commands above).
 
 #### ENV_UNIFORM ruling (as far as this venue shows; the 5080 half is owner)
-- **Delete its equirect half.** `SatEnvironment.jsx` resizes every PMREM input when `(ENV_UNIFORM.enabled || immersive)`
+Venue run (dev server, fixture + SwiftShader, Powell OH 900 m, satellite, all three pins released, one run per arm;
+`env-uniform-off.log` / `env-uniform-on.log`):
+
+| arm | (1) programs compiled across the dusk walk | (2) across 4 forced tier steps, shadows casting | steps accepted | page errors |
+|---|---|---|---|---|
+| `?flags=-ENV_UNIFORM` | 8 (123 → 131) | 3 (131 → 134) | 2/4 | 0 |
+| `?flags=ENV_UNIFORM` | 5 (128 → 133) | 3 (133 → 136) | 2/4 | 0 |
+
+**Ruling: DELETE, unless the owner's 5080 run shows otherwise.** Neither leg reaches 0 with the flag; the tier leg is
+identical; the flag adds 5 programs before the walk. Its parts:
+- **The equirect half is dead.** `SatEnvironment.jsx` resizes every PMREM input when `(ENV_UNIFORM.enabled || immersive)`
   and `immersive` is `IMMERSIVE.features.lighting`, hard-wired true, at `IMMERSIVE.environmentSize` 2048 (=
-  `ENV_UNIFORM.equirectWidth`); so the flag cannot change the dusk-crossing re-key any more — IMMERSIVE already fixed it
-  (`verify-ship-frame` FR-3 (g) proves it from source). The file is not FRAME's: the deletion belongs to the close (8.3).
-- **Its two prewarm halves** (the shadow-twin warm and the environment re-queue, `prewarm.js`, FRAME's) act only on
-  frames ≤ `idleFrameMs` 12 ms, which SwiftShader never draws, so this venue cannot show a benefit (its
-  `verify-env-uniform` arms were queued, see above). Owner: 5080, `verify-env-uniform` with `?flags=-ENV_UNIFORM` and
-  `?flags=ENV_UNIFORM` (`PW_CHANNEL=chrome`); SHIP if (2) "no compile across a tier step" reads 0 only with the flag,
-  else DELETE (the FR-3 consumer's `env` and `tier` re-warms cover the same events for registered variants).
+  `ENV_UNIFORM.equirectWidth`): IMMERSIVE already removed the dusk re-key this half was for (`verify-ship-frame` FR-3 (g)
+  proves it from source). The file is not FRAME's; the deletion belongs to the close (8.3).
+- **The two prewarm halves** (shadow-twin warm, environment re-queue; `prewarm.js`) act only on frames ≤ 12 ms, which
+  SwiftShader never draws, so their benefit cannot be shown here. Owner, 5080: `PW_CHANNEL=chrome node -r
+  ./scripts/_pw-shim.js scripts/verify-env-uniform.js` with `FLY_URL=…/?flags=-ENV_UNIFORM` and `…/?flags=ENV_UNIFORM`;
+  SHIP only if (2) reads 0 with the flag and not without, else DELETE. The harness now prints, from the FR-1 program
+  census, WHICH programs each leg first compiled (`(1i)` / `(2i)`): those are the variants their owners register in
+  `prewarm-registry.js` so the FR-3 consumer warms them (its `env` and `tier` triggers cover exactly these two events).
 
 #### Owner checks (section 9)
 - **5080 #1 (cold boot):** `?diag=1` → "late shaders" reads `0 / N` with SHADER_READY; compare `?flags=-SHADER_READY`. FR-2 trace: `BETA_GPU_TRACE=1` soak, `getProgramInfoLog` totals default vs `-SHADER_READY`. FR-3: `__flyStats.prewarm.ms` default vs `-SHADER_READY` (boot hold ≤ +1.5 s).
