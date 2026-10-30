@@ -951,7 +951,28 @@ Severity and effort are the auditors' estimates. "Where" names the requirement t
 ### FRAME
 
 <!-- SHIP PASS FRAME report begin -->
-(not started)
+**Status (2026-10-30): IN PROGRESS on `ship/frame`** (cloud venue, section 3.8:
+fixture + SwiftShader; no RTX 5080, no iPhone). This report is updated on every
+commit; a continuation agent picks up from it and from `git log ship/frame`.
+
+| ID | State | What landed | Evidence |
+|---|---|---|---|
+| FR-1 | built | `lib/fly/program-census.js`: hooks `renderer.info.programs.push` (instance property) and each program's first `getUniforms`/`getAttributes`; `__flyStats.census.programs = {total, live, preReveal, afterReveal:[{key, ms, t, waitMs}], afterRevealCount, firstUseMs, worstMs, linkFailures}`; link failure → `track('client_error', {kind:'shader_link'})`. Zero per-frame cost. Device-report `census` field. | `verify-ship-frame` FR-1 (a)–(e) |
+| FR-2 | built | `lib/fly/shader-ready.js`: `checkShaderErrors:false` only with SHADER_READY on + production + not `navigator.webdriver`; written in FlyCanvas `onCreated` before any program (`installFrameRenderer`). | `verify-ship-frame` FR-2 (a)–(c) |
+| FR-4 | built (layers, bytes) | `lib/fly/render-census.js` + `components/fly/CensusRig.jsx`: per-layer draws/triangles via `renderBufferDirect` (shadow and pass draws booked apart), logical texture + renderbuffer bytes on the context instance, RGBA16F audit, upload-time ring. `__flyStats.census.{layers,textureBytes}`; device report `renderer.textureBytes`. | `verify-ship-frame` FR-4 (a)–(b) |
+| FR-5 | built | `lib/fly/pace-adapt.js` + governor: `PACE_ADAPT.refreshSnap` adds 30/48/50; mid-session cadence lock (33.3 ms, low variance, low frame work) with a candidate that defers the down-step while the window decides; re-estimate on `visibilitychange`; governor state + cadence in the report. | `verify-ship-frame` FR-5 (a)–(g): 30 Hz held at rung 0 for 5 simulated min; flag-off control steps (PF-05 reproduced); 30 Hz overload steps |
+| FR-7 | instrument built | `lib/fly/stall-classify.mjs` + `lib/fly/stall-census.js`: every >100 ms interval classified (program link, tile upload, worker finalize, GC, React commit) from census rings, markPhase tags, heap drop and Long Animation Frame scripts. | `verify-ship-frame` FR-7 (a)–(b) |
+| FR-9 | built (rows, store, hint) | `lib/fly/frame-api.js` implemented (persisted `fly-frame-rate-v1`, holds, summary); Settings rows in the FRAME block (desktop Frame rate 60 / Match display, touch Battery saver), `frameRateMode` store field, Battery-saver notice through the calm-hud lane. | FR-5 (g) holds |
+| FR-10 | built, flag off | `lib/fly/gpu-benchmark.js` (fill + cloud-march, ≤1.5 s, cached per device/app version) and `decideStart`; wired into the FRAME start-tier block, Ultra DPR cap and tablet effects. | — |
+| FR-11 | built | `lib/fly/device-policy.js` table: W0 seed rows kept, score-aware rows, FRAME rows (BATTERY_SAVER, MATCH_DISPLAY, CADENCE_LOCK, DYNAMIC_NEAR). | — |
+| FR-3, FR-6, FR-8, FR-12, FR-13 | not started | | |
+
+**Flags:** all four FRAME flags still `enabled:false` in this commit.
+
+**Files outside the 5.1 list (new, FRAME's):** `components/fly/{CensusRig,PaceClock}.jsx`,
+`components/fly/hud/BatterySaverHint.jsx`, `lib/fly/{shader-ready,program-census,render-census,census,stall-census,pace-adapt}.js`,
+`lib/fly/stall-classify.mjs`. **Existing files outside the list:** `lib/fly/frame-stats.js`
+is FRAME's; none other.
 <!-- SHIP PASS FRAME report end -->
 
 ### SKY

@@ -22,6 +22,12 @@ import { GLASS_ON, GlassField, GlassToggle } from './LivingGlass';
 // MENU_GLASS off stays the pre-pass menu; H still cycles the modes there).
 import { CALM, HUD_MODES, hudModeLabel, hudModeNote, saveHudMode } from './calm-hud';
 // SHIP PASS FRAME rows imports begin
+import { useSyncExternalStore } from 'react';
+import { frameCadence, setFrameCadence, subscribeFrameCadence } from '@/lib/fly/frame-api';
+import { shipPassOn } from '@/lib/fly/ship-pass';
+import { deviceFeature } from '@/lib/fly/device-policy';
+// FR-9: the rows exist only with PACE_ADAPT on (resolved once per page load).
+const FRAME_ROWS_ON = shipPassOn('PACE_ADAPT');
 // SHIP PASS FRAME rows imports end
 
 const TIERS = ['low', 'medium', 'high', 'ultra'];
@@ -345,7 +351,55 @@ export function SettingsRows({ sheet = false, includeConditions = true }) {
   );
 
   // SHIP PASS FRAME rows begin
-  const frameRows = null;
+  // FR-9 (D12): 60 by default. Desktop offers "Match display"; touch devices
+  // offer "Battery saver" (30 fps plus the phone-lean profile). The mode is
+  // persisted by lib/fly/frame-api.js (FRAME_RATE_KEY) and applied by
+  // FlyCanvas + the governor. With PACE_ADAPT off this renders nothing.
+  const frameMode = useSyncExternalStore(subscribeFrameCadence, frameCadence, () => '60');
+  const pickFrame = (mode) => {
+    store.setFrameRateMode?.(setFrameCadence(mode));
+  };
+  const batterySaver = FRAME_ROWS_ON && deviceFeature('BATTERY_SAVER').allowed;
+  const matchDisplay = FRAME_ROWS_ON && deviceFeature('MATCH_DISPLAY').allowed;
+  const frameNote = batterySaver
+    ? 'Caps the frame rate at 30 and lightens the sky and shadows. Longer battery, cooler phone.'
+    : 'Match display follows your monitor (half rate on Ultra above 100 Hz).';
+  const frameRows = !FRAME_ROWS_ON ? null : batterySaver ? (
+    GLASS_ON ? (
+      <GlassToggle
+        key="battery-saver"
+        testid={sheet ? 'settings-battery-saver' : 'pause-battery-saver'}
+        label="Battery saver"
+        value={onOff(frameMode === '30')}
+        on={frameMode === '30'}
+        name={`Battery saver: ${onOff(frameMode === '30')}`}
+        onClick={() => pickFrame(frameMode === '30' ? '60' : '30')}
+      />
+    ) : (
+      <MenuButton key="battery-saver" testid={sheet ? 'settings-battery-saver' : 'pause-battery-saver'} onClick={() => pickFrame(frameMode === '30' ? '60' : '30')}>
+        Battery saver: {frameMode === '30' ? 'On' : 'Off'}
+      </MenuButton>
+    )
+  ) : matchDisplay ? (
+    GLASS_ON ? (
+      <GlassField key="frame-rate" label="Frame rate" note={frameNote} testid={sheet ? 'settings-frame-rate' : 'pause-frame-rate'}>
+        <div className="lg-seg" role="group" aria-label="Frame rate">
+          {[
+            ['60', '60'],
+            ['display', 'Match display'],
+          ].map(([mode, label]) => (
+            <button key={mode} type="button" data-testid={`settings-frame-rate-${mode}`} aria-pressed={frameMode === mode} data-on={seg(frameMode === mode)} onClick={() => pickFrame(mode)}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </GlassField>
+    ) : (
+      <MenuButton key="frame-rate" testid={sheet ? 'settings-frame-rate' : 'pause-frame-rate'} onClick={() => pickFrame(frameMode === 'display' ? '60' : 'display')}>
+        Frame rate: {frameMode === 'display' ? 'Match display' : '60'}
+      </MenuButton>
+    )
+  ) : null;
   // SHIP PASS FRAME rows end
 
   return sheet ? (

@@ -141,6 +141,9 @@ const initialState = {
 
   // --- SHIP PASS (FLY_SHIP_PASS.md section 7): fields only, never renamed or removed.
   // SHIP PASS FRAME fields begin
+  // FR-9: '60' | 'display' | '30' — mirrors lib/fly/frame-api.js frameCadence()
+  // (the persisted truth, FRAME_RATE_KEY); synced on Fly mount and on a pick.
+  frameRateMode: '60',
   // SHIP PASS FRAME fields end
   // SHIP PASS RELEASE fields begin
   // SHIP PASS RELEASE fields end
@@ -254,6 +257,7 @@ export const useFlyStore = create(
     setHudMode: (hudMode) => set((state) => (state.hudMode === hudMode ? state : { hudMode })),
 
     // SHIP PASS FRAME setters begin
+    setFrameRateMode: (frameRateMode) => set((state) => (state.frameRateMode === frameRateMode ? state : { frameRateMode })),
     // SHIP PASS FRAME setters end
     // SHIP PASS RELEASE setters begin
     // SHIP PASS RELEASE setters end

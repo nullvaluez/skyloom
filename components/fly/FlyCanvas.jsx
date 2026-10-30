@@ -1,7 +1,7 @@
 'use client';
 import { SessionRecovery } from './SessionRecovery';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useState, useSyncExternalStore } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { PerformanceMonitor } from '@react-three/drei';
 import { FlyScene } from './FlyScene';
@@ -31,13 +31,36 @@ import { isMobileGraphicsClass } from '@/lib/fly/device-class';
 import { initialRenderDpr } from '@/lib/fly/render-resolution';
 import { configureCinemaAssets } from '@/lib/fly/cinema-material-assets';
 import { installContextResourceLifetime } from '@/lib/fly/context-resource-lifetime';
+// SHIP PASS FRAME (FR-1, FR-2, FR-4): shader-error policy, census, error telemetry.
+import { installFrameRenderer } from '@/lib/fly/census';
+import { censusWanted } from '@/lib/fly/program-census';
+import { CensusRig } from './CensusRig';
+// SHIP PASS FRAME (FR-5, FR-9; PACE_ADAPT): the presentation cadence.
+import { shipPassOn } from '@/lib/fly/ship-pass';
+import { presentationFps } from '@/lib/fly/pace-adapt';
+import { cadenceState, frameCadence, subscribeCadence, subscribeFrameCadence } from '@/lib/fly/frame-api';
+import { PaceClock } from './PaceClock';
 
-function BudgetFramePump({enabled}){
+// Resolved once per page load (the pin is set before Fly mode mounts).
+const PACE_ON = shipPassOn('PACE_ADAPT');
+const noSubscribe = () => () => {};
+const subscribePace = (fn) => {
+  const a = subscribeCadence(fn);
+  const b = subscribeFrameCadence(fn);
+  return () => {
+    a();
+    b();
+  };
+};
+// Only the inputs FlyCanvas reads: a rung or lock change re-renders nothing.
+const paceSnapshot = () => `${frameCadence()}|${cadenceState().displayHz}`;
+
+function BudgetFramePump({enabled,fps=60}){
   const invalidate=useThree(s=>s.invalidate);
   useEffect(()=>{
     if(!enabled)return;
     let id;
-    const cadence=createFrameCadence(60);
+    const cadence=createFrameCadence(fps);
     const tick=now=>{
       id=requestAnimationFrame(tick);
       if(document.hidden){cadence.reset();return;}
@@ -45,7 +68,7 @@ function BudgetFramePump({enabled}){
     };
     id=requestAnimationFrame(tick);
     return()=>cancelAnimationFrame(id);
-  },[enabled,invalidate]);
+  },[enabled,invalidate,fps]);
   return null;
 }
 
@@ -122,7 +145,14 @@ export function FlyCanvas({ runtime }) {
   // The seated lounge targets 60 fps. Reuse the tested vsync scheduler so a
   // high-refresh desktop does not render the same room 144–240 times/second.
   // Flight/title cadence and all visual quality settings remain unchanged.
-  const budgetedFrames=mobileFlight||(observing&&frameloop==='always');
+  // SHIP PASS FRAME (FR-9): with PACE_ADAPT on the frame-rate mode decides
+  // the cadence (Battery saver 30, '60' caps a high-refresh desktop, Match
+  // display renders native or refresh/2 on Ultra). Off: presentationFps
+  // returns today's rule (mobile flight or the seated lounge at 60).
+  useSyncExternalStore(PACE_ON ? subscribePace : noSubscribe, PACE_ON ? paceSnapshot : () => '', () => '');
+  const qualityPreset=useFlyStore(s=>PACE_ON?s.qualityPreset:null);
+  const paceFps=presentationFps({paceOn:PACE_ON,mode:PACE_ON?frameCadence():'60',always:frameloop==='always',mobile:mobileFlight,observing,displayHz:cadenceState().displayHz,heavy:qualityPreset==='ultra'});
+  const budgetedFrames=paceFps!=null;
   const [dpr, setDpr] = useState(initialDpr);
   // R24 A (STEP_SAFE): resolved once at mount — the pin is set before Fly mode
   // mounts and never moves mid-session.
@@ -181,6 +211,8 @@ export function FlyCanvas({ runtime }) {
         reversedDepthBuffer: true,
       }}
       onCreated={({ gl, camera }) => {
+        // SHIP PASS FRAME (FR-1, FR-2, FR-4): lib/fly/census.js installFrameRenderer.
+        installFrameRenderer(gl);
         // eslint-disable-next-line react-hooks/immutability -- Renderer-owned diagnostics live on the mutable simulation handle.
         if(cinemaOn())runtime.cinemaContextResources=installContextResourceLifetime(gl.getContext());
         configureCinemaAssets(gl);
@@ -209,7 +241,8 @@ export function FlyCanvas({ runtime }) {
       }}
     >
       <SessionRecovery runtime={runtime}/>
-      <BudgetFramePump enabled={budgetedFrames} />
+      <BudgetFramePump enabled={budgetedFrames} fps={paceFps ?? 60} />
+      {PACE_ON && <PaceClock />}
       {/* Round 24 (E CERT): the frame-pace instrument. Priority -101 puts it
           ahead of the governor (-100) and A's STEP_SAFE rig (-99), so its dt
           is the raw inter-frame delta of the frame that just presented. Not
@@ -218,6 +251,8 @@ export function FlyCanvas({ runtime }) {
       {FRAME_STATS.enabled && <FrameStatsRig />}
       {/* TRUE EARTH: whole-frame draw/triangle totals, only with ?diag=1. */}
       {diagRequested() && <DiagFrameTotals />}
+      {/* SHIP PASS FRAME (FR-4): per-layer draws/triangles, upload time. */}
+      {censusWanted() && <CensusRig />}
       {FRONT_DOOR.enabled && <StagePump runtime={runtime} />}
       {PERF_GOVERNOR.enabled ? (
         <>
