@@ -437,6 +437,19 @@ const DEG = Math.PI / 180;
   row('SK-4 (g) wiring: AtmosphereRig writes uPskyAp.z from the policy switch; the far deck reads the lite reach before its old rule',
     rig.includes('PSKY_UNIFORMS.uPskyAp.value.set(luts.aerialState.maxKm, luts.aerialState.h, skyLiteAerialSwitch(qt), 0);')
     && lc.includes("const farLite = skyLiteFarReachM(name, far.maxKm ?? 180, ctx.tier);") && lc.includes("const farMax = farLite ?? (name === 'phone' || name === 'low' ? 0 :"));
+  // (h) glsl.js keeps its header's promise (no runtime dependencies): the node
+  // half of verify-phys-sky imports it — and cinema-sky.js through it — in plain
+  // node with no resolver, so the flag is read in sky-lite.js, not here.
+  const glslImports = [...read('lib/fly/atmosphere/glsl.js').matchAll(/^import [^;]* from '([^']+)';/gm)].map((m) => m[1]);
+  let plain = 'ok';
+  try {
+    execFileSync(process.execPath, ['--input-type=module', '-e', "await import('./lib/fly/atmosphere/glsl.js'); await import('./lib/fly/cinema-sky.js');"], { cwd: ROOT, stdio: 'pipe' });
+  } catch (e) { plain = String(e.stderr || e.message).match(/ERR_[A-Z_]+|Cannot find module '[^']+'/)?.[0] ?? 'failed'; }
+  const MAIN_AERIAL_LOOKUP = 'f44601900ebffff7d656f9485bc0681057b146017ea6c5cd1edaa92623423b1a'; // git archive main
+  row('SK-4 (h) lib/fly/atmosphere/glsl.js stays dependency-free (imports only ./model.js) and plain-node importable with cinema-sky.js (verify-phys-sky\'s node half); its lookup text is main\'s, and the consumers include sky-lite\'s',
+    glslImports.join() === './model.js' && plain === 'ok' && sha(G.ATMO_AERIAL_LOOKUP_GLSL) === MAIN_AERIAL_LOOKUP && SL.PSKY_AERIAL_LOOKUP_GLSL === G.ATMO_AERIAL_LOOKUP_GLSL
+    && ['lib/fly/immersive-cloud-pass.js', 'lib/fly/living-clouds.js', 'components/fly/AerialPerspective.jsx'].every((f) => /PSKY_AERIAL_LOOKUP_GLSL as ATMO_AERIAL_LOOKUP_GLSL \} from '[^']*sky-lite/.test(read(f)) && !/atmosphere\/glsl/.test(read(f).match(/import \{[^}]*ATMO_AERIAL_LOOKUP_GLSL[^}]*\} from '[^']+'/g)?.join() ?? '')),
+    `imports ${glslImports.join(', ')}; plain node: ${plain}`);
 }
 
 // ---- SK-2: AERIAL_CLARITY -----------------------------------------------------

@@ -79,7 +79,8 @@ import { LIVING_AIR_GLSL } from '@/lib/fly/living-atmosphere';
 import { getR25Sky, registerAerialStrengthReader } from '@/lib/fly/r25-sky';
 import { R25_SKY_GLSL_DECL, R25_SKY_GLSL_FUNCS, SKY_ROWS, writeSkyUniforms } from '@/lib/fly/sky-model';
 import { trueRayGLSL, trueScaleShader } from '@/lib/fly/true-scale';
-import { ATMO_AERIAL_LOOKUP_GLSL } from '@/lib/fly/atmosphere/glsl';
+// SHIP PASS SKY (SK-4): the aerial lookup through SKY_LITE's edit (the base with the flag off).
+import { PSKY_AERIAL_LOOKUP_GLSL as ATMO_AERIAL_LOOKUP_GLSL } from '@/lib/fly/sky-lite';
 import { physSkyShader, physWeatherExtinction } from '@/lib/fly/atmosphere/runtime';
 import { PHYS_SKY_TEXT_ACTIVE } from '@/lib/fly/cinema-sky';
 // LIVING WORLD (GROUND): night lights and valley mist on the ground pixel,
