@@ -1001,6 +1001,8 @@ gives 1181x2560 (touchScale 2 raised to minLongPx). **Lead: re-run
 it is all green there: the phone long-side row, the desktop arm (queued here)
 and `verify-photo` (queued here). `verify-attribution` 4/4 (node).
 
+**LT-2 draw cost, read honestly.** The receiver adds no draw: it samples inside the earth surface's existing draw. The desktop refresh is an offscreen pass that redraws the loaded terrain tiles in the light box, bounded by `maxTiles` (400), twice a second or at once on a warp or a light jump. Between refreshes the frame pays 0 extra draws; a refresh frame pays its tile count (`runtime.terrainShadow.draws` and `.tiles`, recorded by the terrain-on arm). So LT-2's "+≤ 1 draw" and the policy seed's `draws: 1` hold on every frame but the two refresh frames a second. A tile-tree terrain cannot be redrawn in one draw. A design that can keep it to one draw per frame (a top-down height map updated per landed tile, plus one lit pass at 2 Hz) is a rewrite this venue cannot check on a GPU, so it is offered, not built. The owner's census (D16) decides whether the refresh frames fit; `?flags=TERRAIN_SHADOW` with the frame stats on shows them.
+
 **Device gating.** Every LIGHT feature asks `deviceFeature()` through
 `lib/fly/ship-light.js`. SwiftShader is class 'software', which the policy
 refuses, so harnesses pin `window.__flyLightDeviceClass`. FRAME's
