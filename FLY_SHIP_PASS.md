@@ -757,6 +757,17 @@ request and is superseded by the merge commit that turns them on.
   runtime's traffic state and records whichever notice the player sees.
   CI had never reached this step; earlier runs died at `npm audit`, and run
   51 died at a screenshot timeout.
+- CI run 52 (`4cb7e8b`) then passed every smoke check except one: the
+  production page threw "Cannot read properties of undefined (reading
+  'isReady')" after the context-loss leg. Cause: three's `compileAsync` polls
+  `properties.get(material).currentProgram` from a timer, and a context
+  restore replaces that table. FRAME's registry warm and the older prewarm
+  queues keep compiles in flight across the loss. Fix:
+  `installSafeCompileAsync` (`lib/fly/compile-scene-safe.js`), installed once
+  per renderer in `installFrameRenderer`, routes every caller through the
+  existing context-loss-safe `compileSceneAsync`, keeping three's contract.
+  Re-run locally after the fix, `smoke:beta` passes every check, ending
+  with "production browser has no uncaught errors []".
 - Gate re-premise notes for the owner:
   - DEVICE_POLICY on also enables FR-13's dynamic near plane on renderers
     without reversed depth (no iPhone report yet), and runs the boot
