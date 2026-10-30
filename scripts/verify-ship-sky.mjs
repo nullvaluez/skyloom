@@ -146,6 +146,13 @@ const DEG = Math.PI / 180;
     d.includes("process.env.NODE_ENV === 'development' || graphicsReviewOn()") &&
     /if \(skyDiag\(\)\?\.aerial === 0\) \{\n\s*u\.get\('uMaxMix'\)\.value = 0;/.test(ap) &&
     ap.indexOf("if (skyDiag()?.aerial === 0)") > ap.indexOf('if (this._r25 && LIVING_GROUND_ACTIVE) updateLivingGround'));
+  // The opt-in `clouds-off` arm: one uniform write after the frame's own mix,
+  // and every composite (legacy and r25) ends in mix(scene, result, cloudMix).
+  const icp = read('lib/fly/immersive-cloud-pass.js');
+  const mixAt = icp.indexOf('u.cloudMix.value=this.mix;'), pinAt = icp.indexOf("if(skyDiag()?.clouds===0){u.cloudMix.value=0;markSkyDiagApplied('clouds');}");
+  row('SK-1 (e) the clouds-off pin zeroes only the cloud composite\'s mix, after the frame\'s own write, and the veil harness offers it',
+    mixAt > 0 && pinAt > mixAt && read('lib/fly/hdr-guard.js').includes(' gl_FragColor=vec4(mix(scene,result,cloudMix),1.);')
+    && h.includes("'clouds-off': { boot: 'main', live: { set: 'window.__flySkyDiag = { clouds: 0 }'"));
 }
 
 // ---- SK-3: REAL_MOON --------------------------------------------------------

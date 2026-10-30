@@ -16,6 +16,10 @@
  *                Enhanced aerial post pass leaves the ground pixels; see
  *                lib/fly/sky-diag.js) — the atmosphere's full share
  *   no-mist      ?flags=-GROUND_MIST (its own page load: a module-load flag)
+ *   clouds-off   window.__flySkyDiag = { clouds: 0 } (opt-in: the cloud
+ *                composite mixes nothing — the cinema deck at 1,500-3,800 m
+ *                is in the sight line from 5,000-12,500 ft even in clear
+ *                weather; the fixture runs put the eye INSIDE it at 7,500 ft)
  *   city-fade    window.__flyCityDiag = { fadeStartM, fadeEndM } (CITY's
  *                frozen CT-1 pin: the detailed-building fade pushed out)
  *   city-premix  window.__flyCityDiag = { skylinePremix: 0 } (CITY's pin: the
@@ -125,6 +129,9 @@ const ARMS = {
   baseline: { boot: 'main', live: null },
   'aerial-pin': { boot: 'main', live: { set: 'window.__flyAerialOverride = 0', clear: 'delete window.__flyAerialOverride' } },
   'air-off': { boot: 'main', live: { set: 'window.__flySkyDiag = { aerial: 0 }', clear: 'delete window.__flySkyDiag', applied: 'aerial' } },
+  // Not one of SK-1's six: the cinema cloud deck (1,500-3,800 m, coverage 0.41
+  // in clear weather) taken out of the frame, on the same pose (opt-in).
+  'clouds-off': { boot: 'main', live: { set: 'window.__flySkyDiag = { clouds: 0 }', clear: 'delete window.__flySkyDiag', applied: 'clouds' } },
   'no-mist': { boot: 'no-mist', flags: '-GROUND_MIST' },
   'city-fade': { boot: 'city-fade', cityPin: { ...CITY_FADE } },
   'city-premix': { boot: 'city-premix', cityPin: { skylinePremix: 0 } },
@@ -233,7 +240,7 @@ function table() {
   // Δ against the control: live arms against their own pose's lead capture
   // (same page, same settled frame); boot arms against the baseline of the
   // same altitude (cross-boot: read against baseline-2's drift).
-  const CONTROL = { 'aerial-pin': 'baseline', 'air-off': 'baseline', 'baseline-2': 'baseline', 'clarity-k0': 'clarity', 'clarity-2': 'clarity', clarity: 'clarity-k0', 'no-mist': 'baseline', 'no-mist-2': 'no-mist', 'city-fade': 'baseline', 'city-premix': 'baseline' };
+  const CONTROL = { 'aerial-pin': 'baseline', 'air-off': 'baseline', 'clouds-off': 'baseline', 'baseline-2': 'baseline', 'clarity-k0': 'clarity', 'clarity-2': 'clarity', clarity: 'clarity-k0', 'no-mist': 'baseline', 'no-mist-2': 'no-mist', 'city-fade': 'baseline', 'city-premix': 'baseline' };
   const pct = (v, c) => (Number.isFinite(v) && Number.isFinite(c) && c ? `${v >= c ? '+' : ''}${(((v - c) / c) * 100).toFixed(1)}%` : '—');
   L.push('', 'Midtown contrast Δ against the control (clarity against its k = 0 control; no-mist and the city arms cross-boot against baseline)', '');
   L.push('| Arm (vs control) | ' + ALTS_FT.map((a) => `${a} ft`).join(' | ') + ' |');
