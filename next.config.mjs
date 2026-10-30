@@ -72,6 +72,16 @@ const nextConfig = {
           },
         ],
       },
+      // SHIP PASS RL-8 (OFFLINE_SHELL): the worker script itself is never
+      // cached by HTTP, so a new version (or the kill switch) reaches
+      // returning players on their next visit.
+      {
+        source: '/sw.js',
+        headers: [
+          { key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },
+          { key: 'Service-Worker-Allowed', value: '/' },
+        ],
+      },
       {
         source: '/models/:path*',
         headers: [

@@ -80,6 +80,7 @@ import { shipPassOn as releaseFlagOn } from '@/lib/fly/ship-pass';
 import { DeepLinkHost } from './hud/DeepLinkHost';
 import { ReleaseAnalytics } from './hud/ReleaseAnalytics';
 import { ConsentPrompt } from './hud/ConsentPrompt';
+import { OfflineShell } from './hud/OfflineShell';
 // SHIP PASS RELEASE imports end
 
 // SHIP PASS FRAME imports begin
@@ -439,6 +440,8 @@ export function FlyMode({ onClose }) {
       {releaseFlagOn('DEEP_LINKS') && <DeepLinkHost runtime={runtime} />}
       <ReleaseAnalytics runtime={runtime} />
       {releaseFlagOn('ANALYTICS_V2') && <ConsentPrompt />}
+      {/* RL-8: registers the worker with OFFLINE_SHELL on, unregisters it (kill switch) with it off. */}
+      <OfflineShell />
       {/* SHIP PASS RELEASE mounts end */}
       {/* SHIP PASS FRAME mounts begin */}
       {/* SHIP PASS FRAME mounts end */}

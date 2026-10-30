@@ -564,5 +564,105 @@ console.log('SHIP PASS RELEASE gate (verify-ship-release)\n');
   gate('E7 /api/entitlements answers {grants} from the validated server env only, uncached', /grants: grantsFromList\(process\.env\.SKYLOOM_GRANTS, PACKS\)/.test(route) && /no-store/.test(route));
 }
 
+// === W  RL-8 offline shell =======================================================
+{
+  console.log('\n[W] Offline shell (OFFLINE_SHELL)');
+  const vm = await import('node:vm');
+  const swSrc = read('public/sw.js');
+  const ctx = { self: { addEventListener() {}, location: { origin: 'https://skyloom.example' } }, URL, console };
+  vm.createContext(ctx);
+  vm.runInContext(`${swSrc}\n;globalThis.__probe = { shellCacheable, CACHE, VERSION };`, ctx);
+  const { shellCacheable, CACHE } = ctx.__probe;
+  const O = 'https://skyloom.example';
+  const cases = [
+    ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/14/6000/4000', 'no-cors', 'GET', null],
+    ['https://tiles.openfreemap.org/planet/20260802/14/4823/6160.pbf', 'cors', 'GET', null],
+    ['https://api.adsb.lol/v2/lat/40/lon/-73/dist/50', 'cors', 'GET', null],
+    ['https://api.open-meteo.com/v1/forecast?latitude=40', 'cors', 'GET', null],
+    ['https://us.i.posthog.com/e/', 'cors', 'POST', null],
+    [`${O}/api/aircraft?lat=1&lon=2`, 'cors', 'GET', null],
+    [`${O}/api/weather?lat=1&lon=2`, 'cors', 'GET', null],
+    [`${O}/api/entitlements`, 'cors', 'GET', null],
+    [`${O}/api/aircraft/abc123/photo`, 'cors', 'GET', null],
+    [`${O}/sw.js`, 'same-origin', 'GET', null],
+    [`${O}/_next/static/chunks/app/page-0123abcd.js`, 'cors', 'GET', 'immutable'],
+    [`${O}/_next/static/chunks/app/page-0123abcd.js`, 'cors', 'POST', null],
+    [`${O}/models/player-vector-hero-v4.glb`, 'cors', 'GET', 'static'],
+    [`${O}/materials/ground/x.bc3`, 'cors', 'GET', 'static'],
+    [`${O}/hdri/day.hdr`, 'cors', 'GET', 'static'],
+    [`${O}/fonts/x.woff2`, 'cors', 'GET', 'static'],
+    [`${O}/data/runways.bin`, 'cors', 'GET', 'static'],
+    [`${O}/manifest.json`, 'cors', 'GET', 'static'],
+    [`${O}/`, 'navigate', 'GET', 'shell'],
+    [`${O}/?fly=grand-canyon`, 'navigate', 'GET', 'shell'],
+    [`${O}/somewhere`, 'navigate', 'GET', null],
+    ['https://evil.example/models/x.glb', 'cors', 'GET', null],
+  ];
+  const bad = cases.filter(([u, m, meth, want]) => shellCacheable(u, O, m, meth) !== want).map(([u, m, meth, want]) => `${meth} ${u} → ${shellCacheable(u, O, m, meth)} (want ${want})`);
+  gate(`W1 the cache allowlist: first-party static only; never /api, provider tiles, ADS-B, weather, analytics or cross-origin (${cases.length} cases)`, bad.length === 0, bad.join(' | '));
+  gate('W2 caches are versioned and an activate drops every older Skyloom cache', /^skyloom-shell-v\d+$/.test(CACHE) && /k\.startsWith\('skyloom-shell-'\) && k !== CACHE/.test(swSrc) && !/cache\.addAll\(.*api/.test(swSrc));
+  const OS = await import(pathToFileURL(path.join(ROOT, 'lib/fly/offline-shell.js')).href);
+  const act = (o) => OS.offlineShellAction({ on: true, production: true, webdriver: false, pinned: false, supported: true, ...o });
+  const table = [
+    [{ on: false }, 'unregister'], [{ on: false, production: false }, 'unregister'], [{ production: false }, 'skip'], [{}, 'register'],
+    [{ webdriver: true }, 'skip'], [{ webdriver: true, pinned: true }, 'register'], [{ supported: false }, 'skip'], [{ on: false, supported: false }, 'skip'],
+  ];
+  const tbad = table.filter(([o, want]) => act(o) !== want).map(([o, want]) => `${JSON.stringify(o)} → ${act(o)} (want ${want})`);
+  gate('W3 registration is production-only, and the flag off is a kill switch (unregister + delete caches)', tbad.length === 0, tbad.join(' | '));
+  const nc = read('next.config.mjs');
+  gate('W4 /sw.js is served no-cache with Service-Worker-Allowed: /', /source: '\/sw\.js'[\s\S]{0,200}no-cache, no-store, must-revalidate[\s\S]{0,120}Service-Worker-Allowed/.test(nc));
+  const fm = read('components/fly/FlyMode.jsx');
+  const mounts = fm.slice(fm.indexOf('SHIP PASS RELEASE mounts begin'), fm.indexOf('SHIP PASS RELEASE mounts end'));
+  gate('W5 FlyMode mounts the shell host whatever the flag (so the kill switch runs)', /\n\s*<OfflineShell \/>/.test(mounts));
+
+  // The LIVE handlers, not just the pure allowlist: a fake worker global runs
+  // sw.js, then fetch and warm events are dispatched into it.
+  const handlers = {};
+  const fetched = [];
+  const stored = new Map();
+  const cache = { match: async (r) => stored.get(typeof r === 'string' ? r : r.url) ?? undefined, put: async (r, res) => void stored.set(typeof r === 'string' ? r : r.url, res), add: async () => {} };
+  const ctx2 = {
+    self: { addEventListener: (t, fn) => (handlers[t] = fn), location: { origin: O }, skipWaiting() {}, clients: { claim() {} } },
+    caches: { open: async () => cache, keys: async () => [], delete: async () => true },
+    fetch: async (u) => {
+      fetched.push(typeof u === 'string' ? u : u.url);
+      return { ok: true, status: 200, type: 'basic', clone() { return this; } };
+    },
+    URL, console, Response: { error: () => ({ type: 'error' }) },
+  };
+  vm.createContext(ctx2);
+  vm.runInContext(swSrc, ctx2);
+  const fetchEvent = (url, mode = 'cors', method = 'GET', headers = {}) => {
+    let responded = false;
+    handlers.fetch({ request: { url, mode, method, headers: { has: (h) => h in headers } }, respondWith: () => (responded = true), waitUntil() {} });
+    return responded;
+  };
+  const live = [
+    [`${O}/api/aircraft?lat=1`, false], [`${O}/api/weather`, false], ['https://server.arcgisonline.com/x/tile/1/2/3', false], ['https://tiles.openfreemap.org/planet/1/2/3.pbf', false],
+    [`${O}/_next/static/chunks/main-abc.js`, true], [`${O}/models/x.glb`, true], [`${O}/`, true, 'navigate'], [`${O}/sw.js`, false],
+  ];
+  const lbad = live.filter(([u, want, m]) => fetchEvent(u, m) !== want).map(([u, want]) => `${u} intercepted=${!want}`);
+  lbad.push(...(fetchEvent(`${O}/models/x.glb`, 'cors', 'GET', { range: 'bytes=0-1' }) ? ['a ranged read was intercepted'] : []));
+  gate('W6 the live fetch handler answers only allowlisted requests (an /api, tile or ranged request falls through to the network untouched)', lbad.length === 0, lbad.join(' | '));
+  await new Promise((r) => setTimeout(r, 20)); // let W6's responses settle, then count only the warm
+  fetched.length = 0;
+  stored.clear();
+  let warmDone = null;
+  handlers.message({ data: { type: 'warm', urls: [`${O}/_next/static/chunks/app-1.js`, `${O}/api/aircraft?x=1`, 'https://evil.example/_next/static/x.js', `${O}/models/m.glb`, `${O}/somewhere`, `${O}/sw.js`, 42] }, waitUntil: (p) => (warmDone = p) });
+  await warmDone;
+  const warmWant = [`${O}/_next/static/chunks/app-1.js`, `${O}/models/m.glb`];
+  gate('W7 the first visit warms the cache through the same allowlist (no /api, cross-origin or page URLs)', JSON.stringify(fetched) === JSON.stringify(warmWant) && [...stored.keys()].every((k) => warmWant.includes(k)), JSON.stringify(fetched));
+  const offline = read('lib/fly/offline-shell.js');
+  const host = read('components/fly/hud/OfflineShell.jsx');
+  gate('W8 registration waits for the load event and an idle period (never inside the first minute\'s critical path)', /whenIdle\(\(\) => \{\s*syncOfflineShell\(action\)/.test(host) && /readyState === 'complete'/.test(offline) && /addEventListener\('load', go/.test(offline) && /requestIdleCallback\(run, \{ timeout \}\)/.test(offline));
+  gate('W9 install hint: touch devices only, the second visit after a completed flight, never installed or dismissed; the browser prompt is captured only for that player', /\['phone', 'tablet'\]\.includes\(deviceClassOf\(\)\)/.test(host) && /touch && !standalone && flewBefore && visit >= 2 && read\(DISMISS_KEY\) !== '1'/.test(host) && /if \(!show\) return cancelSync;[\s\S]*beforeinstallprompt/.test(host) && /data-testid="install-hint"/.test(host));
+  const urls = OS.warmUrls(
+    { scripts: [{ src: '/_next/static/a.js' }, { src: '' }, { src: 'https://cdn.example/x.js' }], querySelectorAll: () => [{ href: 'http://localhost:3135/_next/static/c.css' }] },
+    { getEntriesByType: () => [{ name: 'http://localhost:3135/models/m.glb' }, { name: 'https://tiles.example/1.png' }] },
+    'http://localhost:3135',
+  );
+  gate('W10 warmUrls offers only same-origin URLs the page already loaded', JSON.stringify(urls) === JSON.stringify(['http://localhost:3135/_next/static/a.js', 'http://localhost:3135/_next/static/c.css', 'http://localhost:3135/models/m.glb']), urls);
+}
+
 console.log(`\nverify-ship-release: ${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
