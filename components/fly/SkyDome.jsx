@@ -5,6 +5,8 @@ import { useFrame } from '@react-three/fiber';
 import { BackSide, Color, ShaderMaterial, SphereGeometry, Mesh, SRGBColorSpace, Vector3 } from 'three';
 import { OVERCAST_V2, SKY_DUSK } from '@/lib/fly/fly-constants';
 import { glowEnvelope, nightWeightEl, skyDuskOn } from '@/lib/fly/sky-dusk';
+// SHIP PASS SKY (SK-3): the classic dome's moon follows REAL_MOON too.
+import { moonDiscWeight, REAL_MOON_ON } from '@/lib/fly/sun-model';
 
 // Live horizon dip (round 6): the ground curves away d²k but the dome's
 // horizon used to sit at flat eye level — at altitude a black band opened
@@ -447,6 +449,15 @@ export function SkyDome({
       u.uNight.value =
         sun.active && sun.elValid && skyDuskOn() ? nightWeightEl(sun.elDeg) : night.t;
       u.uMoonDir.value.copy(night.dir);
+      // SHIP PASS SKY (REAL_MOON): no disc once the moon has set, and a glow
+      // that follows the lit fraction (the Enhanced composite draws the phase
+      // itself; this classic disc has no terminator). Flag off: never runs.
+      if (REAL_MOON_ON && moon) {
+        const w = moonDiscWeight();
+        const p = u.uMoonParams.value;
+        p[2] = moon.brightness * w.vis;
+        p[3] = moon.glowStrength * w.vis * w.illum;
+      }
     } else if (u.uNight.value !== 1) {
       u.uNight.value = 1;
     }
