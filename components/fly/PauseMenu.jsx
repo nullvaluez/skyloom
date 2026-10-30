@@ -1,6 +1,8 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import { useDialogFocus } from '@/hooks/use-dialog-focus';
+import { editableTarget, reservedKeyEvent } from '@/lib/fly/keyboard-target';
 import { reviewSurfaceOn } from '@/lib/fly/player-surface';
 import { useFlyStore } from '@/stores/fly-store';
 import { usePassportStore } from '@/stores/passport-store';
@@ -35,8 +37,9 @@ import { GLASS_ON, GLASS_EXIT_MS, GlassKeys, GlassNavItem, closingProps, glassRo
 // The glass pause card speaks the cinema title's type (cinema-menus.css, .tcn-pause).
 
 const CONTROL_ROWS = [
-  ['Mouse', 'steer — cursor offset from center commands the turn/pitch'],
-  ['WASD / arrows', 'steer (adds to mouse)'],
+  ['Mouse', 'steer when Mouse + keyboard is selected in Settings'],
+  ['WASD / arrows', 'steer — takes over from the mouse'],
+  ['Keyboard / trackpad', 'choose Steering input in Settings; drag the view to look around'],
   ['1 / 2 / 3', 'airport: idle / taxi / takeoff · cruise: slow / cruise / boost'],
   ['+ / −', 'adjust throttle near airports'],
   ['Space / B', 'hold wheel brakes / toggle parking brake'],
@@ -83,6 +86,8 @@ export function PauseMenu({ onExit }) {
   const open = !observing && !adventureOverlay && phase === 'paused';
   const still = GLASS_ON && open ? stillMotion() : false;
   const presence = usePresence(GLASS_ON && open, still ? 0 : GLASS_EXIT_MS);
+  const dialogRef = useRef(null);
+  useDialogFocus(dialogRef, open && !creditsOpen);
 
   // M from the pause menu goes straight to the Atlas — same key as in
   // flight, so muscle memory doesn't dead-end on the paused screen.
@@ -96,6 +101,7 @@ export function PauseMenu({ onExit }) {
   useEffect(() => {
     if (phase !== 'paused') return;
     const onKey = (e) => {
+      if (e.repeat || reservedKeyEvent(e) || editableTarget(e.target)) return;
       if (e.key !== 'm' && e.key !== 'M') return;
       const store = useFlyStore.getState();
       store.closeCredits();
@@ -117,6 +123,7 @@ export function PauseMenu({ onExit }) {
         mapStyle={mapStyle}
         aircraftId={aircraftId}
         isTouch={isTouch}
+        dialogRef={dialogRef}
       />
     );
   }
@@ -142,7 +149,7 @@ export function PauseMenu({ onExit }) {
       {creditsOpen ? (
         <CreditsPanel onClose={() => store.closeCredits()} />
       ) : (
-        <div className="pointer-events-auto my-auto w-72 rounded-xl border border-zinc-700/60 bg-zinc-900/90 p-4 text-zinc-100 shadow-2xl backdrop-blur">
+        <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Paused" className="pointer-events-auto my-auto w-72 rounded-xl border border-zinc-700/60 bg-zinc-900/90 p-4 text-zinc-100 shadow-2xl backdrop-blur">
           <h2 className="mb-3 text-center text-sm font-semibold uppercase tracking-widest text-zinc-400">
             Paused
           </h2>
@@ -231,7 +238,7 @@ const REVIEW_WARPS = [
  * windows and phones). Every testid, label and accessible name of the
  * pre-pass card is kept; only the arrangement and the finish change.
  */
-function GlassPause({ onExit, closing, still, creditsOpen, mapStyle, aircraftId, isTouch }) {
+function GlassPause({ onExit, closing, still, creditsOpen, mapStyle, aircraftId, isTouch, dialogRef }) {
   const store = useFlyStore.getState();
   // Read, never subscribe (as the classic card): mounted only while paused.
   const totalSpots = usePassportStore.getState().stats.totalSpotted ?? 0;
@@ -245,7 +252,7 @@ function GlassPause({ onExit, closing, still, creditsOpen, mapStyle, aircraftId,
       {creditsOpen ? (
         <CreditsPanel onClose={() => store.closeCredits()} />
       ) : (
-        <div className="lg-panel lg-pause lg-enter" role="dialog" aria-modal="true" aria-labelledby="lg-pause-title">
+        <div ref={dialogRef} tabIndex={-1} className="lg-panel lg-pause lg-enter" role="dialog" aria-modal="true" aria-labelledby="lg-pause-title">
           <header className="lg-pause-head">
             <div>
               <h2 className="lg-title" id="lg-pause-title">

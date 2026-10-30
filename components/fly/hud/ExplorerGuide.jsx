@@ -13,7 +13,7 @@ import { worldReadiness, retryWorldContent } from '@/lib/fly/world-readiness';
 import { CALM, CALM_CFG, createNoticeLane, publishNotice, sceneryTrouble, wakeHud } from './calm-hud';
 
 const STEPS=[
-  ['Welcome to Skyloom','Steer gently with the mouse, arrow keys, or the touch stick. Return to the centre to level out.'],
+  ['Welcome to Skyloom','Steer gently with the mouse, arrow keys, or the touch stick. On a laptop, choose Keyboard / trackpad in Settings to keep the cursor free.'],
   ['Take your time','Choose Slow for sightseeing or Cruise to cover ground. Near a runway, use the power slider or + / − instead.'],
   ['Choose a horizon','Open the Atlas with M or the compass. Pick a city, a scenic place, or a nearby airport.'],
   ['Keep a memory','Open Photo with P or the touch actions. Compose your view, then use the shutter to download it.'],
