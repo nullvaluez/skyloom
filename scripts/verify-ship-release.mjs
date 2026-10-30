@@ -411,5 +411,72 @@ console.log('SHIP PASS RELEASE gate (verify-ship-release)\n');
       /shipPassOn\('DEEP_LINKS'\) && flightPlanOn\(\) && env\.title === undefined && !titleBypassPinned\(\)/.test(spawn));
 }
 
+// === N  RL-6 analytics =========================================================
+{
+  console.log('\n[N] Analytics (ANALYTICS_V2)');
+  register(pathToFileURL(path.join(ROOT, 'scripts/_node-resolve.mjs')));
+  const A = await import(pathToFileURL(path.join(ROOT, 'lib/fly/analytics.js')).href);
+  const S = A.sanitizeEvent;
+  gate('N1 unknown events are dropped', [S('page_view', {}), S('__proto__', {}), S('constructor'), S(null), S('Session_Start', {}), S('$pageview', {})].every((x) => x === null));
+  const rows = [
+    ['mode_entered', { mode: 'free', extra: 1, lat: 40.7 }, { mode: 'free' }],
+    ['mode_entered', { mode: 'free flight over my house' }, {}],
+    ['deep_link_opened', { kind: '<script>' }, {}],
+    ['deep_link_opened', { kind: 'invalid' }, { kind: 'invalid' }],
+    ['link_copied', { kind: 'watch', url: 'https://x/?watch=KJFK' }, { kind: 'watch' }],
+    ['challenge_toggled', { on: 'yes' }, {}],
+    ['challenge_toggled', { on: true }, { on: true }],
+    ['client_error', { kind: 'boundary', message: 'TypeError at secret.js', stack: 'x' }, { kind: 'boundary' }],
+    ['client_error', { kind: 'oops' }, {}],
+    ['perf_summary', { p95_bucket: '<=16.7', stalls_per_min: 1.234, rung: 'ultra-balanced' }, { p95_bucket: '<=16.7', stalls_per_min: 1.2, rung: 'ultra-balanced' }],
+    ['perf_summary', { p95_bucket: 'a b c', stalls_per_min: Infinity, rung: 'x'.repeat(40) }, {}],
+    ['session_end', { minutes_by_mode: { free: 12.34, watch: 3, hacker: 9, title: -1 }, preset: 'ultra', device_class: 'dgpu', userAgent: 'x' }, { minutes_by_mode: { free: 12.3, watch: 3 }, preset: 'ultra', device_class: 'dgpu' }],
+    ['photo_taken', { hires: true, dataUrl: 'data:image/png;base64,AAA' }, { hires: true }],
+    ['lounge_movement_watched', { movement: 'arrival', hex: 'a1b2c3', callsign: 'DAL123' }, { movement: 'arrival' }],
+    ['adventure_completed', { adventureId: 'alpine-air', medal: 3, location: [1, 2] }, { adventureId: 'alpine-air', medal: 3 }],
+    ['pack_interest', { packId: 'wild-earth', answer: 'maybe' }, { packId: 'wild-earth', answer: 'maybe' }],
+  ];
+  const wrong = rows.filter(([e, p, want]) => JSON.stringify(S(e, p)?.properties) !== JSON.stringify(want)).map(([e, p]) => `${e} ${JSON.stringify(S(e, p))}`);
+  gate(`N2 unknown fields, free text and out-of-schema values are dropped (${rows.length} cases)`, wrong.length === 0, wrong.join(' | '));
+  const names = Object.keys(A.SCHEMA);
+  const spec = ['session_start', 'mode_entered', 'session_end', 'lounge_movement_watched', 'photo_taken', 'deep_link_opened', 'link_copied', 'challenge_toggled', 'perf_summary', 'client_error'];
+  const legacy = ['adventure_started', 'adventure_checkpoint', 'adventure_completed', 'adventure_retried', 'reward_claimed', 'return_visit', 'pack_interest'];
+  gate('N3 the schema is exactly the RL-6 events plus the pre-pass adventure events', JSON.stringify([...names].sort()) === JSON.stringify([...spec, ...legacy].sort()), names.join(','));
+  const w = A.sanitizeWire({ event: 'mode_entered', properties: { mode: 'watch', distinct_id: 'abc', $current_url: 'https://x/?at=1,2', $referrer: 'r', $ip: '1.2.3.4', token: 't' }, timestamp: 1, uuid: 'u' });
+  gate('N4 before_send keeps only schema fields and the SDK identity keys (no URL, referrer or IP), GeoIP off',
+    JSON.stringify(Object.keys(w.properties).sort()) === JSON.stringify(['$geoip_disable', 'distinct_id', 'mode', 'token']) && w.properties.$geoip_disable === true && A.sanitizeWire({ event: '$pageview', properties: {} }) === null,
+    JSON.stringify(w.properties));
+  // Consent and flag, each arm in its own process (a flag resolves once).
+  const armA = (flag, consent, key) => {
+    const code = `
+      import { register } from 'node:module';
+      register(${JSON.stringify(pathToFileURL(path.join(ROOT, 'scripts/_node-resolve.mjs')).href)});
+      const store = new Map(${JSON.stringify(consent ? [['fly-analytics-consent', consent]] : [])});
+      globalThis.window = { __flyAnalyticsV2Override: { enabled: ${flag} }, localStorage: { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, String(v)) } };
+      const A = await import(${JSON.stringify(pathToFileURL(path.join(ROOT, 'lib/fly/analytics.js')).href)});
+      for (let i = 0; i < 40; i++) { A.track('mode_entered', { mode: 'free' }); A.track('client_error', { kind: 'boundary' }); }
+      await new Promise((r) => setTimeout(r, 50));
+      process.stdout.write(JSON.stringify(A.analyticsState()));`;
+    const r = spawnSync(process.execPath, ['--input-type=module', '-e', code], { encoding: 'utf8', env: { ...process.env, NODE_NO_WARNINGS: '1', ...(key ? { NEXT_PUBLIC_POSTHOG_KEY: 'phc_test', NEXT_PUBLIC_POSTHOG_HOST: 'http://127.0.0.1:9' } : { NEXT_PUBLIC_POSTHOG_KEY: '', NEXT_PUBLIC_POSTHOG_HOST: '' }) } });
+    try { return JSON.parse(r.stdout); } catch { return { error: (r.stderr || '').slice(-300) }; }
+  };
+  const never = armA(true, null, true);
+  const no = armA(true, 'no', true);
+  const off = armA(false, 'yes', true);
+  const yes = armA(true, 'yes', true);
+  gate('N5 without consent (never asked, or "no"), 80 track() calls load nothing and queue nothing — the SDK is never imported',
+    never.loading === false && never.client === false && never.queued === 0 && no.loading === false && no.queued === 0, JSON.stringify({ never, no }));
+  gate('N6 flag off: track() is the W0 no-op even with consent', off.loading === false && off.queued === 0 && off.on === false, JSON.stringify(off));
+  gate('N7 with consent and a configured key, the existing posthog-js integration is what loads (positive control)', yes.loading === true && yes.consent === 'yes', JSON.stringify(yes));
+  const src = read('lib/fly/analytics.js');
+  const trackBody = src.slice(src.indexOf('export function track('));
+  gate('N8 track() checks the flag and consent before sanitizing, queueing or connecting', /if \(!analyticsV2On\(\) \|\| analyticsConsent\(\) !== 'yes'\) return;/.test(trackBody) && trackBody.indexOf("analyticsConsent() !== 'yes'") < trackBody.indexOf('connect()'));
+  const aa = read('lib/fly/adventure-analytics.js');
+  gate('N9 adventure-analytics is a thin wrapper under the flag (the pre-pass bodies stand with it off)',
+    /if\(analyticsV2On\(\)\)return track\(event,data\);/.test(aa) && /if\(analyticsV2On\(\)\)return setConsent\(!!value\);/.test(aa) && aa.includes("const ALLOWED = new Set(['adventure_started'"));
+  const adv = read('components/fly/hud/AdventureExperience.jsx');
+  gate('N10 pack_interest is emitted from the Wild Earth debrief', /trackAdventure\('pack_interest',\{packId:'wild-earth',answer:value\}\)/.test(adv) && /route\.packId==='wild-earth'&&progress\.interest==null&&<PackInterest\/>/.test(adv));
+}
+
 console.log(`\nverify-ship-release: ${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

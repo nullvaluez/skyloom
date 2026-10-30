@@ -7,6 +7,7 @@ import { PREFERENCES_KEY, explorerPreferences } from '@/lib/fly/explorer-prefere
 import { EXPLORATION_KEY } from '@/lib/fly/exploration.mjs';
 import { createBackup, parseBackup, restoreBackup, recoveryBackup, RECOVERY_KEY } from '@/lib/fly/save-backup.mjs';
 import { analyticsEnabled, setAnalyticsConsent } from '@/lib/fly/adventure-analytics';
+import { analyticsV2On } from '@/lib/fly/analytics';
 import { usePassportStore } from '@/stores/passport-store';
 import { useFlyAtlasStore } from '@/stores/fly-atlas-store';
 import { useFlyContractsStore } from '@/stores/fly-contracts-store';
@@ -38,7 +39,8 @@ export function GuestSaveControls(){
     {hasRecovery&&<button onClick={()=>{try{setPending(recoveryBackup(localStorage));setMessage('Review the recovery before restoring.');}catch(error){setMessage(error.message);}}}>Recover previous save</button>}
     {pending&&<div role="alert"><p>Restore {Object.keys(pending.data).length} progress records? Matching local records will be replaced. A recovery copy is saved first.</p><div className="journey-actions"><button onClick={restore}>Restore and reload</button><button onClick={()=>setPending(null)}>Cancel</button></div></div>}
     {message&&<p role="status">{message}</p>}
-    <label className="journey-consent"><input type="checkbox" checked={consent} onChange={e=>{setConsent(e.target.checked);setAnalyticsConsent(e.target.checked);}}/><span>Share optional adventure usage to improve Skyloom</span></label>
-    <p>No photos or flight locations. No session recordings. Play works with this off.</p>
+    {/* SHIP PASS RL-6 (ANALYTICS_V2 on): the same checkbox is the one consent for usage and error reports. */}
+    <label className="journey-consent"><input type="checkbox" data-testid="settings-analytics-consent" checked={consent} onChange={e=>{setConsent(e.target.checked);setAnalyticsConsent(e.target.checked);}}/><span>{analyticsV2On()?'Share anonymous usage and error reports to improve Skyloom':'Share optional adventure usage to improve Skyloom'}</span></label>
+    <p>{analyticsV2On()?'Modes, smoothness and crash kinds only. No photos, locations, aircraft or session recordings. Play works with this off.':'No photos or flight locations. No session recordings. Play works with this off.'}</p>
   </section>;
 }

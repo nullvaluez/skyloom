@@ -143,6 +143,8 @@ const initialState = {
   // SHIP PASS FRAME fields begin
   // SHIP PASS FRAME fields end
   // SHIP PASS RELEASE fields begin
+  // RL-6 (ANALYTICS_V2): the first-run consent prompt is up (non-blocking).
+  consentPrompt: false,
   // SHIP PASS RELEASE fields end
 };
 
@@ -256,6 +258,7 @@ export const useFlyStore = create(
     // SHIP PASS FRAME setters begin
     // SHIP PASS FRAME setters end
     // SHIP PASS RELEASE setters begin
+    setConsentPrompt: (consentPrompt) => set({ consentPrompt: !!consentPrompt }),
     // SHIP PASS RELEASE setters end
 
     addTileStats: (requested = 0, evicted = 0) =>

@@ -1,6 +1,8 @@
 'use client';
 
 import { Component } from 'react';
+// SHIP PASS RL-6: opt-in error telemetry (a no-op without consent or with ANALYTICS_V2 off).
+import { track } from '@/lib/fly/analytics';
 
 /**
  * Catches render/WebGL errors inside the game (context loss, shader compile
@@ -17,6 +19,7 @@ export class FlyErrorBoundary extends Component {
 
   componentDidCatch(error, errorInfo) {
     console.error('Fly mode error:', error, errorInfo);
+    track('client_error', { kind: 'boundary' }); // the kind only: no message, stack or URL leaves
   }
 
   handleRetry = () => {

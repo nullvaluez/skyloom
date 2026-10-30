@@ -72,6 +72,10 @@ async function ready(){for(let i=0;i<120;i++){try{if((await fetch(base)).ok)retu
   renderer=await page.evaluate(()=>{const g=document.createElement('canvas').getContext('webgl2');const e=g?.getExtension('WEBGL_debug_renderer_info');const name=e?g.getParameter(e.UNMASKED_RENDERER_WEBGL):'unknown';g?.getExtension('WEBGL_lose_context')?.loseContext();return name;});
   console.log('Renderer',renderer);
   software=process.env.BETA_TRUSTED_INPUT!=='1'&&/SwiftShader|llvmpipe|softpipe|Software/i.test(renderer);console.log('Input',software?'DOM presses (software GL)':'trusted');
+  // Software GL also blocks the page's main thread for minutes at a time while
+  // it links first-use programs (measured here: a locator.evaluate on a visible
+  // button sat 90 s). Waits get the room; no check is relaxed.
+  if(software)page.setDefaultTimeout(Number(process.env.BETA_SOFTWARE_TIMEOUT_MS||300000));
   check('production title offers destination discovery',await page.getByTestId('title-explore').isVisible());
   await press(page.getByTestId('title-settings'));
   check('settings keep weather and time live without condition presets',await page.getByTestId('conditions-panel').count()===0);
@@ -111,7 +115,7 @@ async function ready(){for(let i=0;i<120;i++){try{if((await fetch(base)).ok)retu
   await press(page.getByTestId('hangar-back'));
   await press(page.getByTestId('title-explore'));
   await press(page.getByTestId('hangar-fly'));
-  await page.getByTestId('explorer-guide').waitFor({timeout:90000});
+  await page.getByTestId('explorer-guide').waitFor({timeout:software?300000:90000});
   check('first flight starts with skippable guidance',await page.getByRole('button',{name:'Skip tips',exact:true}).isVisible());
   await press(page.getByRole('button',{name:'Skip tips',exact:true}));
   await page.waitForFunction(()=>window.__fly?.worldLoading!==true&&window.__flyBoot?.pct===100);
@@ -145,7 +149,7 @@ async function ready(){for(let i=0;i<120;i++){try{if((await fetch(base)).ok)retu
   check('successful photograph appears in the journal',await page.locator('.explorer-photos figure').count()===1);
   await page.screenshot({path:path.join(OUT,'memory-journal.png'),timeout:30000});await key(page,'Escape');
   await context.route('**/api/aircraft?**',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ac:[],availability:'unavailable',error:'offline'})}));
-  await page.getByText('Live traffic is unavailable. You can keep exploring.',{exact:true}).waitFor({timeout:60000});
+  await page.getByText('Live traffic is unavailable. You can keep exploring.',{exact:true}).waitFor({timeout:software?300000:60000});
   check('feed loss leaves exploration available',await page.getByTestId('title-screen').count()===0);
   await page.evaluate(()=>{const gl=[...document.querySelectorAll('canvas')].map(c=>c.getContext('webgl2')).find(Boolean);window.__betaContext=gl.getExtension('WEBGL_lose_context');if(!window.__betaContext)throw Error('Context-loss extension missing');window.__betaContext.loseContext();});
   await page.getByRole('alertdialog',{name:'Graphics recovery'}).waitFor();
@@ -155,7 +159,7 @@ async function ready(){for(let i=0;i<120;i++){try{if((await fetch(base)).ok)retu
   await context.close();
   const phone=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:1});await attachFixture(phone);
   await phone.addInitScript(pin=>{window.__flyTileFixture=pin;localStorage.setItem('fly-quality-tier','low');Object.defineProperty(navigator,'webdriver',{get:()=>false});},fixturePin(fixture.url));
-  const p=await phone.newPage();p.setDefaultTimeout(90000);p.on('pageerror',e=>errors.push(e.message));await p.goto(base+'/'+(flags?'?flags='+encodeURIComponent(flags):''),{waitUntil:'domcontentloaded'});await p.getByTestId('title-explore').waitFor({timeout:60000});
+  const p=await phone.newPage();p.setDefaultTimeout(software?Number(process.env.BETA_SOFTWARE_TIMEOUT_MS||300000):90000);p.on('pageerror',e=>errors.push(e.message));await p.goto(base+'/'+(flags?'?flags='+encodeURIComponent(flags):''),{waitUntil:'domcontentloaded'});await p.getByTestId('title-explore').waitFor({timeout:software?300000:60000});
   check('phone viewport title has no horizontal overflow',await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
   await press(p.getByTestId('title-settings'));await p.getByLabel('Steering sensitivity',{exact:true}).waitFor();
   check('phone settings have no manual condition controls',await p.getByTestId('conditions-panel').count()===0);

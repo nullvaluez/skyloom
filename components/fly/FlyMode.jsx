@@ -78,6 +78,8 @@ import { ENCOUNTER_FEEL_ACTIVE } from '@/lib/fly/play-pass';
 // Aliased: FRAME's block may import shipPassOn too (one module, no duplicate binding).
 import { shipPassOn as releaseFlagOn } from '@/lib/fly/ship-pass';
 import { DeepLinkHost } from './hud/DeepLinkHost';
+import { ReleaseAnalytics } from './hud/ReleaseAnalytics';
+import { ConsentPrompt } from './hud/ConsentPrompt';
 // SHIP PASS RELEASE imports end
 
 // SHIP PASS FRAME imports begin
@@ -435,6 +437,8 @@ export function FlyMode({ onClose }) {
       {/* SHIP PASS (FLY_SHIP_PASS.md section 7): one block per stream. */}
       {/* SHIP PASS RELEASE mounts begin */}
       {releaseFlagOn('DEEP_LINKS') && <DeepLinkHost runtime={runtime} />}
+      <ReleaseAnalytics runtime={runtime} />
+      {releaseFlagOn('ANALYTICS_V2') && <ConsentPrompt />}
       {/* SHIP PASS RELEASE mounts end */}
       {/* SHIP PASS FRAME mounts begin */}
       {/* SHIP PASS FRAME mounts end */}
