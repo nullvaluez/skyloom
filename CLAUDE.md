@@ -7,6 +7,19 @@
 >   Enhanced Satellite is the default on every device
 >   (`VISUALS.defaultProfile:'enhanced'`), and `R25_SKY` / `R25_GROUND` ship
 >   `enabled:true`.
+> - **Ship Pass (2026-10-30, PLANNED, W0 not started, owner-requested):**
+>   [FLY_SHIP_PASS.md](FLY_SHIP_PASS.md) is the gap analysis (about 115 gaps
+>   with evidence), the owner's 16 decisions and the requirements for a
+>   five-agent polish and certify pass, run locally on the owner's RTX 5080:
+>   FRAME (first-minute stalls, 30 Hz pacing, one budget table, device
+>   policy), SKY (grey veil, real moon, Medium/phone sky), CITY (city to about
+>   4,500 m, phone night lights), LIGHT (terrain, traffic and aircraft shadows,
+>   hi-res photos), RELEASE (CI green, calm-by-default Challenge layer, deep
+>   links, analytics consent, offline shell, one look). Flags are read only
+>   through `lib/fly/ship-pass.js`, seeded off in W0, and each turns ON after
+>   its own 5080 motion check. Section 3 holds the rules, section 7 the seam
+>   blocks, and section 11 the backlog (Takeoff & Landing, the meta loop and
+>   content come next).
 > - **Play Pass (2026-10-21, BUILT, pushed to `origin/main` 2026-10-22, owner-requested):**
 >   [FLY_PLAY_PASS.md](FLY_PLAY_PASS.md) is the review, plan and record — Free
 >   Flight and Watch an Airport made worth playing: a calm HUD (`CALM_HUD`),
