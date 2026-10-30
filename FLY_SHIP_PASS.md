@@ -1001,6 +1001,23 @@ shared heavy lock; its rows land here when it completes**; CITY's arms read
 "pending merged tree" on this branch and the lead re-runs the harness on the
 merged tree.
 
+**SK-4 cost table (SKY_LITE on; structural rows are gated, GPU ms is the
+owner's).**
+
+| Device (policy class / tier) | SKY_LITE | Aerial reach | Far cloud deck | Draws / passes / targets / programs | GPU ms |
+|---|---|---|---|---|---|
+| phone, any tier | on | 160 km volume, continued past it (`uPskyAp.z = 1`) | none → 90 km, one sample (`cloudReach` 0.5) | +0 / +0 / +0 / +0 (the edits replace the default texts for the page load) | owner: iPhone device report at Medium and High, `?flags=SKY_LITE` vs default |
+| tablet, any tier | on | 160 km, continued | none → 90 km (the phone cinema profile) | +0 | owner (emulation only, D7) |
+| desktop Medium (dGPU / iGPU) | on | 250 km, continued | 90 km (unchanged) | +0 | owner: 5080 at Medium |
+| desktop High / Ultra | off (policy) | 450 km clamp (unchanged) | 180 km (unchanged) | +0 | — |
+| software (SwiftShader) | Medium / Low only | as Medium | as its profile | +0 | — |
+
+Per pixel, the reach edit is a uniform branch plus three `pow` and a few
+ALU ops on pixels beyond the volume's last slice only; the far deck on a
+phone costs what Medium's already does per cloud-resolution pixel (one shell
+intersection, one density sample, one light estimate). The 0.6 ms row of the
+policy budget is the owner's to read on the iPhone (run list, iPhone step 10).
+
 **Flags.** `AERIAL_CLARITY`, `REAL_MOON`, `SKY_LITE`: `enabled:false` (look
 flags; section 3.8 — the owner flips each after the 5080 motion bar).
 `REAL_MOON` tunables live in its block (`floorK`, `horizonBandDeg`,
