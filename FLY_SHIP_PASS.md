@@ -1158,22 +1158,28 @@ dissolves at 4,500-5,000 m) and `verify-sat-buildings` (C-ii) is unaffected
 
 **Contract requests.** None yet.
 
-**Venue (browser runs).** The first SK-1 attempt (SKY's own harness copied
-read-only, 07:29-07:45 UTC) showed that the city does not land on the fixture
-under SwiftShader inside SKY's 3 x 150 s settle (`worldLoading` true,
-streamers busy after 442 s; the still had the ESB model and no blocks), so
-the probe now waits on the city streamers themselves (bounded) before each
-capture. From about 08:22 UTC the shared heavy lock was held by an orphaned
-`next-server` (PID 28356, cwd `/home/user/skyloom-release`, port 3135, left
-running after RELEASE's session1 ended; it inherited the lock fd because that
-session's flock ran without `-o`), so every stream's browser session waited
-behind it; CITY's request to stop it was refused by its permission check and
-the lead was told. CITY's queued sessions (`.graphics-review/ship-pass/city/`
-`chain.sh`, one waiter at a time, `flock -o`): s2 veil 10,000 / 8,500 ft; s3
-phone day census off vs CITY_RANGE plus the phone night all-flags still;
-s4 phone night off still, desktop night all flags, desktop day CITY_RANGE
-census; s5 `verify-sat-buildings`; s6 `verify-sat-night`; s7 desktop day off
-census plus `verify-skyline`; s8 veil 7,500 / 6,000 / 5,000 ft.
+**Venue (browser runs; every number fixture/SwiftShader, 3.8).** Earlier
+sessions (07:29-09:40 UTC) produced no result: SKY's harness copy lost its page
+after the 5,000 ft baseline, then an orphaned RELEASE `next-server` held the
+heavy lock from ~08:22, and CITY's queued chain never acquired it. Session s3
+(12:58-13:23 UTC, `next dev` on a source snapshot of `af3b588`, phone emulation
+844x390, `cls=phone`, tier Low as the phone resolves): **smoke PASS, zero page
+errors and zero shader errors** with all flags off (day, 900 m and 2,438 m) and
+with `?flags=CITY_RANGE,NIGHT_LITE,NIGHT_RHYTHM` (night, 900 m, 2,438 m and
+3,000 m). NIGHT_LITE mounted and placed 26-27 pools out to 52-54 km (reach
+60 km); per-layer census, phone, all flags off, day: 138 draws at 900 m (map
+83, aux/shadow 15, post 9, roads 7; the building ring not yet resident) and
+199 at 2,438 m (map 127, aux 15, roads 11, post 9, `sat-buildings` 7 for 5
+resident chunks, `sat-skyline` 3). The s3 night still pair captured the HUD's
+tips card and toasts (11 % of pixels moved over 60 s), so the probe now hides
+the DOM overlays, the player rig and the traffic instances before a still pair
+(`dd41247`), and both probes exited only at their timeouts (fixed in the same
+commit). Queued (`chain2.sh`, one locked session at a time): s8 phone day
+CITY_RANGE census + phone night still pair off/on; s9 desktop night still pair
+off/on + desktop day census off/CITY_RANGE at 2,438 / 4,300 m; s10
+`verify-sat-buildings` + `verify-skyline`; s11 `verify-sat-night`; s12 the
+SK-1 veil arms at 10,000 / 8,500 ft (where the city's share is non-zero by
+construction).
 
 **Known issues.** In this venue the device policy classes SwiftShader as
 `software`, which CITY_RANGE refuses; the probe uses the harness pin
