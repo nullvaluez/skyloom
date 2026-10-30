@@ -24,16 +24,19 @@ const delay=ms=>new Promise(r=>setTimeout(r,ms));
   },fixturePin(fixture.url));
   page=await context.newPage();page.on('pageerror',e=>report.errors.push(e.message));
   await page.goto(base+'/?graphicsReview=1',{waitUntil:'domcontentloaded'});
-  await page.waitForFunction(()=>window.__fly?.engine&&window.__flyComposer?.renderer,{},{timeout:90000});
+  await page.waitForFunction(()=>window.__fly?.engine&&window.__flyComposer?.renderer,{},{timeout:90000,polling:1000});
   // Test both a saved-Ultra boot and returning to it after lower presets.
   for(const preset of ['ultra','high','low','ultra']){
    await page.evaluate(value=>window.__flyStore.getState().setQualityPreset(value),preset);
-   await page.waitForFunction(value=>window.__fly.cinemaProfile?.name===value,preset,{timeout:30000});
+   // Interval polling, not rAF: on software GL a heavy Ultra frame can starve
+   // rAF for longer than the old 30 s while the profile is already resolved
+   // (measured: the probe read the target profile at once, the rAF poll timed out).
+   await page.waitForFunction(value=>window.__fly.cinemaProfile?.name===value,preset,{timeout:90000,polling:1000});
    await page.waitForFunction(()=>{
     const renderer=window.__flyComposer.renderer;let ready=0;
     window.__fly.engine.forEachTileMaterial(m=>{if(m.userData.__r25Ground&&renderer.properties.get(m).currentProgram)ready++;});
     return ready>0;
-   },{},{timeout:90000});
+   },{},{timeout:90000,polling:1000});
    await delay(2000);
    const state=await page.evaluate(()=>{
     const r=window.__fly,renderer=window.__flyComposer.renderer,gl=renderer.getContext();

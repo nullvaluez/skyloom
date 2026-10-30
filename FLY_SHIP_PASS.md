@@ -768,6 +768,12 @@ request and is superseded by the merge commit that turns them on.
   existing context-loss-safe `compileSceneAsync`, keeping three's contract.
   Re-run locally after the fix, `smoke:beta` passes every check, ending
   with "production browser has no uncaught errors []".
+- `smoke:ultra` (CI's last step, never reached before) passes locally with
+  every flag on. All four stages (Ultra → High → Low → Ultra) link their
+  terrain programs, Ultra keeps three cascades, and there are no page errors.
+  Its waits now poll on an interval: with every look flag on, a SwiftShader
+  frame can starve `requestAnimationFrame` past the old 30 s while the profile
+  is already resolved.
 - Gate re-premise notes for the owner:
   - DEVICE_POLICY on also enables FR-13's dynamic near plane on renderers
     without reversed depth (no iPhone report yet), and runs the boot
