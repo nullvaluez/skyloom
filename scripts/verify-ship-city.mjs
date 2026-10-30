@@ -190,6 +190,18 @@ async function childLogic(windowJSON) {
     return 1 - t * t * (3 - 2 * t);
   };
   out.fadeSame = [0, 1000, 2400, 2401, 2550.5, 2700, 2999, 3000, 3100, 9000].every((a) => Object.is(CR.bandFade(CR.buildingBand(null, {}), a), legacy(a)));
+  // the per-frame memo: same object while nothing changes; a pin edited in place is seen
+  {
+    const w = { __flyCityDiag: { fadeStartM: 1000, fadeEndM: 2000 } };
+    const memo = CR.makeBandMemo();
+    const a = memo(null, w);
+    const b = memo(null, w);
+    w.__flyCityDiag.fadeEndM = 2500;
+    const c = memo(null, w);
+    delete w.__flyCityDiag;
+    const d = memo(null, w);
+    out.memo = { same: a === b, edited: c !== b && c.fadeEndM === 2500, cleared: d.source === 'shipped' };
+  }
   // the lite LOD switch (architecture-draw-range.js)
   const DR = await import(pathToFileURL(path.join(ROOT, 'lib/fly/architecture-draw-range.js')).href);
   out.liteDefault = DR.architectureLiteOn();
@@ -443,6 +455,7 @@ async function main() {
     check('CT-2 flag off: cityRangeFor() is null on every class and tier', Object.values(off.range).every((r) => r === null));
     check('CT-2 flag off: the skyline request is the SAME object (verify-true-areas (7) text kept)', off.requestSame === true && off.requestOn === 'same');
     check('CT-2 the lite LOD switch is off by default and only the engine sets it', off.liteDefault === false && off.liteSet === true);
+    check('CT-1 the engines\' per-frame band is memoised (no allocation) and still sees a pin edited in place or cleared', off.memo.same && off.memo.edited && off.memo.cleared, JSON.stringify(off.memo));
   }
   {
     const bad = runChild(['--child=logic', JSON.stringify({ __flyCityDiag: { fadeStartM: 5000, fadeEndM: 4000, skylinePremix: 2 } })]);
