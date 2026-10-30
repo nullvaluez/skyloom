@@ -305,6 +305,33 @@ const DEG = Math.PI / 180;
     const why = e.sun > today.sun + 1e-12 ? 'key above today' : g < floorLuma - 1e-9 ? `ground ${g} under the floor ${floorLuma}` : g > ground(today) + 1e-9 ? 'ground above today' : m.altDeg < band[0] && (e.sun !== 0 || e.moonW !== 0) ? 'set moon keeps a key or a disc' : e.exposureStops < today.exposureStops - 1e-12 ? 'exposure closed' : '';
     if (why && nightOk) { nightOk = false; nightWhy = `${lat},${lon} ${new Date(t).toISOString()}: ${why}`; }
   }
+  // The terminator the composite draws (a CPU mirror of night-sky.js
+  // shipMoonPhase: the disc's sphere normal in its own tangent frame, lit by
+  // the true sun) must light the disc's REAL fraction: integrate it over the
+  // disc for every reference date with the moon up and compare with illum.
+  {
+    const norm = (v) => { const l = Math.hypot(...v) || 1; return v.map((x) => x / l); };
+    const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+    let worst = 0, n = 0;
+    for (const [, lat, lon, utc] of HORIZONS) {
+      const t = Date.parse(utc), s = SM.computeSun(lon, lat, t, true);
+      const moonDir = SM.moonDirFromSun(s.az, [0, 0, 0], true), m = SM.moonEphemeris(t, lat, lon);
+      if (m.altDeg < C.REAL_MOON.minKeyElDeg + 0.5) continue; // the disc is hidden there (vis), and the key direction clamped
+      const ce = Math.sqrt(Math.max(0, 1 - s.sinEl * s.sinEl)), sun = [-Math.sin(s.az) * ce, s.sinEl, Math.cos(s.az) * ce];
+      const tt = norm(cross(moonDir, [0.0001, 1, 0])), bb = cross(tt, moonDir);
+      let lit = 0, cnt = 0;
+      for (let i = -40; i <= 40; i++) for (let j = -40; j <= 40; j++) {
+        const x = i / 40, y = j / 40, r2 = x * x + y * y;
+        if (r2 > 1) continue;
+        const nn = [0, 1, 2].map((k) => tt[k] * x + bb[k] * y - moonDir[k] * Math.sqrt(1 - r2));
+        const d = nn[0] * sun[0] + nn[1] * sun[1] + nn[2] * sun[2];
+        lit += d > 0 ? 1 : 0; cnt++;
+      }
+      worst = Math.max(worst, Math.abs(lit / cnt - m.illum)); n++;
+    }
+    row('SK-3 (o) the terminator the composite draws (CPU mirror of shipMoonPhase, true sun on the ephemeris moon) lights the disc\'s real fraction within 3%',
+      n >= 10 && worst <= 0.03, `${n} moon-up dates, worst ${(worst * 100).toFixed(2)}%`);
+  }
   row('SK-3 (m) REAL_MOON on, deep night: key <= today\'s full moon, ground light >= the floor, no key or disc once the moon has set, exposure only opens', nightOk && sawSet > 5 && sawUp > 5, nightWhy || `${sawUp} moon-up and ${sawSet} moon-set nights checked; floor ground ${floorLuma.toFixed(4)} vs today ${ground(today).toFixed(4)}`);
 }
 
