@@ -969,37 +969,22 @@ Severity and effort are the auditors' estimates. "Where" names the requirement t
 ### LIGHT
 
 <!-- SHIP PASS LIGHT report begin -->
-**Status (2026-10-30, cloud venue, IN PROGRESS):** LT-2..LT-7 built and
-node-gated; browser smokes (fixture, SwiftShader) next; LT-1 review in
-progress. Every LIGHT flag is `enabled:false` (look flags wait for the owner's
-RTX 5080 motion bar, FLY_SHIP_PASS.md 3.8; PHOTO_HIRES pending its browser gate).
+**Status (2026-10-30, cloud venue, IN PROGRESS — continuation after an API
+cutoff):** LT-2..LT-7 built and node-gated; browser smokes on the fixture
+(SwiftShader) running. Every LIGHT flag is `enabled:false` (look flags wait for
+the owner's RTX 5080 motion bar, FLY_SHIP_PASS.md 3.8; MOBILE_ENHANCED for the
+owner's iPhone glance; PHOTO_HIRES pending its browser gate and FRAME's touch
+maxScale). Full report follows when the browser batches land.
 
-| ID | State | What landed | Evidence |
-|---|---|---|---|
-| LT-1 | in progress | — | node gates verify-mobile-enhanced 6/6, verify-mobile-bloom 6/6 |
-| LT-2 | built, browser pending | `lib/fly/terrain-shadow.js` (desktop terrain-only ortho depth map, texel-snapped, policy rate 2 Hz; touch CPU horizon map from a wrapped `TerrainGroundQuery`, time-sliced), anchored patch in `earth-surface-material.js`, `components/fly/TerrainShadowRig.jsx` mounted from FlyScene's LIGHT block only with the flag on | `verify-ship-light` (0a)-(1m) |
-| LT-3 | built, browser pending | `lib/fly/traffic-shadows.js` driven from `detailed-traffic.js` (TrafficLayer untouched): casters through the fleet depth material, per-cascade cull and a per-frame (mesh, cascade) budget; contact blobs (1 draw) on Medium/touch | (3a)-(3i) |
-| LT-4 | built | `CinemaShadows.setAirframeFit` (cascade 0 pinned past the airframe, its normal bias in cascade-0 texels), `airframeShadowOn`; PlayerPlane LIGHT block toggles receiveShadow (a uniform: no recompile) | (4a)-(4f) |
-| LT-5 | built | `shadowReachConfig` reuses MOBILE_ENHANCED's AGL rule on Medium desktops (CinemaShadowRig) | (5a)-(5b) |
-| LT-6 | built, browser pending | `lib/fly/photo-hires.js` (`photoExportPlan`, `capturePhoto({scale}) -> Promise<Blob>`), PhotoCapture's one-frame supersampled render (tiled past GL limits), `holdGovernor('photo-hires')`, `track('photo_taken')`; the shutter asks `{scale:'auto'}` | (6a)-(6g) |
-| LT-7 | built | `hangar-stage.js` `liveryLuminance` / `hangarExposureScale` / `hangarReflectorResolution`; StageBay scales key/pool/rims/sun, Medium reflector halved | (7a)-(7d) |
-
-**Prewarm:** four LIGHT entries (patched earth, terrain depth, fleet caster +
-depth, contact blob) via `lib/fly/light-prewarm.js` (8a)-(8c).
-
-**Device gating:** every LIGHT feature asks `deviceFeature()` through
-`lib/fly/ship-light.js`. This venue's SwiftShader is class 'software', which
-the policy refuses, so harnesses pin `window.__flyLightDeviceClass`
-(passed as `ctx.cls`, the frozen API's own field).
-
-**Contract requests:** (FRAME) a general device-class pin in
-`device-policy.js` (this stream's `__flyLightDeviceClass` then retires);
-(FRAME) PHOTO_HIRES touch `maxScale` 3 — at 2 a 585x1266 phone buffer
-exports 2,532 px, short of LT-6's 2,560.
-
-**Gates:** `verify-ship-light` 51/51; seam rule PASS; verify-fleet-airframes,
-verify-attribution, verify-shadow-calm, verify-shadow-coverage,
-verify-mobile-enhanced, verify-mobile-bloom green.
+**So far this continuation:** `verify-cloud-silhouette-gpu` PASS on SwiftShader
+(Chrome is absent; run through a venue shim that drops `channel:'chrome'`);
+`lounge-pass-gates.mjs` PASS all 31; `ship-pass-gates` 32 PASS / 2 KNOWN-RED /
+0 FAIL, seam rule PASS; `verify-ship-light` 54/54. PHOTO_HIRES: phone 'auto'
+now aims at `touchScale` 2 and is raised only to `minLongPx` 2,560 where the
+policy allows; the hi-res path clears the 15 s request timeout once picked up.
+Harnesses set both `__flyLightDeviceClass` and FRAME's
+`__flyDeviceClassOverride`, and tolerate the desktop boot's hidden-first-canvas
+selector timeout (pre-existing; CITY hit it too).
 <!-- SHIP PASS LIGHT report end -->
 
 ### RELEASE

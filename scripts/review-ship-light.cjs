@@ -65,6 +65,26 @@ function loungeTraffic(t) {
     ],
   };
 }
+/**
+ * bootFly, tolerant of one venue defect: on desktop the fly root holds three
+ * canvases and `.fixed.inset-0 canvas` resolves to a hidden one first, so
+ * bootFly's visibility wait can time out AFTER the reveal (pct 100) with the
+ * world drawn (CITY's probe hit the same). Then: any visible canvas, the boot
+ * screen gone, the settle — exactly bootFly's tail.
+ */
+async function bootFlySafe(page, opts) {
+  try {
+    return await bootFly(page, opts);
+  } catch (e) {
+    if (!/fixed\.inset-0 canvas/.test(String(e.message))) throw e;
+    if ((await page.evaluate(() => window.__flyBoot?.pct)) !== 100) throw e;
+    await page.waitForFunction(() => [...document.querySelectorAll('canvas')].some((c) => { const r = c.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(c).visibility !== 'hidden'; }), undefined, { timeout: 60000 });
+    await page.waitForFunction(() => !document.querySelector('[data-testid="boot-screen"]'), undefined, { timeout: 60000 });
+    await page.waitForTimeout(opts.settleMs ?? 4000);
+    return { ms: null, tolerant: true };
+  }
+}
+
 const want = (args.arms || 'terrain-off,terrain-on').split(',').filter((a) => ARMS[a]);
 const report = { url: BOOT_URL, fixture: process.env.FLY_TILE_FIXTURE || null, physicalDevice: false, arms: [] };
 const save = () => fs.writeFileSync(path.join(OUT, 'report.json'), JSON.stringify(report, null, 2));
@@ -113,7 +133,7 @@ const SHADER_ERR = /Shader Error|WebGLProgram|shader|GL_INVALID|TERRAIN_SHADOW|C
         if (arm.lounge) {
           await page.route('**/api/aircraft?**', (route) => (inject ? route.fulfill({ status: 200, contentType: 'application/json', headers: { 'x-adsb-source': 'fixture' }, body: JSON.stringify(loungeTraffic(inject)) }) : route.fallback()));
         }
-        const boot = await bootFly(page, { style: 'satellite', url, geo: arm.geo, timeoutMs: 900000, settleMs: 4000 });
+        const boot = await bootFlySafe(page, { style: 'satellite', url, geo: arm.geo, timeoutMs: 900000, settleMs: 4000 });
         row.bootMs = boot.ms;
         if (arm.lounge) {
           await page.evaluate((id) => window.__fly.airportWatch.enter(id), arm.lounge);

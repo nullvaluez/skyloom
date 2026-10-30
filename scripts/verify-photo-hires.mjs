@@ -63,18 +63,40 @@ async function shoot(page, options, { forceMaxTexture } = {}) {
     canvas.addEventListener('webglcontextlost', onLost);
     const keepMax = renderer.capabilities.maxTextureSize;
     if (forceMaxTexture) renderer.capabilities.maxTextureSize = forceMaxTexture;
-    const before = { pr: renderer.getPixelRatio(), w: canvas.width, h: canvas.height, view: camera.view ? camera.view.enabled : null, proj: camera.projectionMatrix.elements.slice() };
+    const before = { pr: renderer.getPixelRatio(), w: canvas.width, h: canvas.height, view: camera.view ? camera.view.enabled : null };
+    // Every composer render while the photo is in flight, with the camera's
+    // projection and the canvas width it drew at: the hi-res renders are the
+    // ones at a different width, and the restore render right after them must
+    // carry exactly the projection of the frame render right before them (the
+    // same rAF task, so the camera cannot have moved in between).
+    const log = [];
+    const ownRender = Object.prototype.hasOwnProperty.call(composer, 'render') ? composer.render : null;
+    const render = composer.render;
+    composer.render = function (...a) {
+      log.push({ w: canvas.width, proj: camera.projectionMatrix.elements.slice() });
+      return render.apply(this, a);
+    };
     const t0 = performance.now();
     let res;
     try {
       res = options === undefined ? await fn() : await fn(options);
     } finally {
       renderer.capabilities.maxTextureSize = keepMax;
+      if (ownRender) composer.render = ownRender;
+      else delete composer.render;
     }
+    const hi = log.map((e, i) => (e.w !== before.w ? i : -1)).filter((i) => i >= 0);
+    const same = (a, b) => !!a && !!b && a.every((v, i) => Math.abs(v - b[i]) <= 1e-6 + 1e-6 * Math.abs(v));
+    const pre = hi.length ? log[hi[0] - 1] : null, post = hi.length ? log[hi[hi.length - 1] + 1] : null;
+    const restore = hi.length === 0 ? null : {
+      renders: hi.length,
+      restored: !!post && post.w === before.w && same(post.proj, pre?.proj),
+      tilesMoved: hi.some((i) => !same(log[i].proj, pre?.proj)),
+    };
     const ms = performance.now() - t0;
     // one more frame, then read the restored state
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-    const after = { pr: renderer.getPixelRatio(), w: canvas.width, h: canvas.height, view: camera.view ? camera.view.enabled : null, proj: camera.projectionMatrix.elements.slice(), buffer: [composer.inputBuffer.width, composer.inputBuffer.height] };
+    const after = { pr: renderer.getPixelRatio(), w: canvas.width, h: canvas.height, view: camera.view ? camera.view.enabled : null, buffer: [composer.inputBuffer.width, composer.inputBuffer.height] };
     canvas.removeEventListener('webglcontextlost', onLost);
     const buf = new Uint8Array(await res.blob.arrayBuffer());
     const be32 = (o) => ((buf[o] << 24) | (buf[o + 1] << 16) | (buf[o + 2] << 8) | buf[o + 3]) >>> 0;
@@ -101,6 +123,7 @@ async function shoot(page, options, { forceMaxTexture } = {}) {
       ms,
       before,
       after,
+      restore,
       lost: lost || gl.isContextLost(),
       bright,
       plate: [boxW, boxH],
@@ -109,6 +132,26 @@ async function shoot(page, options, { forceMaxTexture } = {}) {
       b64: btoa(b64),
     };
   }, { options, forceMaxTexture });
+}
+
+/**
+ * bootFly, tolerant of one venue defect: on desktop the fly root holds three
+ * canvases and `.fixed.inset-0 canvas` resolves to a hidden one first, so
+ * bootFly's visibility wait can time out AFTER the reveal (pct 100) with the
+ * world drawn (CITY's probe hit the same). Then: any visible canvas, the boot
+ * screen gone, the settle — exactly bootFly's tail.
+ */
+async function bootFlySafe(page, opts) {
+  try {
+    return await bootFly(page, opts);
+  } catch (e) {
+    if (!/fixed\.inset-0 canvas/.test(String(e.message))) throw e;
+    if ((await page.evaluate(() => window.__flyBoot?.pct)) !== 100) throw e;
+    await page.waitForFunction(() => [...document.querySelectorAll('canvas')].some((c) => { const r = c.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(c).visibility !== 'hidden'; }), undefined, { timeout: 60000 });
+    await page.waitForFunction(() => !document.querySelector('[data-testid="boot-screen"]'), undefined, { timeout: 60000 });
+    await page.waitForTimeout(opts.settleMs ?? 4000);
+    return { ms: null, tolerant: true };
+  }
 }
 
 const PNG = [137, 80, 78, 71, 13, 10, 26, 10];
@@ -150,7 +193,7 @@ try {
       window.__flySunOverride = Date.UTC(2026, 8, 27, 17);
     }, { cls, tier: phone ? 'medium' : 'high' });
     try {
-      await bootFly(page, { style: 'satellite', url: `${BOOT_URL}/${on ? '?flags=PHOTO_HIRES' : ''}`, geo: NYC, timeoutMs: 900000, settleMs: 4000 });
+      await bootFlySafe(page, { style: 'satellite', url: `${BOOT_URL}/${on ? '?flags=PHOTO_HIRES' : ''}`, geo: NYC, timeoutMs: 900000, settleMs: 4000 });
       await page.evaluate(() => window.__flyStore.getState().setCameraMode('photo'));
       await page.waitForTimeout(6000);
       const hires = await shoot(page, { scale: 'auto' });
@@ -176,17 +219,19 @@ try {
       check(`${label}: attribution plate burned in at the export's scale`, hires.bright >= 40 && (hires.stats?.watermark ?? true) === true, `${hires.bright} bright px in ${hires.plate.join('x')}`);
       check(`${label}: renderer, composer and camera restored; no context loss`,
         !hires.lost && hires.after.pr === hires.before.pr && hires.after.w === hires.before.w && hires.after.h === hires.before.h
-          && hires.after.buffer[0] === hires.before.w && hires.after.buffer[1] === hires.before.h && hires.after.view === hires.before.view,
-        JSON.stringify({ before: [hires.before.pr, hires.before.w, hires.before.h], after: [hires.after.pr, hires.after.w, hires.after.h], buffer: hires.after.buffer }));
+          && hires.after.buffer[0] === hires.before.w && hires.after.buffer[1] === hires.before.h && hires.after.view === hires.before.view
+          && (!on || hires.restore?.restored === true),
+        JSON.stringify({ before: [hires.before.pr, hires.before.w, hires.before.h], after: [hires.after.pr, hires.after.w, hires.after.h], buffer: hires.after.buffer, restore: hires.restore }));
       if (on) {
         const tiled = await shoot(page, { scale: 'auto' }, { forceMaxTexture: 2048 });
         fs.writeFileSync(path.join(OUT, `${arm}-tiled.png`), Buffer.from(tiled.b64, 'base64'));
         const tplan = photoExportPlan({ bufW: tiled.before.w, bufH: tiled.before.h, request: 'auto', budget: policy.budget, block: PHOTO_HIRES, limits: { ...tiled.limits, maxTexture: 2048 } });
         row.tiled = { export: [tiled.pngW, tiled.pngH], plan: tplan, ms: Math.round(tiled.ms) };
         check(`${label}: past MAX_TEXTURE_SIZE 2048 the tiled path (${tplan.tiles}x${tplan.tiles}) exports ${tplan.outW}x${tplan.outH}`,
-          tplan.tiles > 1 ? Math.abs(tiled.pngW - tplan.tileW * tplan.tiles) <= 4 && Math.abs(tiled.pngH - tplan.tileH * tplan.tiles) <= 4 && !tiled.lost && tiled.after.view === tiled.before.view && tiled.after.proj.every((v, i) => Math.abs(v - tiled.before.proj[i]) <= 1e-6 + 1e-4 * Math.abs(v))
+          tplan.tiles > 1 ? Math.abs(tiled.pngW - tplan.tileW * tplan.tiles) <= 4 && Math.abs(tiled.pngH - tplan.tileH * tplan.tiles) <= 4 && !tiled.lost && tiled.after.view === tiled.before.view
+              && tiled.restore?.restored === true && tiled.restore?.tilesMoved === true
             : tiled.pngW === tplan.outW,
-          `${tiled.pngW}x${tiled.pngH} in ${row.tiled.ms} ms`);
+          `${tiled.pngW}x${tiled.pngH} in ${row.tiled.ms} ms; ${JSON.stringify(tiled.restore)}`);
         const bare = await shoot(page, undefined);
         check(`${label}: a bare capture() (lounge, verify-photo) is still the drawing buffer`, bare.pngW === bare.before.w && bare.pngH === bare.before.h);
       }
