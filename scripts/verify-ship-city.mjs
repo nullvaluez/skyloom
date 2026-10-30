@@ -245,8 +245,11 @@ async function childNight(windowJSON) {
   const cities = [];
   for (let km = 1; km <= 100; km++) cities.push({ name: `c${km}`, wx: km * 1000 * k, wz: z, lat: 40.7, lon: -74 });
   const placed = NL.placeNightLite(cities, 0, z, { roadRingM: 9000, reachM: 60000, cap: 200 });
+  // the terrain's own dissolve clips it: a satellite edge band ending at 120,000 scene units at NYC
+  const clipped = NL.placeNightLite(cities, 0, z, { roadRingM: 9000, reachM: 60000, cap: 200, edgeEndM: 120000 / k });
+  const clip = clipped.length ? Math.max(...clipped.map((o) => o.d)) : 0;
   const at = (km) => placed.find((o) => o.c.name === `c${km}`);
-  out.place = { n: placed.length, k, f4: at(4)?.fade ?? 0, f8: at(8)?.fade ?? 0, f20: at(20)?.fade ?? 0, f60: at(60)?.fade ?? 0, f65: at(65)?.fade ?? 0, f80: at(80) ? at(80).fade : -1, r20: at(20)?.r, r70: at(70)?.r, nearestFirst: placed.every((o, i) => i === 0 || placed[i - 1].d <= o.d) };
+  out.place = { clipKm: clip / 1000, edgeEndKm: (0.98 * 120000) / k / 1000, n: placed.length, k, f4: at(4)?.fade ?? 0, f8: at(8)?.fade ?? 0, f20: at(20)?.fade ?? 0, f60: at(60)?.fade ?? 0, f65: at(65)?.fade ?? 0, f80: at(80) ? at(80).fade : -1, r20: at(20)?.r, r70: at(70)?.r, nearestFirst: placed.every((o, i) => i === 0 || placed[i - 1].d <= o.d) };
   const capped = NL.placeNightLite(cities, 0, z, { roadRingM: 9000, reachM: 60000, cap: 10 });
   out.place.capN = capped.length;
   out.place.capNearest = capped.every((o) => o.d <= capped[capped.length - 1].d);
@@ -652,8 +655,9 @@ async function main() {
     const L = nOn.place;
     check(
       'CT-4 city light reaches 60+ km: full strength from the road-ring hand-off to 60 km, still lit at 65 km, gone by 75 km; nearest first, capped',
-      L.f4 === 0 && L.f8 > 0 && L.f20 === 1 && L.f60 === 1 && L.f65 > 0 && L.f80 === -1 && L.nearestFirst && L.capN === 10 && L.capNearest && L.r70 > L.r20,
-      `fade 4km ${L.f4} · 8km ${L.f8.toFixed(2)} · 20km ${L.f20} · 60km ${L.f60} · 65km ${L.f65.toFixed(2)}; radius 20km ${Math.round(L.r20)} m, 70km ${Math.round(L.r70)} m`,
+      L.f4 === 0 && L.f8 > 0 && L.f20 === 1 && L.f60 === 1 && L.f65 > 0 && L.f80 === -1 && L.nearestFirst && L.capN === 10 && L.capNearest && L.r70 > L.r20 &&
+        L.clipKm >= 60 && L.clipKm < L.edgeEndKm,
+      `edge-clipped reach ${L.clipKm.toFixed(1)} km (< ${L.edgeEndKm.toFixed(1)} km dissolve end); fade 4km ${L.f4} · 8km ${L.f8.toFixed(2)} · 20km ${L.f20} · 60km ${L.f60} · 65km ${L.f65.toFixed(2)}; radius 20km ${Math.round(L.r20)} m, 70km ${Math.round(L.r70)} m`,
     );
     const pol = nOn.policy;
     check(

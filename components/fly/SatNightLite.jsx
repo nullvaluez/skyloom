@@ -74,11 +74,11 @@ export function SatNightLite({ runtime, flight, origin, engine }) {
     const px = flight.pos.x;
     const pz = flight.pos.z;
     const k = mercK(pz);
-    const edge = getEdgeFade().startM;
+    const edge = getEdgeFade().endM; // scene units from the bend centre
     const placed = placeNightLite(cities, px, pz, {
       roadRingM: SAT_ROADS.ring.r / k,
       reachM: policy.budget?.reachM ?? 60000,
-      edgeStartM: Number.isFinite(edge) && edge > 0 ? edge / k : Infinity,
+      edgeEndM: Number.isFinite(edge) && edge > 0 ? edge / k : Infinity,
       cap: block.pool,
       block,
     });
