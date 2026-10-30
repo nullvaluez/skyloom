@@ -62,6 +62,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { register, createRequire } from 'node:module';
+import { r25w0Show } from './_r25-w0-baseline.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
@@ -119,7 +120,9 @@ const THREE = await import('three');
 const W0 = await (async () => {
   try {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'r25-a-w0-'));
-    const show = (rel) => execFileSync('git', ['-C', ROOT, 'show', `r25-w0:${rel}`], { encoding: 'utf8' });
+    // SHIP PASS RL-1: the tag when present, else the hash-verified fixture
+    // (scripts/_r25-w0-baseline.mjs), so a depth-1 CI clone runs these rows.
+    const show = (rel) => r25w0Show(rel);
     const fdSrc = show('lib/fly/front-door.js').replace(
       "from './satellite-visuals'",
       `from '${pathToFileURL(path.join(ROOT, 'lib/fly/satellite-visuals.js')).href}'`

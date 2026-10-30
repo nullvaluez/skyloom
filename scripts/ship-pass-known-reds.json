@@ -1,10 +1,6 @@
 {
   "about": "SHIP PASS (FLY_SHIP_PASS.md 3.5, 12.3): gates known red at the start of the pass. scripts/ship-pass-gates.mjs prints a failing gate listed here as KNOWN-RED (separately from FAIL), and a listed gate that passes as KNOWN-RED (now passing) so its row can be retired. A stream that fixes a red removes its row in the same commit.",
   "reds": [
-    { "gate": "verify-r25-front-door.mjs", "failure": "(3b) and (4h): no r25-w0 baseline", "owner": "RELEASE", "reason": "The flag-off arms diff against `git show r25-w0:...`; the tag is absent in shallow clones (this venue and actions/checkout depth 1), so CI fails too (RL-1).", "since": "2026-10-30" },
-    { "gate": "verify-encounters.mjs", "failure": "c17: length 53.45 m", "owner": "RELEASE", "reason": "C-17 airframe metrics assertion out of date (RL-1).", "since": "2026-10-29" },
-    { "gate": "verify-living-earth.mjs", "failure": "no-data semantics", "owner": "RELEASE", "reason": "RL-1.", "since": "2026-10-29" },
-    { "gate": "verify-finalize-pace.mjs", "failure": "CRLF", "owner": "RELEASE", "reason": "Fails on CRLF checkouts (the owner's Windows tree); RL-1.", "since": "2026-10-29" },
     { "gate": "verify-sat-buildings.js", "failure": "F1", "owner": "CITY", "reason": "F1 predates the current maxPerChunk accounting (CT-6).", "since": "2026-10-29" },
     { "gate": "verify-lounge-promotion.cjs", "failure": "tcn-row", "owner": "RELEASE", "reason": "RL-1.", "since": "2026-10-29" },
     { "gate": "verify-mobile-layout.js", "failure": "intermittent commit race", "owner": "RELEASE", "reason": "RL-1.", "since": "2026-10-29" },
@@ -17,7 +13,6 @@
     { "gate": "verify-sat-night.js", "failure": "27/2", "owner": "CITY", "reason": "Reconciled with NIGHT_LITE (CT-4).", "since": "2026-10-29" },
     { "gate": "verify-feel.js", "failure": "74 deg vs 78 deg", "owner": "RELEASE", "reason": "Recorded in 12.3; not in the beta suite.", "since": "2026-10-29" },
     { "gate": "verify-chase-cam.js", "failure": "live traffic", "owner": "RELEASE", "reason": "Depends on live ADS-B (blocked in the cloud venue).", "since": "2026-10-29" },
-    { "gate": "verify-cinematic-earth.mjs", "failure": "fleet assertions", "owner": "RELEASE", "reason": "RL-1.", "since": "2026-10-29" },
     { "gate": "verify-phys-sky.mjs", "failure": "GPU half needs Chrome", "owner": "SKY", "reason": "Passes where a Chromium build is installed (PLAYWRIGHT_CHANNEL=chrome on the owner's machine).", "since": "2026-10-29" },
     { "gate": "verify-hdr-guard.mjs", "failure": "GPU half needs Chrome", "owner": "SKY", "reason": "As verify-phys-sky.", "since": "2026-10-29" },
     { "gate": "verify-graphics-governor.mjs", "failure": "crashes", "owner": "FRAME", "reason": "FR-5/FR-6 touch the governor.", "since": "2026-10-29" },

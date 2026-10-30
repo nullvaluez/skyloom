@@ -15,7 +15,7 @@ const {buildForestCluster,LivingForest}=await import('../lib/fly/living-forest.j
 const {deriveWorldContent}=await import('../lib/fly/world-content.js');
 const {architectureRegion}=await import('../lib/fly/living-regions.js');
 const {inferBuildingStyle}=await import('../lib/fly/building-profiles.js');
-const {localRingReadiness,worldReadiness}=await import('../lib/fly/world-readiness.js');
+const {localRingReadiness,worldReadiness}=await import('../lib/fly/world-readiness.js');const {noDataCountsReady}=await import('../lib/fly/load-guard.js');
 const {steppedBuildingLevels,emitSteppedBuilding}=await import('../lib/fly/living-architecture.js');
 const {buildRoadsideInfill}=await import('../lib/fly/settlement-infill.js');
 const {buildAirportSurfaces}=await import('../lib/fly/airport-surfaces.js');
@@ -186,7 +186,11 @@ check('readiness covers missing neighbouring tiles and rejects provider failure 
   const chunks=new Map(),flight={latDeg:0,pos:{x:0,z:0,y:300}};
   for(const x of [8191,8192])for(const y of [8191,8192])chunks.set(`14/${x}/${y}`,{state:'empty',reason:'zero'});
   assert.equal(localRingReadiness({chunks},flight).ready,true);
-  chunks.get('14/8192/8192').reason='no-data';assert.equal(localRingReadiness({chunks},flight).ready,false);
+  // SHIP PASS RL-1: TRUE EARTH LOAD_GUARD (noDataReady) made a provider-EMPTY
+  // tile ('no-data') final, so it counts as ready when the guard says so; a
+  // provider FAILURE (state 'error') must still hold the reveal.
+  chunks.get('14/8192/8192').reason='no-data';assert.equal(localRingReadiness({chunks},flight).ready,noDataCountsReady());
+  chunks.set('14/8192/8192',{state:'error'});assert.equal(localRingReadiness({chunks},flight).ready,false);assert.equal(localRingReadiness({chunks},flight).unavailable,1);
   chunks.delete('14/8192/8192');assert.equal(localRingReadiness({chunks},flight).total,4);assert.equal(localRingReadiness({chunks},flight).ready,false);
   const missing=worldReadiness({flight});assert.equal(missing.ready,false);assert.ok(missing.missing.includes('surfaces'));assert.ok(missing.missing.includes('fleet'));
 });
