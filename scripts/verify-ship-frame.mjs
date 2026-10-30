@@ -270,6 +270,28 @@ const atBase = (rel) => {
     assert(ENV_UNIFORM.enabled === false, 'the shipped constant is not edited by FRAME');
     for (const f of ['lib/fly/prewarm.js', 'components/fly/PrewarmRig.jsx']) assert(/const ENV_UNIFORM = pinned\(ENV_UNIFORM_BLOCK, '__flyEnvUniformOverride'\);/.test(read(f)), f);
   });
+  await check('FR-3 (g) ENV_UNIFORM ruling instrument: its equirect half cannot change anything (IMMERSIVE normalizes every PMREM input to the same width unconditionally)', async () => {
+    // SatEnvironment.jsx (not FRAME's; read only): the resize condition is
+    // `(ENV_UNIFORM.enabled || immersive)` and `immersive = immersiveOn('lighting')`,
+    // which IMMERSIVE.features.lighting hard-wires true ("URL parameters and old
+    // preview switches cannot disable it"); the target width is
+    // IMMERSIVE.environmentSize (2048 = ENV_UNIFORM.equirectWidth) unless the
+    // stylized earth's own width wins first. So ENV_UNIFORM.enabled is dead in
+    // that file: what the flag still changes is prewarm.js's two idle-frame
+    // halves (warmBothShadowStates, requeueForEnvironment).
+    const env = read('components/fly/SatEnvironment.jsx');
+    assert(/const immersive = immersiveOn\('lighting'\);/.test(env), 'immersive is the lighting feature');
+    assert(/\(ENV_UNIFORM\.enabled \|\| immersive\) && !blending/.test(env), 'resize condition ORs the flag with immersive');
+    assert(/stylizedEarthOn\(\) \? STYLIZED_EARTH\.environmentWidth : immersive \? IMMERSIVE\.environmentSize : ENV_UNIFORM\.enabled/.test(env), 'width: immersive wins before the flag');
+    const { IMMERSIVE, immersiveOn } = await mod('lib/fly/immersive.js');
+    const { ENV_UNIFORM } = await mod('lib/fly/fly-constants.js');
+    assert(immersiveOn('lighting') === true && IMMERSIVE.features.lighting === true, 'IMMERSIVE lighting is always on');
+    assert(IMMERSIVE.environmentSize === ENV_UNIFORM.equirectWidth, 'same width');
+    const pre = read('lib/fly/prewarm.js');
+    const live = (pre.match(/ENV_UNIFORM\.(enabled|warmBothShadowStates|requeueForEnvironment|idleFrameMs|idleBudget)/g) ?? []).length;
+    assert(live >= 5, 'prewarm.js still reads the two idle halves');
+    return `equirect half dead (immersive ${IMMERSIVE.environmentSize} px); the flag reaches ${live} reads in prewarm.js (shadow-twin warm + environment re-queue, both on frames <= ${ENV_UNIFORM.idleFrameMs} ms)`;
+  });
   await check('FR-3 (e) wiring: boot tier rides the boot drain, the ladder queues after it, PrewarmRig rescans tier/env/late entries; flag-gated', () => {
     const src = read('lib/fly/prewarm.js');
     const run = src.slice(src.indexOf('export async function runPrewarm'));
