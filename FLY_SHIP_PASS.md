@@ -1221,7 +1221,241 @@ shape kept; additive `lightK` is the ground's moonlight relative to today's
 ### CITY
 
 <!-- SHIP PASS CITY report begin -->
-(not started)
+**Status (2026-10-30, cloud venue, branch `ship/city`): IN PROGRESS.** CT-1,
+CT-6 (node half), CT-4 and CT-5 (built, flags off) and CT-7 (the list) landed;
+CT-2 plumbing is in (flag off); the SK-1 city arms (browser), CT-3 and the
+browser smokes follow. The browser probe (`scripts/ship-city-probe.cjs`) now
+measures the SK-1 city arms at SKY's poses with SKY's metric (ported from
+`scripts/ship-sky-veil.cjs`, live CT-1 pins on one boot), books every draw of
+a frame to its layer (CT-3 census) and takes a 60 s still diff (CT-4). Every number below is the offline
+fixture on SwiftShader or a node gate, never a device number (3.8).
+
+**CT-1 — diagnosis pins (P0, landed).** `window.__flyCityDiag = { fadeStartM?,
+fadeEndM?, skylinePremix?: 0 | 1 }` is read live (every frame) by the city code
+whether or not CITY_RANGE is on, through `lib/fly/city-range.js`
+(`cityDiag`, `buildingBand`, `cityRangeRequest`). Absent = today's band exactly
+(node gate: the band equals SAT_BLDG_FADE / SAT_BUILDINGS and `bandFade` is the
+engine's old expression, `Object.is` at ten heights). A fade pin needs both
+ends; it moves the detail ring's dissolve, keeps the shipped 200 m evict
+margin past the pinned end and arms the ring up to the pinned end (so a warp
+to 10,000 ft streams the city it pins); the skyline's hole choreography and
+coverage mask follow the same band. `skylinePremix: 0` rides the skyline build
+request as `premix: false`. When a consumer honours a pin it sets
+`window.__flyCityDiagApplied = true`. **Finding:** the Enhanced skyline bakes
+no grey premix at all (the worker's `visuals` palette path never applied
+`SAT_SKYLINE.hazeMix`; only the Classic colour did), measured: Enhanced output
+with `premix: false` is byte-identical on 12 fixture tiles, Classic output
+changes. So the skyline-premix arm's share of the veil is structurally zero in
+Enhanced; the city's share is the detail-ring fade.
+
+**SK-1 — the city's share of the veil (CITY's half of the table).** Two
+readings. (1) By construction (node, `city-range.js` `bandFade` over the
+shipped band, `verify-ship-city` CT-1): the detailed ring is fully drawn below
+2,400 m eye AGL and dithered away by 3,000 m (evicted at 3,200 m), i.e. it
+dissolves between about 7,900 and 9,850 ft, which is where the owner's veil
+begins (L-01, "from about 8,000 ft"). At the five SK-1 heights (eye AGL with
+the fixture's ~15 m Midtown ground):
+
+| Eye height | 5,000 ft (1,509 m) | 6,000 ft (1,814 m) | 7,500 ft (2,271 m) | 8,500 ft (2,576 m) | 10,000 ft (3,033 m) |
+|---|---|---|---|---|---|
+| detailed ring, shipped band | 1 | 1 | 1 | 0.79 | 0 (resident, invisible) |
+| detailed ring, `city-fade` pin (4,500/5,000 m) | 1 | 1 | 1 | 1 | 1 |
+| skyline premix, Enhanced | none baked | none baked | none baked | none baked | none baked |
+
+So the city's two arms cannot move a pixel at 5,000-7,500 ft (both bands
+read 1), the fade arm is the whole city share at 8,500 and 10,000 ft, and
+the premix arm is structurally zero in Enhanced (the worker's `visuals`
+palette never applied `SAT_SKYLINE.hazeMix`: Enhanced skyline output with
+`premix: false` is byte-identical on 12 fixture tiles; only Classic changes).
+(2) Rendered (fixture/SwiftShader, `ship-city-probe --mode=veil`, SKY's
+geometry and metric, baseline / `fade` / `baseline-2` as live pins on one
+boot, plus the draws per layer): queued, see "Venue" below.
+
+**CT-2 — CITY_RANGE (P1, plumbing in, flag `enabled:false`).** Tunables in the
+CITY_RANGE block. Desktop High/Ultra (`deviceFeature('CITY_RANGE').budget.detailedM`):
+detailed ring live to ~4,500 m (lite LOD past 2,400 m: body range only and the
+surface-detail term off; Bayer dissolve 4,500-5,000 m into the skyline mass,
+which the coverage mask fills in under the same fade; evict 5,200 m, re-arm
+5,000 m). Every allowed device: a dense-core skyline (a z14 tile with >= 40
+polygons mapped >= 35 m admits its mapped 20-35 m blocks into the cap the
+shipped selection leaves; a capped core keeps its towers byte for byte, a
+suburb or desert tile is byte-identical). The CITY_FACADES regional palette
+already reaches the skyline program (Play Pass, on), and Enhanced already drops
+the baked premix (above), so those two sub-items need no new code.
+Worker flag-off identity: byte-identical to `main`'s worker on 48 fixture
+builds (skyline, buildings, roads, Classic skyline).
+
+**CT-3 — city budget (P1, partly landed under CITY_RANGE).** Measured lever
+first: the building colour pass splits a partly visible chunk into one draw
+per contiguous run of visible 4x4 regions (`architecture-draw-range.js`), so a
+half-visible chunk costs 4 submissions (node test) and a portrait phone, where
+most chunks are partly visible, pays several draws per chunk. Under CITY_RANGE
+without the long band (Medium desktops and touch, i.e. exactly the phone
+budget's devices) the colour pass submits a visible chunk's body as ONE draw
+(`setArchitectureMergeColor`); the shadow pass keeps its split. The skyline is
+already merged per 2x2 tile group (`SAT_SKYLINE.groupN`), so "merge chunks per
+tile group" holds there; merging the DETAIL ring's z14 chunks into groups would
+rebuild its drape, heal, fade and collision bookkeeping and is not attempted
+this pass (recorded, not hidden). Thresholds import `TIER_BUDGETS` from
+`lib/fly/tier-budgets.js` (FRAME's FR-6 table replaces it at integration). The
+per-layer census (probe `--mode=census`, visibility toggles, an independent
+per-frame draw counter) is pending a heavy-lock slot.
+
+**CT-6 — the `verify-sat-buildings` F1 red (P0, re-derived, not re-baselined).**
+Cause, measured: since Living Earth the Enhanced builder keeps EVERY mapped
+footprint of a tile as a body (`vector-tile.worker.js`, "all mapped footprints
+retain a body") and the 500-polygon cap bounds the DETAILED subset
+(`meta.provenance.detailedBodies`: roof forms, entrances, stepped levels);
+`meta.kept` is now the coverage count, legitimately over 500 on a live Midtown
+tile (~1,500 footprints), so F1's `kept <= 500` and `max kept === 500` read the
+wrong number. F1 now reads the detailed subset, and its binding precondition is
+the implication "every chunk that parsed more footprints than the cap details
+exactly the cap" (the cap number 500 did not move). Node evidence
+(`verify-ship-city` CT-6): fixture Midtown parses at most 363 footprints per
+z14 tile, so the shipped cap cannot bind on the fixture (detailed = parsed on
+every tile); with the cap scaled to the fixture's density (200) the detailed
+subset never exceeds it and binds while kept = every body (363 > 200), which
+is the old red reproduced and explained. The browser half (verify-sat-buildings
+on the fixture, `PLAYWRIGHT_CHANNEL=` for the bundled Chromium) is pending a
+heavy-lock slot. `scripts/ship-pass-known-reds.json` is RELEASE's: the row can
+retire once the browser half reads green.
+
+**CT-4 — NIGHT_LITE (P1, built, flag `enabled:false`).** `lib/fly/night-lite.js`
++ `components/fly/SatNightLite.jsx`, mounted from FlyScene's CITY mounts block
+only with the flag on, in satellite, in Enhanced lighting (where FlyScene's own
+gated SatCityGlow mount at the old line is off and untouched); the device gate is
+`deviceFeature('NIGHT_LITE')` (touch, or Low). ONE instanced draw of flat
+ground light pools at the POI cities: a disc whose vertex colours fall from a
+hot core to exactly black at the rim (no dome, so no silhouette against the
+horizon), bent per vertex through the shared `world-bend` variant, additive, no
+depth write (the terrain behind writes depth, so the cloud composite never
+reads it as sky). Full strength from the road-ring hand-off to the policy's
+60 km reach, fading out by 75 km and never past the world edge band; hidden by
+day and whenever nothing is placed (zero draws); placement on a 2 s cadence
+(nothing moves between placements, so a still camera is still). Program
+registered in the CITY prewarm block (`CITY:night-lite-pools`, flag-gated).
+`verify-sat-night` reconciliation and the phone-emulation capture at 3 km are
+pending browser runs.
+
+**CT-5 — NIGHT_RHYTHM (P2, built, flag `enabled:false`).** `lib/fly/night-rhythm.js`.
+(a) Seam: NIGHT_LIGHTS' lamps faded in across 0.3-1.4 x the road ring, so
+inside the ring both lit the same streets and just past it the lamps were still
+partial; with the flag they arrive across 0.8-1.05 x the ring at `seam.gain`
+(1 = the owner's 5080 calibration knob; the venue cannot draw VIIRS, GIBS is
+blocked), an anchored edit on `night-lights-atlas.js`'s text re-anchored to
+the ring through the shipped `uNLFade` (living-ground.js untouched).
+(b) Twilight: Enhanced window light followed the cinema night weight (0 above
+-2 deg, full at -12 deg), so a blue-hour city was unlit; window emission now
+takes at least an elevation-keyed weight (0 above +1 deg, full by civil dusk,
+-6 deg). (c) Occupancy: local SOLAR hour recovered from the published sun
+(hour angle from sinEl/decl/lat, sign from the azimuth; within 0.032 h of the
+clock in both azimuth conventions) drives ONE uniform `uNightRhythm` =
+(office, residential, other, twilight); a window stays lit while its stable
+per-cell hash is under its family's share, so windows go dark one by one after
+~23:00, offices empty through the evening, homes stay lit until bedtime.
+No new program: each edited material keeps one program under a `|night-rhythm-v1`
+key (gate counts them); flag off, the four architecture programs and the
+NIGHT_LIGHTS text are main's byte for byte. Prewarm: `prewarm.js` already
+builds these programs through the same factory, so the flag-on variant is
+warmed with no registry entry. Dusk/night capture pairs at 500 m and 3 km are
+owner rows (run list 6); VIIRS cannot render here.
+
+**CT-7 — NIGHT_CITY_R23's consumers (for the lead's deletion, 8.3).** NOT dead
+code in Enhanced: `nightCityOn(sub)` (`lib/fly/night-city.js`) is true for every
+sub-block but `windows` whenever `satelliteVisualsOn('lighting')`, so two
+sub-blocks are LIVE in the shipped frame: `.roads` (spread by
+`satelliteRoadLighting()` into the Enhanced road program, key
+`world-bend-road-satnight-r23`) and `.tier` (`.tier.nightMinTier` gates night
+windows in `SatBuildingLayer.jsx`). Deleting the block must move those values,
+not drop them. Consumers: `lib/fly/fly-constants.js` (the block, ~6711-6900,
+plus comments in NIGHT_TRUTH_R23's header); `lib/fly/night-city.js`
+(`nightCityOn`, `satelliteRoadLighting`, `NIGHT_CITY_SWEPT`,
+`installNightCityDevHandle`); `lib/fly/toy-world/sat-building-engine.js`
+(import + `nightCityOn('windows')` at the material, twin pool and
+`setNightCityWindows`); `lib/fly/toy-world/sat-road-engine.js`
+(`satelliteRoadLighting()` into `applyBendRoadSat`); `lib/fly/prewarm.js`
+(`nightCityOn('windows')`, `satelliteRoadLighting()`);
+`components/fly/SatBuildingLayer.jsx` (the `.tier` gate);
+`components/fly/SatRoadLayer.jsx` (`installNightCityDevHandle`);
+`lib/fly/toy-world/world-bend.js` (the r23 road/window variants and their
+uniforms, frozen this pass); `scripts/verify-night-city-identity.mjs` (the
+gate; it crashed on main with ERR_MODULE_NOT_FOUND since world-bend.js gained
+imports, fixed here with the shared resolve hook: 8/8 run, (1)/(3) need
+`R23_BASE_WORLDBEND`).
+
+**Flags (all three `enabled:false`, by design, 3.8).** CITY_RANGE, NIGHT_LITE
+and NIGHT_RHYTHM are look flags: built, node-gated (flag-off identity proven
+against `main`), smoke-tested on and off on the fixture, and left off for the
+owner's RTX 5080 motion bar (3.6) and iPhone glance; none claims to be on.
+When CITY_RANGE is flipped, three frozen browser premises move with it and
+must be re-read the same day: `verify-skyline` (B) "detail ring gone at
+5,000 m" (the range evicts at 5,200 m: probe at 5,400 m),
+`verify-sat-night` (E) "fade strictly inside (0,1) at 2,700 m" (the range
+dissolves at 4,500-5,000 m) and `verify-sat-buildings` (C-ii) is unaffected
+(6,000 m > 5,200 m).
+
+**Owner checks (run list section 9).**
+- 5080 step 2 (Midtown climb 6,000 -> 10,000 ft): `?flags=CITY_RANGE` vs
+  `?flags=-CITY_RANGE` (with SKY's `AERIAL_CLARITY`); the motion bar: a
+  descend/climb burst through 2,400 m (lite LOD) and 4,500-5,000 m (dissolve
+  into the mass) with no pop; Manhattan 8,000 ft draws against the FR-6 row.
+- 5080 step 6 (night at the current moon): `?flags=NIGHT_RHYTHM` at 500 m and
+  3 km at dusk and at 23:00-01:00 local: no ring where the road lights hand
+  off to NIGHT_LIGHTS (tune `NIGHT_RHYTHM.seam.gain` against the ring-edge
+  luma if one shows), lit windows by civil dusk, windows going dark one by one
+  late; still-camera diff for window crawl.
+- iPhone step 4 (night at 3 km) and step 10: `?flags=NIGHT_LITE` vs off at
+  night from 3 km and at cruise: city light to 60 km, no sparkle in a 60 s
+  still, the phone's draws (DiagnosticsPanel) within 250.
+- iPhone step 4 (city turn): `?flags=CITY_RANGE` (merged colour draws on the
+  phone) vs off: draws and turn hitch.
+
+**Gates.** `scripts/verify-ship-city.mjs` (node, starts the fixture itself): 46/46.
+`verify-play-city` 28/28, `verify-night-city-identity` PASS (8 rows). `ship-pass-gates`: 32 PASS, 2 KNOWN-RED, 0 FAIL, seam rule PASS.
+`FLY_TILE_FIXTURE=1 verify-worker-window` 4/4, `verify-true-areas` 7/7.
+
+**Contract requests.** None yet.
+
+**Venue (browser runs; every number fixture/SwiftShader, 3.8).** Earlier
+sessions (07:29-09:40 UTC) produced no result: SKY's harness copy lost its page
+after the 5,000 ft baseline, then an orphaned RELEASE `next-server` held the
+heavy lock from ~08:22, and CITY's queued chain never acquired it. Session s3
+(12:58-13:23 UTC, `next dev` on a source snapshot of `af3b588`, phone emulation
+844x390, `cls=phone`, tier Low as the phone resolves): **smoke PASS, zero page
+errors and zero shader errors** with all flags off (day, 900 m and 2,438 m) and
+with `?flags=CITY_RANGE,NIGHT_LITE,NIGHT_RHYTHM` (night, 900 m, 2,438 m and
+3,000 m). NIGHT_LITE mounted and placed 26-27 pools out to 52-54 km (reach
+60 km); per-layer census, phone, all flags off, day: 138 draws at 900 m (map
+83, aux/shadow 15, post 9, roads 7; the building ring not yet resident) and
+199 at 2,438 m (map 127, aux 15, roads 11, post 9, `sat-buildings` 7 for 5
+resident chunks, `sat-skyline` 3). The s3 night still pair captured the HUD's
+tips card and toasts (11 % of pixels moved over 60 s), so the probe now hides
+the DOM overlays, the player rig and the traffic instances before a still pair
+(`dd41247`), and both probes exited only at their timeouts (fixed in the same
+commit). Session s8 (14:18-14:43 UTC, snapshot `ecb5140`): **smoke PASS** for
+phone `?flags=CITY_RANGE` by day (900 m, 2,438 m) and for the phone night pair
+off / all three flags at 3,000 m; desktop night (`cls=dgpu`, tier High) all
+flags off at 900 m PASS, while its all-flags arm ran out of the session's
+budget before its first pose (re-queued as s9). CT-3 census (phone, day,
+2,438 m, per frame): all flags off, `sat-buildings` booked **7 draws for 5
+resident chunks** (a partly visible chunk splits); `?flags=CITY_RANGE`,
+**6 draws for 8 resident chunks** (at most one colour draw per chunk); the
+scene totals (199 vs 208) are dominated by the satellite map's 127-137 tile
+draws, which follow how far streaming had got when the bounded settle
+(75 s) expired, so they are not a CITY_RANGE delta. CT-4 still (phone, night,
+3,000 m, 60 s apart, HUD, player rig and traffic hidden): all flags off
+13.2 % of pixels moved (mean |dL| 4.85: the skyline was still landing,
+`skReady` 0), all three flags on 4.1 % (mean |dL| 1.65, 27 pools placed to
+54 km): the pools add no crawl the off arm does not already show. Desktop
+night off still at 900 m: 7.3 % (clouds and streaming). Queued
+(`chain2.sh`): s9 desktop night all flags at 900 m (still) + desktop day
+census off / CITY_RANGE at 2,438 / 4,300 m; s10 `verify-sat-buildings` + the
+SK-1 veil arms at 10,000 / 8,500 ft; s11 `verify-sat-night`; s12
+`verify-skyline`.
+
+**Known issues.** In this venue the device policy classes SwiftShader as
+`software`, which CITY_RANGE refuses; the probe uses the harness pin
+`window.__flyCityDeviceClass` ('dgpu' / 'phone') to see each arm.
 <!-- SHIP PASS CITY report end -->
 
 ### LIGHT

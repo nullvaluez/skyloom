@@ -45,6 +45,25 @@
  *       this fix retires as a side effect.
  *
  *  (F3) COVERAGE — the ring's total kept footprints at Manhattan: 3483 -> 6990.
+ *
+ * ---------------------------------------------------------------------------
+ * SHIP PASS CITY (CT-6, 2026-10-30) — F1 RE-DERIVED, not re-baselined.
+ * ---------------------------------------------------------------------------
+ * F1 went red when Living Earth changed the accounting it reads: the Enhanced
+ * builder ("all mapped footprints retain a body", vector-tile.worker.js)
+ * keeps EVERY footprint of a tile as a body, and the 500-polygon cap now
+ * bounds the DETAILED subset (meta.provenance.detailedBodies; roof forms,
+ * entrances and stepped levels) instead of the kept set. meta.kept is the
+ * coverage count, legitimately over 500 on a live Midtown tile (~1,500
+ * footprints), so "kept <= 500" and "max kept === 500" were reading the wrong
+ * number. F1 now reads the detailed subset; its binding precondition is the
+ * implication "every chunk that PARSED more footprints than the cap details
+ * exactly the cap" (on the offline fixture no tile parses 500, so it holds
+ * vacuously and the log says so — scripts/verify-ship-city.mjs proves the
+ * binding on the fixture with the cap scaled to the fixture's density).
+ * The cap number (500) did not move. Browser: PLAYWRIGHT_CHANNEL (default
+ * 'chrome' as before; set it empty to use Playwright's bundled Chromium, the
+ * cloud venue's only browser).
  */
 const { chromium } = require('playwright');
 const path = require('path');
@@ -135,8 +154,9 @@ const groundProbe = () => {
 };
 
 (async () => {
+  const channel = process.env.PLAYWRIGHT_CHANNEL ?? 'chrome'; // SHIP PASS CITY: '' = bundled Chromium
   const browser = await chromium.launch({
-    channel: 'chrome',
+    ...(channel ? { channel } : {}),
     headless: true,
     args: ['--enable-gpu', '--ignore-gpu-blocklist'],
   });
@@ -162,7 +182,7 @@ const groundProbe = () => {
   await page.evaluate(pinScene, [40.7075, -74.0113, 792, 2.6, -0.12]);
   await page.waitForTimeout(22000);
   await page.mouse.move(800, 450);
-  const man = await page.evaluate(() => {
+  const man = await page.evaluate((CAP_FOR_BINDING) => {
     // Round 20 (A): per-chunk kept + the widest collision cylinder. Both come
     // off the ENGINE's own records (chunk.meta is the worker's per-tile
     // telemetry; chunk.columns.data is [x, z, topY, r] per anchor run), so
@@ -170,6 +190,12 @@ const groundProbe = () => {
     let maxKept = 0;
     let totKept = 0;
     let metaChunks = 0;
+    // SHIP PASS CITY (CT-6): the detailed subset the cap bounds, the parsed
+    // total, and whether every over-cap chunk details exactly the cap.
+    let maxDetailed = 0;
+    let maxTotal = 0;
+    let overCap = 0;
+    let overCapBinds = true;
     let maxR = 0;
     let nCol = 0;
     const eng = window.__satBuildings;
@@ -179,6 +205,14 @@ const groundProbe = () => {
           metaChunks += 1;
           totKept += c.meta.kept ?? 0;
           if ((c.meta.kept ?? 0) > maxKept) maxKept = c.meta.kept;
+          // Classic (no provenance) keeps the old meaning: kept IS the capped set.
+          const detailed = c.meta.provenance?.detailedBodies ?? c.meta.kept ?? 0;
+          if (detailed > maxDetailed) maxDetailed = detailed;
+          if ((c.meta.total ?? 0) > maxTotal) maxTotal = c.meta.total;
+          if ((c.meta.total ?? 0) > CAP_FOR_BINDING) {
+            overCap += 1;
+            if (detailed !== CAP_FOR_BINDING) overCapBinds = false;
+          }
         }
         const col = c.columns;
         if (col) {
@@ -200,10 +234,14 @@ const groundProbe = () => {
       maxKept,
       totKept,
       metaChunks,
+      maxDetailed,
+      maxTotal,
+      overCap,
+      overCapBinds,
       maxR,
       nCol,
     };
-  });
+  }, POLY_CAP);
   await glShot('r13-bldg-manhattan.png');
   console.log('MANHATTAN:', JSON.stringify(man));
   gate('buildings stream in satellite (ready ≥ 3)', (man.sb?.ready ?? 0) >= 3, `ready=${man.sb?.ready}`);
@@ -216,14 +254,16 @@ const groundProbe = () => {
       `columns=${man.nCol} maxColumnR=${man.maxR.toFixed(1)} m`
   );
   gate(
-    `(F1) per-chunk kept never exceeds the POLYGON cap (${POLY_CAP})`,
-    man.metaChunks > 0 && man.maxKept > 0 && man.maxKept <= POLY_CAP,
-    `max kept/chunk=${man.maxKept} over ${man.metaChunks} chunks (total ${man.totKept})`
+    `(F1) per-chunk DETAILED subset never exceeds the POLYGON cap (${POLY_CAP})`,
+    man.metaChunks > 0 && man.maxDetailed > 0 && man.maxDetailed <= POLY_CAP,
+    `max detailed/chunk=${man.maxDetailed}, max kept (bodies)/chunk=${man.maxKept} over ${man.metaChunks} chunks (total ${man.totKept})`
   );
   gate(
-    '(F1) the cap is actually binding over Manhattan (precondition)',
-    man.maxKept === POLY_CAP,
-    `max kept/chunk=${man.maxKept}`
+    '(F1) the cap binds wherever a chunk parsed more footprints than the cap (precondition)',
+    man.overCapBinds === true,
+    man.overCap > 0
+      ? `${man.overCap} chunk(s) over the cap, each details exactly ${POLY_CAP}`
+      : `NOT CALIBRATED here: no chunk parsed more than ${POLY_CAP} (max ${man.maxTotal}; the offline fixture's density) — verify-ship-city CT-6 proves the binding with a scaled cap`
   );
   gate(
     `(F2) one collision cylinder per BUILDING — widest radius <= ${COLUMN_R_MAX_M} (control: 3391)`,

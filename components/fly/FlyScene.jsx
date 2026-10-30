@@ -248,6 +248,9 @@ import { ShipSkyDiag } from './ShipSkyDiag';
 // SHIP PASS SKY imports end
 
 // SHIP PASS CITY imports begin
+// CT-4 NIGHT_LITE: flat city light pools from altitude on phones and Low.
+import { SatNightLite } from './SatNightLite';
+import { NIGHT_LITE_ON } from '@/lib/fly/night-lite';
 // SHIP PASS CITY imports end
 
 // SHIP PASS LIGHT imports begin
@@ -3784,6 +3787,12 @@ export function FlyScene({ runtime }) {
       {/* SHIP PASS (FLY_SHIP_PASS.md section 7): one block per stream; a stream
           edits only its own block. */}
       {/* SHIP PASS CITY mounts begin */}
+      {/* CT-4 NIGHT_LITE: only in Enhanced lighting, where FlyScene's own
+          SatCityGlow mount is off (the two never double up); the device
+          policy (touch or Low) is applied inside, per tier. */}
+      {NIGHT_LITE_ON && mapStyle === 'satellite' && satelliteVisualsOn('lighting') && (
+        <SatNightLite runtime={runtime} flight={flight} origin={origin} engine={engine} />
+      )}
       {/* SHIP PASS CITY mounts end */}
       {/* SHIP PASS LIGHT mounts begin */}
       {/* SHIP PASS LIGHT mounts end */}
