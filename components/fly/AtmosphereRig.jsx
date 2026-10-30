@@ -9,6 +9,8 @@ import { CINEMA_UNIFORMS } from '@/lib/fly/cinema-frame';
 import { isMobileGraphicsClass } from '@/lib/fly/device-class';
 import { registerCinemaResources } from '@/lib/fly/cinema-resources';
 import { useFlyStore } from '@/stores/fly-store';
+// SHIP PASS SKY (SK-4): SKY_LITE's aerial reach switch, from the device policy.
+import { skyLiteAerialSwitch } from '@/lib/fly/sky-lite';
 
 /**
  * TRUE EARTH Phase 2 (PHYS_SKY): the atmosphere tables, rendered between the
@@ -55,7 +57,9 @@ export function AtmosphereRig({ runtime }) {
     // Consumers look up with what each table holds, not with this frame's eye.
     const hl = Math.hypot(sun.x, sun.z);
     PSKY_UNIFORMS.uPskyEye.value.set(luts.skyState.h, luts.skyState.muS, hl > 1e-6 ? sun.x / hl : 1, hl > 1e-6 ? sun.z / hl : 0);
-    PSKY_UNIFORMS.uPskyAp.value.set(luts.aerialState.maxKm, luts.aerialState.h, 0, 0);
+    // .z: SKY_LITE continues the aerial volume past its reach (0 = the clamp,
+    // which High and every flag-off session keep).
+    PSKY_UNIFORMS.uPskyAp.value.set(luts.aerialState.maxKm, luts.aerialState.h, skyLiteAerialSwitch(qt), 0);
     runtime.physSky = { ...luts.stats, eyeKm: h, aerialKm: tier.aerialKm };
   }, -20);
   return null;

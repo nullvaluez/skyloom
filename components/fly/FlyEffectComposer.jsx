@@ -21,6 +21,8 @@ import { finishPassChain } from '@/lib/fly/post-policy';
 import { installDepthProbe } from '@/lib/fly/depth-probe';
 import { FX_STABILITY } from '@/lib/fly/fly-constants';
 import { registerComposer, resolveStepSafe } from '@/lib/fly/step-safe';
+// SHIP PASS SKY: the live merged aerial pass, for the prewarm registry's SKY entry.
+import { provideSkyPrewarm } from '@/lib/fly/sky-prewarm';
 
 /**
  * ROUND 21 (A GOVERNOR, S2 + S3) — a vendored fork of
@@ -369,6 +371,14 @@ const StableEffectComposer = /* @__PURE__ */ memo(
       if (downSamplingPass) downSamplingPass.enabled = true;
 
       built.current = { objects, passes, owned, composer, camera };
+      // SHIP PASS SKY (prewarm registry, 'SKY:sky-lite-aerial'): the merged
+      // pass(es) carrying the aerial effect, read at call time so a rebuild or
+      // teardown never hands out a disposed material.
+      provideSkyPrewarm('aerial-pass', () =>
+        (built.current?.passes ?? [])
+          .filter((p) => p instanceof EffectPass && p.effects?.some((e) => e?.name === 'AerialPerspectiveEffect'))
+          .map((p) => p.fullscreenMaterial)
+      );
       bumpFxStat({
         rebuilds: (window.__flyStats?.fx?.rebuilds ?? 0) + 1,
         passes: passes.length,

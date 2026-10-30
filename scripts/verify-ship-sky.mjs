@@ -43,6 +43,7 @@ const LEGS = {
   'real-moon': { REAL_MOON: true },
   shafts: { LIGHT_SHAFTS: true },
   lens: { LIGHT_SHAFTS: true, LENS_FLARE: true },
+  'sky-lite': { SKY_LITE: true },
 };
 
 async function buildLeg(name) {
@@ -81,8 +82,17 @@ async function buildLeg(name) {
     aerialMergedDefines: JSON.stringify(merged.fullscreenMaterial.defines ?? {}),
   };
   const hashes = Object.fromEntries(Object.entries(texts).map(([k, v]) => [k, v == null ? null : sha(v)]));
+  // SKY_LITE: each program with the reach edit, hashed again with the edit
+  // reverted (the edit must be the ONLY difference from the default text).
+  // (The merged EffectPass prefixes every identifier, e.g. e0UPskyAp: match either.)
+  const LITE_RE = / {2}if \((\w*[uU]PskyAp)\.z > 0\.5\) \{\n {4}float dLast = [0-9.]+ \* range;\n {4}if \(distKm > dLast\) \{\n[^]*?\n {4}\}\n {2}\}\n/g;
+  const liteCount = Object.fromEntries(Object.entries(texts).map(([k, v]) => [k, v == null ? 0 : (v.match(LITE_RE) ?? []).length]));
+  const reverted = Object.fromEntries(Object.entries(texts).map(([k, v]) => [k, v == null ? null : sha(v.replace(LITE_RE, ''))]));
   return {
+    texts: process.env.DUMP_TEXTS ? texts : undefined,
     hashes,
+    liteCount,
+    reverted,
     uniforms: Object.keys(pass.r25.uniforms).sort(),
     compositeHasPhase: texts.composite.includes('shipMoonPhase(ray)*.60*'),
     compositeHasLens: /livLens|livSunVisible|uLivFlare/.test(texts.composite),
@@ -336,6 +346,88 @@ const DEG = Math.PI / 180;
     shafts.hashes.shaftSource === MAIN_SHAFTS.shaftSource && shafts.hashes.shaftBlur === MAIN_SHAFTS.shaftBlur && shafts.hashes.composite === MAIN_SHAFTS.compositeMinusLens && shafts.compositeHasShafts,
     `composite ${shafts.hashes.composite.slice(0, 12)}`);
   row('SK-5 (d) LIGHT_SHAFTS still ships off; the LENS_FLARE block stays for the lead\'s close (8.3)', C.LIGHT_SHAFTS.enabled === false && C.LENS_FLARE?.enabled === false);
+}
+
+// ---- SK-4: SKY_LITE ----------------------------------------------------------
+{
+  register('./_node-resolve.mjs', import.meta.url);
+  const SL = await import('../lib/fly/sky-lite.js');
+  const DP = await import('../lib/fly/device-policy.js');
+  const G = await import('../lib/fly/atmosphere/glsl.js');
+  // (a) the policy: Medium and touch devices, never a desktop at High.
+  const want = { phone: [true, true, true], tablet: [true, true, true], dgpu: [false, true, true], igpu: [false, true, true], software: [false, true, true] };
+  let polOk = true;
+  for (const [cls, row] of Object.entries(want)) ['high', 'medium', 'low'].forEach((tier, i) => {
+    if (SL.skyLitePolicy(tier, { cls }).allowed !== row[i]) polOk = false;
+  });
+  const b = SL.skyLitePolicy('medium', { cls: 'phone' }).budget;
+  row('SK-4 (a) through deviceFeature(\'SKY_LITE\'): Medium and phones / tablets, never a desktop at High; budget +0 aerial draws, <= +1 cloud draw, one sample, half reach',
+    polOk && b.aerialDraws === 0 && b.cloudDraws <= 1 && b.cloudSamples === 1 && b.cloudReach === 0.5 && DP.POLICY_FEATURES.includes('SKY_LITE'), JSON.stringify(b));
+  const src = read('lib/fly/sky-lite.js');
+  row('SK-4 (b) no raw device-class call and no GPU object: SKY_LITE is uniforms and one GLSL edit (+0 draws, +0 passes, +0 targets)',
+    !/isPhoneClass|isMobileGraphicsClass|new (ShaderMaterial|WebGLRenderTarget|Mesh|EffectPass|Pass)\b/.test(src));
+  // (c) flag off: nothing reads the policy, the uniform stays 0, the deck rule is the previous one.
+  row('SK-4 (c) flag off (shipped): the aerial switch is 0 and the far deck keeps its rule on every device',
+    SL.SKY_LITE_ON === false && SL.skyLiteAerialSwitch('medium', { cls: 'phone' }) === 0 && SL.skyLiteFarReachM('phone', 180, 'medium', { cls: 'phone' }) === null
+    && G.skyLiteAerialGLSL('x') === 'x' && !G.ATMO_AERIAL_LOOKUP_GLSL.includes('uPskyAp.z'));
+  // (d) flag on: the switch and the far deck follow the policy.
+  const on = true;
+  const reach = (n, cls, tier) => SL.skyLiteFarReachM(n, 180, tier, { cls }, on);
+  row('SK-4 (d) flag on: the aerial switch is 1 exactly where the policy allows; phone profiles get 90 km of far deck (0.5 x 180), Low / Medium / High keep theirs',
+    SL.skyLiteAerialSwitch('high', { cls: 'dgpu' }, on) === 0 && SL.skyLiteAerialSwitch('medium', { cls: 'dgpu' }, on) === 1 && SL.skyLiteAerialSwitch('high', { cls: 'phone' }, on) === 1
+    && reach('phone', 'phone', 'medium') === 90000 && reach('phone-balanced', 'phone', 'medium') === 90000 && reach('phone-economy', 'tablet', 'high') === 90000
+    && reach('phone-low', 'phone', 'low') === null && reach('low', 'phone', 'low') === null && reach('medium', 'dgpu', 'medium') === null && reach('high', 'dgpu', 'high') === null);
+  // (e) the reach math (a mirror of the GLSL): continuous at the last slice,
+  // transmittance falls and in-scatter rises toward its own asymptote.
+  const ext = (S, T, k) => { const Tk = Math.pow(Math.max(T, 1e-4), k); return [S * (1 - Tk) / Math.max(1 - T, 1e-4), Tk]; };
+  let mathOk = true;
+  for (const T of [0.02, 0.2, 0.5, 0.9, 0.99]) for (const S of [0.01, 0.3, 1.2]) {
+    const [s1, t1] = ext(S, T, 1);
+    if (Math.abs(s1 - S) > 1e-12 || Math.abs(t1 - T) > 1e-12) mathOk = false;
+    let ps = S, pt = T;
+    for (let k = 1.05; k < 4; k += 0.05) {
+      const [sk, tk] = ext(S, T, k);
+      if (!(tk <= pt + 1e-15 && sk >= ps - 1e-15 && sk <= S / (1 - T) + 1e-12)) mathOk = false;
+      ps = sk; pt = tk;
+    }
+  }
+  row('SK-4 (e) past the reach: continuous at the last slice, T falls, S rises to its asymptote S / (1 - T)', mathOk);
+  const lite = legOut('sky-lite'), def = legOut('default');
+  const withAerial = ['march', 'composite', 'aerialEnhanced', 'aerialMerged'];
+  row('SK-4 (f) flag on: the reach edit is in every program that looks the volume up (aerial pass, cloud march, cloud composite), once, and is the ONLY change',
+    withAerial.every((k) => lite.liteCount[k] >= 1 && lite.reverted[k] === def.hashes[k]) && ['classicMarch', 'classicComposite', 'classicFilter', 'aerialClassic', 'filter'].every((k) => lite.hashes[k] === def.hashes[k]),
+    JSON.stringify(Object.fromEntries(withAerial.map((k) => [k, lite.liteCount[k]]))));
+  const rig = read('components/fly/AtmosphereRig.jsx'), lc = read('lib/fly/living-clouds.js');
+  row('SK-4 (g) wiring: AtmosphereRig writes uPskyAp.z from the policy switch; the far deck reads the lite reach before its old rule',
+    rig.includes('PSKY_UNIFORMS.uPskyAp.value.set(luts.aerialState.maxKm, luts.aerialState.h, skyLiteAerialSwitch(qt), 0);')
+    && lc.includes("const farLite = skyLiteFarReachM(name, far.maxKm ?? 180, ctx.tier);") && lc.includes("const farMax = farLite ?? (name === 'phone' || name === 'low' ? 0 :"));
+}
+
+// ---- SK-6: the sky LUT cadence is kept ----------------------------------------
+{
+  const t = C.PHYS_SKY.tiers;
+  row('SK-6 (a) the sky / aerial LUT cadence is unchanged (skyHz 60 / 30 / 30, aerialHz 30 / 15 / 10) and nothing SKY added writes it',
+    t.high.skyHz === 60 && t.medium.skyHz === 30 && t.phone.skyHz === 30 && t.high.aerialHz === 30 && t.medium.aerialHz === 15 && t.phone.aerialHz === 10
+    && !/skyHz|aerialHz/.test(read('lib/fly/sky-lite.js') + read('lib/fly/sky-diag.js') + read('lib/fly/sky-prewarm.js')));
+  let me = '';
+  try {
+    me = execFileSync(process.execPath, [path.join(ROOT, 'scripts/verify-mobile-enhanced.mjs')], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] }).toString();
+  } catch (e) {
+    me = String(e.stdout ?? '') + String(e.message ?? '');
+  }
+  row('SK-6 (b) verify-mobile-enhanced: cadence 6/6 (sky redraws fall at the phone budget, the tables unchanged)', /PASS 6 mobile Enhanced checks/.test(me) && /PASS declared sky cadence/.test(me), (me.match(/sky draws:[^\n]*/) ?? [''])[0]);
+}
+
+// ---- prewarm registry: SKY's entries -----------------------------------------
+{
+  const PR = await import('../lib/fly/prewarm-registry.js');
+  const sky = PR.prewarmEntries().filter((e) => e.stream === 'SKY');
+  const keys = sky.map((e) => e.key).sort();
+  const reach = (flags) => sky.filter((e) => PR.entryReachable(e, { flagOn: (f) => flags.includes(f) })).map((e) => e.key).sort();
+  row('PREWARM SKY registers its flag-on variants, reachable only with their flag',
+    JSON.stringify(keys) === JSON.stringify(['SKY:real-moon-composite', 'SKY:sky-lite-aerial', 'SKY:sky-lite-clouds'])
+    && reach([]).length === 0 && JSON.stringify(reach(['REAL_MOON'])) === '["SKY:real-moon-composite"]' && reach(['SKY_LITE']).length === 2
+    && sky.every((e) => { const o = e.build(); return o?.isObject3D === true; }), keys.join(', '));
 }
 
 console.log(`\nverify-ship-sky: ${passed} passed, ${failed} failed`);
