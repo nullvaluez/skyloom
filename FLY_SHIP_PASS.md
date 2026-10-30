@@ -1034,10 +1034,25 @@ the link but never left the title → diagnosed (the launcher read the store's
 pre-spawn 'hangar' screen as "the player left") and fixed (D11); re-run
 pending.
 
-**Owner checks.** Run list 5080 #8: a private window boots calm (no crash on a
-commanded dive, no combo chip, no tower buzz in Contracts); Settings →
-"Challenge mode" On restores today's arcade layer; `?flags=-CHALLENGE_LAYER`
-is the pre-pass game.
+**Owner checks (section 9; nothing here is a 5080 or iPhone result).**
+- 5080 #1 (production build): a warm boot to reveal with the worker installed
+  vs W0.6 (RL-8), and Chrome's install prompt / Lighthouse "installable".
+  `?flags=-OFFLINE_SHELL` once removes the worker (DevTools → Application).
+- 5080 #4 / #8: no `Assertion failed` in the console over a 5-minute flight and
+  a lounge session (RL-9); a private window boots calm (no crash on a
+  commanded dive, no combo chip, no tower buzz in Contracts); Settings →
+  "Challenge mode" On restores today's arcade layer; `?flags=-CHALLENGE_LAYER`
+  is the pre-pass game (RL-2).
+- 5080 #9: each deep-link kind — `?fly=grand-canyon`, `?at=36.1,-112.1,9000`,
+  `?watch=KJFK`, `?journey=manhattan-skyline`, `&aircraft=glider`, and a junk
+  link (quiet notice); Copy link on an airport card, a journey brief, the Atlas
+  card and Pause (RL-4; while DEEP_LINKS is off add `&flags=DEEP_LINKS`).
+- iPhone #7 / #8 / #9: a deep link from Messages; Add to Home Screen (the
+  install hint shows on the second visit after a completed flight); the
+  consent card on the title after a first flight, and "No thanks" sticks
+  (RL-6; `&flags=ANALYTICS_V2` while it is off).
+- Per-mode 1200×630 share cards captured on the 5080 (RL-5), and
+  `NEXT_PUBLIC_SITE_URL` set on any self-hosted deploy.
 
 **Known issues.** The airport-buzz *toast* (`SpotToast.jsx`, not a RELEASE
 file) still shows when a calm player buzzes a tower; it no longer scores,
