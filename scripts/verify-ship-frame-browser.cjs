@@ -90,6 +90,9 @@ async function runArm(browser, arm) {
     });
   }
   const q = new URLSearchParams({ diag: '1' });
+  // A production server reads the harness pins (title bypass, visuals pin) and
+  // publishes __fly / __flyStore only under ?graphicsReview=1 (beta-soak's idiom).
+  if (process.env.FRAME_PROD === '1') q.set('graphicsReview', '1');
   if (FLAGS[arm]) q.set('flags', FLAGS[arm]);
   const url = `${BOOT_URL.replace(/\/$/, '')}/?${q}`;
   const t0 = Date.now();
@@ -164,7 +167,7 @@ async function runArm(browser, arm) {
       if (!f) return null;
       f.setFrameCadence('30');
       await new Promise((r) => setTimeout(r, 3000));
-      const out = { stored: localStorage.getItem('fly-frame-rate-v1'), store: window.__flyStore.getState().frameRateMode, mode: f.frameCadence(), target: window.__flyGov?.state?.().targetFps ?? null, refresh: window.__flyGov?.state?.().refresh ?? null };
+      const out = { stored: localStorage.getItem('fly-frame-rate-v1'), store: window.__flyStore?.getState?.().frameRateMode ?? null, mode: f.frameCadence(), target: window.__flyGov?.state?.().targetFps ?? null, refresh: window.__flyGov?.state?.().refresh ?? null };
       f.setFrameCadence('60');
       await new Promise((r) => setTimeout(r, 1500));
       out.back = { stored: localStorage.getItem('fly-frame-rate-v1'), target: window.__flyGov?.state?.().targetFps ?? null };
