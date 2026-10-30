@@ -10,6 +10,7 @@
  *
  *   FLY_URL=http://localhost:3134 FLY_TILE_FIXTURE=1 node scripts/review-ship-light.cjs \
  *     [--arms=desktop-off,desktop-on,...] [--out=.graphics-review/ship-pass/light/review]
+ *     [--settle=25000] [--shimmer=<s>]  (terrain arms default to a 60 s still diff)
  *
  * The venue's SwiftShader is device class 'software', which the device policy
  * refuses; each arm pins `window.__flyLightDeviceClass` (lib/fly/ship-light.js)
@@ -230,6 +231,28 @@ const SHADER_ERR = /Shader Error|WebGLProgram|shader|GL_INVALID|TERRAIN_SHADOW|C
           row.screenshotError = String(e.message).slice(0, 200);
         });
         row.file = file;
+        // LT-2's "no shimmer in a 60 s still diff": with the pose frozen, a
+        // second still `--shimmer=<s>` seconds later (default 60 on the terrain
+        // arms), diffed over the ground (the lower 45 % of the frame). Compare
+        // the ON arm against the OFF arm: water, clouds and HUD breathe in
+        // both, so only the difference is the shadow's.
+        const shimmerS = Number(args.shimmer ?? (/^terrain-/.test(name) ? 60 : 0));
+        if (shimmerS > 0 && !row.screenshotError) {
+          await page.waitForTimeout(shimmerS * 1000);
+          const later = `${name}-t${shimmerS}.png`;
+          await page.screenshot({ path: path.join(OUT, later), timeout: 120000 });
+          const sharp = require('sharp');
+          const a = await sharp(path.join(OUT, file)).raw().toBuffer({ resolveWithObject: true });
+          const b = await sharp(path.join(OUT, later)).raw().toBuffer({ resolveWithObject: true });
+          const { width: w, height: h, channels: c } = a.info;
+          const L = (d, i) => 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+          let n = 0, moved = 0, sum = 0;
+          for (let y = Math.floor(h * 0.55); y < h; y++) for (let x = 0; x < w; x++) {
+            const i = (y * w + x) * c, d = Math.abs(L(a.data, i) - L(b.data, i));
+            n++; sum += d; if (d > 8) moved++;
+          }
+          row.shimmer = { seconds: shimmerS, file: later, movedFrac: +(moved / n).toFixed(5), meanAbsLuma: +(sum / n).toFixed(3) };
+        }
       } catch (e) {
         row.fatal = String(e.stack || e).slice(0, 1200);
       }
