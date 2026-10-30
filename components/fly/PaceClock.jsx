@@ -2,7 +2,7 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { estimateDisplayHz, markFrameEnd } from '@/lib/fly/pace-adapt';
-import { frameCadence, noteCadence, subscribeFrameCadence } from '@/lib/fly/frame-api';
+import { cadenceState, frameCadence, governorHolds, noteCadence, setFrameCadence, subscribeFrameCadence } from '@/lib/fly/frame-api';
 import { setCinemaEffectFloor } from '@/lib/fly/cinema-policy';
 import { deviceFeature } from '@/lib/fly/device-policy';
 import { shipPassBlock } from '@/lib/fly/ship-pass';
@@ -22,6 +22,14 @@ import { useFlyStore } from '@/stores/fly-store';
 export function PaceClock() {
   const mode = useSyncExternalStore(subscribeFrameCadence, frameCadence, () => '60');
   useFrame(() => markFrameEnd(), 1000);
+
+  // The owner's console and the harnesses: window.__flyFrame (PACE_ADAPT on only).
+  useEffect(() => {
+    window.__flyFrame = { setFrameCadence, frameCadence, cadenceState, governorHolds };
+    return () => {
+      delete window.__flyFrame;
+    };
+  }, []);
 
   useEffect(() => {
     const block = shipPassBlock('PACE_ADAPT') ?? {};

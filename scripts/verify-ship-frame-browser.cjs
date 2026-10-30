@@ -123,6 +123,21 @@ async function runArm(browser, arm) {
   } else if (s.checkShaderErrors != null) {
     check(arm, 'checkShaderErrors stays true under automation (FR-2)', s.checkShaderErrors === true);
   }
+  // FR-9: Battery saver / 30 persists, mirrors into the store and re-aims the governor.
+  if (paceOn) {
+    const m = await page.evaluate(async () => {
+      const f = window.__flyFrame;
+      if (!f) return null;
+      f.setFrameCadence('30');
+      await new Promise((r) => setTimeout(r, 3000));
+      const out = { stored: localStorage.getItem('fly-frame-rate-v1'), store: window.__flyStore.getState().frameRateMode, mode: f.frameCadence(), target: window.__flyGov?.state?.().targetFps ?? null, refresh: window.__flyGov?.state?.().refresh ?? null };
+      f.setFrameCadence('60');
+      await new Promise((r) => setTimeout(r, 1500));
+      out.back = { stored: localStorage.getItem('fly-frame-rate-v1'), target: window.__flyGov?.state?.().targetFps ?? null };
+      return out;
+    });
+    check(arm, 'frame-rate mode 30 persists (fly-frame-rate-v1), mirrors to the store, re-aims the governor (FR-9)', !!m && m.stored === '30' && m.store === '30' && (m.refresh ? m.target === 30 : true) && m.back.stored === '60', JSON.stringify(m));
+  }
   // FR-9: the Frame rate row exists only with PACE_ADAPT (desktop: Match display).
   let row = null;
   try {
