@@ -19,7 +19,8 @@
  *            to the analytics host, zero page / shader errors
  *   watch    ?watch=KJFK: the lounge opens at JFK
  *   journey  ?journey=<first>: that journey's briefing opens
- *   invalid  ?fly=atlantis: the title stays with the quiet notice
+ *   invalid  ?fly=atlantis: the title stays with the quiet notice; then the
+ *            consent card clears the imagery credit and "No thanks" persists
  *   consent  consent 'yes' (positive control): analytics requests are seen
  * LEGS=fly,watch limits the run. Evidence: .graphics-review/ship-pass/release/.
  */
@@ -161,6 +162,22 @@ const booted = (page) => page.waitForFunction(() => window.__flyBoot?.pct === 10
         await page.getByTestId('deep-link-notice').waitFor();
         const s = await store(page);
         gate('invalid: an unknown place leaves the title up with the quiet notice', s?.screen === 'title', s);
+        // RL-6: the consent card (raised by the store here: automation is never
+        // prompted) sits on the title above the imagery credit, and the choice
+        // persists.
+        await page.evaluate(() => window.__flyStore.getState().setConsentPrompt(true));
+        await page.getByTestId('consent-prompt').waitFor();
+        await page.waitForTimeout(1500);
+        const geo = await page.evaluate(() => {
+          const r = (id) => document.querySelector(`[data-testid="${id}"]`)?.getBoundingClientRect();
+          const c = r('consent-prompt');
+          const a = r('title-attribution');
+          return { cardBottom: c && Math.round(c.bottom), creditTop: a && Math.round(a.top), creditH: a && Math.round(a.height) };
+        });
+        gate('invalid: the consent card clears the imagery credit', geo.cardBottom != null && (!geo.creditH || geo.cardBottom <= geo.creditTop), geo);
+        await page.getByTestId('consent-decline').evaluate((el) => el.click());
+        const choice = await page.evaluate(() => ({ stored: localStorage.getItem('fly-analytics-consent'), open: !!document.querySelector('[data-testid="consent-prompt"]') }));
+        gate('invalid: "No thanks" persists the choice and closes the card', choice.stored === 'no' && !choice.open, choice);
       },
     });
     await leg(browser, fixture, 'consent', `?graphicsReview=1&flags=${ON}`, {
