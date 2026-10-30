@@ -673,6 +673,9 @@ console.log('SHIP PASS RELEASE gate (verify-ship-release)\n');
   const offlineSrc = read('lib/fly/offline-shell.js');
   gate('W12 retire: the worker deletes only Skyloom caches, acks, then answers and stores nothing; the kill switch retires before it unregisters',
     JSON.stringify(deleted) === '["skyloom-shell-v1"]' && ack === 'retired' && !afterRetire && fetched.length === 0 && /await retireWorker\(r\.active\);\s*if \(await r\.unregister\(\)\) n\+\+;/.test(offlineSrc), JSON.stringify({ deleted, ack, afterRetire, fetched }));
+  const constants = read('lib/fly/fly-constants.js');
+  const shellBlk = constants.slice(constants.indexOf('export const OFFLINE_SHELL = {'), constants.indexOf('};', constants.indexOf('export const OFFLINE_SHELL = {')));
+  gate('W13 OFFLINE_SHELL ships enabled:true (D6: production-only registration, the allowlist and an offline launch measured in the venue)', /\n  enabled: true,\n/.test(shellBlk + '\n'));
   const offline = read('lib/fly/offline-shell.js');
   const host = read('components/fly/hud/OfflineShell.jsx');
   gate('W8 registration waits for the load event and an idle period (never inside the first minute\'s critical path)', /whenIdle\(\(\) => \{\s*syncOfflineShell\(action\)/.test(host) && /readyState === 'complete'/.test(offline) && /addEventListener\('load', go/.test(offline) && /requestIdleCallback\(run, \{ timeout \}\)/.test(offline));
