@@ -412,6 +412,15 @@ console.log('SHIP PASS RELEASE gate (verify-ship-release)\n');
   const host = read('components/fly/hud/DeepLinkHost.jsx');
   gate('D11 the launcher waits for the opening title (the spawn resolves async): only leaving it AFTER it was up stands the link down; it reports __flyDeepLink',
     /if \(s\.screen === 'title'\) sawTitle = true;\s*else if \(sawTitle\) return finish\('', 'stood-down'\);/.test(host) && !/if \(s\.screen !== 'title'\) return finish/.test(host) && /window\.__flyDeepLink = \{/.test(host));
+  // React runs a child's effects before its parent's on the mounting commit, so
+  // DeepLinkHost's effect body runs BEFORE FlyMode's pre-mount effect consumes
+  // the link (measured in the venue: the link was stripped, __flyDeepLink never
+  // set). The link must be read on the first interval tick (arm), never in the
+  // effect body.
+  const body = host.slice(host.indexOf('let link = null;'), host.indexOf('timer = setInterval(step, 500);'));
+  gate('D12 the launcher reads the consumed link on its first tick, after FlyMode\'s pre-mount effect (a child effect runs before its parent\'s)',
+    /const arm = \(\) => \{\s*link = pendingDeepLink\(\);/.test(host) && /if \(!link && !arm\(\)\) return;/.test(host) &&
+      (host.match(/pendingDeepLink\(\)/g) || []).length === 1 && !/^\s*const link = pendingDeepLink\(\)/m.test(host) && body.length > 0);
 }
 
 // === N  RL-6 analytics =========================================================

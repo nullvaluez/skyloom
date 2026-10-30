@@ -52,18 +52,23 @@ export function DeepLinkHost({ runtime }) {
   }, [runtime]);
 
   useEffect(() => {
-    const link = pendingDeepLink();
-    if (!link) return undefined;
-    track('deep_link_opened', { kind: link.ok ? link.kind : 'invalid' });
+    // The link is read on the first TICK, not in this effect's body: FlyMode's
+    // pre-mount effect consumes it (resolveInitialSpawn's RELEASE spawn block),
+    // and React runs a child's effects BEFORE its parent's on the mounting
+    // commit, so here the link is not consumed yet (measured in the venue: the
+    // ?fly= link was stripped and __flyDeepLink never set). By the first tick
+    // the parent effect has run; no link then (none, or a harness bypass pin
+    // left it unread) means there is nothing to launch.
+    let link = null;
     let timer = null;
     let busy = false;
     let done = false;
+    let started = 0;
     // `window.__flyDeepLink` says where the link stands (harnesses, and an
     // owner reading a phone's state): waiting | launched | refused | stood-down.
     const report = (state, message = '') => {
       window.__flyDeepLink = { kind: link.ok ? link.kind : 'invalid', state, message };
     };
-    report('waiting');
     const finish = (message, state = message ? 'refused' : 'launched') => {
       done = true;
       settleDeepLink();
@@ -71,12 +76,22 @@ export function DeepLinkHost({ runtime }) {
       report(state, message);
       if (message) setNotice(message);
     };
-    if (!link.ok) {
-      // Deferred past this effect (no synchronous state write inside it).
-      const t = setTimeout(() => finish("That link didn't match a place in Skyloom, so you're on the title."), 0);
-      return () => clearTimeout(t);
-    }
-    const started = performance.now();
+    const arm = () => {
+      link = pendingDeepLink();
+      if (!link) {
+        done = true;
+        clearInterval(timer);
+        return false;
+      }
+      track('deep_link_opened', { kind: link.ok ? link.kind : 'invalid' });
+      report('waiting');
+      started = performance.now();
+      if (!link.ok) {
+        finish("That link didn't match a place in Skyloom, so you're on the title.");
+        return false;
+      }
+      return true;
+    };
     // FlyMode sets the opening screen only once the (async) spawn resolves, and
     // a linked spawn far from home takes longer: until the title has been up,
     // "not on the title" means "not yet", not "the player left" (measured in
@@ -85,6 +100,7 @@ export function DeepLinkHost({ runtime }) {
     let sawTitle = false;
     const step = () => {
       if (done || busy) return;
+      if (!link && !arm()) return;
       const s = useFlyStore.getState();
       const late = performance.now() - started > DEADLINE_MS;
       if (s.screen === 'title') sawTitle = true;
