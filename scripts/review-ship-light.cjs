@@ -257,7 +257,10 @@ const SHADER_ERR = /Shader Error|WebGLProgram|shader|GL_INVALID|TERRAIN_SHADOW|C
         row.fatal = String(e.stack || e).slice(0, 1200);
       }
       row.ms = Date.now() - row.t0;
-      if (row.errors.length || row.shaderErrors.length || row.fatal || row.data?.contextLost) failed = true;
+      // The owner's ANGLE/D3D11 and the iPhone expose 16 fragment units even
+      // where this venue exposes more: over 16 is a red here too.
+      row.samplersOver16 = (row.data?.samplers ?? []).filter((s) => s.samplers > 16);
+      if (row.errors.length || row.shaderErrors.length || row.fatal || row.data?.contextLost || row.samplersOver16.length) failed = true;
       report.arms.push(row);
       save();
       console.log(`${name}: ${row.fatal ? 'FATAL' : 'ok'} errors=${row.errors.length} shader=${row.shaderErrors.length} ms=${row.ms} ts=${JSON.stringify(row.data?.terrainShadow ?? null)?.slice(0, 200)}`);

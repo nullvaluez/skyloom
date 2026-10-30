@@ -363,6 +363,31 @@ try {
     check('(1o) horizon bind: the first cell centre maps to uv (0.5/n, 0.5/n), the texture is the lit grid', Math.abs(c.x - 0.5 / n) < 1e-9 && Math.abs(c.y - 0.5 / n) < 1e-9 && u.uTsMap.value === hm.texture && u.uTsParams.value.x === 1);
   }
 
+  {
+    // The 16-unit fragment sampler ceiling. ANGLE on D3D11 (Chrome on Windows,
+    // the owner's RTX 5080) and iPhone WebGL2 both expose 16 fragment texture
+    // units, and SwiftShader may expose more, so a venue link proves nothing
+    // here. The upper bound: every custom sampler the patched earth fragment
+    // REFERENCES (a declared-only one is compiled out), plus three's map and
+    // envMap (satellite imagery, the Enhanced environment) and one shadow map
+    // per cascade at the class's largest profile (desktop Ultra, phone).
+    // TERRAIN_SHADOW adds one (uTsMap); another stream adding a sampler to the
+    // earth chain on the merged tree turns this row red.
+    const { CINEMA_PROFILES } = await import('../lib/fly/cinema-profile.js');
+    const desktopCascades = Math.max(...['ultra', 'high', 'medium'].map((p) => CINEMA_PROFILES[p].cascades));
+    const census = (text, cascades) => {
+      const names = [...text.matchAll(/^\s*uniform\s+(?:(?:lowp|mediump|highp)\s+)?sampler\w*\s+(\w+)/gm)].map((m) => m[1]);
+      // three's own optional maps sit in #ifdef blocks the live tile never
+      // defines (specularColorMap, sheenColorMap, ...), so only custom names count.
+      const custom = [...new Set(names)].filter((n) => /^u[A-Z]/.test(n) && count(text, n) > 1);
+      return { custom, total: custom.length + 2 + cascades };
+    };
+    const off = census(cur.earth.text, desktopCascades), on = census(map.earth.text, desktopCascades), ph = census(hor.earth.text, CINEMA_PROFILES.phone.cascades);
+    check('(1p) earth fragment samplers stay within 16 units with the flag on (desktop Ultra cascades, phone)',
+      on.total <= 16 && ph.total <= 16 && on.total === off.total + 1 && on.custom.includes('uTsMap'),
+      `desktop off ${off.total} -> on ${on.total} (${on.custom.length} custom + map + envMap + ${desktopCascades} cascades), phone on ${ph.total}`);
+  }
+
   // =========================================================================
   // (4) LT-4 AIRFRAME_SHADOW and (5) LT-5 SHADOW_REACH.
   // =========================================================================

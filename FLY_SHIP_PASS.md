@@ -979,7 +979,7 @@ known issues). Every LIGHT flag ships `enabled:false`.
 | ID | State | What landed | Evidence |
 |---|---|---|---|
 | LT-1 | owner-pending | No defect found. Review of `mobile-enhanced.js` / `mobile-bloom.js` and their three consumers (Effects bloom, CinemaShadowRig reach, daylight depth): uniform-only or same-shader changes, so no program-key moves; the flag stays OFF for the owner's iPhone glance | `verify-mobile-enhanced` 6/6, `verify-mobile-bloom` 6/6, `verify-cloud-silhouette-gpu` PASS on SwiftShader (1426 -> 0 leaked hull px over 15 silhouettes; Chrome is absent, so it ran through a venue shim that drops `channel:'chrome'`). Phone-emulation app smoke with `?flags=MOBILE_ENHANCED` is queued (`review-ship-light --arms=phone-off,phone-mobile,phone-on`) |
-| LT-2 | built, browser queued | `lib/fly/terrain-shadow.js`: on desktop, a terrain-only ortho depth map (texel-snapped, 2 Hz per policy); on touch, a CPU horizon map built from a wrapped `TerrainGroundQuery` and time-sliced. Anchored patch in `earth-surface-material.js`; `TerrainShadowRig.jsx` is mounted from FlyScene's LIGHT block only with the flag on | `verify-ship-light` (0a)-(0c), (1a)-(1o). Flag off, the terrain key and the shader sha256 equal the base tree |
+| LT-2 | built, browser queued | `lib/fly/terrain-shadow.js`: on desktop, a terrain-only ortho depth map (texel-snapped, 2 Hz per policy); on touch, a CPU horizon map built from a wrapped `TerrainGroundQuery` and time-sliced. Anchored patch in `earth-surface-material.js`; `TerrainShadowRig.jsx` is mounted from FlyScene's LIGHT block only with the flag on | `verify-ship-light` (0a)-(0c), (1a)-(1p). Flag off, the terrain key and the shader sha256 equal the base tree. (1p) is the 16-unit fragment sampler ceiling (ANGLE D3D11 and iPhone expose 16): at Ultra's 3 cascades the upper bound goes from 15 to 16 with the flag on (phone 14). That is zero headroom, and no sibling branch adds a sampler. The review harness now fails an arm whose measured earth program exceeds 16, whatever the venue's own limit |
 | LT-3 | built, browser queued | `lib/fly/traffic-shadows.js`, driven from `detailed-traffic.js` (TrafficLayer untouched). Casters render through the fleet depth material, with a per-cascade cull and a per-frame (mesh, cascade) budget. Contact blobs (1 draw) on Medium and touch. Shadow hooks are chained, and `dispose()` hands the meshes back | (3a)-(3j) |
 | LT-4 | built | `CinemaShadows.setAirframeFit` pins cascade 0 past the airframe, with its normal bias in cascade-0 texels. The PlayerPlane LIGHT block toggles receiveShadow (a uniform, so no recompile) | (4a)-(4f) |
 | LT-5 | built | `shadowReachConfig` applies MOBILE_ENHANCED's AGL rule to Medium desktops | (5a)-(5b): 900 m AGL reaches the 1.2 km ceiling |
@@ -1007,7 +1007,7 @@ refuses, so harnesses pin `window.__flyLightDeviceClass`. FRAME's
 `window.__flyDeviceClassOverride` is read as a fallback, and the harnesses set
 both, so they work before and after integration.
 
-**Gates.** `verify-ship-light` 57/57; `ship-pass-gates` 32 PASS / 2 KNOWN-RED
+**Gates.** `verify-ship-light` 58/58; `ship-pass-gates` 32 PASS / 2 KNOWN-RED
 / 0 FAIL, seam rule PASS (re-run at f67addb); `lounge-pass-gates.mjs` PASS all 31; node:
 verify-shadow-calm (35), verify-shadow-coverage, verify-fleet-airframes,
 verify-mobile-enhanced, verify-mobile-bloom, verify-attribution all green.
