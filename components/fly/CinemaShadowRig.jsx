@@ -2,7 +2,7 @@
 /* eslint-disable react-hooks/immutability -- R3F frame callbacks update owned Three objects and shared runtime telemetry, not React state. */
 import { useEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { CinemaShadows, airframeRefit, airframeShadowBreak, airframeShadowOn, shadowReachConfig } from '@/lib/fly/cinema-shadows';
+import { CinemaShadows, airframeRefit, airframeShadowBreak, airframeShadowOn, applyShadowCasterRequests, shadowReachConfig } from '@/lib/fly/cinema-shadows';
 import { cameraModelSize } from '@/lib/fly/camera-framing';
 import { lightBlock } from '@/lib/fly/ship-light';
 import { cinemaOn, cinemaProfile } from '@/lib/fly/cinema-policy';
@@ -36,7 +36,7 @@ export function CinemaShadowRig({runtime,sunRef}){
     const r=rig.current;
     r?.setMapSize(profile.shadowSize);
     if(sunRef.current){sunRef.current.castShadow=false;sunRef.current.intensity=r?0:e.sun;}
-    if(!r){runtime.cinemaShadows={cascades:0};delete runtime.adoptCinematicWarmScene;return;}
+    if(!r){applyShadowCasterRequests(false);runtime.cinemaShadows={cascades:0};delete runtime.adoptCinematicWarmScene;return;}
     const state=useFlyStore.getState();
     let rangeM=profile.shadowRangeM;
     // SHIP PASS LIGHT (SHADOW_REACH, LT-5): Medium desktops reuse the phone
@@ -92,10 +92,12 @@ export function CinemaShadowRig({runtime,sunRef}){
       airframeBreak=airframeShadowBreak({distM,lengthM:size?Math.max(size.length,size.width)*Math.max(1,k):NaN,rangeM:range,cameraMode:state.cameraMode,cascades:r.cascades});
     }
     if(airframeRefit(r.airframeBreakM,airframeBreak,lightBlock('AIRFRAME_SHADOW').refitFrac))r.setAirframeFit(airframeBreak,lightBlock('AIRFRAME_SHADOW'));
+    // SHIP PASS LIGHT: other streams' casters (requestShadowCasters), bounded.
+    const requestedCasters=applyShadowCasterRequests(true);
     camera.updateMatrixWorld();r.update();
     runtime.shadowRadiusM=rangeM;
     Object.assign(runtime.cinemaShadows??={}, {cascades:r.cascades,size:profile.shadowSize,rangeM,baseRangeM:profile.shadowRangeM,materials:r.owned.size,bytes:r.cascades*profile.shadowSize**2*5,scanObjects:r.scanObjects,scanMs:r.scanMs,
-      airframeBreakM:r.airframeBreakM,reach:reach?(mobileReach?'mobile':'medium'):null});
+      airframeBreakM:r.airframeBreakM,reach:reach?(mobileReach?'mobile':'medium'):null,requestedCasters});
   },-.9);
   return null;
 }

@@ -137,6 +137,17 @@ if (probeArg) {
       sh.end();
       out.traffic.blob = { stats: { ...sh.stats }, count: sh.blobs.count, alpha: sh.alpha.getX(0), key: sh.blobs.material.customProgramCacheKey(), casting: [A, B].map((m) => m.castShadow) };
       useFlyStore.setState({ qualityTier: 'high', qualityPreset: 'high' });
+      // dispose() hands the meshes back (their own hooks, no depth material,
+      // not armed), and a new instance arms the same meshes afresh.
+      const proto = THREE.Object3D.prototype.onBeforeShadow;
+      sh.dispose();
+      const handedBack = [A, B].every((m) => m.onBeforeShadow === proto && m.customDepthMaterial === undefined && !m.userData.shipShadowArmed && m.material.userData.shipShadowDepth === undefined);
+      const sh2 = new tsh.TrafficShadows(new THREE.Group());
+      sh2.begin({ tier: 'high' });
+      sh2.note(A, 0, 'hero', 500, at(500), 25);
+      sh2.end();
+      out.traffic.rearm = { handedBack, armed: A.onBeforeShadow !== proto && !!A.customDepthMaterial, drawn: shot(A, big).drawn };
+      sh2.dispose();
     }
     const reg = await mod('lib/fly/prewarm-registry.js');
     out.prewarm = reg.prewarmEntries().filter((e) => e.stream === 'LIGHT').map((e) => {
@@ -403,6 +414,8 @@ try {
     check('(3f) a cascade the casters do not touch draws nothing; the per-frame pair budget (2) is never exceeded', c.aNone.drawn === 0 && c.a2.drawn === 0 && c.a1Again.drawn === 2 && c.stats.castInstances === 3);
     check('(3g) next frame: last frame\'s shadow draws are reported (2 <= budget) and a far contact stops all casting', c.next.stats.shadowDraws === 2 && c.next.casting.join() === 'false,false,false,false');
     const b = on.traffic.blob;
+    check('(3j) dispose hands the meshes back (prototype hooks, no depth material) and a new instance re-arms them',
+      on.traffic.rearm?.handedBack === true && on.traffic.rearm?.armed === true && on.traffic.rearm?.drawn === 1, JSON.stringify(on.traffic.rearm));
     check('(3h) blobs: one instanced draw, below the AGL ceiling only, casters released on the blob path', b.count === 1 && b.stats.blobs === 1 && b.casting.join() === 'false,false' && b.key.endsWith('|traffic-blob-v1') && b.key.includes('world-bend'));
     const tsh = await import('../lib/fly/traffic-shadows.js');
     const cfg = { opacity: 0.5, spanPad: 1, lengthPad: 1, sunStretchMax: 2.5, liftM: 0.3 };
@@ -494,6 +507,29 @@ try {
     check('(8b) the builds carry the live keys: patched earth, terrain depth, fleet + fleet depth, blob',
       keys.some((k) => k.includes('|ts-map-v1')) && keys.some((k) => k.endsWith('|terrain-shadow-depth-v1')) && keys.includes('fleet-airframe-v2|depth') && keys.some((k) => k.includes('fleet-airframe-v2')) && keys.some((k) => k.endsWith('|traffic-blob-v1')) && !keys.some((k) => k.startsWith('THROW')), keys.filter((k) => k.startsWith('THROW')).join(' '));
     check('(8c) the live earth key equals the prewarm earth key (same chain, same session decision)', keys.includes(map.earth.key));
+  }
+
+  // =========================================================================
+  // (9) Provides: requestShadowCasters() (FLY_SHIP_PASS.md 5.4).
+  // =========================================================================
+  {
+    const cs = await import('../lib/fly/cinema-shadows.js');
+    const parent = new THREE.Object3D();
+    const objs = [0, 1, 2].map(() => { const o = new THREE.Object3D(); parent.add(o); return o; });
+    objs[1].castShadow = true; // an object that already casts keeps its own value on release
+    const orphan = new THREE.Object3D();
+    const release = cs.requestShadowCasters('gate', [...objs, orphan], { max: 2 });
+    const on = cs.applyShadowCasterRequests(true);
+    const armed = objs.map((o) => o.castShadow);
+    const offN = cs.applyShadowCasterRequests(false);
+    const parked = objs.map((o) => o.castShadow);
+    cs.applyShadowCasterRequests(true);
+    release();
+    const restored = objs.map((o) => o.castShadow);
+    const empty = cs.applyShadowCasterRequests(true);
+    check('(9a) requestShadowCasters: bounded casters while the cascades exist, parked without them, scene-only',
+      on === 2 && armed.join() === 'true,true,false' && orphan.castShadow === false && offN === 0 && parked.join() === 'false,true,false', `${on} ${armed} ${parked}`);
+    check('(9b) release restores each object\'s own castShadow; no request = nothing touched', restored.join() === 'false,true,false' && empty === 0 && objs.every((o) => o.userData.shipCastPrev === undefined));
   }
 } finally {
   rmSync(SNAP, { recursive: true, force: true });
