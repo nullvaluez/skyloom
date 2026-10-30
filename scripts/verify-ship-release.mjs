@@ -661,6 +661,13 @@ console.log('SHIP PASS RELEASE gate (verify-ship-release)\n');
     { getEntriesByType: () => [{ name: 'http://localhost:3135/models/m.glb' }, { name: 'https://tiles.example/1.png' }] },
     'http://localhost:3135',
   );
+  const consent = read('components/fly/hud/ConsentPrompt.jsx');
+  const ra = read('components/fly/hud/ReleaseAnalytics.jsx');
+  const reserveHook = read('components/fly/hud/use-title-credit-reserve.js');
+  gate('W11 the install hint and the consent card sit above the title\'s imagery credit (the measured --fly-title-attr-reserve), never on it',
+    /--fly-title-attr-reserve/.test(reserveHook) && /title-attribution/.test(reserveHook) && /style=\{\{ bottom: reserve \+ 12 \}\}/.test(host) && /style=\{\{ bottom: reserve \+ 12 \}\}/.test(consent) && !/bottom-\[max\(env\(safe-area-inset-bottom\),1rem\)\]/.test(host + consent));
+  gate('N11 the consent prompt is raised on the title only (never mid-flight over a phone\'s stick), after a first completed flight, once per visit, never under automation',
+    /s\.consentPrompt && s\.screen === 'title'/.test(consent) && /!prompted && !automation && firstDone && s\.screen === 'title' && analyticsV2On\(\) && analyticsConsent\(\) == null/.test(ra) && /navigator\?\.webdriver === true/.test(ra) && !/completeFirstFlight[\s\S]{0,400}setConsentPrompt/.test(ra.slice(ra.indexOf('const completeFirstFlight'), ra.indexOf('let prompted'))));
   gate('W10 warmUrls offers only same-origin URLs the page already loaded', JSON.stringify(urls) === JSON.stringify(['http://localhost:3135/_next/static/a.js', 'http://localhost:3135/_next/static/c.css', 'http://localhost:3135/models/m.glb']), urls);
 }
 

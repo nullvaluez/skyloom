@@ -19,8 +19,14 @@ import { deviceClassOf } from '@/lib/fly/device-policy';
  *     touchdown or liftoff;
  *   - the FIRST COMPLETED FLIGHT (a flight of at least a minute that ends, or
  *     five minutes in one): asks the browser to keep this site's storage
- *     (navigator.storage.persist(), RL-10, once), and with ANALYTICS_V2 on and
- *     the consent never asked, raises the consent prompt.
+ *     (navigator.storage.persist(), RL-10, once);
+ *   - with ANALYTICS_V2 on, the consent never asked and a first flight
+ *     completed (this visit or an earlier one), the consent prompt, raised on
+ *     the TITLE only (never mid-flight, where a card in the lower left would
+ *     sit on a phone's flight stick), once per visit. Automation
+ *     (navigator.webdriver) is never prompted, so the harness fleet's long
+ *     SwiftShader flights keep their layout; a harness opens it through
+ *     `setConsentPrompt`.
  * Every track() call is a no-op without consent or with the flag off.
  */
 const FLIGHT_MODES = new Set(['free', 'journey', 'ops']);
@@ -69,8 +75,9 @@ export function ReleaseAnalytics({ runtime }) {
         writeFlag(PERSIST_KEY);
         navigator.storage?.persist?.().catch(() => {});
       }
-      if (analyticsV2On() && analyticsConsent() == null) useFlyStore.getState().setConsentPrompt(true);
     };
+    let prompted = false;
+    const automation = globalThis.navigator?.webdriver === true;
 
     const tick = () => {
       const s = useFlyStore.getState();
@@ -86,6 +93,10 @@ export function ReleaseAnalytics({ runtime }) {
       } else if (FLIGHT_MODES.has(mode) && s.phase !== 'paused') {
         flightSec += 1;
         if (flightSec >= 300) completeFirstFlight();
+      }
+      if (!prompted && !automation && firstDone && s.screen === 'title' && analyticsV2On() && analyticsConsent() == null) {
+        prompted = true;
+        s.setConsentPrompt(true);
       }
       const moments = runtime.airportWatch?.active ? runtime.airportWatch?.director?.snapshot?.()?.moments : null;
       for (const m of moments ?? []) {

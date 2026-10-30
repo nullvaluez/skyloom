@@ -6,6 +6,7 @@ import { useFlyStore } from '@/stores/fly-store';
 import { shipPassOn } from '@/lib/fly/ship-pass';
 import { offlineShellAction, syncOfflineShell, whenIdle } from '@/lib/fly/offline-shell';
 import { deviceClassOf } from '@/lib/fly/device-policy';
+import { useTitleCreditReserve } from './use-title-credit-reserve';
 
 /**
  * SHIP PASS RL-8 (OFFLINE_SHELL) — the worker's registration (or its kill
@@ -90,6 +91,8 @@ export function OfflineShell() {
     };
   }, []);
 
+  const reserve = useTitleCreditReserve(eligible && onTitle);
+
   if (!eligible || !onTitle) return null;
   const dismiss = () => {
     write(DISMISS_KEY, '1');
@@ -108,7 +111,8 @@ export function OfflineShell() {
       aria-modal="false"
       aria-label="Install Skyloom"
       data-testid="install-hint"
-      className="pointer-events-auto absolute bottom-[max(env(safe-area-inset-bottom),1rem)] left-1/2 z-[46] flex w-[min(24rem,calc(100vw-2rem))] -translate-x-1/2 items-center gap-2 rounded-lg border border-zinc-700/70 bg-zinc-950/90 p-2 pl-3 text-xs text-zinc-200 shadow-xl"
+      style={{ bottom: reserve + 12 }}
+      className="pointer-events-auto absolute left-1/2 z-[46] flex w-[min(24rem,calc(100vw-2rem))] -translate-x-1/2 items-center gap-2 rounded-lg border border-zinc-700/70 bg-zinc-950/90 p-2 pl-3 text-xs text-zinc-200 shadow-xl"
     >
       <Download size={16} aria-hidden="true" className="shrink-0 text-sky-300" />
       <p className="min-w-0 flex-1">{prompt ? 'Add Skyloom to your home screen for a full-screen window seat.' : 'Add Skyloom to your home screen: tap Share, then Add to Home Screen.'}</p>
