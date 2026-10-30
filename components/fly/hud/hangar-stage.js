@@ -245,3 +245,63 @@ function mulberry(seed) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
+
+/*
+ * SHIP PASS LIGHT — HANGAR_EXPOSURE (FLY_SHIP_PASS.md LT-7). The studio lights
+ * were set for a mid-grey airframe, so a white livery's nose clipped. The key,
+ * pool, rims and door sun now scale by the livery's albedo luminance; darker
+ * liveries never get brighter than today. Pure helpers (node-gated).
+ */
+const luma = (c) => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+
+/**
+ * Area-weighted (by triangle count) linear albedo luminance of an airframe:
+ * the painted preset's hull/trim/accent when a paint preset is on, else each
+ * mesh's material colour times its mean vertex colour. 0.5 when unknown.
+ */
+export function liveryLuminance(root) {
+  const paint = root?.userData?.fleetPaint?.uniforms;
+  if (paint?.uFleetPaintOn?.value === 1 && paint.uFleetHull?.value) {
+    return 0.75 * luma(paint.uFleetHull.value) + 0.15 * luma(paint.uFleetTrim.value) + 0.1 * luma(paint.uFleetAccent.value);
+  }
+  let sum = 0;
+  let weight = 0;
+  root?.traverse?.((o) => {
+    if (!o.isMesh || !o.geometry) return;
+    const g = o.geometry;
+    const tris = (g.index ? g.index.count : g.attributes.position?.count ?? 0) / 3;
+    if (!(tris > 0)) return;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    const m = mats[0];
+    if (!m?.color || m.transparent) return;
+    let k = luma(m.color);
+    const attr = m.vertexColors ? g.getAttribute?.('color') : null;
+    if (attr) {
+      let s = 0;
+      let n = 0;
+      const step = Math.max(1, Math.floor(attr.count / 256));
+      for (let i = 0; i < attr.count; i += step) {
+        s += 0.2126 * attr.getX(i) + 0.7152 * attr.getY(i) + 0.0722 * attr.getZ(i);
+        n++;
+      }
+      if (n) k *= s / n;
+    }
+    sum += k * tris;
+    weight += tris;
+  });
+  return weight > 0 ? sum / weight : 0.5;
+}
+
+/** Light scale for a livery luminance: targetLuma / luma, clamped [minScale, maxScale]. */
+export function hangarExposureScale(liveryLuma, cfg = {}) {
+  const target = cfg.targetLuma ?? 0.42;
+  if (!(liveryLuma > 0)) return 1;
+  return Math.min(cfg.maxScale ?? 1, Math.max(cfg.minScale ?? 0.55, target / liveryLuma));
+}
+
+/** The reflector render-target size: halved (reflectorScale) on Medium. */
+export function hangarReflectorResolution(tier, cfg = null) {
+  const base = tier === 'high' ? 1024 : 512;
+  if (!cfg || tier !== 'medium') return base;
+  return Math.max(128, Math.round(base * (cfg.reflectorScale ?? 0.5)));
+}

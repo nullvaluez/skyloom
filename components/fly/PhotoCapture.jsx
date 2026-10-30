@@ -10,6 +10,12 @@ import { adventurePhotoFrame } from '@/lib/fly/adventure-photo';
 import { encounterPhotoFrame } from '@/lib/fly/encounter-photo';
 import { saveMemoryPhoto } from '@/lib/fly/encounter-photo';
 import { useExplorationStore } from '@/stores/exploration-store';
+import { Vector2 } from 'three';
+import { holdGovernor } from '@/lib/fly/frame-api';
+import { track } from '@/lib/fly/analytics';
+import { getComposer } from '@/lib/fly/step-safe';
+import { lightBlock, lightFeature } from '@/lib/fly/ship-light';
+import { glPhotoLimits, photoExportPlan, photoHiresActive } from '@/lib/fly/photo-hires';
 
 /**
  * Round 17 — the shutter.
@@ -44,11 +50,19 @@ import { useExplorationStore } from '@/stores/exploration-store';
  */
 export function PhotoCapture({runtime}) {
   const gl = useThree((s) => s.gl);
+  const camera = useThree((s) => s.camera);
   // { resolve, reject, t0 } — set by the action, drained by the frame below.
   const pendingRef = useRef(null);
+  // SHIP PASS LIGHT (PHOTO_HIRES): the governor hold, released a few frames
+  // after the supersampled frame (its long delta lands in the NEXT frame).
+  const holdRef = useRef(null);
+  useEffect(() => () => { holdRef.current?.release(); holdRef.current = null; }, []);
 
   useEffect(() => {
-    const capturePhoto = () =>
+    // `options.scale` (SHIP PASS LIGHT, PHOTO_HIRES): 'auto' or a number asks
+    // for a supersampled export; absent (the lounge, harnesses) or with the
+    // flag off, the drawing buffer exactly as before.
+    const capturePhoto = (options) =>
       new Promise((resolve, reject) => {
         // A second request while one is in flight simply replaces it: the
         // shutter is idempotent within a frame, and the old promise would
@@ -56,7 +70,7 @@ export function PhotoCapture({runtime}) {
         pendingRef.current?.reject?.(new Error('superseded'));
         let settled=false;
         const timeout=setTimeout(()=>{settled=true;reject(new Error('Photo timed out. Resume the scene and try again.'));},15000);
-        pendingRef.current = { get settled(){return settled;}, resolve:value=>{clearTimeout(timeout);settled=true;resolve(value);}, reject:error=>{clearTimeout(timeout);settled=true;reject(error);}, t0: performance.now() };
+        pendingRef.current = { get settled(){return settled;}, resolve:value=>{clearTimeout(timeout);settled=true;resolve(value);}, reject:error=>{clearTimeout(timeout);settled=true;reject(error);}, t0: performance.now(), scale: options?.scale };
       });
     registerRuntimeActions({ capturePhoto });
     return () => {
@@ -69,6 +83,8 @@ export function PhotoCapture({runtime}) {
   }, []);
 
   useFrame(() => {
+    const hold = holdRef.current;
+    if (hold && --hold.frames <= 0) { hold.release(); holdRef.current = null; }
     const req = pendingRef.current;
     if (!req) return;
     pendingRef.current = null;
@@ -76,16 +92,33 @@ export function PhotoCapture({runtime}) {
 
     try {
       const src = gl.domElement;
-      const w = src.width;
-      const h = src.height;
+      let w = src.width;
+      let h = src.height;
       if (!w || !h) throw new Error('canvas has no drawing buffer');
 
       // --- SAME TASK, immediately after the composer pass -----------------
-      const out = document.createElement('canvas');
-      out.width = w;
-      out.height = h;
+      // SHIP PASS LIGHT (PHOTO_HIRES): a supersampled frame when asked for
+      // and allowed; otherwise (and always with the flag off) the drawing
+      // buffer exactly as before.
+      const fly = useFlyStore.getState();
+      const hires = req.scale !== undefined && photoHiresActive({ tier: fly.qualityTier, preset: fly.qualityPreset })
+        ? photoExportPlan({ bufW: w, bufH: h, request: req.scale, budget: lightFeature('PHOTO_HIRES', { tier: fly.qualityTier, preset: fly.qualityPreset }).budget, limits: glPhotoLimits(gl) })
+        : null;
+      let out;
+      if (hires && hires.scale > 1) {
+        holdRef.current?.release();
+        const block = lightBlock('PHOTO_HIRES');
+        holdRef.current = { release: holdGovernor('photo-hires'), frames: Math.max(1, block.releaseFrames ?? 3) };
+        out = renderHires(gl, camera, hires, block);
+        w = out.width;
+        h = out.height;
+      } else {
+        out = document.createElement('canvas');
+        out.width = w;
+        out.height = h;
+        out.getContext('2d').drawImage(src, 0, 0);
+      }
       const ctx = out.getContext('2d');
-      ctx.drawImage(src, 0, 0);
       const observationCapture=!!runtime?.airportWatch?.active||runtime?.escort?.source==='airport';
       const adventureFrame=adventurePhotoFrame(runtime,useFlyStore.getState().warpEpoch);
       const encounterFrame=encounterPhotoFrame(runtime,useFlyStore.getState().warpEpoch);
@@ -117,8 +150,11 @@ export function PhotoCapture({runtime}) {
             h,
             bytes: blob.size,
             style: mapStyle,
+            ...(hires ? { hires: { scale: hires.scale, tiles: hires.tiles, renderMs: out.hiresMs } } : {}),
           };
         }
+        // Analytics (RELEASE's sanitizer decides what, if anything, leaves).
+        track('photo_taken');
         if(!observationCapture)runtime?.adventures?.photo(adventureFrame,blob);
         if(!observationCapture)runtime?.encounters?.photo(encounterFrame,blob);
         if(memory&&!observationCapture){useExplorationStore.getState().record('photo',memory);saveMemoryPhoto(blob).then(thumbnail=>{if(thumbnail)useExplorationStore.getState().attachThumbnail(memory.id,thumbnail);}).catch(()=>{});}
@@ -131,6 +167,51 @@ export function PhotoCapture({runtime}) {
   }, PHOTO.capturePriority);
 
   return null;
+}
+
+/**
+ * SHIP PASS LIGHT (PHOTO_HIRES): one frame at the export size, inside this
+ * rAF task. The renderer's pixel ratio and the composer's buffers go up for
+ * the frame (or, past the GL limits, the frame is drawn in tiles through the
+ * camera's view offset), the result is copied into a 2D canvas, and the
+ * renderer, the composer and the visible frame are restored before the task
+ * ends. A WebGL context loss rejects the photo instead of exporting garbage.
+ */
+function renderHires(gl, camera, plan, block) {
+  const composer = getComposer() ?? (typeof window !== 'undefined' ? window.__flyComposer : null);
+  if (!composer) throw new Error('No composer to render the photo.');
+  const css = gl.getSize(new Vector2()), pr = gl.getPixelRatio();
+  const view = camera.view?.enabled ? { ...camera.view } : null;
+  const settle = Math.max(0, block.settleFrames ?? 1);
+  const t0 = performance.now();
+  const out = document.createElement('canvas');
+  let ctx = null;
+  try {
+    const n = plan.tiles;
+    gl.setPixelRatio((pr * plan.scale) / n);
+    composer.setSize(css.x, css.y);
+    const tw = gl.domElement.width, th = gl.domElement.height;
+    out.width = tw * n;
+    out.height = th * n;
+    ctx = out.getContext('2d');
+    for (let ty = 0; ty < n; ty++) {
+      for (let tx = 0; tx < n; tx++) {
+        if (n > 1) camera.setViewOffset(tw * n, th * n, tx * tw, ty * th, tw, th);
+        for (let i = 0; i <= settle; i++) composer.render(0);
+        if (gl.getContext().isContextLost()) throw new Error('The graphics context was lost while taking the photo.');
+        ctx.drawImage(gl.domElement, tx * tw, ty * th);
+      }
+    }
+  } finally {
+    if (view) camera.setViewOffset(view.fullWidth, view.fullHeight, view.offsetX, view.offsetY, view.width, view.height);
+    else if (plan.tiles > 1) camera.clearViewOffset();
+    gl.setPixelRatio(pr);
+    composer.setSize(css.x, css.y);
+    // The visible frame: the canvas was resized (and so cleared) above.
+    composer.render(0);
+  }
+  out.hiresMs = Math.round(performance.now() - t0);
+  return out;
 }
 
 /**

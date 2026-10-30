@@ -61,10 +61,83 @@ if (probeArg) {
     out.mode = ts.terrainShadowMode();
     const depth = compile(ts.createTerrainShadowDepthMaterial());
     out.depth = { key: depth.key, vert: depth.vert, frag: depth.frag };
+    out.photoActive = (await mod('lib/fly/photo-hires.js')).photoHiresActive({ tier: 'high' });
     const cs = await mod('lib/fly/cinema-shadows.js');
     const st = useFlyStore.getState();
     out.airframeOn = { high: cs.airframeShadowOn(st), medium: cs.airframeShadowOn({ ...st, qualityTier: 'medium', qualityPreset: 'medium' }) };
     out.reach = { high: cs.shadowReachConfig(st), medium: cs.shadowReachConfig({ ...st, qualityTier: 'medium', qualityPreset: 'medium' }) };
+    // LT-3: the fleet, the path table and one simulated frame of each path.
+    const tsh = await mod('lib/fly/traffic-shadows.js');
+    const { DetailedTraffic } = await mod('lib/fly/detailed-traffic.js');
+    const dt = new DetailedTraffic();
+    out.traffic = { shadows: !!dt.shadows, groupChildren: dt.group.children.length };
+    out.traffic.paths = Object.fromEntries(['dgpu', 'igpu', 'phone', 'tablet', 'software'].flatMap((cls) => ['low', 'medium', 'high'].map((tier) => [`${cls}/${tier}`, tsh.trafficShadowPath({ tier, cls })])));
+    if (dt.shadows) {
+      const { CINEMA_UNIFORMS } = await mod('lib/fly/cinema-frame.js');
+      CINEMA_UNIFORMS.uCinema.value = 1;
+      CINEMA_UNIFORMS.uCinemaKey.value.set(0.5, 0.3, 0.8).normalize();
+      const sh = dt.shadows;
+      const mk = (name) => {
+        const m = new THREE.MeshPhysicalMaterial();
+        m.userData.fleet = {};
+        m.userData.fleetShared = {};
+        const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(30, 10, 40), m, 8);
+        mesh.name = name;
+        mesh.count = 3;
+        return mesh;
+      };
+      const [A, B, C, D] = ['A', 'B', 'C', 'D'].map(mk);
+      const at = (z) => new THREE.Matrix4().makeTranslation(0, 5, -z);
+      sh.begin({ tier: 'high' });
+      sh.note(A, 0, 'hero', 500, at(500), 25);
+      sh.note(A, 1, 'hero', 900, at(900), 25);
+      sh.note(B, 0, 'mid', 1500, at(1500), 25);
+      sh.note(C, 0, 'mid', 3000, at(3000), 25);
+      sh.note(D, 0, 'far', 100, at(100), 25);
+      sh.note(D, 1, 'mid', 9000, at(9000), 25);
+      sh.end();
+      const big = new THREE.OrthographicCamera(-20000, 20000, 20000, -20000, 1, 40000);
+      big.position.set(0, 10000, 0);
+      big.lookAt(0, 0, 0);
+      big.updateMatrixWorld();
+      const big2 = big.clone();
+      big2.updateMatrixWorld();
+      const none = new THREE.OrthographicCamera(-10, 10, 10, -10, 1, 20);
+      none.position.set(50000, 10000, 50000);
+      none.lookAt(50000, 0, 50000);
+      none.updateMatrixWorld();
+      const shot = (mesh, cam) => {
+        mesh.onBeforeShadow(null, mesh, null, cam);
+        const drawn = mesh.count;
+        mesh.onAfterShadow(null, mesh);
+        return { drawn, restored: mesh.count };
+      };
+      out.traffic.caster = {
+        casting: [A, B, C, D].map((m) => m.castShadow),
+        depth: A.customDepthMaterial?.customProgramCacheKey?.() ?? null,
+        sharedDepth: A.customDepthMaterial === A.material.userData.shipShadowDepth,
+        a1: shot(A, big),
+        aNone: shot(A, none),
+        b1: shot(B, big),
+        a2: shot(A, big2),
+        a1Again: shot(A, big),
+        stats: { ...sh.stats },
+      };
+      // Next frame: one draw from last frame's pairs is reported, and a far
+      // contact never makes a mesh cast.
+      sh.begin({ tier: 'high' });
+      sh.note(D, 0, 'mid', 9000, at(9000), 25);
+      sh.end();
+      out.traffic.caster.next = { stats: { ...sh.stats }, casting: [A, B, C, D].map((m) => m.castShadow) };
+      // The blob path on Medium.
+      useFlyStore.setState({ qualityTier: 'medium', qualityPreset: 'medium' });
+      sh.begin({ tier: 'medium' });
+      sh.blob({ x: 0, y: 4, z: 0, yaw: 0.3, groundY: 0, span: 35, length: 38, scale: 1, eff: 1 }, 1.3);
+      sh.blob({ x: 0, y: 200, z: 0, yaw: 0, groundY: 0, span: 35, length: 38, scale: 1, eff: 1 }, 1.3);
+      sh.end();
+      out.traffic.blob = { stats: { ...sh.stats }, count: sh.blobs.count, alpha: sh.alpha.getX(0), key: sh.blobs.material.customProgramCacheKey(), casting: [A, B].map((m) => m.castShadow) };
+      useFlyStore.setState({ qualityTier: 'high', qualityPreset: 'high' });
+    }
     const reg = await mod('lib/fly/prewarm-registry.js');
     out.prewarm = reg.prewarmEntries().filter((e) => e.stream === 'LIGHT').map((e) => {
       let keys = [];
@@ -288,6 +361,97 @@ try {
     const me = await import('../lib/fly/mobile-enhanced.js');
     const cfg = { shadowMaxRangeM: 1200, shadowAglScale: 1.6, shadowPaddingM: 180 };
     check('(5b) Medium at 900 m AGL shadows to the 1.2 km ceiling; ground level keeps the 600 m profile', me.mobileShadowRange(600, 900, cfg) === 1200 && me.mobileShadowRange(600, 0, cfg) === 600 && me.mobileShadowRange(600, 300, cfg) === 660);
+  }
+  // =========================================================================
+  // (3) LT-3 TRAFFIC_SHADOWS.
+  // =========================================================================
+  {
+    check('(3a) flags off: the live fleet builds no shadow system (today\'s meshes and draws)', cur.traffic.shadows === false && cur.traffic.groupChildren === 0);
+    const on = probe(ROOT, { ...ON('TRAFFIC_SHADOWS'), __flyLightDeviceClass: 'dgpu' });
+    const p = on.traffic.paths;
+    check('(3b) paths: desktop High casts, desktop Medium/Low and touch get blobs, software none',
+      p['dgpu/high'] === 'caster' && p['igpu/high'] === 'caster' && p['dgpu/medium'] === 'blob' && p['phone/high'] === 'blob' && p['tablet/medium'] === 'blob' && p['software/high'] === null && cur.traffic.paths['dgpu/high'] === null,
+      JSON.stringify(p));
+    const c = on.traffic.caster;
+    check('(3c) casters: the two nearest in-range meshes cast; out-of-range and far-LOD never', c.casting.join() === 'true,true,false,false', c.casting.join());
+    check('(3d) casters use the fleet depth material, one per family material', c.depth === 'fleet-airframe-v2|depth' && c.sharedDepth === true);
+    check('(3e) each caster draws only its in-range instance prefix, and its count is restored after the shadow draw', c.a1.drawn === 2 && c.a1.restored === 3 && c.b1.drawn === 1 && c.b1.restored === 3);
+    check('(3f) a cascade the casters do not touch draws nothing; the per-frame pair budget (2) is never exceeded', c.aNone.drawn === 0 && c.a2.drawn === 0 && c.a1Again.drawn === 2 && c.stats.castInstances === 3);
+    check('(3g) next frame: last frame\'s shadow draws are reported (2 <= budget) and a far contact stops all casting', c.next.stats.shadowDraws === 2 && c.next.casting.join() === 'false,false,false,false');
+    const b = on.traffic.blob;
+    check('(3h) blobs: one instanced draw, below the AGL ceiling only, casters released on the blob path', b.count === 1 && b.stats.blobs === 1 && b.casting.join() === 'false,false' && b.key.endsWith('|traffic-blob-v1') && b.key.includes('world-bend'));
+    const tsh = await import('../lib/fly/traffic-shadows.js');
+    const cfg = { opacity: 0.5, spanPad: 1, lengthPad: 1, sunStretchMax: 2.5, liftM: 0.3 };
+    const sun = new THREE.Vector3(1, Math.tan((10 * Math.PI) / 180), 0).normalize();
+    const touch = tsh.blobPose({ x: 0, y: 0, z: 0, yaw: 0, groundY: 0, span: 30, length: 40 }, sun, 60, cfg);
+    const mid = tsh.blobPose({ x: 0, y: 10, z: 0, yaw: 0, groundY: 0, span: 30, length: 40 }, sun, 60, cfg);
+    const low = tsh.blobPose({ x: 0, y: 50, z: 0, yaw: 0, groundY: 0, span: 30, length: 40 }, new THREE.Vector3(1, 0.01, 0).normalize(), 60, cfg);
+    check('(3i) blob math: full at the wheels, falls away from the light by agl/tan(el), capped at sunStretchMax lengths, gone at the ceiling',
+      touch.alpha === 0.5 && touch.x === 0 && Math.abs(mid.x + 10 / Math.tan((10 * Math.PI) / 180)) < 1e-6 && Math.abs(mid.alpha - 0.5 * (50 / 60) ** 2) < 1e-12
+        && Math.abs(low.x + 100) < 1e-9 && tsh.blobPose({ x: 0, y: 61, z: 0, groundY: 0, span: 1, length: 1 }, sun, 60, cfg) === null && tsh.blobPose({ x: 0, y: 1, z: 0, groundY: NaN, span: 1, length: 1 }, sun, 60, cfg) === null,
+      `${mid.x.toFixed(2)} ${low.x}`);
+  }
+
+  // =========================================================================
+  // (6) LT-6 PHOTO_HIRES.
+  // =========================================================================
+  {
+    const ph = await import('../lib/fly/photo-hires.js');
+    const block = { scale: 3, minLongPx: 2560, maxTiles: 16 };
+    const desk = ph.photoExportPlan({ bufW: 1920, bufH: 1080, request: 'auto', budget: { maxScale: 3, maxLongPx: 4096 }, block, limits: { maxTexture: 16384, maxRenderbuffer: 16384, maxViewport: [16384, 16384] } });
+    const phone2 = ph.photoExportPlan({ bufW: 585, bufH: 1266, request: 'auto', budget: { maxScale: 2, maxLongPx: 4096 }, block });
+    const phone3 = ph.photoExportPlan({ bufW: 585, bufH: 1266, request: 'auto', budget: { maxScale: 3, maxLongPx: 4096 }, block });
+    const one = [ph.photoExportPlan({ bufW: 800, bufH: 600, request: undefined, budget: { maxScale: 3 }, block }), ph.photoExportPlan({ bufW: 800, bufH: 600, request: 1, budget: { maxScale: 3 }, block })];
+    const tiled = ph.photoExportPlan({ bufW: 2000, bufH: 1000, request: 2, budget: { maxScale: 3, maxLongPx: 4096 }, block, limits: { maxTexture: 2048, maxRenderbuffer: 2048, maxViewport: [2048, 2048] } });
+    const bounded = ph.photoExportPlan({ bufW: 2000, bufH: 1000, request: 2, budget: { maxScale: 3, maxLongPx: 4096 }, block: { ...block, maxTiles: 1 }, limits: { maxTexture: 2048 } });
+    check('(6a) desktop: 2-3x up to the 4,096 px long side, one offscreen render', desk.outW === 4096 && desk.outH === 2304 && desk.tiles === 1 && Math.abs(desk.scale - 4096 / 1920) < 1e-12, JSON.stringify(desk));
+    check('(6b) phone: the policy caps the scale (2x -> 2532 px; 3x -> 3798 px, >= 2,560)', phone2.outH === 2532 && phone3.outH === 3798 && phone3.outH >= 2560);
+    check('(6c) no request or scale 1: the drawing buffer exactly (verify-photo\'s contract)', one.every((o) => o.scale === 1 && o.outW === 800 && o.outH === 600 && o.tiles === 1));
+    check('(6d) past MAX_TEXTURE_SIZE the export is tiled; the tile bound shrinks it rather than exceed', tiled.tiles === 2 && tiled.outW === 4000 && tiled.tileW <= 2048 && bounded.tiles === 1 && bounded.outW <= 2048, `${JSON.stringify(tiled)} ${JSON.stringify(bounded)}`);
+    let rejected = false;
+    try { await ph.capturePhoto({ scale: 2 }); } catch { rejected = true; }
+    check('(6e) capturePhoto({scale}) -> Promise<Blob> rejects cleanly with no camera registered', rejected && ph.capturePhoto.length <= 1);
+    const src = (await import('node:fs')).readFileSync(path.join(ROOT, 'components/fly/PhotoCapture.jsx'), 'utf8').replace(/\r\n/g, '\n');
+    check('(6f) capture holds the governor (frame-api), emits track(\'photo_taken\'), keeps the watermark, restores pixel ratio + composer',
+      src.includes("holdGovernor('photo-hires')") && src.includes("track('photo_taken')") && src.includes('drawWatermark(ctx, w, h, mapStyle)') && /finally \{[\s\S]*gl\.setPixelRatio\(pr\);[\s\S]*composer\.setSize\(css\.x, css\.y\);[\s\S]*composer\.render\(0\)/.test(src));
+    const off = probe(ROOT, {});
+    check('(6g) flags off: no hi-res path (the action ignores scale)', off.photoActive === false);
+  }
+
+  // =========================================================================
+  // (7) LT-7 HANGAR_EXPOSURE.
+  // =========================================================================
+  {
+    const hs = await import('../components/fly/hud/hangar-stage.js');
+    const cfg = { targetLuma: 0.42, minScale: 0.55, maxScale: 1, reflectorScale: 0.5 };
+    check('(7a) exposure: a white livery dims (clamped 0.55), mid grey keeps today, a dark one never brightens',
+      hs.hangarExposureScale(0.85, cfg) === 0.55 && hs.hangarExposureScale(0.42, cfg) === 1 && hs.hangarExposureScale(0.1, cfg) === 1 && Math.abs(hs.hangarExposureScale(0.6, cfg) - 0.7) < 1e-12);
+    check('(7b) reflector: flag off 1024/512 (today); on, Medium halves (256), High keeps 1024', hs.hangarReflectorResolution('high', null) === 1024 && hs.hangarReflectorResolution('medium', null) === 512 && hs.hangarReflectorResolution('medium', cfg) === 256 && hs.hangarReflectorResolution('high', cfg) === 1024);
+    const root = new THREE.Group();
+    const white = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ color: 0xffffff }));
+    const vc = new THREE.BoxGeometry(1, 1, 1);
+    vc.setAttribute('color', new THREE.BufferAttribute(new Float32Array(vc.attributes.position.count * 3).fill(0.2), 3));
+    const tinted = new THREE.Mesh(vc, new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true }));
+    root.add(white, tinted);
+    const l = hs.liveryLuminance(root);
+    const painted = new THREE.Group();
+    painted.userData.fleetPaint = { uniforms: { uFleetPaintOn: { value: 1 }, uFleetHull: { value: new THREE.Color(1, 1, 1) }, uFleetTrim: { value: new THREE.Color(0, 0, 0) }, uFleetAccent: { value: new THREE.Color(0, 0, 0) } } };
+    check('(7c) livery luminance: area-weighted material x vertex colour; a paint preset reads its hull', Math.abs(l - 0.6) < 1e-6 && Math.abs(hs.liveryLuminance(painted) - 0.75) < 1e-12 && hs.liveryLuminance(new THREE.Group()) === 0.5, l.toFixed(4));
+    const hsrc = (await import('node:fs')).readFileSync(path.join(ROOT, 'components/fly/hud/HangarScene.jsx'), 'utf8');
+    check('(7d) hangar: flag off = no exposure state read (EXPOSURE null) and today\'s reflector size', hsrc.includes("const EXPOSURE = shipPassOn('HANGAR_EXPOSURE') ? lightBlock('HANGAR_EXPOSURE') : null;") && hsrc.includes('const exposure=EXPOSURE&&liveryLuma!==null?hangarExposureScale(liveryLuma,EXPOSURE):1;'));
+  }
+
+  // =========================================================================
+  // (8) Prewarm: every new LIGHT program variant is registered.
+  // =========================================================================
+  {
+    const all = probe(ROOT, { ...ON('TERRAIN_SHADOW'), ...ON('TRAFFIC_SHADOWS'), __flyLightDeviceClass: 'dgpu' });
+    const by = Object.fromEntries(all.prewarm.map((e) => [e.key, e]));
+    const keys = all.prewarm.flatMap((e) => e.keys);
+    check('(8a) four LIGHT entries, each gated on its flag', ['LIGHT:terrain-shadowed-earth', 'LIGHT:terrain-shadow-depth', 'LIGHT:traffic-caster', 'LIGHT:traffic-blob'].every((k) => by[k]) && all.prewarm.every((e) => e.when.flags?.length === 1), Object.keys(by).join(','));
+    check('(8b) the builds carry the live keys: patched earth, terrain depth, fleet + fleet depth, blob',
+      keys.some((k) => k.includes('|ts-map-v1')) && keys.some((k) => k.endsWith('|terrain-shadow-depth-v1')) && keys.includes('fleet-airframe-v2|depth') && keys.some((k) => k.includes('fleet-airframe-v2')) && keys.some((k) => k.endsWith('|traffic-blob-v1')) && !keys.some((k) => k.startsWith('THROW')), keys.filter((k) => k.startsWith('THROW')).join(' '));
+    check('(8c) the live earth key equals the prewarm earth key (same chain, same session decision)', keys.includes(map.earth.key));
   }
 } finally {
   rmSync(SNAP, { recursive: true, force: true });
