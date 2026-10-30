@@ -10,6 +10,16 @@ import { HANGAR } from '@/lib/fly/fly-constants';
 import { aircraftName } from '@/lib/fly/player-aircraft';
 import { immersiveOn } from '@/lib/fly/immersive';
 import { callRuntimeAction } from '@/lib/fly/runtime-bus';
+// SHIP PASS RL-4 (DEEP_LINKS): Copy link for where you are (renders nothing with the flag off).
+import { CopyLink } from './hud/CopyLink';
+
+/** The flight's current place as an ?at= link (altitude clamped to the link's window). */
+function currentPlaceLink() {
+  const p = callRuntimeAction('currentPlace');
+  if (!p || p === false) throw new Error('no position yet');
+  const altFt = Number.isFinite(p.altM) ? Math.min(45000, Math.max(500, Math.round(p.altM / 0.3048))) : undefined;
+  return { kind: 'at', lat: p.lat, lon: p.lon, altFt };
+}
 // R25 A (FRONT DOOR): the settings rows and the credits panel are shared with
 // the title's Settings sheet / Credits button; exit leads to the title.
 import { MenuButton, SettingsRows } from './hud/SettingsRows';
@@ -188,6 +198,7 @@ export function PauseMenu({ onExit }) {
             {/* R25 A: the rows live in hud/SettingsRows.jsx (shared with the
                 title's Settings sheet); pause keeps its pre-R25 order + markup. */}
             <SettingsRows includeConditions={false} />
+            <CopyLink link={currentPlaceLink} testid="pause-copy-link" label="Copy link to this place" />
             <MenuButton onClick={() => store.openCredits()}>Credits &amp; licenses</MenuButton>
             {exitGoesToTitle() ? (
               // R25 A: leave the flight for the title over the live world
@@ -296,6 +307,7 @@ function GlassPause({ onExit, closing, still, creditsOpen, mapStyle, aircraftId,
                 />
               )}
               <hr className="lg-rule" />
+              <CopyLink link={currentPlaceLink} testid="pause-copy-link" label="Copy link to this place" />
               <GlassNavItem icon={Info} label="Credits & licenses" onClick={() => store.openCredits()} />
               {exitGoesToTitle() ? (
                 <GlassNavItem icon={LogOut} testid="pause-exit-title" tone="caution" label="Exit to title" onClick={onExit} />

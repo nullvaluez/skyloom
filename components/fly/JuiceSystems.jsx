@@ -20,6 +20,10 @@ import { useFlyStore } from '@/stores/fly-store';
 import { useFlyContractsStore } from '@/stores/fly-contracts-store';
 import { usePassportStore } from '@/stores/passport-store';
 import { gameplayLive } from '@/lib/fly/front-door';
+// SHIP PASS RL-2 (CHALLENGE_LAYER): combos, near-miss scoring and its shake,
+// the run summary and tower-buzz scoring are Challenge mode; constant on with
+// the layer off.
+import { challengeOn } from '@/lib/fly/challenge';
 
 /**
  * ROUND 18 "Alive & Dangerous" — A4 SHOWTIME: the arcade layer's engine room.
@@ -78,7 +82,7 @@ export function JuiceSystems({ runtime }) {
   const fireRef = useRef(null);
   fireRef.current = (kind, basePts, trauma) => {
     const nowSec = performance.now() / 1000;
-    const res = scoreEvent(kind, basePts, nowSec);
+    const res = scoreEvent(kind, basePts, nowSec, challengeOn());
     if (SHAKE.enabled && trauma) addTrauma(trauma);
     return res;
   };
@@ -111,7 +115,7 @@ export function JuiceSystems({ runtime }) {
        */
       onCrash: () => {
         if (SHAKE.enabled) addTrauma(SHAKE.sources.crash);
-        if (!SESSION.enabled) return null;
+        if (!SESSION.enabled || !challengeOn()) return null;
         const stats = endRun(performance.now() / 1000);
         const st = useFlyStore.getState();
         st.setRunStats(stats);
@@ -149,6 +153,9 @@ export function JuiceSystems({ runtime }) {
           if (!b || !(b.at > prevBuzzAt)) return;
           prevBuzzAt = b.at;
           const touchGo = b.kind === 'touch-go';
+          // A tower buzz scores (and shakes) only in Challenge mode; a
+          // touch-and-go is flying, not a stunt, and always counts.
+          if (!touchGo && !challengeOn()) return;
           fireRef.current(
             touchGo ? 'touchGo' : 'buzz',
             touchGo ? SESSION.pts.touchGo : SESSION.pts.buzz,
@@ -241,7 +248,10 @@ export function JuiceSystems({ runtime }) {
       // (the frozen flight is not flying past anyone). The detector restarts
       // clean on the way back into flight — its stored distances predate the
       // menu. gameplayLive() is constant true with the flag off.
-      const live = gameplayLive(useFlyStore.getState()) && runtime.escort?.source !== 'airport';
+      // SHIP PASS RL-2: near-miss scoring (and its shake) is Challenge mode;
+      // folding it into `live` restarts the detector clean when Challenge is
+      // switched back on mid-flight.
+      const live = gameplayLive(useFlyStore.getState()) && runtime.escort?.source !== 'airport' && challengeOn();
       if (live !== S.wasLive) {
         if (live && S.wasLive === false) detectorRef.current?.reset();
         S.wasLive = live;

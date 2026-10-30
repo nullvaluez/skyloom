@@ -47,7 +47,11 @@ const seed = () => {
     await card.first().waitFor({ state: 'visible', timeout: 60000 }).catch(() => {});
     const onTitle = await card.count();
     const cardClass = onTitle ? await card.first().getAttribute('class') : null;
-    check('title shows the "Watch an airport" card with no review parameters', onTitle === 1 && /fly-title-card/.test(cardClass || ''), { onTitle, cardClass });
+    // SHIP PASS RL-1 (12.3 "tcn-row"): the cinema title (FLY_TITLE_CINEMA.md,
+    // the only title since 2026-10-21) shows the modes as numbered rows,
+    // `tcn-row`; the classic title's `fly-title-card` is no longer mounted.
+    // Either is a first-class entry, which is what this row asserts.
+    check('title shows the "Watch an airport" card with no review parameters', onTitle === 1 && /\b(tcn-row|fly-title-card)\b/.test(cardClass || ''), { onTitle, cardClass });
     await page.screenshot({ path: path.join(out, 'desktop-title.png') });
     await card.first().click();
     await page.getByTestId('airport-browser').waitFor({ state: 'visible', timeout: 30000 });

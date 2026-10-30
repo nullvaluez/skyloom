@@ -22,6 +22,10 @@
  * engine calls the shared brake, and the toy index build is a typed array.
  */
 import { mkdirSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
+// SHIP PASS RL-1: every source read normalizes CRLF — the owner's Windows
+// checkout is CRLF, and the anchored `.replace()` shims and line regexes
+// below are written against LF text (they silently missed on CRLF).
+const readText = (p) => readFileSync(p, 'utf8').replace(/\r\n/g, '\n');
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { checkShip } from './_r24a-ship-state.mjs';
@@ -40,8 +44,8 @@ mkdirSync(out, { recursive: true });
 // with my reading of it. Under node with no `window`, budgetK() returns 1 —
 // which is exactly why the K arm below has to define one.
 const hb = path.join(out, `.hb-${process.pid}.mjs`);
-writeFileSync(hb, readFileSync(path.join(root, 'lib/fly/harness-budget.js'), 'utf8'));
-const src = readFileSync(path.join(root, 'lib/fly/finalize-pace.js'), 'utf8');
+writeFileSync(hb, readText(path.join(root, 'lib/fly/harness-budget.js')));
+const src = readText(path.join(root, 'lib/fly/finalize-pace.js'));
 const shim = path.join(out, `.fp-${process.pid}.mjs`);
 writeFileSync(
   shim,
@@ -249,13 +253,13 @@ const engines = {
 };
 const missing = [];
 for (const [name, rel] of Object.entries(engines)) {
-  const txt = readFileSync(path.join(root, rel), 'utf8');
+  const txt = readText(path.join(root, rel));
   if (!/if \(!mayFinalize\(done\)\) break;/.test(txt)) missing.push(name);
 }
 gate('7 every chunk engine calls the shared brake in its finalize loop',
   missing.length === 0, missing.join(', '));
 
-const toy = readFileSync(path.join(root, 'lib/fly/toy-world/toy-world-engine.js'), 'utf8');
+const toy = readText(path.join(root, 'lib/fly/toy-world/toy-world-engine.js'));
 // The typed container is still the WB-10 win; gate 20 pins WHICH width and
 // gate 19 pins that it reaches three wrapped. This row only says the boxed
 // plain array is gone from the armed path.
@@ -288,7 +292,7 @@ gate('20 the container width mirrors three’s arrayNeedsUint32 rather than defa
 // three's threshold is >= 65535, NOT > 65535 (PRIMITIVE_RESTART_FIXED_INDEX,
 // three #24565). Read it out of three's real source so a future three bump
 // that moves it fails here instead of silently desynchronising the two paths.
-const threeSrc = readFileSync(path.join(root, 'node_modules/three/build/three.core.js'), 'utf8');
+const threeSrc = readText(path.join(root, 'node_modules/three/build/three.core.js'));
 const needs32Src = threeSrc.slice(
   threeSrc.indexOf('function arrayNeedsUint32'),
   threeSrc.indexOf('function arrayNeedsUint32') + 500
@@ -343,7 +347,7 @@ if (decl.length === 2) {
 }
 rows.push(...widthRows);
 
-const veg = readFileSync(path.join(root, 'lib/fly/toy-world/sat-veg-engine.js'), 'utf8');
+const veg = readText(path.join(root, 'lib/fly/toy-world/sat-veg-engine.js'));
 // E (pass 2b): the cap now carries the harness scaler, at A's request — this
 // was the ONE budget site of six that budgetK() missed, so at ~1 fps the venue
 // committed one veg chunk per second and any veg reading was partly populated.
@@ -361,7 +365,7 @@ gate('10 the veg commit is capped per frame (A9), and the cap carries the harnes
 // bare module const that budgetK() never touched. At K=40/200 every other
 // engine speeds up and roads does not, so the road ring starves and the stall
 // concentrates exactly where markPhase pointed. Same idiom as the veg site.
-const road = readFileSync(path.join(root, 'lib/fly/toy-world/sat-road-engine.js'), 'utf8');
+const road = readText(path.join(root, 'lib/fly/toy-world/sat-road-engine.js'));
 gate('23 the sat-road finalize bound carries the harness scaler (E CERT’s seventh site)',
   /const perFrame = Math\.max\(1, FINALIZE_PER_FRAME \* budgetK\(\)\);/.test(road) &&
     /done < perFrame;/.test(road) &&
@@ -384,7 +388,7 @@ gate('23 the sat-road finalize bound carries the harness scaler (E CERT’s seve
     ['sat-veg commit', 'lib/fly/toy-world/sat-veg-engine.js', /vegPerFrame \* budgetK\(\)/],
     ['sat-road finalize', 'lib/fly/toy-world/sat-road-engine.js', /FINALIZE_PER_FRAME \* budgetK\(\)/],
   ];
-  const have = SITES.filter(([, rel, re]) => re.test(readFileSync(path.join(root, rel), 'utf8')));
+  const have = SITES.filter(([, rel, re]) => re.test(readText(path.join(root, rel))));
   rows.push(
     `  harness-budget sites carrying budgetK() on THIS branch: ${have.length}/${SITES.length}` +
       ` — ${have.map(([n]) => n).join(', ') || 'none'}`
@@ -399,7 +403,7 @@ gate('23 the sat-road finalize bound carries the harness scaler (E CERT’s seve
 // harness budget multiplier sits on that expression, and two owners editing one
 // expression is how a merge silently drops one of them.
 const bounds = Object.values(engines)
-  .map((rel) => readFileSync(path.join(root, rel), 'utf8'))
+  .map((rel) => readText(path.join(root, rel)))
   .filter((t) => /&& done < [^;]*mayFinalize/.test(t));
 gate('11 the brake is a separate guard, never folded into the loop bound',
   bounds.length === 0, `${bounds.length} engines fold it in`);

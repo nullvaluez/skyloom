@@ -19,6 +19,15 @@ const fs = require("fs");
   await page.addInitScript(() => {
     localStorage.setItem("fly-controls-seen", "1");
     localStorage.setItem("fly-sound-on", "0");
+    // SHIP PASS RL-1 (12.3 "tips card"): this gate checks the flight deck for a
+    // returning player. A fresh profile's first-flight tips card
+    // (ExplorerGuide) sits over the setup sheet's close button and took the
+    // tap; the beta soak and the review harnesses seed the same preference.
+    // The overlap itself is recorded for the Takeoff & Landing backlog.
+    localStorage.setItem(
+      "fly-explorer-preferences-v1",
+      JSON.stringify({ version: 1, settings: { tutorial: "skipped" } }),
+    );
   });
   const check = (name, ok) => {
     report.checks.push({ name, pass: ok });

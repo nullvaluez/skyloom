@@ -4,6 +4,8 @@ import { runwayIndex } from '@/lib/fly/runway-catalog';
 import { localClockAt, majorAirports, shortAirportName, sunStateAt } from '@/lib/fly/airport-watch-sky.mjs';
 import { AIRPORTS } from '@/lib/airports';
 import { CITIES } from '@/lib/fly/poi/cities';
+// SHIP PASS RL-4 (DEEP_LINKS): Copy link on the featured cards (renders the card alone with the flag off).
+import { CardWithLink } from '../CopyLink';
 
 /*
  * Airport browser parts: the golden-hour pool, the sun chip and the three
@@ -67,6 +69,7 @@ export function FeaturedAirportCard({ airport: a, now, busy, onChoose }) {
   const clock = localClockAt(a.lat, a.lon, now);
   const sun = sunStateAt(a.lat, a.lon, sunNow());
   return (
+    <CardWithLink link={{ kind: 'watch', airportId: a.id, ident: a.id }} testid={`copy-link-airport-${a.id}`}>
     <button type="button" disabled={busy} onClick={() => onChoose(a.id)} data-testid={`airport-featured-${a.id}`} data-sun={sun.kind}>
       <small>{a.id}</small>
       <strong>{a.name}</strong>
@@ -77,6 +80,7 @@ export function FeaturedAirportCard({ airport: a, now, busy, onChoose }) {
         <SunChip sun={sun} />
       </span>
     </button>
+    </CardWithLink>
   );
 }
 

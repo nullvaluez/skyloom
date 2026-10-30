@@ -9,6 +9,8 @@ import { MAP_STYLE_KEY, MAP_STYLES } from '@/lib/fly/map-style';
 // and must never be written to storage.
 import { crashStakesOn, saveCrashMode, saveQualityTier, saveSoundOn } from '@/lib/fly/fly-settings';
 import { CRASH } from '@/lib/fly/fly-constants';
+// SHIP PASS RL-2 (CHALLENGE_LAYER): the stakes row becomes "Challenge mode".
+import { challengeLayerOn, challengeOn, saveChallenge } from '@/lib/fly/challenge';
 import { immersiveOn, readReducedMotion, saveReducedMotion } from '@/lib/fly/immersive';
 import { visualsAvailable, saveVisuals, setVisualsLive } from '@/lib/fly/visuals-profile';
 import { GuestSaveControls } from './GuestSaveControls';
@@ -60,6 +62,8 @@ export function SettingsRows({ sheet = false, includeConditions = true }) {
   // store. The rows mount each time the pause card / sheet opens, so a lazy
   // read on mount is current by construction.
   const [stakes, setStakes] = useState(() => crashStakesOn());
+  // SHIP PASS RL-2: read once per mount like the stakes (module cache).
+  const [challenge, setChallenge] = useState(() => challengeOn());
   const [reducedMotion, setReducedMotion] = useState(() => readReducedMotion());
   const store = useFlyStore.getState();
   const tid = (id) => (sheet ? `settings-${id}` : undefined);
@@ -98,6 +102,16 @@ export function SettingsRows({ sheet = false, includeConditions = true }) {
   const flipStakes = () => {
     const next = !stakes;
     saveCrashMode(next); // a CLICKED mode is a choice — persist it
+    setStakes(next);
+  };
+  // SHIP PASS RL-2: one switch for the arcade layer. Crashes ride it, so the
+  // Round 18 key is written in step (it is also what `?flags=-CHALLENGE_LAYER`
+  // reads, so the pre-pass arm follows the player's last choice).
+  const flipChallenge = () => {
+    const next = !challenge;
+    saveChallenge(next); // a CLICKED mode is a choice — persist it
+    saveCrashMode(next);
+    setChallenge(next);
     setStakes(next);
   };
   const pickChase = (value) => {
@@ -278,7 +292,27 @@ export function SettingsRows({ sheet = false, includeConditions = true }) {
   // gate as CRASH.enabled, so nothing about a forgiving session differs from
   // R17 by a single frame.
   const stakesValue = stakes ? 'Crashes ON' : 'Forgiving';
-  const stakesRow = CRASH.enabled && (GLASS_ON ? (
+  // SHIP PASS RL-2 (CHALLENGE_LAYER on): the same row, testids kept, is
+  // "Challenge mode" — crashes, combos, near-misses, the run summary and the
+  // tower-buzz contracts in one opt-in switch (D2). Calm is the default.
+  const challengeValue = challenge ? 'On' : 'Off';
+  const challengeName = `Challenge mode: ${challengeValue} (crashes, combos, near-misses, tower buzzes)`;
+  const stakesRow = challengeLayerOn() ? (GLASS_ON ? (
+    <GlassToggle
+      key="stakes"
+      testid={sheet ? 'settings-stakes' : 'pause-stakes'}
+      label="Challenge mode"
+      value={challengeValue}
+      on={challenge}
+      tone="caution"
+      name={challengeName}
+      onClick={flipChallenge}
+    />
+  ) : (
+    <MenuButton key="stakes" testid={sheet ? 'settings-stakes' : 'pause-stakes'} onClick={flipChallenge}>
+      Challenge mode: {challengeValue}
+    </MenuButton>
+  )) : CRASH.enabled && (GLASS_ON ? (
     <GlassToggle
       key="stakes"
       testid={sheet ? 'settings-stakes' : 'pause-stakes'}

@@ -87,7 +87,7 @@ test('map conversion preserves physical dimensions through every heading/bank/la
     assert.ok(Math.abs(width-.18)<1e-8);
   }
 });
-test('all nine hero and mobile GLBs normalize to declared lengths and wingspans',()=>{
+test('every hero and mobile GLB normalizes to its declared length and wingspan',()=>{
   // Geometry-only decode of GLB nodes; no browser texture/image mocks.
   for(const id of ADVENTURE_AIRCRAFT_IDS)for(const phone of [false,true]){
     const entry=aircraftPresentation(resolveAircraft(id),phone),bytes=fs.readFileSync('public'+entry.url);
@@ -99,7 +99,10 @@ test('all nine hero and mobile GLBs normalize to declared lengths and wingspans'
     json.nodes.forEach((n,i)=>n.children?.forEach(child=>nodes[i].add(nodes[child])));
     const root=new Group();for(const i of json.scenes[json.scene||0].nodes)root.add(nodes[i]);root.updateMatrixWorld(true);
     const correction=computeModelCorrection(root,entry.targetLenM,entry.yawFixRad),matrix=new Matrix4().makeRotationY(correction.rotY).multiply(new Matrix4().makeScale(correction.scale,correction.scale,correction.scale));
-    const box=new Box3().setFromObject(root).applyMatrix4(matrix),size=box.getSize(new Vector3());
+    // SHIP PASS RL-1: measure the skin, not the transformed node bounds — the
+    // same precise box model-loader.js computeModelCorrection() scales by. The
+    // C-17's rotated hinge nodes inflated the loose box to 53.45 m.
+    const box=new Box3().setFromObject(root,true).applyMatrix4(matrix),size=box.getSize(new Vector3());
     assert.ok(Math.abs(size.z-entry.targetLenM)<.02,`${id}: length ${size.z}`);
     if(entry.span)assert.ok(Math.abs(size.x-entry.span)<entry.span*.03,`${id}: span ${size.x}`);
     root.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});

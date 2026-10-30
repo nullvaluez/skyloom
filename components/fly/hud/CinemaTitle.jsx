@@ -26,6 +26,7 @@ import { attributionsFor } from '@/lib/fly/tile-sources';
 import { CITIES } from '@/lib/fly/poi';
 import { OPERATIONS_AIRPORTS, airportById } from '@/lib/fly/operations-airports';
 import { airportLabel } from '@/lib/fly/ops-labels.mjs';
+import { gateToGate } from '@/lib/fly/ops-flags';
 import { nearestFeatured, readLastSetup } from '@/lib/fly/flight-plan';
 import { enterHangarFromTitle, freeFlightAvailable } from '@/lib/fly/front-door';
 import { aircraftName, isAircraftId } from '@/lib/fly/player-aircraft';
@@ -368,7 +369,7 @@ export function continueFields(last, adventure) {
     return { label: 'Continue', sub: 'Glider practice over Columbus', fields: [['Mode', 'Practice'], ['Aircraft', who], ['From', 'KOSU']], seed: 'ops:practice', aircraftId: last.aircraftId };
   }
   const l = airportLabel(airportById(last.airportId));
-  const start = { apron: 'From the apron', runway: 'On the runway', approach: 'On approach', gate: 'From the gate' }[last.start] ?? 'Takeoff & landing';
+  const start = { apron: 'From the apron', runway: 'On the runway', approach: 'On approach', gate: gateToGate().enabled === true ? 'From the gate' : null }[last.start] ?? 'Takeoff & landing';
   return {
     label: 'Continue',
     sub: `${start} · ${l?.name ?? last.airportId}`,
@@ -668,7 +669,7 @@ function CinemaBody({ runtime }) {
     { key: 'free', testid: 'title-explore', label: 'Free Flight', desc: 'Anywhere on Earth, in any aircraft.', Icon: Globe2, run: () => enterHangarFromTitle('free', runtime) },
     free && { key: 'journeys', testid: 'title-adventures', label: 'Guided Journeys', desc: 'Curated flights, four discoveries each.', Icon: Compass, run: () => useAdventureStore.getState().setLibraryOpen(true) },
     watch && { key: 'watch', testid: 'watch-airport', label: 'Watch an Airport', desc: 'A window seat on real arrivals.', Icon: Binoculars, tag: 'Live', run: () => useFlyStore.setState({ airportBrowserOpen: true }) },
-    { key: 'ops', testid: 'title-takeoff-landing', label: 'Takeoff & Landing', desc: 'Real runways, gate to gate.', Icon: PlaneTakeoff, run: () => enterHangarFromTitle('ops', runtime) },
+    { key: 'ops', testid: 'title-takeoff-landing', label: 'Takeoff & Landing', desc: 'Real runways, worldwide.', Icon: PlaneTakeoff, run: () => enterHangarFromTitle('ops', runtime) },
   ].filter(Boolean);
   const [active, setActive] = useState('pass');
   const activeRef = useRef('pass');

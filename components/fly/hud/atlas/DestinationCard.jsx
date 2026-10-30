@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useFlyAtlasStore } from '@/stores/fly-atlas-store';
 import { useDeviceLayout } from '@/hooks/use-device-layout';
 import { ATLAS_KIND, CARD_THEME } from './atlas-tokens';
+// SHIP PASS RL-4 (DEEP_LINKS): share this place (renders nothing with the flag off).
+import { CopyLink } from '../CopyLink';
 
 const NM_PER_DEG = 60;
 
@@ -173,6 +175,11 @@ export function DestinationCard({ entry, runtime, onWarp }) {
         <p className="mt-1.5 text-center font-mono text-[9px]" style={{ color: CARD_THEME.iceFaint }}>
           arrives ~2nm out, nose on the field
         </p>
+      )}
+      {Number.isFinite(entry.lat) && Number.isFinite(entry.lon) && (
+        <div className="mt-2 flex justify-center">
+          <CopyLink link={{ kind: 'at', lat: entry.lat, lon: entry.lon }} testid="atlas-copy-link" />
+        </div>
       )}
     </div>
   );

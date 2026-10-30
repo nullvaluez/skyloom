@@ -56,6 +56,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { register } from 'node:module';
+import { pinnedShow } from './_r25-w0-baseline.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
@@ -240,7 +241,9 @@ await tryGate('1g columbus practice is the glider spot', () => {
 
 // ===========================================================================
 section('2 search parity with the r25-w0 Atlas');
-const W0_ATLAS = git('show', 'r25-w0:components/fly/hud/Atlas.jsx');
+// SHIP PASS RL-1: the tag when present, else the committed, hash-verified
+// fixture (scripts/_r25-w0-baseline.mjs), so a depth-1 clone runs this gate.
+const W0_ATLAS = pinnedShow('r25-w0', 'components/fly/hud/Atlas.jsx');
 const rankBody = W0_ATLAS.slice(
   W0_ATLAS.indexOf('const results = useMemo(() => {') + 'const results = useMemo(() => {'.length,
   W0_ATLAS.indexOf('}, [entries, query]);')
@@ -581,7 +584,11 @@ await tryGate('6a placement', () => {
       }
     }
   }
-  gate('6a altitude max(altM, ground+minAglM), heading, cruise inside the envelope — 10 aircraft x 11 destinations x 3 grounds', bad.length === 0 && n === 10 * 11 * 3, bad.slice(0, 5).join(',') || `${n} placements`);
+  // SHIP PASS RL-1: the catalogs grew (the Umbra joined the hangar, two featured
+  // spots joined the title); every aircraft x destination x ground is still
+  // checked, and the floor keeps the R25 catalog's size as a minimum.
+  const want6a = PLAYER_AIRCRAFT.length * FP.FEATURED_DESTINATIONS.length * 3;
+  gate(`6a altitude max(altM, ground+minAglM), heading, cruise inside the envelope — ${PLAYER_AIRCRAFT.length} aircraft x ${FP.FEATURED_DESTINATIONS.length} destinations x 3 grounds`, bad.length === 0 && n === want6a && PLAYER_AIRCRAFT.length >= 10 && FP.FEATURED_DESTINATIONS.length >= 11, bad.slice(0, 5).join(',') || `${n} placements`);
 });
 
 // ===========================================================================
@@ -663,7 +670,7 @@ await tryGate('7a launchFreeFlight', () => {
       w.off();
     }
   }
-  gate('7a launchFreeFlight: 10 aircraft x 11 destinations land airborne at the placement, cruise, far-warp hold, crash disarmed, trim armed', bad.length === 0 && n === 110, bad.slice(0, 6).join(',') || `${n} launches`);
+  gate(`7a launchFreeFlight: ${PLAYER_AIRCRAFT.length} aircraft x ${FP.FEATURED_DESTINATIONS.length} destinations land airborne at the placement, cruise, far-warp hold, crash disarmed, trim armed`, bad.length === 0 && n === PLAYER_AIRCRAFT.length * FP.FEATURED_DESTINATIONS.length && n >= 110, bad.slice(0, 6).join(',') || `${n} launches`);
 });
 await tryGate('7b launchFreeFlight rejects', () => {
   const w = makeWorld();
@@ -800,7 +807,7 @@ await tryGate('7h launchGlider unchanged', () => {
     .replace('      if(!contentAccess(`aircraft:${id}`).allowed)return false;\n','')
     .replaceAll('      runtime.adventures?.suspend();\n','');
   // Pre-pass baseline already resets glider gear/flaps, unlike the R25 tag.
-  const w0 = git('show', '9ee7e79:lib/fly/operations-runtime.js');
+  const w0 = pinnedShow('9ee7e79', 'lib/fly/operations-runtime.js');
   const body = (t) => t.slice(t.indexOf('runtime.launchGlider = () => {'), t.indexOf('};', t.indexOf('runtime.launchGlider = () => {')) + 2);
   // code lines only: B rewrote the comment above launchGlider, not a statement
   const beginDep = (t) => t.slice(t.indexOf('const sync = () => {'), t.indexOf('runtime.launchGlider')).split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');

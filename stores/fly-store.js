@@ -146,6 +146,8 @@ const initialState = {
   frameRateMode: '60',
   // SHIP PASS FRAME fields end
   // SHIP PASS RELEASE fields begin
+  // RL-6 (ANALYTICS_V2): the first-run consent prompt is up (non-blocking).
+  consentPrompt: false,
   // SHIP PASS RELEASE fields end
 };
 
@@ -260,6 +262,7 @@ export const useFlyStore = create(
     setFrameRateMode: (frameRateMode) => set((state) => (state.frameRateMode === frameRateMode ? state : { frameRateMode })),
     // SHIP PASS FRAME setters end
     // SHIP PASS RELEASE setters begin
+    setConsentPrompt: (consentPrompt) => set({ consentPrompt: !!consentPrompt }),
     // SHIP PASS RELEASE setters end
 
     addTileStats: (requested = 0, evicted = 0) =>

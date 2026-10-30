@@ -61,10 +61,17 @@ const {enterHangar}=require('./_title'); // R25 (E, SANCTIONED): reach the hanga
   await page.getByTestId('hangar-fly').tap();
   await page.waitForFunction(()=>window.__flyBoot?.pct===100&&!window.__fly.worldLoading&&!window.__fly.worldDegraded&&window.__fly.worldReadiness.ready,undefined,{timeout:90000});
   await page.getByTestId('warp-hold').waitFor({state:'hidden'});await page.waitForTimeout(500);await shot('arrival-phone');
-  await button('Minimize flight controls').tap();await page.waitForTimeout(400);await shot('flight-phone-collapsed');
-  check(await page.getByTestId('operations-hud').getAttribute('data-expanded')==='false','Touch can minimize controls');
-  await button('Open flight controls').tap();
-  check(await page.getByTestId('operations-hud').getAttribute('data-expanded')==='true','Touch can reopen controls');
+  // SHIP PASS RL-1 (12.3 "role names"): phones fly with the compact deck
+  // (MobileFlightDeck), not the desktop panel, so there is no Minimize/Open
+  // pair: the deck is always compact and its strip button opens and closes
+  // the "Flight setup" sheet. Same intent: touch reaches and dismisses the
+  // controls.
+  await page.getByTestId('mobile-flight-deck').waitFor();await shot('flight-phone-collapsed');
+  check(await button('Flight setup').getAttribute('aria-expanded')==='false','Touch flight deck starts compact');
+  await button('Flight setup').tap();await page.locator('#mobile-flight-setup').waitFor();
+  check(await button('Flight setup').getAttribute('aria-expanded')==='true','Touch can open flight setup');
+  await button('Close flight setup').tap();await page.locator('#mobile-flight-setup').waitFor({state:'detached'});
+  check(await button('Flight setup').getAttribute('aria-expanded')==='false','Touch can close flight setup');
   check(report.tiles>=9,'Live airport imagery loaded');
   check(report.errors.filter(e=>e!=='Failed to fetch').length===0,'No application exceptions');
   report.status='PASS';console.log('VERIFY: PASS — hangar design, live exterior, takeoff disclosure, arrival and touch controls.');

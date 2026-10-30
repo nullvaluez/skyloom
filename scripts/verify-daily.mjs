@@ -27,6 +27,11 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
+import { register } from 'node:module';
+// SHIP PASS RL-2: contracts.js now imports lib/fly/challenge.js (the
+// Challenge layer's templates), whose own imports are extensionless app
+// specifiers; the R24 resolve hook lets node follow them (nothing ships).
+register('./_node-resolve.mjs', import.meta.url);
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -182,9 +187,15 @@ async function importApp(rel) {
       leaked.length === 0, leaked.length ? leaked.slice(0, 4).join('; ') : 'sealed');
 
     // …and no context can make a plain template ineligible.
+    // SHIP PASS RL-2 (the new pool rule): with CHALLENGE_LAYER on, the tower
+    // buzzes (lib/fly/challenge.js CHALLENGE_TEMPLATE_IDS) are Challenge mode
+    // and are dealt only while the player has it on — node has no player, so
+    // here that is challengeDealOn(); with the layer off it is always true and
+    // this gate is the pre-pass gate exactly.
+    const { challengeDealOn, challengeTemplate } = await importApp('lib/fly/challenge.js');
     const plainBad = [];
     for (const ctx of [...TOY_CTXS, { mapStyle: 'satellite', wx: richWx, sunFrac: 0 }])
-      for (const t of plain) if (!contractEligible(t, ctx)) plainBad.push(t.id);
+      for (const t of plain) if (contractEligible(t, ctx) !== (!challengeTemplate(t.id) || challengeDealOn())) plainBad.push(t.id);
     gate(`c2 templates without \`requires\` are always eligible (${plain.length})`,
       plainBad.length === 0, plainBad.length ? [...new Set(plainBad)].join(', ') : 'all pass');
 

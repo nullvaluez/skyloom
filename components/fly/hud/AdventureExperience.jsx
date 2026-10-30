@@ -16,6 +16,8 @@ import { adventureRecovery } from '@/lib/fly/adventure-guidance.mjs';
 import './adventures.css';
 // The library opens as a full-bleed sheet in the cinema title's language.
 import './cinema-menus.css';
+import { CopyLink } from './CopyLink';
+import { analyticsV2On } from '@/lib/fly/analytics';
 
 const medals=['','Bronze','Silver','Gold'];
 function Dialog({title,onClose,children,className='',style}){
@@ -62,6 +64,8 @@ function AdventureLibrary({runtime}){
       <p className="journey-meta"><Plane size={15}/>{aircraftName(route.aircraftId)} recommended · all nine aircraft available</p>
       {replace&&<p role="alert">Choose another journey? Your unfinished route is replaced only when you launch. Earned stamps and liveries stay yours.</p>}{error&&<p role="alert">{error}</p>}
       <button className="journey-primary" disabled={!ready||!access.allowed} onClick={launch} data-testid="adventure-launch">{!ready?'Preparing flight…':resuming?'Prepare to continue':replace?'Choose aircraft for this journey':'Choose your aircraft'}<ArrowRight size={20}/></button>
+      {/* SHIP PASS RL-4 (DEEP_LINKS): share this journey's briefing (nothing with the flag off). */}
+      <CopyLink link={{kind:'journey',adventureId:route.id}} testid="copy-link-journey"/>
       {replace&&<button onClick={()=>setReplace(false)}>Keep current journey</button>}
       <small>Complete this journey to earn {LIVERIES[route.reward].name}. {access.reason==='preview'?'Free during preview.':''}</small>
     </div></article>
@@ -102,6 +106,10 @@ function EarnedAircraft({id}) {
   const resolved=resolveAircraft(id),aircraft={...resolved,entry:aircraftPresentation(resolved,isPhoneClass(),{visuals,mapStyle})};
   return <div className="journey-earned-aircraft">{failed?<p>Preview unavailable. Your livery is saved in the hangar.</p>:<RewardAircraftPreview aircraft={aircraft} onError={()=>setFailed(true)}/>}</div>;
 }
+function PackInterest(){
+  const answer=value=>{const state=useAdventureStore.getState();state.save({...state.progress,interest:value});trackAdventure('pack_interest',{packId:'wild-earth',answer:value});};
+  return <div className="journey-actions" data-testid="pack-interest" role="group" aria-label="More journeys like this"><p>Would you like more Wild Earth journeys?</p><button onClick={()=>answer('yes')} data-testid="pack-interest-yes">Yes, more like this</button><button onClick={()=>answer('maybe')}>Maybe</button><button onClick={()=>answer('no')}>Not for me</button></div>;
+}
 function AdventureSummary({runtime,summary}){
   usePauseForMenu();
   const progress=useAdventureStore(s=>s.progress),postcard=useAdventureStore(s=>s.postcard),route=adventureById(summary.id),next=ADVENTURES.find(a=>!progress.completed[a.id])||ADVENTURES[(ADVENTURES.indexOf(route)+1)%ADVENTURES.length];
@@ -114,6 +122,8 @@ function AdventureSummary({runtime,summary}){
     {summary.rewards.length>0&&<EarnedAircraft id={summary.rewards[0]}/>}
     <ul className="journey-result-list">{route.activities.map(a=><li key={a.id}><span>{summary.activities[a.id]==='complete'?<Check size={17}/>:<Compass size={17}/>}</span><div><strong>{a.name}</strong><p>{summary.activities[a.id]==='complete'?'Completed':a.instruction}</p></div></li>)}</ul>
     {summary.rewards.map(id=><div key={id} className="journey-reward"><img src={'/models/player-'+({fighter:'vector-v4',military:'talon-v3','warbird-jet':'dart-v3','warbird-prop':'mustang-v3',prop:'skylark-v3',glider:'whisper-v3',bizjet:'meridian-v3',airliner:'stratoliner-v3',cargo:'leviathan-v3'}[id])+'.svg'} alt=""/><div><strong>{LIVERIES[id].name}</strong><p>New livery for {aircraftName(id)}</p><button onClick={()=>{useAdventureStore.getState().equip(id,true);runtime.adventures?.prepare(route.id);useAdventureStore.setState(s=>({preflight:{...s.preflight,aircraftId:id}}));}}>Try it in the hangar</button></div></div>)}
+    {/* SHIP PASS RL-6 (ANALYTICS_V2): pack_interest is finally emitted, from the Wild Earth debrief, once per player. */}
+    {analyticsV2On()&&route.packId==='wild-earth'&&progress.interest==null&&<PackInterest/>}
     <button className="journey-primary" onClick={nextFlight}>Next: {next.place}<ArrowRight size={20}/></button><div className="journey-actions"><button onClick={()=>runtime.adventures?.start(route.id,{aircraftId:summary.aircraftId,conditions:summary.conditions})}>Fly again</button><button onClick={()=>runtime.adventures?.prepare(route.id)}>Choose another aircraft</button><button onClick={close}>Keep exploring</button></div>
     </div>
   </div></Dialog>;

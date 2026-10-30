@@ -87,8 +87,14 @@ const run = (leg) =>
   );
 const legacy = (r) => r.surface === true && r.mapStyle === 'toy' && r.visuals === 'classic' && r.savedStyle === 'toy' && r.savedVisuals === 'classic';
 
+// SHIP PASS RL-3 (D11): PLAYER_SURFACE ships ON, so the shipped default for
+// an ordinary player is leg (2): one migration to Day/Enhanced, rows hidden.
 const shipped = run({ webdriver: false, review: false });
-check('shipped ordinary-player settings retain Classic/Neon and show the look controls', legacy(shipped), JSON.stringify(shipped));
+check(
+  'shipped ordinary-player settings migrate Neon/Classic to Day/Enhanced once and hide the look controls',
+  shipped.surface === false && shipped.mapStyle === 'satellite' && shipped.visuals === 'enhanced' && shipped.savedStyle === 'satellite' && shipped.savedVisuals === 'enhanced',
+  JSON.stringify(shipped),
+);
 
 const off = run({ flag: false, webdriver: false, review: false });
 check('(1) flag off: nothing moves', legacy(off), JSON.stringify(off));

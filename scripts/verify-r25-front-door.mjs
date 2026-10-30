@@ -62,6 +62,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { register, createRequire } from 'node:module';
+import { r25w0Show } from './_r25-w0-baseline.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
@@ -119,7 +120,9 @@ const THREE = await import('three');
 const W0 = await (async () => {
   try {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'r25-a-w0-'));
-    const show = (rel) => execFileSync('git', ['-C', ROOT, 'show', `r25-w0:${rel}`], { encoding: 'utf8' });
+    // SHIP PASS RL-1: the tag when present, else the hash-verified fixture
+    // (scripts/_r25-w0-baseline.mjs), so a depth-1 CI clone runs these rows.
+    const show = (rel) => r25w0Show(rel);
     const fdSrc = show('lib/fly/front-door.js').replace(
       "from './satellite-visuals'",
       `from '${pathToFileURL(path.join(ROOT, 'lib/fly/satellite-visuals.js')).href}'`
@@ -802,8 +805,12 @@ try {
     /data-testid="boot-screen"/.test(boot) && /data-testid="boot-caption"/.test(boot) && /data-stage=\{stage\}/.test(boot) && /window\.__flyBoot = \{ phase, pct \}/.test(boot));
   gate('(8f) Skyloom branding: layout metadata, manifest, loading, BootScreen wordmark; welcome moves to skippable flight tips',
     !/ShadowADSB/.test(layout) && /Skyloom/.test(layout) && /"short_name": "Skyloom"/.test(manifest) && /Skyloom/.test(loading) && /Sky\s*<span[^>]*>loom<\/span>/.test(boot) && /Welcome to Skyloom/.test(fs.readFileSync(path.join(ROOT,'components/fly/hud/ExplorerGuide.jsx'),'utf8')));
-  gate('(8g) ... the OG url and the passport storage key are unchanged',
-    /url: "https:\/\/shadowadsb\.app"/.test(layout) && /shadowadsb-passport/.test(rd('stores/passport-store.js')));
+  // SHIP PASS RL-5 (SANCTIONED, FLY_SHIP_PASS.md 5.5): the legacy
+  // shadowadsb.app OG url is REMOVED; absolute share URLs come from
+  // metadataBase = NEXT_PUBLIC_SITE_URL (unset: the serving origin). The
+  // passport storage key still never changes (a save key is a player contract).
+  gate('(8g) ... the OG url follows NEXT_PUBLIC_SITE_URL (no legacy domain) and the passport storage key is unchanged',
+    !/https?:\/\/(www\.)?shadowadsb\.app/.test(layout) && /metadataBase: new URL\(SITE_URL\)/.test(layout) && /NEXT_PUBLIC_SITE_URL/.test(layout) && /shadowadsb-passport/.test(rd('stores/passport-store.js')));
   gate('(8h) the dead geolocation spawn is gone; the fly-last-pos WRITER stays (verify-boot reads it)',
     !/navigator\.geolocation/.test(mode) && /'fly-last-pos'/.test(mode) && /localStorage\.setItem\(\s*LAST_POS_KEY/.test(mode));
   gate('(8i) no new <canvas> in the title layer (67 harness sites read .fixed.inset-0 canvas)', !/<canvas/.test(title));

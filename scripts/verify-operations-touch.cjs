@@ -65,7 +65,12 @@ const {enterHangar,waitTitleReady}=require('./_title'); // R25 (E, SANCTIONED)
     await page.getByTestId('warp-hold').waitFor({state:'hidden'});
     await page.waitForTimeout(1500);
     await page.screenshot({path:out+'/apron-portrait.png'});
-    await tap('Parking brake on');
+    // SHIP PASS RL-1 (12.3 "role names"): the phone deck's parking brake is
+    // ONE toggle named "Parking brake" whose aria-pressed is the state (the
+    // desktop panel's "Parking brake on/off" text label is not on phones).
+    const parking=page.getByRole('button',{name:'Parking brake',exact:true});
+    if(await parking.getAttribute('aria-pressed')!=='true')throw new Error('The stand does not start with the parking brake set');
+    await parking.tap();await page.waitForFunction(()=>window.__fly.operations.parkingBrake===false,undefined,{timeout:10000});
     await page.getByTestId('touch-fab').tap();await page.getByTestId('touch-throttle-cruise').tap();
     await page.getByTestId('touch-fab').tap();await page.waitForTimeout(4000);
     const before=await state();if(before.speed<=0)throw new Error('Touch taxi preset did not move aircraft');
@@ -81,7 +86,9 @@ const {enterHangar,waitTitleReady}=require('./_title'); // R25 (E, SANCTIONED)
     const box=await brake.boundingBox();await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:box.x+box.width/2,y:box.y+box.height/2}]});
     await page.waitForTimeout(2000);await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
     if((await state()).speed>.5)throw new Error('Touch wheel braking did not stop aircraft');
-    await tap('Parking brake off');report.checks.push('idle','held wheel brake','parking brake');
+    await parking.tap();await page.waitForFunction(()=>window.__fly.operations.parkingBrake===true,undefined,{timeout:10000});
+    if(await parking.getAttribute('aria-pressed')!=='true')throw new Error('Parking brake toggle does not report its state');
+    report.checks.push('idle','held wheel brake','parking brake');
     await page.setViewportSize({width:844,height:390});await page.waitForTimeout(500);
     await page.screenshot({path:out+'/apron-landscape.png'});
     for(const id of ['touch-joystick','touch-fab']){

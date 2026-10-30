@@ -10,7 +10,12 @@ import {createBackup,parseBackup,restoreBackup,RECOVERY_KEY} from '../lib/fly/sa
 import {FLEET_PRESENTATION} from '../lib/fly/fleet-aircraft.mjs';
 import {buildFleetGear} from '../lib/fly/fleet-gear.mjs';
 import {operationsProfile} from '../lib/fly/operations-profiles.js';
-import {sanitizeAdventureEvent,setAnalyticsConsent,trackAdventure} from '../lib/fly/adventure-analytics.js';
+import {register} from 'node:module';
+// SHIP PASS RL-6: adventure-analytics.js now wraps lib/fly/analytics.js, whose
+// imports are extensionless app specifiers; the R24 resolve hook lets node
+// follow them, so this one module loads after the hook is registered.
+register('./_node-resolve.mjs',import.meta.url);
+const {sanitizeAdventureEvent,setAnalyticsConsent,trackAdventure}=await import('../lib/fly/adventure-analytics.js');
 import {attachVectorControls,applyFleetLivery,disposeFleetGeometry} from '../lib/fly/fleet-animation.js';
 const route=ADVENTURES[0];
 test('analytics strips automatic URLs, identity attributes, coordinates and photographs',async()=>{const clean=sanitizeAdventureEvent({event:'adventure_started',properties:{token:'public-project-key',distinct_id:'anonymous',adventureId:route.id,lat:36,lon:-112,hex:'123abc',aircraftId:'prop',photo:'private',$current_url:'https://local/?lat=36',$referrer:'private'},$set:{name:'private'}});assert.deepEqual(Object.keys(clean.properties).sort(),['$geoip_disable','adventureId','distinct_id','token'].sort());assert.equal(clean.$set,undefined);assert.equal(sanitizeAdventureEvent({event:'$pageview'}),null);await setAnalyticsConsent(false);assert.doesNotThrow(()=>trackAdventure('adventure_started',{adventureId:route.id}));});

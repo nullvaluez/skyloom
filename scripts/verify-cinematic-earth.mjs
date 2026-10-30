@@ -48,22 +48,35 @@ check('night rim is the same scene-linear color as the cloud composite',()=>{
 check('cloud curl remains geographically periodic and densities stay finite',()=>{
   for(let x=-300000;x<300000;x+=37117){const a=cloudDensity(x,1900,x*.31);const b=cloudDensity(x+131072,1900,x*.31+131072);assert.ok(Number.isFinite(a)&&a>=0);assert.ok(Math.abs(a-b)<1e-7);}
 });
-check('fleet keeps physics and all original non-fighter assets',()=>{
+// SHIP PASS RL-1: the fleet rebuild (9ba95e8, FLY_FLEET_AND_ADVENTURES.md)
+// gave EVERY aircraft a FLEET_PRESENTATION hero/mobile pair, applied in every
+// visuals state, so "the original non-fighter entry, and the original entry
+// in Classic" no longer holds by design. What must hold: the physics length
+// never moves, every aircraft presents a distinct hero and mobile model that
+// exists on disk, and the presentation is one look whatever the profile.
+check('fleet keeps physics and presents every aircraft with hero and mobile models in every visuals state',()=>{
   for(const id of ['fighter','military','warbird-jet','warbird-prop','prop','glider','bizjet','airliner','cargo']){
-    const ac=resolveAircraft(id),entry=aircraftPresentation(ac,false);
+    const ac=resolveAircraft(id),entry=aircraftPresentation(ac,false),phone=aircraftPresentation(ac,true);
     assert.equal(entry.targetLenM,ac.entry.targetLenM);
-    if(id!=='fighter')assert.equal(entry,ac.entry);else{assert.ok(entry.url.includes('hero'));assert.ok(aircraftPresentation(ac,true).url.includes('mobile'));}
-    assert.equal(aircraftPresentation(ac,false,{mapStyle:'satellite',visuals:'classic'}),ac.entry);
+    assert.ok(entry.url.includes('hero')&&phone.url.includes('mobile')&&fs.existsSync(`public${entry.url}`)&&fs.existsSync(`public${phone.url}`),`${id}: ${entry.url} / ${phone.url}`);
+    assert.deepEqual(aircraftPresentation(ac,false,{mapStyle:'satellite',visuals:'classic'}),entry);
   }
 });
-check('original hero and mobile GLBs are bounded and contain six material roles',()=>{
+// SHIP PASS RL-1: the detail pass (scripts/aircraft-detail.mjs, detail
+// revision 3) gave the Vector v4 a seventh, 'Service markings' material on top
+// of the six roles, and the fleet's recorded limits are 20,000 hero / 6,000
+// phone triangles (FLY_FLEET_AND_ADVENTURES.md). The six roles, the bounds and
+// the mirrored-fin normals are unchanged.
+check('Vector hero and mobile GLBs are bounded and contain the six material roles (plus service markings)',()=>{
   let heroTris;
   for(const lod of ['hero','mobile']){
     const entry=aircraftPresentation(resolveAircraft('fighter'),lod==='mobile');
     const b=fs.readFileSync(`public${entry.url}`);assert.equal(b.readUInt32LE(0),0x46546c67);assert.equal(b.readUInt32LE(8),b.length);
-    const json=JSON.parse(b.subarray(20,20+b.readUInt32LE(12)).toString());assert.equal(json.materials.length,6);let tris=0;
+    const json=JSON.parse(b.subarray(20,20+b.readUInt32LE(12)).toString());let tris=0;
+    const roles=json.nodes.map(n=>n.name);assert.ok(['hull','trim','accent','metal','dark','canopy'].every(r=>roles.includes(r)),roles.join(','));
+    assert.ok(json.materials.length===6||json.materials.length===7&&json.materials[6].name==='Service markings',json.materials.map(m=>m.name).join('|'));
     for(const mesh of json.meshes)for(const p of mesh.primitives){const a=json.accessors[p.attributes.POSITION];assert.ok([...a.min,...a.max].every(Number.isFinite));tris+=(p.indices==null?a.count:json.accessors[p.indices].count)/3;}
-    if(lod==='hero'){heroTris=tris;assert.ok(tris<12000);}else assert.ok(tris<heroTris*.5);
+    if(lod==='hero'){heroTris=tris;assert.ok(tris<20000,`hero ${tris}`);}else assert.ok(tris<6000&&tris<heroTris*.5,`mobile ${tris}`);
     // The twin fins must be mirrors in both geometry and outward normals.
     // Mirroring X without reversing winding produces an inside-out left fin.
     const bin=28+b.readUInt32LE(12),p=json.meshes[json.nodes.find(n=>n.name==='trim').mesh].primitives[0];

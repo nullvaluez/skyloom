@@ -2,7 +2,7 @@
 import { satelliteVisualsOn } from '@/lib/fly/satellite-visuals';
 
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Text } from '@react-three/drei';
 import { buildPoiList } from '@/lib/fly/poi-data';
@@ -13,6 +13,8 @@ import { useFlyStore } from '@/stores/fly-store';
 // R24 B (GROUND_VIS, recon A6/T8) — AGL fade bands read the DAMPED ground.
 import { eyeAglVis } from '@/lib/fly/ground-vis';
 import { getTrueScaleK } from '@/lib/fly/true-scale';
+// SHIP PASS RL-9: POI heights through the bucketed ground query (no three-tile assert flood).
+import { refreshPoiElevation } from '@/lib/fly/poi-ground';
 
 const FONT = '/fonts/ArchivoBlack-Regular.ttf'; // OFL, self-hosted
 
@@ -63,9 +65,16 @@ export function PoiLetters({ runtime, flight, origin }) {
   const [picked, setPicked] = useState([]);
   const groupRefs = useRef([]);
   const pickedRef = useRef([]);
-  pickedRef.current = picked;
   const styleRef = useRef(mapStyle);
-  styleRef.current = mapStyle;
+  // SHIP PASS RL-9: mirror state into the refs after commit (no ref writes
+  // during render — the two react-hooks errors), before the next rAF reads
+  // them (layout effects run before the browser's next frame).
+  useLayoutEffect(() => {
+    pickedRef.current = picked;
+  }, [picked]);
+  useLayoutEffect(() => {
+    styleRef.current = mapStyle;
+  }, [mapStyle]);
 
   // 0.5Hz selection: nearest per kind, in range. Round 6 stability pass
   // (user: "POI letters are very intermittent — they should always be
@@ -163,10 +172,10 @@ export function PoiLetters({ runtime, flight, origin }) {
           // ~0m forever while its monument (which re-samples, same cadence)
           // healed to the summit — caught by verify-monuments-sat at
           // Corcovado (letter 64m vs monument top 741m).
-          if (runtime.engine) {
-            const e = runtime.engine.getElevationAt(poi.lon, poi.lat);
-            if (e != null) poi.elev = e;
-          }
+          // SHIP PASS RL-9: the bucketed ground query with its coverage
+          // check (lib/fly/poi-ground.js) — no raycast, so no three-tile
+          // assert — keeping the finest tile's answer per POI.
+          if (runtime.engine) refreshPoiElevation(runtime.engine, poi);
           ideal.push(poi);
           taken += 1;
         }
