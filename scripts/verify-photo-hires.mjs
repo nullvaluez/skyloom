@@ -52,8 +52,13 @@ function check(name, ok, detail = '') {
 }
 
 /** In-page: shoot through the bus; return PNG facts + attribution pixels. */
-async function shoot(page, options, { forceMaxTexture } = {}) {
-  return page.evaluate(async ({ options, forceMaxTexture }) => {
+async function shoot(page, options, { forceMaxTexture, stretchTimeout } = {}) {
+  return page.evaluate(async ({ options, forceMaxTexture, stretchTimeout }) => {
+    // Venue shim (stretchTimeout): PhotoCapture's 15 s timeout, armed when the
+    // request is made, becomes 180 s for this one call, so a SwiftShader frame
+    // cannot fail a size check. Only the 15,000 ms timer is touched.
+    const keepTimeout = window.setTimeout;
+    if (stretchTimeout) window.setTimeout = (fn, ms, ...rest) => keepTimeout(fn, ms === 15000 ? 180000 : ms, ...rest);
     const fn = window.__flyRuntimeBus?.getRuntimeAction('capturePhoto');
     if (!fn) return { err: 'capturePhoto not registered' };
     const composer = window.__flyComposer, renderer = composer?.getRenderer?.();
@@ -89,8 +94,11 @@ async function shoot(page, options, { forceMaxTexture } = {}) {
     const t0 = performance.now();
     let res;
     try {
-      res = options === undefined ? await fn() : await fn(options);
+      const p = options === undefined ? fn() : fn(options);
+      window.setTimeout = keepTimeout;
+      res = await p;
     } finally {
+      window.setTimeout = keepTimeout;
       renderer.capabilities.maxTextureSize = keepMax;
       if (ownRender) composer.render = ownRender;
       else delete composer.render;
@@ -148,7 +156,7 @@ async function shoot(page, options, { forceMaxTexture } = {}) {
       limits: { maxTexture: keepMax, maxRenderbuffer: gl.getParameter(gl.MAX_RENDERBUFFER_SIZE), maxViewport: Array.from(gl.getParameter(gl.MAX_VIEWPORT_DIMS)) },
       b64: btoa(b64),
     };
-  }, { options, forceMaxTexture });
+  }, { options, forceMaxTexture, stretchTimeout: !!stretchTimeout });
 }
 
 /**
@@ -249,14 +257,15 @@ try {
               && tiled.restore?.restored === true && tiled.restore?.tilesMoved === true
             : tiled.pngW === tplan.outW,
           `${tiled.pngW}x${tiled.pngH} in ${row.tiled.ms} ms; ${JSON.stringify(tiled.restore)}`);
-        // The bare path keeps main's 15 s timeout, armed before the frame
-        // that serves it; one SwiftShader desktop frame right after a
-        // supersampled export can outlast it (a venue frame time, not a size
-        // defect), so a timeout here is retried once and said so.
+        // The bare path keeps main's 15 s timeout (unchanged by LIGHT). On
+        // SwiftShader desktop it times out after a supersampled export (twice
+        // in a row, 2026-10-30), and main's own path took 21 s here with the
+        // flag off ('off' arm). So a timeout is retried once with the 15 s
+        // timer stretched (a venue shim, printed); the check is the size.
         let bare = await shoot(page, undefined).catch((e) => ({ err: String(e.message) }));
         if (bare.err && /timed out/.test(bare.err)) {
-          console.log(`note  ${label}: bare capture timed out once on SwiftShader; retried`);
-          bare = await shoot(page, undefined);
+          bare = await shoot(page, undefined, { stretchTimeout: true });
+          console.log(`note  ${label}: bare capture timed out at 15 s on SwiftShader; retried with the timer stretched: ${Math.round(bare.ms)} ms`);
         }
         if (bare.err) throw new Error(bare.err);
         check(`${label}: a bare capture() (lounge, verify-photo) is still the drawing buffer`, bare.pngW === bare.before.w && bare.pngH === bare.before.h);
