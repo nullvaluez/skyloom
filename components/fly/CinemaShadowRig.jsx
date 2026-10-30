@@ -2,7 +2,9 @@
 /* eslint-disable react-hooks/immutability -- R3F frame callbacks update owned Three objects and shared runtime telemetry, not React state. */
 import { useEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { CinemaShadows } from '@/lib/fly/cinema-shadows';
+import { CinemaShadows, airframeRefit, airframeShadowBreak, airframeShadowOn, applyShadowCasterRequests, shadowReachConfig } from '@/lib/fly/cinema-shadows';
+import { cameraModelSize } from '@/lib/fly/camera-framing';
+import { lightBlock } from '@/lib/fly/ship-light';
 import { cinemaOn, cinemaProfile } from '@/lib/fly/cinema-policy';
 import { compactDepthShadowTarget } from '@/lib/fly/compact-shadow-target';
 import { toSceneDir } from '@/lib/fly/true-scale';
@@ -34,11 +36,16 @@ export function CinemaShadowRig({runtime,sunRef}){
     const r=rig.current;
     r?.setMapSize(profile.shadowSize);
     if(sunRef.current){sunRef.current.castShadow=false;sunRef.current.intensity=r?0:e.sun;}
-    if(!r){runtime.cinemaShadows={cascades:0};delete runtime.adoptCinematicWarmScene;return;}
+    if(!r){applyShadowCasterRequests(false);runtime.cinemaShadows={cascades:0};delete runtime.adoptCinematicWarmScene;return;}
     const state=useFlyStore.getState();
     let rangeM=profile.shadowRangeM;
-    if(mobileEnhancedOn(state)){
-      const config=resolveMobileEnhanced();
+    // SHIP PASS LIGHT (SHADOW_REACH, LT-5): Medium desktops reuse the phone
+    // rule with their own tunables; flag off, `reach` is exactly the old
+    // mobileEnhancedOn() branch.
+    const mobileReach=mobileEnhancedOn(state);
+    const reach=mobileReach?resolveMobileEnhanced():shadowReachConfig(state);
+    if(reach){
+      const config=reach;
       const ground=runtime.cinemaGeography?.groundVisualM;
       const agl=Number.isFinite(ground)?camera.position.y-ground:NaN;
       mobileRange.current=stepMobileShadowRange(mobileRange.current,
@@ -72,9 +79,25 @@ export function CinemaShadowRig({runtime,sunRef}){
     r.adoptWarmScene??=object=>object.traverse(r.registerObject);
     runtime.adoptCinematicWarmScene=r.adoptWarmScene;
     const scanMs=performance.now()-scanStart;r.scanMs=r.scanMs==null?scanMs:r.scanMs+(scanMs-r.scanMs)*.05;
+    // SHIP PASS LIGHT (AIRFRAME_SHADOW, LT-4): in chase and photo views
+    // cascade 0 ends just past the player's airframe, so the player's own
+    // shadow (it receives on High/Ultra, PlayerPlane.jsx) gets cascade-0
+    // texels sized to it. Flag off: airframeShadowOn() is false and the break
+    // stays null, the practical split, exactly as before.
+    let airframeBreak=null;
+    if(airframeShadowOn(state)){
+      const size=cameraModelSize(runtime.flight),p=runtime.flight?.renderPos??runtime.flight?.pos,a=runtime.origin?.anchor;
+      const k=runtime.cinemaGeography?.worldUnitsPerMetre??1;
+      const distM=p&&a?Math.hypot(camera.position.x-(p.x-a.x),camera.position.y-p.y,camera.position.z-(p.z-a.z)):NaN;
+      airframeBreak=airframeShadowBreak({distM,lengthM:size?Math.max(size.length,size.width)*Math.max(1,k):NaN,rangeM:range,cameraMode:state.cameraMode,cascades:r.cascades});
+    }
+    if(airframeRefit(r.airframeBreakM,airframeBreak,lightBlock('AIRFRAME_SHADOW').refitFrac))r.setAirframeFit(airframeBreak,lightBlock('AIRFRAME_SHADOW'));
+    // SHIP PASS LIGHT: other streams' casters (requestShadowCasters), bounded.
+    const requestedCasters=applyShadowCasterRequests(true);
     camera.updateMatrixWorld();r.update();
     runtime.shadowRadiusM=rangeM;
-    Object.assign(runtime.cinemaShadows??={}, {cascades:r.cascades,size:profile.shadowSize,rangeM,baseRangeM:profile.shadowRangeM,materials:r.owned.size,bytes:r.cascades*profile.shadowSize**2*5,scanObjects:r.scanObjects,scanMs:r.scanMs});
+    Object.assign(runtime.cinemaShadows??={}, {cascades:r.cascades,size:profile.shadowSize,rangeM,baseRangeM:profile.shadowRangeM,materials:r.owned.size,bytes:r.cascades*profile.shadowSize**2*5,scanObjects:r.scanObjects,scanMs:r.scanMs,
+      airframeBreakM:r.airframeBreakM,reach:reach?(mobileReach?'mobile':'medium'):null,requestedCasters});
   },-.9);
   return null;
 }

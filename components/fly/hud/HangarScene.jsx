@@ -1,10 +1,11 @@
 'use client';
-import { Component, Suspense, useEffect, useMemo, useRef } from 'react';
+import { Component, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { ContactShadows, Environment, MeshReflectorMaterial, OrbitControls, useGLTF } from '@react-three/drei';
 import { Vector3 } from 'three';
 import { HangarExterior } from './HangarExterior';
-import { CameraGlide, advanceHaze, createMoteMaterial, createShaftMaterial, hangarCameraGoal, moteGeometry, shaftGeometry } from './hangar-stage';
+import { CameraGlide, advanceHaze, createMoteMaterial, createShaftMaterial, hangarCameraGoal, hangarExposureScale, hangarReflectorResolution, liveryLuminance, moteGeometry, shaftGeometry } from './hangar-stage';
+import { lightBlock, shipPassOn } from '@/lib/fly/ship-light';
 import { livingWorldBlock, livingWorldOn } from '@/lib/fly/living-world';
 import { readReducedMotion } from '@/lib/fly/immersive';
 import { isPhoneClass } from '@/lib/fly/device-class';
@@ -21,12 +22,12 @@ class ModelBoundary extends Component {
   componentDidCatch(){this.props.onError();}
   render(){return this.state.error?null:this.props.children;}
 }
-function Aircraft({aircraft,onReady,earnedPreview=false}){
+function Aircraft({aircraft,onReady,earnedPreview=false,onLuma}){
   const {scene}=useGLTF(aircraft.entry.url);
   const clone=useMemo(()=>{const object=scene.clone(true);if(aircraft.id==='fighter'&&aircraft.entry.parts)attachVectorControls(object);object.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;const copy=m=>{const c=m.clone();c.vertexColors=!!o.geometry.attributes.color;return c;};o.material=Array.isArray(o.material)?o.material.map(copy):copy(o.material);}});
     return object;},[scene,aircraft.id,aircraft.entry.parts]);
   const livery=useAdventureStore(s=>s.progress.liveries[aircraft.id]);
-  useEffect(()=>{applyFleetLivery(clone,aircraft.id,earnedPreview?'earned':livery);},[clone,aircraft.id,livery,earnedPreview]);
+  useEffect(()=>{applyFleetLivery(clone,aircraft.id,earnedPreview?'earned':livery);onLuma?.(liveryLuminance(clone));},[clone,aircraft.id,livery,earnedPreview,onLuma]);
   // LIVING WORLD AIRFRAME_DETAIL: the flight model's panel lines, glass and pilot on the display model.
   // After the paint, so a livery change re-applies it; materials here are per-mount copies. Null on Neon, Classic, Low and phone.
   useEffect(()=>{const finish=applyAirframeDetail(clone,aircraft.id,{mode:'hangar',canopyMaterial:aircraft.entry.canopyMaterial});return()=>finish?.dispose();},[clone,aircraft.id,aircraft.entry.canopyMaterial,livery,earnedPreview]);
@@ -117,6 +118,9 @@ function Bay({aircraft,airport,onReady,onError,onExteriorReady,view}){
  */
 const STAGE = livingWorldOn('HANGAR_STAGE');
 const cfg = livingWorldBlock('HANGAR_STAGE') ?? {};
+// SHIP PASS LIGHT (HANGAR_EXPOSURE, LT-7): null with the flag off, so the
+// studio intensities and the reflector size are exactly today's.
+const EXPOSURE = shipPassOn('HANGAR_EXPOSURE') ? lightBlock('HANGAR_EXPOSURE') : null;
 /** A spot light aimed at a point (its target is not in the scene, so its matrix is set here). */
 function StageSpot({aim,...props}){
   const ref=useRef();
@@ -218,7 +222,9 @@ function StageBay({aircraft,airport,onReady,onError,onExteriorReady,view}){
     if(turntable.current)turntable.current.rotation.y=m.yaw;
     if(!reduced)advanceHaze(haze,dt);
   });
-  const spot=(from,to,e)=>Math.hypot(from[0]-to[0],from[1]-to[1],from[2]-to[2])**2*e;
+  const [liveryLuma,setLiveryLuma]=useState(null);
+  const exposure=EXPOSURE&&liveryLuma!==null?hangarExposureScale(liveryLuma,EXPOSURE):1;
+  const spot=(from,to,e)=>Math.hypot(from[0]-to[0],from[1]-to[1],from[2]-to[2])**2*e*exposure;
   const aim=[0,viewLength*.1,0];
   const keyPos=[-width*.22,height*.92,-depth*.42],poolPos=[0,height-.6,0],rims=[[width*.3,height*.9,depth*.45],[-width*.34,height*.86,depth*.4]];
   const L=cfg.light??{};
@@ -228,7 +234,7 @@ function StageBay({aircraft,airport,onReady,onError,onExteriorReady,view}){
     <Suspense fallback={null}><Environment files="/hdri/kloofendal_48d_partly_cloudy_puresky_2k.hdr" background backgroundRotation={[0,2.6,0]} environmentIntensity={L.env??.5}/></Suspense>
     <hemisphereLight args={['#d6edff','#17212e',L.hemi??.3]}/>
     {/* Sun through the open door (the shadow caster), and the classic cool fill. */}
-    <directionalLight name="hangar-stage-sun" position={haze.sun} intensity={L.sun??3.6} color="#ffe3b8" castShadow shadow-mapSize={[1024,1024]} shadow-camera-left={-width} shadow-camera-right={width} shadow-camera-top={width} shadow-camera-bottom={-width} shadow-camera-far={length*7} shadow-normalBias={.025} shadow-bias={-.0001}/>
+    <directionalLight name="hangar-stage-sun" position={haze.sun} intensity={(L.sun??3.6)*exposure} color="#ffe3b8" castShadow shadow-mapSize={[1024,1024]} shadow-camera-left={-width} shadow-camera-right={width} shadow-camera-top={width} shadow-camera-bottom={-width} shadow-camera-far={length*7} shadow-normalBias={.025} shadow-bias={-.0001}/>
     <directionalLight position={[-width,height,-depth]} intensity={L.fill??.55} color="#9aeaff"/>
     {/* Studio: a key from the camera side, a soft pool overhead, two rims from the door. */}
     <StageSpot name="hangar-stage-key" position={keyPos} aim={aim} angle={.55} penumbra={.75} decay={2} intensity={spot(keyPos,aim,L.key??2.6)} color="#f4f8ff"/>
@@ -238,7 +244,7 @@ function StageBay({aircraft,airport,onReady,onError,onExteriorReady,view}){
     <group ref={cutaway} name="hangar-architecture">
       <mesh name="hangar-stage-floor" rotation-x={-Math.PI/2} position-y={-.025} receiveShadow><planeGeometry args={[width,depth]}/>
         {cheap?<meshStandardMaterial color="#4a5864" metalness={.12} roughness={.64}/>
-          :<MeshReflectorMaterial resolution={tier==='high'?1024:512} blur={[320,110]} mixBlur={.9} mixStrength={cfg.floor?.mixStrength??1.8} mixContrast={1.05} depthScale={.7} minDepthThreshold={.3} maxDepthThreshold={1.3} mirror={0} color={cfg.floor?.color??"#56636d"} metalness={cfg.floor?.metalness??.15} roughness={cfg.floor?.roughness??.58}/>}
+          :<MeshReflectorMaterial resolution={hangarReflectorResolution(tier,EXPOSURE)} blur={[320,110]} mixBlur={.9} mixStrength={cfg.floor?.mixStrength??1.8} mixContrast={1.05} depthScale={.7} minDepthThreshold={.3} maxDepthThreshold={1.3} mirror={0} color={cfg.floor?.color??"#56636d"} metalness={cfg.floor?.metalness??.15} roughness={cfg.floor?.roughness??.58}/>}
       </mesh>
       <mesh castShadow userData={{cutawaySide:'roof'}} position={[0,height,0]}><boxGeometry args={[width,.7,depth]}/><meshStandardMaterial color="#172630" metalness={.5} roughness={.48}/></mesh>
       {[-1,1].map(side=><group key={side}>
@@ -268,7 +274,7 @@ function StageBay({aircraft,airport,onReady,onError,onExteriorReady,view}){
     </group>
     <group ref={turntable} name="hangar-stage-turntable">
       <ModelBoundary key={aircraft.id} onError={onError}><Suspense fallback={null}>
-        <Aircraft aircraft={aircraft} onReady={onReady}/>
+        <Aircraft aircraft={aircraft} onReady={onReady} onLuma={EXPOSURE?setLiveryLuma:undefined}/>
         <ContactShadows position={[0,.004,0]} opacity={.85} scale={width} blur={1.8} far={Math.min(height,viewLength*.25)} resolution={512} frames={1} color="#020713"/>
       </Suspense></ModelBoundary>
     </group>

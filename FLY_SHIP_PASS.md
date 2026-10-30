@@ -1461,7 +1461,84 @@ SK-1 veil arms at 10,000 / 8,500 ft; s11 `verify-sat-night`; s12
 ### LIGHT
 
 <!-- SHIP PASS LIGHT report begin -->
-(not started)
+**Status (2026-10-30, cloud venue, IN PROGRESS — continuation after an API
+cutoff).** LT-2..LT-7 are built and node-gated, and the Provides
+(`requestShadowCasters()`, `capturePhoto({scale})`) are in. Browser evidence
+so far: the fixture on SwiftShader, phone emulation only. The desktop and
+look-flag browser batches are queued behind the shared heavy lock (see
+known issues). Every LIGHT flag ships `enabled:false`.
+
+| ID | State | What landed | Evidence |
+|---|---|---|---|
+| LT-1 | owner-pending | No defect found. Review of `mobile-enhanced.js` / `mobile-bloom.js` and their three consumers (Effects bloom, CinemaShadowRig reach, daylight depth): uniform-only or same-shader changes, so no program-key moves; the flag stays OFF for the owner's iPhone glance | `verify-mobile-enhanced` 6/6, `verify-mobile-bloom` 6/6, `verify-cloud-silhouette-gpu` PASS on SwiftShader (1426 -> 0 leaked hull px over 15 silhouettes; Chrome is absent, so it ran through a venue shim that drops `channel:'chrome'`). Phone-emulation app smoke with `?flags=MOBILE_ENHANCED` is queued (`review-ship-light --arms=phone-off,phone-mobile,phone-on`) |
+| LT-2 | built, browser queued | `lib/fly/terrain-shadow.js`: on desktop, a terrain-only ortho depth map (texel-snapped, 2 Hz per policy); on touch, a CPU horizon map built from a wrapped `TerrainGroundQuery` and time-sliced. Anchored patch in `earth-surface-material.js`; `TerrainShadowRig.jsx` is mounted from FlyScene's LIGHT block only with the flag on | `verify-ship-light` (0a)-(0c), (1a)-(1p). Flag off, the terrain key and the shader sha256 equal the base tree. (1p) is the 16-unit fragment sampler ceiling (ANGLE D3D11 and iPhone expose 16): at Ultra's 3 cascades the upper bound goes from 15 to 16 with the flag on (phone 14). That is zero headroom, and no sibling branch adds a sampler. The review harness now fails an arm whose measured earth program exceeds 16, whatever the venue's own limit |
+| LT-3 | built, browser queued | `lib/fly/traffic-shadows.js`, driven from `detailed-traffic.js` (TrafficLayer untouched). Casters render through the fleet depth material, with a per-cascade cull and a per-frame (mesh, cascade) budget. Contact blobs (1 draw) on Medium and touch. Shadow hooks are chained, and `dispose()` hands the meshes back | (3a)-(3j) |
+| LT-4 | built | `CinemaShadows.setAirframeFit` pins cascade 0 past the airframe, with its normal bias in cascade-0 texels. The PlayerPlane LIGHT block toggles receiveShadow (a uniform, so no recompile) | (4a)-(4f) |
+| LT-5 | built | `shadowReachConfig` applies MOBILE_ENHANCED's AGL rule to Medium desktops | (5a)-(5b): 900 m AGL reaches the 1.2 km ceiling |
+| LT-6 | built, flag OFF | `lib/fly/photo-hires.js` and PhotoCapture: one supersampled offscreen frame, tiled through the camera's own projection past GL limits, with `holdGovernor('photo-hires')` and `track('photo_taken')`. On touch, `'auto'` aims at `touchScale` 2 and is raised just to `minLongPx` 2,560 where the policy allows. Once the frame picks the request up, the 15 s timeout is cleared | (6a)-(6h). `verify-photo-hires` on SwiftShader, fixture: **desktop 8/8** (1280x720 buffer: 3840x2160 PNG, attribution burned in, restored with no context loss, the 2x2 tiled path at a forced MAX_TEXTURE_SIZE 2048 restored with the tiles moved, bare `capture()` still the buffer, zero page/shader errors); **phone 7/8** (390x844 at DPR 3, 487x1055 buffer: 975x2110 PNG, tiled 2x2 restored, bare capture, zero errors). The one red: long side 2,110 < 2,560 at W0's touch maxScale 2 |
+| LT-7 | built, browser queued | `hangar-stage.js` `liveryLuminance` / `hangarExposureScale` / `hangarReflectorResolution`. StageBay scales the key, pool, rims and sun; Medium's reflector is halved | (7a)-(7d) |
+
+**Provides.** `requestShadowCasters(key, objects, {max}) -> release`
+(cinema-shadows.js; CinemaShadowRig applies it each frame: casters on while
+the cascades exist, parked without them, each object's own castShadow
+restored on release; (9a)-(9b)), and `capturePhoto({scale}) -> Promise<Blob>`
+(photo-hires.js).
+
+**PHOTO_HIRES decision: OFF on this branch.** The phone export misses LT-6's
+2,560 px only because W0's touch `maxScale` is 2: the emulated phone's
+1055 px buffer reaches 2,110 and needs 2.427x. FRAME's contract (touch
+`maxScale` 3, device-policy.js) closes exactly that: `photoExportPlan` then
+gives 1181x2560 (touchScale 2 raised to minLongPx). **Lead: re-run
+`verify-photo-hires` on the merged tree**, and flip `PHOTO_HIRES.enabled` if
+it is all green there: the phone long-side row, the desktop arm (queued here)
+and `verify-photo` (queued here). `verify-attribution` 4/4 (node).
+
+**LT-2 draw cost, read honestly.** The receiver adds no draw: it samples inside the earth surface's existing draw. The desktop refresh is an offscreen pass that redraws the loaded terrain tiles in the light box, bounded by `maxTiles` (400), twice a second or at once on a warp or a light jump. Between refreshes the frame pays 0 extra draws; a refresh frame pays its tile count (`runtime.terrainShadow.draws` and `.tiles`, recorded by the terrain-on arm). So LT-2's "+≤ 1 draw" and the policy seed's `draws: 1` hold on every frame but the two refresh frames a second. A tile-tree terrain cannot be redrawn in one draw. A design that can keep it to one draw per frame (a top-down height map updated per landed tile, plus one lit pass at 2 Hz) is a rewrite this venue cannot check on a GPU, so it is offered, not built. The owner's census (D16) decides whether the refresh frames fit; `?flags=TERRAIN_SHADOW` with the frame stats on shows them.
+
+**Device gating.** Every LIGHT feature asks `deviceFeature()` through
+`lib/fly/ship-light.js`. SwiftShader is class 'software', which the policy
+refuses, so harnesses pin `window.__flyLightDeviceClass`. FRAME's
+`window.__flyDeviceClassOverride` is read as a fallback, and the harnesses set
+both, so they work before and after integration.
+
+**Gates.** `verify-ship-light` 58/58; `ship-pass-gates` 32 PASS / 2 KNOWN-RED
+/ 0 FAIL, seam rule PASS (re-run at f67addb); `lounge-pass-gates.mjs` PASS all 31; node:
+verify-shadow-calm (35), verify-shadow-coverage, verify-fleet-airframes,
+verify-mobile-enhanced, verify-mobile-bloom, verify-attribution all green.
+ESLint: no new errors in any touched file (FlyScene.jsx 26/2 = main).
+
+**Owner checks (section 9).** RTX 5080: step 3 (`?flags=TERRAIN_SHADOW`, Alps
+golden hour, valley luma drop and 60 s shimmer), step 4
+(`?flags=TRAFFIC_SHADOWS&airports=on`, KJFK touchdown), step 5
+(`?flags=AIRFRAME_SHADOW`, chase orbit at a 10 deg sun), step 7 (photo
+export, no frame over 2 s), `?flags=SHADOW_REACH` at Medium,
+`?flags=HANGAR_EXPOSURE` (white nose). iPhone: step 6 (photo at 2,560 px or
+more, after the merged-tree flip) and step 10 (`?flags=MOBILE_ENHANCED`
+glance).
+
+**Contract requests (to FRAME, accepted, on its branch).** A general
+device-class pin, and touch PHOTO_HIRES `maxScale` 3.
+
+**Known issues.** (1) The heavy lock was still deadlocked at 09:20 (since
+about 07:57) by an orphaned RELEASE `next-server` (pid 28356, :3135) that
+inherited the lock fd. This agent was denied permission to kill it, and the
+lead has been told. LIGHT's run script now starts its server with `3>&-`.
+**Queued LIGHT browser batches** run on their own once the lock frees, each
+under 25 minutes. Stop one by killing its `flock ... run-session.sh <X>`
+process. Output goes to `.graphics-review/ship-pass/light/`:
+`sessionB.out` (verify-photo-hires desktop / phone / off, plus the
+terrain-off / terrain-on arms with the 60 s still diff and the phone-off /
+phone-mobile / phone-on arms, into `review/`), `sessionC.out` (desktop-on,
+medium-on, airframe-off / airframe-on, hangar-off / hangar-on into
+`review-c/`, plus verify-photo) and `sessionD.out` (lounge-off /
+lounge-casters / lounge-blobs at KJFK into `review-d/`, plus verify-hangar).
+Every arm's `report.json` records page and shader errors, LIGHT telemetry,
+sampler counts and context loss. For terrain-shadow luma, compare
+`review/terrain-off.png` with `review/terrain-on.png`. (2) A pre-existing
+venue harness defect: on desktop, `_boot.js`'s
+`.fixed.inset-0 canvas` wait resolves to a hidden first canvas and times out
+after the reveal (CITY hit it too). The LIGHT harnesses wrap bootFly, and
+existing gates run through a scratch preload; `_boot.js` is not edited.
 <!-- SHIP PASS LIGHT report end -->
 
 ### RELEASE

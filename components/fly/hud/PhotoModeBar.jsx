@@ -43,7 +43,9 @@ export function PhotoModeBar() {
     try {
       // Resolved AT CALL TIME through the bus (round 8.5 lesson) — a scene
       // remount re-registers the action instead of orphaning a captured null.
-      const pending = callRuntimeAction('capturePhoto');
+      // SHIP PASS LIGHT (PHOTO_HIRES): the shutter asks for the supersampled
+      // export; with the flag off the action ignores it (drawing buffer).
+      const pending = callRuntimeAction('capturePhoto', { scale: 'auto' });
       if (!pending) {
         flash('shutter not ready');
         return;
