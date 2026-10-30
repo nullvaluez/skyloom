@@ -409,6 +409,9 @@ console.log('SHIP PASS RELEASE gate (verify-ship-release)\n');
   gate('D10 the entry and spawn blocks act only with DEEP_LINKS on, and a harness bypass pin wins',
     /shipPassOn\('DEEP_LINKS'\) && frontDoorOn\(\) && !titleBypassPinned\(\) && consumeDeepLink\(\)/.test(entry) &&
       /shipPassOn\('DEEP_LINKS'\) && flightPlanOn\(\) && env\.title === undefined && !titleBypassPinned\(\)/.test(spawn));
+  const host = read('components/fly/hud/DeepLinkHost.jsx');
+  gate('D11 the launcher waits for the opening title (the spawn resolves async): only leaving it AFTER it was up stands the link down; it reports __flyDeepLink',
+    /if \(s\.screen === 'title'\) sawTitle = true;\s*else if \(sawTitle\) return finish\('', 'stood-down'\);/.test(host) && !/if \(s\.screen !== 'title'\) return finish/.test(host) && /window\.__flyDeepLink = \{/.test(host));
 }
 
 // === N  RL-6 analytics =========================================================

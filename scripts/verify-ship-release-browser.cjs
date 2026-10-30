@@ -91,8 +91,19 @@ async function leg(browser, fixture, name, search, { consent = null, check }) {
     await page.goto(`${BASE}/${search}`, { waitUntil: 'domcontentloaded' });
     await check(page, { analytics, errors, shader });
   } catch (e) {
-    gate(`${name}: leg completed`, false, String(e.message).slice(0, 300));
+    const state = await page
+      .evaluate(() => {
+        const s = window.__flyStore?.getState?.();
+        return { screen: s?.screen, phase: s?.phase, flightMode: s?.flightMode, boot: window.__flyBoot, link: window.__flyDeepLink, notice: document.querySelector('[data-testid="deep-link-notice"]')?.textContent ?? null, url: location.href };
+      })
+      .catch(() => null);
+    gate(`${name}: leg completed`, false, `${String(e.message).slice(0, 200)} | state ${JSON.stringify(state)}`);
     await page.screenshot({ path: path.join(OUT, `browser-${name}-failure.png`), timeout: 20000 }).catch(() => {});
+  }
+  // RL-6: every leg with ANALYTICS_V2 pinned on and no consent is also a
+  // zero-network proof (the PostHog host is intercepted for the whole leg).
+  if (!consent && /flags=[^&]*(^|[,=])ANALYTICS_V2/.test(search) && !/-ANALYTICS_V2/.test(search)) {
+    gate(`${name}: ANALYTICS_V2 on without consent — zero requests reached the analytics host`, analytics.length === 0, analytics.slice(0, 3));
   }
   gate(`${name}: zero page errors and zero shader errors`, errors.length === 0 && shader.length === 0, { errors: errors.slice(0, 3), shader: shader.slice(0, 3) });
   gate(`${name}: zero console assert failures (RL-9)`, asserts.length === 0, { count: asserts.length, first: asserts[0] });

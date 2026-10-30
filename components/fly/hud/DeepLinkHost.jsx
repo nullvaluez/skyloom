@@ -23,7 +23,7 @@ import { registerRuntimeActions } from '@/lib/fly/runtime-bus';
  * link stands down. An invalid link, or one that cannot open, leaves the
  * title up with one quiet line that fades by itself.
  */
-const DEADLINE_MS = 90000;
+const DEADLINE_MS = 120000;
 const NOTICE_MS = 6500;
 
 function savedAircraft() {
@@ -58,10 +58,17 @@ export function DeepLinkHost({ runtime }) {
     let timer = null;
     let busy = false;
     let done = false;
-    const finish = (message) => {
+    // `window.__flyDeepLink` says where the link stands (harnesses, and an
+    // owner reading a phone's state): waiting | launched | refused | stood-down.
+    const report = (state, message = '') => {
+      window.__flyDeepLink = { kind: link.ok ? link.kind : 'invalid', state, message };
+    };
+    report('waiting');
+    const finish = (message, state = message ? 'refused' : 'launched') => {
       done = true;
       settleDeepLink();
       clearInterval(timer);
+      report(state, message);
       if (message) setNotice(message);
     };
     if (!link.ok) {
@@ -70,11 +77,22 @@ export function DeepLinkHost({ runtime }) {
       return () => clearTimeout(t);
     }
     const started = performance.now();
+    // FlyMode sets the opening screen only once the (async) spawn resolves, and
+    // a linked spawn far from home takes longer: until the title has been up,
+    // "not on the title" means "not yet", not "the player left" (measured in
+    // the venue: the ?fly= link stood down at its first tick on the store's
+    // default 'hangar' screen).
+    let sawTitle = false;
     const step = () => {
       if (done || busy) return;
       const s = useFlyStore.getState();
-      if (s.screen !== 'title') return finish(''); // the player chose something else
       const late = performance.now() - started > DEADLINE_MS;
+      if (s.screen === 'title') sawTitle = true;
+      else if (sawTitle) return finish('', 'stood-down'); // the player chose something else
+      else {
+        if (late) finish("The world took too long to load, so that link didn't open.");
+        return;
+      }
       if (globalThis.window?.__flyBoot?.pct !== 100) {
         if (late) finish("The world took too long to load, so that link didn't open.");
         return;
