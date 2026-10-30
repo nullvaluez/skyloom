@@ -966,7 +966,10 @@ Severity and effort are the auditors' estimates. "Where" names the requirement t
 **Status (2026-10-30, cloud venue, branch `ship/city`): IN PROGRESS.** CT-1,
 CT-6 (node half), CT-4 and CT-5 (built, flags off) and CT-7 (the list) landed;
 CT-2 plumbing is in (flag off); the SK-1 city arms (browser), CT-3 and the
-browser smokes follow. Every number below is the offline
+browser smokes follow. The browser probe (`scripts/ship-city-probe.cjs`) now
+measures the SK-1 city arms at SKY's poses with SKY's metric (ported from
+`scripts/ship-sky-veil.cjs`, live CT-1 pins on one boot), books every draw of
+a frame to its layer (CT-3 census) and takes a 60 s still diff (CT-4). Every number below is the offline
 fixture on SwiftShader or a node gate, never a device number (3.8).
 
 **CT-1 — diagnosis pins (P0, landed).** `window.__flyCityDiag = { fadeStartM?,
@@ -1126,7 +1129,7 @@ dissolves at 4,500-5,000 m) and `verify-sat-buildings` (C-ii) is unaffected
 - iPhone step 4 (city turn): `?flags=CITY_RANGE` (merged colour draws on the
   phone) vs off: draws and turn hitch.
 
-**Gates.** `scripts/verify-ship-city.mjs` (node, starts the fixture itself): 45/45.
+**Gates.** `scripts/verify-ship-city.mjs` (node, starts the fixture itself): 46/46.
 `verify-play-city` 28/28, `verify-night-city-identity` PASS (8 rows). `ship-pass-gates`: 32 PASS, 2 KNOWN-RED, 0 FAIL, seam rule PASS.
 `FLY_TILE_FIXTURE=1 verify-worker-window` 4/4, `verify-true-areas` 7/7.
 
