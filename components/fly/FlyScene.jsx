@@ -239,6 +239,8 @@ import { ENCOUNTER_FEEL_ACTIVE } from '@/lib/fly/play-pass';
 
 // SHIP PASS imports: one block per stream (FLY_SHIP_PASS.md section 7).
 // SHIP PASS FRAME imports begin
+import { applyDynamicNear } from '@/lib/fly/dynamic-near';
+import { noteHeading } from '@/lib/fly/turn-budget';
 // SHIP PASS FRAME imports end
 
 // SHIP PASS SKY imports begin
@@ -3600,6 +3602,11 @@ export function FlyScene({ runtime }) {
     // SHIP PASS (FLY_SHIP_PASS.md section 7): per-frame blocks, the last
     // writes of the simulation block before the camera refresh.
     // SHIP PASS FRAME frame begin
+    // FR-13 (DEVICE_POLICY.dynamicNear): clamp(0.02·AGL, 2.5 m, 60 m), only on
+    // a renderer WITHOUT reversed depth; a no-op everywhere else (desktop).
+    applyDynamicNear(gl, camera, flight.agl, !!runtime.airportWatch?.active);
+    // FR-8 (PACE_ADAPT.turn, ships off): the turn budget reads the yaw rate.
+    noteHeading(flight.heading, delta);
     // SHIP PASS FRAME frame end
     // SHIP PASS SKY frame begin
     // SHIP PASS SKY frame end

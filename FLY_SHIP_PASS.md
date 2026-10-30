@@ -967,9 +967,21 @@ commit; a continuation agent picks up from it and from `git log ship/frame`.
 | FR-11 | built | `lib/fly/device-policy.js` table: W0 seed rows kept, score-aware rows, FRAME rows (BATTERY_SAVER, MATCH_DISPLAY, CADENCE_LOCK, DYNAMIC_NEAR). | — |
 | FR-3 | built | `lib/fly/registry-warm.js` + `prewarm.js queueRegistryWarm` + `PrewarmRig`: every `prewarmEntries()` entry `entryReachable()` here (tier/preset, `deviceClassOf()`, `shipPassOn`) is compiled against the LIVE scene under the 1×1 target binding and RETAINED; the boot tier rides the boot drain, the lower ladder tiers queue after it (idle frames), a tier/preset step, a late registration (2 s rescan, covers the title) and a new `scene.environment` (day/night bucket) queue what is missing; a lost context drops the retained set. Handles an empty registry. `__flyStats.prewarm.registry`. | `verify-ship-frame` FR-3 (a)–(e) |
 | FR-6 | built (provisional rows) | `lib/fly/tier-budgets.js` is the one table (`BUDGET_TABLE`, rows ultra/high/medium/phone/tablet/low, each `provisional:true` with its `sources`); `cinema-profile.js` budgets, `device-report.js`, `verify-device-report.mjs`, `beta-soak.cjs`, `analyze-beta-soak.mjs` read it; frame time graded as the share of frames over 1.5× the target interval (`missedShare`, device report `frame.missed`). `scripts/derive-budget-table.mjs [reports] --write` re-derives rows from W0.6 reports (peak + 5%). Conflicts resolved to the stricter number: High 375 / 2.2 M (not 450 / 4.0 M), phone 250 / 1.2 M (not 375 / 2.2 M). | `verify-ship-frame` FR-6 (a)–(e); `verify-device-report` 5/5 (new (4) 60 Hz pass, (5) miss rule) |
-| FR-8, FR-12, FR-13 | not started | | |
+| FR-8 | built (budget ships off; harness pending) | `lib/fly/turn-budget.js` + `finalize-pace.js setTurnBudgetK`: `PACE_ADAPT.turn` scales the shared finalize allowance (chunk mounts) while yawing > 25°/s, fed from the FlyScene FRAME frame block; SHIPS OFF (only a 5080/iPhone turn measurement can show the benefit). COMMIT_BUDGET / TERRA_PACE / atlas uploads are read inside CITY/terrain engines FRAME does not own: not re-budgeted. | `verify-ship-frame` FR-8 (a); `verify-finalize-pace` 22/0 |
+| FR-12 | built, flag off | `render-resolution.js ultraSupersampleScale()`: 1.5× on a DPR-1 display at Ultra with a dGPU and a 'high' benchmark (needs DEVICE_POLICY); the governor makes it the top rung, shed first. | `verify-ship-frame` FR-12 (a)–(b) |
+| FR-13 | built, sub-switch of DEVICE_POLICY (off) | `lib/fly/dynamic-near.js`: near = clamp(0.02·AGL, 2.5 m, 60 m) only where `gl.capabilities.reversedDepthBuffer` is false, from the FlyScene FRAME frame block; skips the lounge (it owns the near plane). Desktop (reversed depth) never runs it. No iPhone report exists, so whether it ever runs there is the owner's report. | `verify-ship-frame` FR-13 (a)–(b) |
+| FR-7 (fix) | built, on with PACE_ADAPT | `PACE_ADAPT.sliceBar`: the post-reveal prewarm slice bar follows the target interval (24.2 ms at 60 = today's 24; 48 ms at 30 instead of a 20 s wait then 50 ms). | `verify-ship-frame` FR-7 (c) |
 
 **Flags:** all four FRAME flags still `enabled:false` in this commit.
+
+**Reds fixed:** `verify-graphics-governor` (FRAME's known red, "crashes"): the
+gate ran the governor in a VM without the imports it gained since (cinema
+policy, render resolution, pacing) and asserted removed behaviour (a latch
+that times out, a legacy satellite renderer, a ladder without effect rungs).
+Now 14/14 with the stubs added and those assertions brought to the shipped
+contract (latch holds for the session; satellite targets 60; render scale is
+spent before the first tier step). `verify-frame-step` (10/11) is untouched:
+FRAME_STEP is backlogged and none of this work reads it.
 
 **Files outside the 5.1 list (new, FRAME's):** `components/fly/{CensusRig,PaceClock}.jsx`,
 `components/fly/hud/BatterySaverHint.jsx`, `lib/fly/{shader-ready,program-census,render-census,census,stall-census,pace-adapt}.js`,

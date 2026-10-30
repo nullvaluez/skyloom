@@ -13,6 +13,10 @@ import { queueRegistryWarm } from '@/lib/fly/prewarm';
 import { prewarmEntries } from '@/lib/fly/prewarm-registry';
 import { resetRegistryWarm } from '@/lib/fly/registry-warm';
 import { shipPassOn } from '@/lib/fly/ship-pass';
+import { sliceBarSec } from '@/lib/fly/pace-adapt';
+import { cadenceState } from '@/lib/fly/frame-api';
+// Flag off: the identity (today's 24 ms bar).
+const SLICE_BAR = (base) => sliceBarSec(base, cadenceState().targetFps);
 
 /**
  * ROUND 21 (A GOVERNOR, §3.2) — the mount point for the boot shader pre-warm.
@@ -109,7 +113,10 @@ export function PrewarmRig({ runtime }) {
     // is actually delivering — still never a frame that is ALREADY the worst
     // one, which is the whole rule.
     sliceWaitRef.current += delta;
-    const bar = sliceWaitRef.current > 20 ? 0.05 : 0.024;
+    // SHIP PASS FRAME (FR-7, PACE_ADAPT.sliceBar): the bar follows the
+    // governor's target interval (sliceBarSec), so a 30 Hz page drains at
+    // ~48 ms instead of waiting 20 s for a 24 ms frame it never draws.
+    const bar = sliceWaitRef.current > 20 ? Math.max(0.05, SLICE_BAR(0.024)) : SLICE_BAR(0.024);
     if (delta > bar) return;
     sliceWaitRef.current = 0;
     sliceRef.current = true;

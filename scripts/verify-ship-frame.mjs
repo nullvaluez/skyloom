@@ -507,5 +507,283 @@ const atBase = (rel) => {
   });
 }
 
+// ===========================================================================
+// FR-7 / FR-8 — the slice bar and the turn budget (PACE_ADAPT sub-switches)
+// ===========================================================================
+{
+  const { sliceBarSec } = await mod('lib/fly/pace-adapt.js');
+  const { PACE_ADAPT } = await mod('lib/fly/fly-constants.js');
+  await check('FR-7 (c) the prewarm slice bar follows the target: today\'s 24 ms at 60, 48 ms at 30; off = 24 ms', () => {
+    const cfg = PACE_ADAPT.sliceBar;
+    assert(cfg.enabled === true, 'sliceBar ships on with PACE_ADAPT (its 60 Hz value is today\'s bar)');
+    assert(Math.abs(sliceBarSec(0.024, 60, cfg) - 0.024) < 0.0005, `60: ${sliceBarSec(0.024, 60, cfg)}`);
+    assert(Math.abs(sliceBarSec(0.024, 30, cfg) - 0.0483) < 0.0005, `30: ${sliceBarSec(0.024, 30, cfg)}`);
+    assert(sliceBarSec(0.024, 30, null) === 0.024 && sliceBarSec(0.024, null, cfg) === 0.024, 'off / unknown target = today');
+  });
+  await check('FR-8 (a) the turn budget ships OFF; armed, a fast yaw scales the shared finalize allowance and a straight flight does not', async () => {
+    assert(PACE_ADAPT.turn.enabled === false, 'turn sub-switch must ship off (5080/iPhone turn measurement decides)');
+    const fp = await mod('lib/fly/finalize-pace.js');
+    const tb = await mod('lib/fly/turn-budget.js');
+    fp.resetFinalizePace();
+    tb.resetTurnBudget();
+    tb.noteHeading(0, 1 / 60);
+    tb.noteHeading(0.05, 1 / 60); // 172 deg/s, but unarmed (the shipped state)
+    assert(fp.turnBudgetK() === 1, 'unarmed: no turn scale');
+    const armed = { ...PACE_ADAPT.turn, enabled: true };
+    tb.noteHeading(0, 1 / 60, armed);
+    assert(tb.noteHeading(0.05, 1 / 60, armed) === armed.budgetK && fp.turnBudgetK() === armed.budgetK, 'a 172 deg/s yaw scales the allowance');
+    assert(tb.noteHeading(0.052, 1 / 60, armed) === 1 && fp.turnBudgetK() === 1, 'a 7 deg/s drift does not');
+    tb.resetTurnBudget();
+    assert(/config\(\)\.budgetMs \* budgetK\(\) \* turnK/.test(read('lib/fly/finalize-pace.js')), 'rule 2 multiplies the turn scale');
+    const scene = read('components/fly/FlyScene.jsx');
+    const block = scene.slice(scene.indexOf('// SHIP PASS FRAME frame begin'), scene.indexOf('// SHIP PASS FRAME frame end'));
+    assert(block.includes('noteHeading(flight.heading, delta)'), 'FlyScene FRAME block feeds the yaw rate');
+  });
+}
+
+// ===========================================================================
+// FR-9 — frame-rate modes, the presentation cadence, the session summary
+// ===========================================================================
+{
+  const store = new Map();
+  globalThis.window = { localStorage: { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)) } };
+  const fa = await import(path.join(ROOT, 'lib/fly/frame-api.js') + '?fr9');
+  const { presentationFps, paceTarget } = await mod('lib/fly/pace-adapt.js');
+  await check('FR-9 (a) setFrameCadence persists to fly-frame-rate-v1, notifies, ignores junk; the default is 60', () => {
+    assert(fa.FRAME_RATE_KEY === 'fly-frame-rate-v1');
+    assert(fa.frameCadence() === '60', 'default');
+    const seen = [];
+    const un = fa.subscribeFrameCadence((m) => seen.push(m));
+    fa.setFrameCadence('30');
+    fa.setFrameCadence('bogus');
+    fa.setFrameCadence('display');
+    un();
+    eq(seen, ['30', 'display']);
+    assert(store.get('fly-frame-rate-v1') === 'display' && fa.frameCadence() === 'display');
+  });
+  await check('FR-9 (b) the measured cadence matches the mode: 30 pumps 30; 60 caps a 144 Hz desktop and leaves 60 Hz alone; Match display renders native (refresh/2 on Ultra >= 100 Hz)', () => {
+    const P = (o) => presentationFps({ paceOn: true, always: true, ...o });
+    eq([P({ mode: '30' }), P({ mode: '30', mobile: true }), P({ mode: '60', displayHz: 144 }), P({ mode: '60', displayHz: 60 }), P({ mode: 'display', displayHz: 144 }), P({ mode: 'display', displayHz: 144, heavy: true }), P({ mode: 'display', displayHz: 60, heavy: true }), P({ mode: '60', mobile: true }), P({ mode: '60', observing: true, displayHz: 144 })], [30, 30, 60, null, null, 72, null, 60, 60]);
+    // Off: today's rule exactly (mobile flight or the seated lounge at 60).
+    for (const mobile of [false, true]) for (const observing of [false, true]) for (const always of [false, true]) for (const mode of ['60', 'display', '30'])
+      assert(presentationFps({ paceOn: false, mode, always, mobile, observing, displayHz: 144 }) === (always && (mobile || observing) ? 60 : null), 'flag-off legacy rule');
+    // The governor target the mode implies.
+    eq([paceTarget({ mode: '30', refresh: 60 }), paceTarget({ mode: 'display', refresh: 144 }), paceTarget({ mode: 'display', refresh: 144, heavy: true }), paceTarget({ mode: 'display', refresh: 144, mobile: true }), paceTarget({ mode: '60', refresh: 144 }), paceTarget({ mode: '60', refresh: 60, locked: 30 })], [30, 144, 72, null, null, 30]);
+  });
+  await check('FR-9 (c) frameSessionSummary carries coarse buckets only', () => {
+    eq([fa.p95Bucket(15), fa.p95Bucket(16.7), fa.p95Bucket(22), fa.p95Bucket(40), fa.p95Bucket(250), fa.p95Bucket(null)], ['<=16.7', '<=16.7', '<=33.3', '<=50', '>100', null]);
+    eq([fa.stallBucket(0), fa.stallBucket(0.4), fa.stallBucket(3), fa.stallBucket(30)], [0, 1, 5, '>10']);
+    window.__flyStats = { frame: { sample: () => ({ p95: 18.2, long100PerMin: 1.6 }) } };
+    fa.noteCadence({ rung: 2 });
+    eq(fa.frameSessionSummary(), { p95Bucket: '<=20', stallsPerMin: 2, rung: 2 });
+  });
+  await check('FR-9 (d) Settings rows live in the FRAME blocks only and render nothing with PACE_ADAPT off; store field + setter exist', () => {
+    const rows = read('components/fly/hud/SettingsRows.jsx');
+    const block = rows.slice(rows.indexOf('// SHIP PASS FRAME rows begin'), rows.indexOf('// SHIP PASS FRAME rows end'));
+    assert(/const frameRows = !FRAME_ROWS_ON \? null :/.test(block), 'frameRows is null with the flag off');
+    for (const id of ['settings-battery-saver', 'settings-frame-rate']) assert(block.includes(id), id);
+    assert(/deviceFeature\('BATTERY_SAVER'\)/.test(block) && /deviceFeature\('MATCH_DISPLAY'\)/.test(block), 'rows gate through the policy');
+    const st = read('stores/fly-store.js');
+    assert(/frameRateMode: '60'/.test(st) && /setFrameRateMode:/.test(st));
+    const hint = read('components/fly/hud/BatterySaverHint.jsx');
+    assert(/publishNotice\(/.test(hint) && !/CalmHud/.test(hint.replace(/\/\*[\s\S]*?\*\//g, '')), 'the hint uses the notice lane, never CalmHud');
+  });
+  delete globalThis.window;
+}
+
+// ===========================================================================
+// FR-10 — the boot benchmark decision table
+// ===========================================================================
+{
+  const { decideStart, gradeScore } = await mod('lib/fly/gpu-benchmark.js');
+  const { DEVICE_POLICY } = await mod('lib/fly/fly-constants.js');
+  const t = DEVICE_POLICY.benchmark.thresholds;
+  const hi = { fillMpixPerMs: 10, cloudMs: 1 };
+  const mid = { fillMpixPerMs: 1.5, cloudMs: 8 };
+  const lo = { fillMpixPerMs: 0.2, cloudMs: 40 };
+  await check('FR-10 (a) grades: high / medium / low from fill and cloud throughput', () => {
+    eq([gradeScore(hi, t), gradeScore(mid, t), gradeScore(lo, t), gradeScore(null, t)], ['high', 'medium', 'low', null]);
+  });
+  await check('FR-10 (b) the decision table: start tier, preset, Ultra DPR cap, tablet desktop effects', () => {
+    const row = (score, cls, masked = false) => {
+      const d = decideStart({ score, cls, masked, thresholds: t });
+      return `${d.tier}/${d.preset}/${d.dprCap}/${d.tabletDesktopEffects ? 'T' : '-'}`;
+    };
+    const table = {
+      'dgpu hi': row(hi, 'dgpu'), 'dgpu mid': row(mid, 'dgpu'), 'igpu hi': row(hi, 'igpu'), 'igpu lo': row(lo, 'igpu'),
+      'mac(masked) hi': row(hi, 'igpu', true), 'mac(masked) mid': row(mid, 'igpu', true),
+      'phone hi': row(hi, 'phone'), 'phone lo': row(lo, 'phone'), 'tablet hi': row(hi, 'tablet'), 'tablet mid': row(mid, 'tablet'), 'tablet lo': row(lo, 'tablet'), software: row(hi, 'software'),
+    };
+    eq(table, {
+      'dgpu hi': 'high/ultra/2/-', 'dgpu mid': 'medium/medium/1.5/-', 'igpu hi': 'high/high/1.5/-', 'igpu lo': 'low/low/1.5/-',
+      'mac(masked) hi': 'high/ultra/2/-', 'mac(masked) mid': 'medium/medium/1.5/-',
+      'phone hi': 'high/high/1.5/-', 'phone lo': 'medium/medium/1.5/-', 'tablet hi': 'high/high/1.5/T', 'tablet mid': 'high/high/1.5/T', 'tablet lo': 'medium/medium/1.5/-', software: 'low/low/1/-',
+    });
+    eq(decideStart({ score: null }).tier, null, 'no score: no decision (today\'s hints stand)');
+    return Object.entries(table).map(([k, v]) => `${k} ${v}`).join('; ');
+  });
+  await check('FR-10 (c) the benchmark never runs with DEVICE_POLICY off, is capped at 1.5 s, and runs on a throwaway context', async () => {
+    const src = read('lib/fly/gpu-benchmark.js');
+    assert(/if \(!shipPassOn\('DEVICE_POLICY'\)/.test(src), 'flag gate');
+    assert(DEVICE_POLICY.benchmark.maxMs <= 1500, 'cap');
+    assert(/document\.createElement\('canvas'\)/.test(src) && /loseContext\(\)/.test(src), 'throwaway context released');
+    const { benchmarkScore, resetBenchmark } = await mod('lib/fly/gpu-benchmark.js');
+    resetBenchmark(undefined);
+    let measured = 0;
+    assert(benchmarkScore({ measure: () => (measured++, hi) }) === null && measured === 0, 'flag off: no score, no measurement');
+    const fs = read('lib/fly/fly-settings.js');
+    const block = fs.slice(fs.indexOf('// SHIP PASS FRAME start tier begin'), fs.indexOf('// SHIP PASS FRAME start tier end'));
+    assert(/benchmarkStart\(\)/.test(block) && /if \(bench\?\.tier\) return bench\.tier;/.test(block), 'the start-tier block consults the benchmark first');
+  });
+}
+
+// ===========================================================================
+// FR-11 — the device policy table
+// ===========================================================================
+{
+  const dp = await mod('lib/fly/device-policy.js');
+  const seedSrc = atBase('lib/fly/device-policy.js');
+  await check('FR-11 (a) every feature answers {allowed:boolean, budget:object} for every class x tier x preset', () => {
+    let n = 0;
+    for (const f of dp.POLICY_FEATURES)
+      for (const cls of dp.DEVICE_CLASSES)
+        for (const tier of ['low', 'medium', 'high'])
+          for (const preset of [tier, 'ultra']) {
+            const r = dp.deviceFeature(f, { cls, tier, preset, score: null, reversedDepth: true });
+            assert(typeof r.allowed === 'boolean' && r.budget && typeof r.budget === 'object', `${f} ${cls} ${tier}`);
+            n++;
+          }
+    eq(dp.DEVICE_CLASSES, ['phone', 'tablet', 'igpu', 'dgpu', 'software']);
+    for (const need of ['SKY_LITE', 'NIGHT_LITE', 'TERRAIN_SHADOW', 'TRAFFIC_SHADOWS', 'AIRFRAME_DETAIL', 'BATTERY_SAVER', 'MATCH_DISPLAY', 'CADENCE_LOCK', 'DYNAMIC_NEAR', 'ULTRA_SUPERSAMPLE']) assert(dp.POLICY_FEATURES.includes(need), need);
+    return `${dp.POLICY_FEATURES.length} features, ${n} answers`;
+  });
+  await check('FR-11 (b) with no benchmark score every W0 seed row answers exactly what it answered at W0', () => {
+    if (!seedSrc) return 'no merge-base (not a git checkout): skipped';
+    const code = seedSrc.replace(/\r\n/g, '\n').replace(/^import[\s\S]*?;\n/gm, '').replace(/^export /gm, '');
+    const ctx = vm.createContext({ isMobileGraphicsClass: () => false, isPhoneClass: () => false, sessionGpuClass: () => ({ cls: 'high' }), window: undefined });
+    vm.runInContext(`${code}\nthis.__api = { deviceFeature, POLICY_FEATURES };`, ctx);
+    const seed = ctx.__api;
+    let n = 0;
+    for (const f of seed.POLICY_FEATURES)
+      for (const cls of dp.DEVICE_CLASSES)
+        for (const tier of ['low', 'medium', 'high'])
+          for (const preset of [tier, 'ultra']) {
+            const a = JSON.stringify(seed.deviceFeature(f, { cls, tier, preset }));
+            const b = JSON.stringify(dp.deviceFeature(f, { cls, tier, preset, score: null }));
+            assert(a === b, `${f} ${cls} ${tier}/${preset}: W0 ${a} now ${b}`);
+            n++;
+          }
+    return `${seed.POLICY_FEATURES.length} seed rows, ${n} answers identical`;
+  });
+  await check('FR-11 (c) a score changes only what FR-10 says: tablet sky, tablet airframe detail, Ultra supersample', () => {
+    const hi = { grade: 'high' };
+    const lo = { grade: 'low' };
+    assert(dp.deviceFeature('SKY_LITE', { cls: 'tablet', tier: 'high', score: hi }).allowed === false, 'a high tablet keeps the full sky');
+    assert(dp.deviceFeature('SKY_LITE', { cls: 'phone', tier: 'high', score: hi }).allowed === true, 'phones keep the lite sky');
+    assert(dp.deviceFeature('AIRFRAME_DETAIL', { cls: 'tablet', tier: 'high', score: lo }).allowed === false);
+    assert(dp.deviceFeature('ULTRA_SUPERSAMPLE', { cls: 'dgpu', preset: 'ultra', score: lo }).allowed === false);
+    assert(dp.deviceFeature('ULTRA_SUPERSAMPLE', { cls: 'dgpu', preset: 'ultra', score: hi }).allowed === true);
+  });
+  await check('FR-11 (d) grep gate: this stream adds no raw isPhoneClass()/isMobileGraphicsClass() call outside device-class.js / device-policy.js', () => {
+    if (!BASE) return 'no merge-base: skipped';
+    // Per file, the number of raw class CALLS may not grow (a moved or
+    // rewritten call is not a new one; a new gate is).
+    const RAW = /\b(isPhoneClass|isMobileGraphicsClass)\(/g;
+    const files = git('diff', '--name-only', BASE, '--', 'lib', 'components', 'stores', 'hooks', 'app').split('\n').filter((f) => /\.(m?js|jsx)$/.test(f) && !/device-(class|policy)\.js$/.test(f));
+    const bad = [];
+    for (const f of files) {
+      let now = '';
+      try {
+        now = read(f);
+      } catch {
+        continue; // deleted
+      }
+      const then = atBase(f) ?? '';
+      const count = (t) => (t.replace(/\r\n/g, '\n').replace(/^\s*(\/\/|\*).*$/gm, '').match(RAW) ?? []).length;
+      if (count(now) > count(then)) bad.push(`${f}: ${count(then)} → ${count(now)}`);
+    }
+    assert(!bad.length, bad.join(' | '));
+    return `${files.length} changed source files checked`;
+  });
+}
+
+// ===========================================================================
+// FR-12 — ULTRA_SUPERSAMPLE: the top rung, shed first
+// ===========================================================================
+{
+  const { createGovernor } = await mod('lib/fly/perf-governor.js');
+  await check('FR-12 (a) a supersampled boot is the ladder\'s top rung and the first one shed', () => {
+    const events = [];
+    const g = createGovernor({ dpr0: 1.5, tier0: 'high', supersample: 1.5, pace: null, applyDpr: (v) => events.push(`dpr:${v}`), applyTier: (v) => events.push(`tier:${v}`), applyEffects: (v) => events.push(`fx:${v}`) });
+    const plain = createGovernor({ dpr0: 1, tier0: 'high', supersample: null, pace: null, applyDpr: () => {}, applyTier: () => {}, applyEffects: () => {} });
+    assert(g.ladder[0].dpr === 1.5 && g.ladder.length === plain.ladder.length + 1, `ladder ${JSON.stringify(g.ladder.slice(0, 3))}`);
+    eq(g.ladder.slice(1), plain.ladder, 'below the top rung: the native ladder, unchanged');
+    g.force(-1, 0);
+    eq(events, ['dpr:1'], 'the first step sheds supersampling and nothing else');
+  });
+  await check('FR-12 (b) off by default; needs a DPR-1 display, Ultra, a dGPU and a high benchmark', async () => {
+    const { ULTRA_SUPERSAMPLE } = await mod('lib/fly/fly-constants.js');
+    assert(ULTRA_SUPERSAMPLE.enabled === false && ULTRA_SUPERSAMPLE.maxScale === 1.5);
+    const src = read('lib/fly/render-resolution.js');
+    for (const need of ["shipPassOn('ULTRA_SUPERSAMPLE')", '(window.devicePixelRatio || 1) !== 1', "deviceFeature('ULTRA_SUPERSAMPLE'", "benchmarkStart()?.grade !== 'high'"]) assert(src.includes(need), need);
+  });
+}
+
+// ===========================================================================
+// FR-13 — the dynamic near plane
+// ===========================================================================
+{
+  const dn = await mod('lib/fly/dynamic-near.js');
+  await check('FR-13 (a) near = clamp(0.02 x AGL, 2.5 m, 60 m)', () => {
+    eq([dn.dynamicNearFor(0), dn.dynamicNearFor(100), dn.dynamicNearFor(1000), dn.dynamicNearFor(2000), dn.dynamicNearFor(10000), dn.dynamicNearFor(NaN)], [2.5, 2.5, 20, 40, 60, 2.5]);
+  });
+  await check('FR-13 (b) only where reversed depth is unavailable, only with DEVICE_POLICY + its sub-switch; desktop (reversed depth) never', () => {
+    assert(dn.dynamicNearBudget({ reversedDepth: true, flagOn: true, sub: true, cls: 'phone' }) === null, 'reversed depth: never');
+    assert(dn.dynamicNearBudget({ reversedDepth: false, flagOn: false, sub: true, cls: 'phone' }) === null, 'flag off: never');
+    assert(dn.dynamicNearBudget({ reversedDepth: false, flagOn: true, sub: false, cls: 'phone' }) === null, 'sub-switch off: never');
+    assert(dn.dynamicNearBudget({ reversedDepth: false, flagOn: true, sub: true, cls: 'phone' })?.maxM === 60, 'no reversed depth + on: runs');
+    // Applied through the real entry point on a fake renderer with reversed depth: nothing written.
+    const cam = { near: 2.5, updates: 0, updateProjectionMatrix() { this.updates++; } };
+    assert(dn.applyDynamicNear({ capabilities: { reversedDepthBuffer: true } }, cam, 2000, false) === false && cam.near === 2.5 && cam.updates === 0);
+    const scene = read('components/fly/FlyScene.jsx');
+    const block = scene.slice(scene.indexOf('// SHIP PASS FRAME frame begin'), scene.indexOf('// SHIP PASS FRAME frame end'));
+    assert(block.includes('applyDynamicNear(gl, camera, flight.agl, !!runtime.airportWatch?.active)'), 'FlyScene FRAME block');
+  });
+}
+
+// ===========================================================================
+// Flags — the FRAME blocks and their flag-off identity
+// ===========================================================================
+{
+  const C = await mod('lib/fly/fly-constants.js');
+  await check('flags (a) DEVICE_POLICY and ULTRA_SUPERSAMPLE ship off (device evidence); PACE_ADAPT.turn ships off', () => {
+    assert(C.DEVICE_POLICY.enabled === false && C.ULTRA_SUPERSAMPLE.enabled === false && C.PACE_ADAPT.turn.enabled === false);
+    return `SHADER_READY ${C.SHADER_READY.enabled}, PACE_ADAPT ${C.PACE_ADAPT.enabled}, DEVICE_POLICY ${C.DEVICE_POLICY.enabled}, ULTRA_SUPERSAMPLE ${C.ULTRA_SUPERSAMPLE.enabled}`;
+  });
+  await check('flags (b) flag-off identity: every cinema profile\'s rendering fields and every resolveCinemaProfile answer equal the W0 module', async () => {
+    const seed = atBase('lib/fly/cinema-profile.js');
+    if (!seed) return 'no merge-base: skipped';
+    const before = await import(`data:text/javascript,${encodeURIComponent(seed.replace(/\r\n/g, '\n'))}`);
+    const now = await mod('lib/fly/cinema-profile.js');
+    const VERDICT = new Set(['draws', 'triangles', 'textureBytes', 'geometryBytes']);
+    const strip = (p) => Object.fromEntries(Object.entries(p).filter(([k]) => !VERDICT.has(k)));
+    for (const k of Object.keys(before.CINEMA_PROFILES)) eq(strip(now.CINEMA_PROFILES[k]), strip(before.CINEMA_PROFILES[k]), k);
+    let n = 0;
+    for (const preset of ['ultra', 'high', 'medium', 'low']) for (const tier of ['high', 'medium', 'low']) for (const phone of [false, true]) for (const effectLevel of [0, 1, 2, 3]) for (const scale of [1, 0.85, 0.75]) for (const scaleDemotes of [true, false]) {
+      const o = { preset, tier, phone, effectLevel, scale, scaleDemotes };
+      eq(strip(now.resolveCinemaProfile(o)), strip(before.resolveCinemaProfile(o)), JSON.stringify(o));
+      n++;
+    }
+    return `${n} profile resolutions identical in every rendering field`;
+  });
+  await check('flags (c) FRAME edits no shader text: no anchored substitution, onBeforeCompile or customProgramCacheKey in FRAME\'s diff', () => {
+    if (!BASE) return 'no merge-base: skipped';
+    const diff = git('diff', '-U0', BASE, '--', 'lib', 'components');
+    const added = diff.split('\n').filter((l) => l.startsWith('+') && !l.startsWith('+++'));
+    const bad = added.filter((l) => /onBeforeCompile|customProgramCacheKey|ShaderChunk|fragmentShader\s*=|vertexShader\s*=/.test(l) && !/gpu-benchmark/.test(l));
+    assert(!bad.length, bad.slice(0, 3).join(' | '));
+  });
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
