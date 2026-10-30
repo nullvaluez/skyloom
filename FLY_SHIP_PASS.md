@@ -951,42 +951,85 @@ Severity and effort are the auditors' estimates. "Where" names the requirement t
 ### FRAME
 
 <!-- SHIP PASS FRAME report begin -->
-**Status (2026-10-30): IN PROGRESS on `ship/frame`** (cloud venue, section 3.8:
-fixture + SwiftShader; no RTX 5080, no iPhone). This report is updated on every
-commit; a continuation agent picks up from it and from `git log ship/frame`.
+**Status (2026-10-30): BUILT on `ship/frame`, browser evidence in progress.**
+Venue: the cloud container (section 3.8) — offline world fixture + SwiftShader,
+no RTX 5080, no iPhone. Nothing below is a device number; every fps, stall,
+soak, motion and device acceptance row is the owner's (run-list steps below).
+A continuation agent picks up from this report and `git log ship/frame`.
 
-| ID | State | What landed | Evidence |
+#### Per requirement
+
+| ID | State | What landed | Evidence (venue) |
 |---|---|---|---|
-| FR-1 | built | `lib/fly/program-census.js`: hooks `renderer.info.programs.push` (instance property) and each program's first `getUniforms`/`getAttributes`; `__flyStats.census.programs = {total, live, preReveal, afterReveal:[{key, ms, t, waitMs}], afterRevealCount, firstUseMs, worstMs, linkFailures}`; link failure → `track('client_error', {kind:'shader_link'})`. Zero per-frame cost. Device-report `census` field. | `verify-ship-frame` FR-1 (a)–(e) |
-| FR-2 | built | `lib/fly/shader-ready.js`: `checkShaderErrors:false` only with SHADER_READY on + production + not `navigator.webdriver`; written in FlyCanvas `onCreated` before any program (`installFrameRenderer`). | `verify-ship-frame` FR-2 (a)–(c) |
-| FR-4 | built (layers, bytes) | `lib/fly/render-census.js` + `components/fly/CensusRig.jsx`: per-layer draws/triangles via `renderBufferDirect` (shadow and pass draws booked apart), logical texture + renderbuffer bytes on the context instance, RGBA16F audit, upload-time ring. `__flyStats.census.{layers,textureBytes}`; device report `renderer.textureBytes`. | `verify-ship-frame` FR-4 (a)–(b) |
-| FR-5 | built | `lib/fly/pace-adapt.js` + governor: `PACE_ADAPT.refreshSnap` adds 30/48/50; mid-session cadence lock (33.3 ms, low variance, low frame work) with a candidate that defers the down-step while the window decides; re-estimate on `visibilitychange`; governor state + cadence in the report. | `verify-ship-frame` FR-5 (a)–(g): 30 Hz held at rung 0 for 5 simulated min; flag-off control steps (PF-05 reproduced); 30 Hz overload steps |
-| FR-7 | instrument built | `lib/fly/stall-classify.mjs` + `lib/fly/stall-census.js`: every >100 ms interval classified (program link, tile upload, worker finalize, GC, React commit) from census rings, markPhase tags, heap drop and Long Animation Frame scripts. | `verify-ship-frame` FR-7 (a)–(b) |
-| FR-9 | built (rows, store, hint) | `lib/fly/frame-api.js` implemented (persisted `fly-frame-rate-v1`, holds, summary); Settings rows in the FRAME block (desktop Frame rate 60 / Match display, touch Battery saver), `frameRateMode` store field, Battery-saver notice through the calm-hud lane. | FR-5 (g) holds |
-| FR-10 | built, flag off | `lib/fly/gpu-benchmark.js` (fill + cloud-march, ≤1.5 s, cached per device/app version) and `decideStart`; wired into the FRAME start-tier block, Ultra DPR cap and tablet effects. | — |
-| FR-11 | built | `lib/fly/device-policy.js` table: W0 seed rows kept, score-aware rows, FRAME rows (BATTERY_SAVER, MATCH_DISPLAY, CADENCE_LOCK, DYNAMIC_NEAR). | — |
-| FR-3 | built | `lib/fly/registry-warm.js` + `prewarm.js queueRegistryWarm` + `PrewarmRig`: every `prewarmEntries()` entry `entryReachable()` here (tier/preset, `deviceClassOf()`, `shipPassOn`) is compiled against the LIVE scene under the 1×1 target binding and RETAINED; the boot tier rides the boot drain, the lower ladder tiers queue after it (idle frames), a tier/preset step, a late registration (2 s rescan, covers the title) and a new `scene.environment` (day/night bucket) queue what is missing; a lost context drops the retained set. Handles an empty registry. `__flyStats.prewarm.registry`. | `verify-ship-frame` FR-3 (a)–(e) |
-| FR-6 | built (provisional rows) | `lib/fly/tier-budgets.js` is the one table (`BUDGET_TABLE`, rows ultra/high/medium/phone/tablet/low, each `provisional:true` with its `sources`); `cinema-profile.js` budgets, `device-report.js`, `verify-device-report.mjs`, `beta-soak.cjs`, `analyze-beta-soak.mjs` read it; frame time graded as the share of frames over 1.5× the target interval (`missedShare`, device report `frame.missed`). `scripts/derive-budget-table.mjs [reports] --write` re-derives rows from W0.6 reports (peak + 5%). Conflicts resolved to the stricter number: High 375 / 2.2 M (not 450 / 4.0 M), phone 250 / 1.2 M (not 375 / 2.2 M). | `verify-ship-frame` FR-6 (a)–(e); `verify-device-report` 5/5 (new (4) 60 Hz pass, (5) miss rule) |
-| FR-8 | built (budget ships off; harness pending) | `lib/fly/turn-budget.js` + `finalize-pace.js setTurnBudgetK`: `PACE_ADAPT.turn` scales the shared finalize allowance (chunk mounts) while yawing > 25°/s, fed from the FlyScene FRAME frame block; SHIPS OFF (only a 5080/iPhone turn measurement can show the benefit). COMMIT_BUDGET / TERRA_PACE / atlas uploads are read inside CITY/terrain engines FRAME does not own: not re-budgeted. | `verify-ship-frame` FR-8 (a); `verify-finalize-pace` 22/0 |
-| FR-12 | built, flag off | `render-resolution.js ultraSupersampleScale()`: 1.5× on a DPR-1 display at Ultra with a dGPU and a 'high' benchmark (needs DEVICE_POLICY); the governor makes it the top rung, shed first. | `verify-ship-frame` FR-12 (a)–(b) |
-| FR-13 | built, sub-switch of DEVICE_POLICY (off) | `lib/fly/dynamic-near.js`: near = clamp(0.02·AGL, 2.5 m, 60 m) only where `gl.capabilities.reversedDepthBuffer` is false, from the FlyScene FRAME frame block; skips the lounge (it owns the near plane). Desktop (reversed depth) never runs it. No iPhone report exists, so whether it ever runs there is the owner's report. | `verify-ship-frame` FR-13 (a)–(b) |
-| FR-7 (fix) | built, on with PACE_ADAPT | `PACE_ADAPT.sliceBar`: the post-reveal prewarm slice bar follows the target interval (24.2 ms at 60 = today's 24; 48 ms at 30 instead of a 20 s wait then 50 ms). | `verify-ship-frame` FR-7 (c) |
+| FR-1 | built | `lib/fly/program-census.js`: hooks `renderer.info.programs.push`/`pop` (instance properties of that one array) and each new program's first `getUniforms`/`getAttributes` (restored after the first call), so it costs nothing per frame. `__flyStats.census.programs = {total, live, preReveal, afterReveal:[{key, ms, t, waitMs}], afterRevealCount, firstUseMs, worstMs, linkFailures}`; `key` = `<type>[:name]#fnv1a(cacheKey)`. A failed link (three's diagnostics, else LINK_STATUS read after the link landed) → `track('client_error', {kind:'shader_link'})`. DiagnosticsPanel row "late shaders"; device report `census`. Installed with SHADER_READY, `?diag=1` or automation. | `verify-ship-frame` FR-1 (a)–(e) |
+| FR-2 | built | `lib/fly/shader-ready.js`: `gl.debug.checkShaderErrors = false` only with SHADER_READY on, a production build and `navigator.webdriver` not true; dev and every harness keep `true`. Applied first thing in FlyCanvas `onCreated` (`installFrameRenderer`, `lib/fly/census.js`), before any program exists; flag off never writes the field. | `verify-ship-frame` FR-2 (a)–(c) (all 8 combinations); production smoke: see Browser evidence |
+| FR-3 | built | `lib/fly/registry-warm.js` + `prewarm.js queueRegistryWarm` + `PrewarmRig`: every `prewarmEntries()` entry that `entryReachable()` allows here (tier/preset, `deviceClassOf()`, `shipPassOn`) is compiled against the LIVE scene under the 1×1 target binding (production's key) and RETAINED (refcount); the boot tier rides the boot drain, the lower ladder tiers queue after it on idle frames, and a tier/preset step, a late registration (2 s rescan: covers the title) and a new `scene.environment` (the day/night bucket) queue whatever is missing. Empty registry = no-op; a throwing entry is counted, never thrown; a restored context drops the retained set. `__flyStats.prewarm.registry`. ENV_UNIFORM is now read through its pin, so `?flags=ENV_UNIFORM` A/Bs it (the constant is untouched). | `verify-ship-frame` FR-3 (a)–(f) |
+| FR-4 | built | `lib/fly/render-census.js` + `components/fly/CensusRig.jsx`: per-layer draws/triangles through `renderBufferDirect` (nearest named ancestor, else `<top type>~<material>`; shadow-map draws `shadow/…`, other scenes `pass/…`), `__flyStats.census.layers` with three's whole-frame totals beside it for the 2% check; logical texture + renderbuffer bytes from the allocation calls on the context instance (FlyMode's opt-in probe promoted to a live counter), RGBA16F count/MiB/top-8, unknown-format count, `__flyStats.census.textureBytes`; device report `renderer.textureBytes` (TRUE EARTH left it null). The per-draw instruments install only with `?diag=1` or automation, so a player never pays per draw. | `verify-ship-frame` FR-4 (a)–(b); browser smoke |
+| FR-5 | built, flag ON | `lib/fly/pace-adapt.js` + governor (PACE_ADAPT): `refreshSnap` with 30/48/50 (`PERF_GOVERNOR` untouched); a mid-session cadence lock (90-frame window on 33.3 ms ± 2.5, σ ≤ 2.5 ms, the frame's own work ≤ 60 % of the interval, measured end-of-frame by `PaceClock`) with a CANDIDATE that defers a down-step while the window decides; the lock is trusted on touch devices, Battery saver or a 30 Hz boot (`lockDesktop` false: a GPU-bound desktop also quantizes to 33.3 ms and GPU time is not readable everywhere); re-estimate on `visibilitychange`; the stutter window resets when the boot estimate re-aims the target. Governor state, cadence, lock and boot rung in the device report (`pacing`). | `verify-ship-frame` FR-5 (a)–(g): 30 Hz held at rung 0 for 5 simulated min (target 30); the flag-off control steps to Low (PF-05 reproduced); 45 ms frames at 30 Hz step; touch lock holds, desktop and busy 33 ms frames step; holds freeze both ways |
+| FR-6 | built, provisional rows | `lib/fly/tier-budgets.js` is the ONE table (`BUDGET_TABLE`: ultra/high/medium/phone/tablet/low; draws, triangles, texture MiB, geometry MiB, GPU ms, stalls/min, missed share; every row `provisional:true` with `sources`). `cinema-profile.js` budgets (verdict thresholds only; every rendering field identical), `device-report.js`, `verify-device-report.mjs`, `beta-soak.cjs`, `analyze-beta-soak.mjs` read it; `budgetFor(profile)` (section 6). Frame time graded as the share of frames over 1.5× the target interval (`missedShare`; report `frame.missed`), p95/p99 kept as information. Conflicts → stricter: High 375 / 2.2 M (not 450 / 4.0 M); phone 250 / 1.2 M (not cinema-profile's 375 / 2.2 M). `node scripts/derive-budget-table.mjs <reports> --write` re-derives rows (peak + 5 %) after W0.6. | `verify-ship-frame` FR-6 (a)–(e); `verify-device-report` 5/5 (new: a 60 Hz report with no missed vblank passes; the miss rule) |
+| FR-7 | instrument built; one fix ON, root causes owner | `lib/fly/stall-classify.mjs` + `lib/fly/stall-census.js`: every >100 ms interval classified (program link, tile upload, worker finalize, GC, React commit, else unattributed) from the program/upload rings, markPhase tags, JS heap drop and Long Animation Frame scripts; `beta-soak.cjs` writes the tally (`stalls`, `programs`, budget limits) and `analyze-beta-soak.mjs` reports `stallPhases`; `BETA_SOAK_FIXTURE=1` is the instrument-proof mode for this venue. Fix behind PACE_ADAPT: `sliceBar` (the post-reveal prewarm slice bar follows the target: 24.2 ms at 60 = today, 48 ms at 30, where a 30 Hz page used to wait 20 s and then drain on 50 ms frames). The other root causes need the 5080 trace (owner). | `verify-ship-frame` FR-7 (a)–(c); fixture soak: see Browser evidence |
+| FR-8 | harness built; budget ships OFF | `scripts/verify-ship-frame-yaw.cjs`: 360° yaw at the Battery (Manhattan, in the fixture), 900 m, desktop or `--device=phone` (iPhone 13 emulation), per-frame arc; records longest interval, `lastStall.phases`, stalls by phase, programs first used during the turn, peak draws; `--strict` enforces 50 / 67 ms on a real GPU only. `lib/fly/turn-budget.js` + `finalize-pace.js setTurnBudgetK`: `PACE_ADAPT.turn` scales the shared finalize allowance (chunk mounts) while yawing > 25°/s, fed from the FlyScene FRAME frame block — SHIPS OFF (only a turn measurement on the 5080/iPhone can show the benefit). COMMIT_BUDGET, TERRA_PACE and atlas uploads are read inside engines FRAME does not own (contract request below). Chunk-material prewarm: the yaw records which programs compile mid-turn; none can be named without that run on a real GPU. | `verify-ship-frame` FR-8 (a); `verify-finalize-pace` 22/0; phone-emulation yaw: see Browser evidence |
+| FR-9 | built, ON with PACE_ADAPT | `lib/fly/frame-api.js` implemented: `setFrameCadence` persisted under `fly-frame-rate-v1`, `holdGovernor` OR'd into the governor's pin (both ways; live regardless of flags), `frameSessionSummary` (p95 bucket, stalls/min bucket, rung). `presentationFps`: Battery saver pumps 30 + the phone-lean floor (`setCinemaEffectFloor`), '60' caps a >65 Hz desktop at 60 (D12) and leaves 60 Hz alone, Match display renders native (refresh/2 on Ultra ≥ 100 Hz); `PaceClock` probes the display rate. Settings rows in the FRAME blocks (desktop "Frame rate: 60 / Match display", touch "Battery saver"), `frameRateMode` store field + setter, `BatterySaverHint` (FlyMode FRAME mounts) through `publishNotice`/`wakeHud` when the governor latches low or after 10 min of Watch for me (shown once the flight HUD is visible). `window.__flyFrame` for the console. | `verify-ship-frame` FR-9 (a)–(d), FR-5 (g) |
+| FR-10 | built, DEVICE_POLICY OFF | `lib/fly/gpu-benchmark.js`: fill + 48-step cloud march on a throwaway WebGL2 context, doubling batches to 40 ms, ≤ 1.5 s total, TIME_ELAPSED timer query where exposed (wall time to a readPixels sync elsewhere), cached per device and app version; `decideStart` (grade → start tier, preset, Ultra DPR cap 1.5 unless 'high', tablet desktop effects). Wired into the FRAME start-tier block, `render-resolution.js` and `cinema-policy.js`; report `devicePolicy`. Thresholds PROVISIONAL (DEVICE_POLICY.benchmark). | `verify-ship-frame` FR-10 (a)–(c) (12-row decision table) |
+| FR-11 | built, live regardless of the flag | `lib/fly/device-policy.js`: frozen signatures kept; every W0 seed row answers exactly its W0 answer with no score; score-aware tablet rows; FRAME rows BATTERY_SAVER, MATCH_DISPLAY, CADENCE_LOCK, DYNAMIC_NEAR; `devicePolicyReport()`. Class order: a touch device is phone/tablet even on a software renderer (emulated phones get the phone policy; a real phone never has a software renderer). | `verify-ship-frame` FR-11 (a)–(d): 14 features × 5 classes × 3 tiers × 2 presets; 300 seed answers identical to W0; the raw-call grep (count per file may not grow) |
+| FR-12 | built, OFF | `ultraSupersampleScale()`: 1.5× on a DPR-1 display at Ultra with a dGPU and a 'high' benchmark (needs DEVICE_POLICY); the governor makes it the top rung, shed first. | `verify-ship-frame` FR-12 (a)–(b) |
+| FR-13 | built, DEVICE_POLICY sub-switch (OFF) | `lib/fly/dynamic-near.js`: near = clamp(0.02·AGL, 2.5 m, 60 m), only where `gl.capabilities.reversedDepthBuffer` is false, from the FlyScene FRAME frame block (the lounge keeps its own near plane). Every reversed-depth renderer (the 5080, desktop Chrome) never runs it; no iPhone report exists, so whether it ever runs on Safari is the owner's W0.6 report. Phone horizon cap: not built (only if that report needs it). | `verify-ship-frame` FR-13 (a)–(b) |
 
-**Flags:** all four FRAME flags still `enabled:false` in this commit.
+#### Flags
 
-**Reds fixed:** `verify-graphics-governor` (FRAME's known red, "crashes"): the
-gate ran the governor in a VM without the imports it gained since (cinema
-policy, render resolution, pacing) and asserted removed behaviour (a latch
-that times out, a legacy satellite renderer, a ladder without effect rungs).
-Now 14/14 with the stubs added and those assertions brought to the shipped
-contract (latch holds for the session; satellite targets 60; render scale is
-spent before the first tier step). `verify-frame-step` (10/11) is untouched:
-FRAME_STEP is backlogged and none of this work reads it.
+| Flag | State | Why |
+|---|---|---|
+| SHADER_READY | see commit log (lands ON with the production smoke) | FR-1/2/3 gates green; behaviour, not pixels: no shader text or program key moves (`verify-ship-frame` flags (c)). |
+| PACE_ADAPT | see commit log (lands ON after the browser smoke) | FR-5 gate green (30 Hz hold + overload step). Sub-switches: `sliceBar` ON (60 Hz value = today's), `turn` OFF (5080/iPhone turn measurement), `lockDesktop` false. |
+| DEVICE_POLICY | OFF | The boot benchmark and the FR-13 fallback change what real devices do; the owner's reports decide (thresholds provisional). `deviceFeature()` is live regardless. |
+| ULTRA_SUPERSAMPLE | OFF | 5080 only (boot at 1.5 on 1440p, shimmer metric). |
 
-**Files outside the 5.1 list (new, FRAME's):** `components/fly/{CensusRig,PaceClock}.jsx`,
-`components/fly/hud/BatterySaverHint.jsx`, `lib/fly/{shader-ready,program-census,render-census,census,stall-census,pace-adapt}.js`,
-`lib/fly/stall-classify.mjs`. **Existing files outside the list:** `lib/fly/frame-stats.js`
-is FRAME's; none other.
+Flag-off identity: `verify-ship-frame` flags (b) — 576 `resolveCinemaProfile`
+answers and every profile identical to W0 in every rendering field; (c) no
+`onBeforeCompile`/`customProgramCacheKey`/shader-text edit in FRAME's diff;
+`verify-ops-golden` 28/28.
+
+#### Gates (venue)
+`verify-ship-frame` 50/50 · `ship-pass-gates` 31 PASS, 2 KNOWN-RED (RELEASE's), 0 FAIL, seam rule PASS ·
+`verify-device-report` 5/5 · `verify-device-tiers` 6/6 · `verify-render-optimization` 22 ·
+`verify-cinema-overhaul` 16/16 · `verify-graphics-governor` 14 (was red) · `verify-finalize-pace` 22/0 ·
+`verify-cinema-profile-prewarm` 7/7 · `verify-graphics-repair` 8 · `graphics-unit` PASS ·
+`verify-true-earth-flags` 8/8 · `verify-import-integrity` 4/4 · ESLint: no new errors in any touched file.
+
+#### Browser evidence (fixture + SwiftShader; functional only)
+Pending: the dev smoke (`verify-ship-frame-browser.cjs --arms=off,on,policy`), the phone-emulation yaw,
+the 2-minute fixture soak, `verify-env-uniform` off/on, `verify-mobile-layout` with PACE_ADAPT, and the
+production smoke (`--arms=off,on,player`) are queued under the heavy lock.
+
+#### Owner checks (section 9)
+- **5080 #1 (cold boot):** `?diag=1` → "late shaders" reads `0 / N` with SHADER_READY; compare `?flags=-SHADER_READY`. FR-2 trace: `BETA_GPU_TRACE=1` soak, `getProgramInfoLog` totals default vs `-SHADER_READY`. FR-3: `__flyStats.prewarm.ms` default vs `-SHADER_READY` (boot hold ≤ +1.5 s).
+- **5080 endurance (FR-7):** `BETA_CPU_TRACE=1 BETA_GPU_TRACE=1 npm run soak:beta` at Ultra and High, then `node scripts/analyze-beta-soak.mjs` → `stallPhases`; re-run uninstrumented.
+- **5080 turn (FR-8):** production build, `FLY_FINALIZE_BUDGET_K=1 FLY_URL=… node scripts/verify-ship-frame-yaw.cjs --device=desktop --strict` (and `--device=phone`); A/B `window.__flyPaceAdaptOverride = { turn: { enabled: true } }`.
+- **5080 #10 (Match display):** Settings → Frame rate → Match display; `__flyFrame.cadenceState()`.
+- **5080 FR-12:** `?flags=DEVICE_POLICY,ULTRA_SUPERSAMPLE` at 1440p DPR 1 → boots dpr 1.5, holds it; shimmer pan.
+- **ENV_UNIFORM:** `node -r ./scripts/_pw-shim.js scripts/verify-env-uniform.js` with `PW_CHANNEL=chrome`, both arms (`FLY_URL=…/?flags=ENV_UNIFORM`).
+- **W0.6 (FR-6):** after the 5080 and iPhone reports, `node scripts/derive-budget-table.mjs .graphics-review/device-reports/*.json --write`.
+- **iPhone #1–#3:** report at Medium and High (`pacing`, `devicePolicy`, `census.textureBytes`, `gpu.reversedDepth` for FR-13); Low Power Mode → `pacing.targetFps` 30, no tier step; Battery saver row.
+- **iPhone/iPad/Mac FR-10:** `?flags=DEVICE_POLICY&diag=1` → report `devicePolicy.score` and the chosen tier.
+
+#### Known issues
+- The benchmark thresholds, the budget rows and the cadence-lock tolerances are provisional until real reports exist.
+- A masked "Apple GPU" Mac that measures 'high' starts High, not Ultra (the preset still comes from `DEVICE_TIERS.ultraStart`, outside the FRAME block).
+- The Battery-saver notice cannot show inside the lounge (its HUD is not the calm HUD); it shows on the return to flight.
+- The phone budget row is stricter than cinema-profile's old phone numbers (250 / 1.2 M), so `soak-visual-finish` phone verdicts now flag the city poses MOBILE_ENHANCED_VISUALS already measured at 284/285.
+
+#### Contract requests
+- **RELEASE:** add `fly-frame-rate-v1` (`FRAME_RATE_KEY`) to the save/backup whitelist (FR-9).
+- **CITY (and the terrain owner):** if the owner's yaw shows finalize/atlas hitches, route `COMMIT_BUDGET.finalizePerFrame` and the TERRA_PACE / surface-atlas upload budgets through a FRAME hook (`turnBudgetK()` from `lib/fly/finalize-pace.js` is ready to read); FRAME does not edit those engines.
+- **SKY / CITY / LIGHT:** `deviceClassOf()` now classes a touch device as phone/tablet before the software check (emulated phones in harnesses get the phone policy).
+
+#### Reds fixed
+- `verify-graphics-governor` (FRAME's known red, "crashes"): it ran the governor in a VM without the imports it has gained and asserted removed behaviour (a latch that times out, a legacy satellite renderer, a ladder with no effect rungs). Now 14/14, the stubs added and those assertions brought to the shipped contract. `verify-frame-step` (10/11) untouched: FRAME_STEP is backlogged and nothing here reads it.
+
+**Files outside the 5.1 list (new, FRAME's):** `components/fly/{CensusRig,PaceClock}.jsx`, `components/fly/hud/BatterySaverHint.jsx`,
+`lib/fly/{shader-ready,program-census,render-census,census,stall-census,pace-adapt,registry-warm,dynamic-near,turn-budget}.js`,
+`lib/fly/stall-classify.mjs`, `scripts/{verify-ship-frame-browser,verify-ship-frame-yaw}.cjs`, `scripts/derive-budget-table.mjs`.
+**Existing files outside the list (edited minimally):** none — `frame-stats.js`, `finalize-pace.js`, the governor, budgets and prewarm files are FRAME's; `scripts/verify-graphics-governor.mjs` is FRAME's red.
 <!-- SHIP PASS FRAME report end -->
 
 ### SKY
