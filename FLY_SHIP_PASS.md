@@ -996,12 +996,39 @@ SwiftShader); nothing here is a 5080 or iPhone result.
 | RL-8 | built (flag off until its browser check) | `public/sw.js` caches first-party static assets only — Next's hashed chunks cache-first; models, materials, HDRIs, textures, fonts, audio, data, atlas, icons, share and journey art stale-while-revalidate; the title shell network-first — under a versioned key (`skyloom-shell-v1`; an activate drops older versions). It never answers `/api/*`, provider tiles, ADS-B, weather, analytics, ranged reads or anything cross-origin (those fall through untouched). `lib/fly/offline-shell.js` registers it in production only, after the load event and an idle period (never in the first minute's critical path), and under automation only when pinned (`?flags=OFFLINE_SHELL`); it then offers the worker what the first visit already loaded, so one visit is enough for an offline launch. With the flag off it is the kill switch: it unregisters the worker and deletes its caches. `components/fly/hud/OfflineShell.jsx` (FlyMode RELEASE mounts, whatever the flag) hosts both and the install hint: touch devices (`deviceClassOf()` phone or tablet), the second visit after a completed flight, never installed or dismissed (`install-hint`, `install-hint-install`, `install-hint-dismiss`; the browser's install prompt is captured only for that player). `next.config.mjs` (RELEASE-owned headers) serves `/sw.js` no-cache. Gate rows W1–W10 (the allowlist in 22 cases, the LIVE fetch and warm handlers run in a VM, the production-only and kill-switch table, deferral, the hint rule); the browser half is `scripts/verify-offline-shell.cjs` (unpinned automation registers nothing; one visit warms the cache with only allowlisted entries; a controlled boot reaches reveal; with the server stopped an offline launch is answered by the worker and shows the title; `?flags=-OFFLINE_SHELL` unregisters and deletes the caches). |
 
 **Flags.** `CHALLENGE_LAYER` **ON** (behaviour, not look: its acceptance is
-measurable here and its node gate passes). `DEEP_LINKS`, `ANALYTICS_V2`,
-`OFFLINE_SHELL` off (not landed yet). `PLAYER_SURFACE` **ON** (D11; node-proven migration, owner glance in run list).
+measurable here and its node gate passes). `PLAYER_SURFACE` **ON** (D11;
+node-proven migration, owner glance in run list). `DEEP_LINKS`, `ANALYTICS_V2`
+and `OFFLINE_SHELL` are built and stay off until their browser rows pass (see
+Venue evidence); each lands ON in its own commit.
 
-**Gates (venue).** `verify-ship-release` 29/29; `verify-player-surface` 6/6; `verify-daily` 28/28;
-`ship-pass-gates --quick` 31 PASS, 2 KNOWN-RED, 0 FAIL, seam rule PASS.
-ESLint on every touched file: no new errors (JuiceSystems.jsx 3 = main's 3).
+**Gates (venue).** `verify-ship-release` 79/79 (node); `verify-player-surface`
+6/6; `verify-daily` 28/28; `verify-r25-front-door` 70/0; `verify-title-cinema`
+22/0; `verify-attribution` 4/0; `verify-r25-flight-plan` 45/3 (the known
+7h/8a/8b); `npm audit --omit=dev --audit-level=high` 0 vulnerabilities;
+`ship-pass-gates --quick` 32 PASS, 0 FAIL after the (8g) fix, seam rule PASS.
+ESLint on every file the branch touches: no new errors or warnings
+(`PoiLetters.jsx` 2 → 0; `FlyMode.jsx` 1 error + 1 warning = main's).
+
+**Venue evidence (fixture + SwiftShader, correctness only; logs under
+`.graphics-review/ship-pass/release/`).** Session 1, production build
+`.next-release` (2 min) with a test PostHog key whose host is intercepted:
+`verify-offline-shell` 8/9 — unpinned automation registers nothing; one pinned
+visit registers the worker at `/` after load + idle and caches the title shell
+and all 9 page scripts (73 entries, every one first-party and allowlisted); a
+visit under the worker boots on the fixture to reveal with zero page errors;
+**with the server stopped, an offline launch is answered by the worker
+(`fromServiceWorker`, 200) and shows the title shell with zero page errors**;
+the kill leg unregistered the worker but found `skyloom-shell-v1` re-created
+(an unregistered worker still serves its page) → fixed by the retire message
+(W12), browser re-run pending. `verify-ship-release-browser`: meta (no legacy
+domain; the manifest leads with the real Earth; og:image measured at
+`localhost:3000` on an unset build → RL-5 note), off leg (all four flags off:
+a `?fly=` link does nothing, zero analytics requests, zero page / shader errors,
+zero console asserts), consent positive control (the intercepted host sees
+the SDK's config requests within 35 s). The `?fly=` leg consumed and stripped
+the link but never left the title → diagnosed (the launcher read the store's
+pre-spawn 'hangar' screen as "the player left") and fixed (D11); re-run
+pending.
 
 **Owner checks.** Run list 5080 #8: a private window boots calm (no crash on a
 commanded dive, no combo chip, no tower buzz in Contracts); Settings →
