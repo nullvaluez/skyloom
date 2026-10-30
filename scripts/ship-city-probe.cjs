@@ -17,7 +17,9 @@
  *           `baseline-2` (the noise floor); `--bootPin=premix` boots with
  *           __flyCityDiag skylinePremix 0. Writes veil.json + PNGs.
  *   settle  how long the city takes to land here (streamer stats over time).
- *   smoke   one boot per arm in --arms (e.g. "off,CITY_RANGE,NIGHT_LITE"):
+ *   smoke   one boot per arm in --arms (e.g. "off,CITY_RANGE,NIGHT_LITE";
+ *           "CITY_RANGE+NIGHT_LITE" is one arm with both flags; --census adds
+ *           the per-layer draw attribution at each pose):
  *           ?flags=NAME, Midtown at --poses (m AGL; default 900 m and 8,000 ft),
  *           at night when the arm is a NIGHT_* flag or --night; --cls pins the
  *           city's device class (window.__flyCityDeviceClass), --device=phone
@@ -476,9 +478,11 @@ async function veil() {
       const img = decodePng(buf);
       const mid = pt ? cropStats(img, pt.x, pt.y, (VEIL_CROP * img.h) / 2) : null;
       const s2 = await stats(page);
-      const row = { ft, arm, midtown: mid, agl: pt ? Math.round(pt.agl) : null, applied: s2.applied, settle: { ms: st.ms, idle: st.idle, b: st.b, sk: st.sk }, band: s2.band, bRing: s2.bRing, tier: s2.tier };
+      // The frame's draws per layer at this pose and arm (desktop High, day).
+      const attr = await attribute(page, 3).catch(() => null);
+      const row = { ft, arm, midtown: mid, agl: pt ? Math.round(pt.agl) : null, applied: s2.applied, settle: { ms: st.ms, idle: st.idle, b: st.b, sk: st.sk }, band: s2.band, bRing: s2.bRing, tier: s2.tier, draws: attr ? { total: attr.total, layers: attr.layers } : null };
       rows.push(row);
-      log('VEIL', ft, arm, mid ? { c: mid.contrast, rms: mid.rms, chroma: mid.chroma, luma: mid.luma } : 'no crop', { applied: s2.applied, b: st.b?.chunks, idle: st.idle, s: Math.round(st.ms / 1000) });
+      log('VEIL', ft, arm, mid ? { c: mid.contrast, rms: mid.rms, chroma: mid.chroma, luma: mid.luma } : 'no crop', { applied: s2.applied, b: st.b?.chunks, idle: st.idle, s: Math.round(st.ms / 1000), draws: attr?.total ?? null });
       save();
     }
   }
@@ -493,7 +497,8 @@ async function smoke() {
   for (const arm of arms) {
     const browser = await launch();
     const night = args.night === true || args.night === '1' || /NIGHT/.test(arm);
-    const flags = arm === 'off' ? '' : `?flags=${arm}`;
+    // An arm of several flags joins them with '+' (the --arms list is comma separated).
+    const flags = arm === 'off' ? '' : `?flags=${arm.split('+').join(',')}`;
     const pins = { __flySunOverride: night ? NIGHT_UTC : NOON_UTC };
     if (args.cls) pins.__flyCityDeviceClass = args.cls;
     const { page, errs } = await newPage(browser, { pins, unpin: ['__flyVisualsOverride', '__flyAerialOverride', '__flySatShadowOverride'], device: args.device || null });
@@ -508,11 +513,15 @@ async function smoke() {
       await pinPose(page, { ...MIDTOWN, altM: m + 12, pitch: m > 2000 ? -0.5 : -0.3 });
       if (args.dwellFirst && m === poses[0]) await page.waitForTimeout(Number(args.dwellFirst));
       await page.waitForTimeout(DWELL);
+      // --census: settle (bounded) and book this pose's draws per layer too.
+      const settledMs = args.census ? await settle(page) : null;
+      const attr = args.census ? await attribute(page) : null;
+      if (attr) log('LAYERS', arm, m, { total: attr.total, frames: attr.frames, settledMs }, attr.layers);
       const st = await stats(page);
       const tag = `smoke-${arm.replace(/[^A-Za-z0-9_-]/g, '_')}-${m}m${args.device ? '-' + args.device : ''}`;
       const png = await shot(page, tag);
       const L = await lumaStats(page, png);
-      const row = { m, ...st, ...L };
+      const row = { m, ...st, ...L, ...(attr ? { census: { settledMs, ...attr } } : {}) };
       // --still=MS: a second still of the same pose MS later (the crawl check).
       if (args.still && m === poses[poses.length - 1]) {
         await page.waitForTimeout(Number(args.still));
