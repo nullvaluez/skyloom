@@ -55,13 +55,15 @@ const quantile=(rows,q)=>rows.length?[...rows].sort((a,b)=>a-b)[Math.min(rows.le
     }
   });
   await context.addInitScript(()=>{if(location.protocol!=='http:')return;localStorage.setItem('fly-sound-on','0');localStorage.setItem('fly-crash-mode','forgiving');localStorage.setItem('fly-explorer-preferences-v1',JSON.stringify({version:1,settings:{tutorial:'skipped'}}));});
-  page=await context.newPage();page.setDefaultTimeout(STALL_MS);page.on('pageerror',e=>errors.push(e.message));
+  page=await context.newPage();page.setDefaultTimeout(STALL_MS);page.on('pageerror',e=>errors.push(e.message));page.on('crash',()=>errors.push('renderer process crashed'));
   if(process.env.BETA_CPU_TRACE==='1'){cpu=await context.newCDPSession(page);await cpu.send('Profiler.enable');await cpu.send('Profiler.start');}
   page.on('response',res=>{const host=new URL(res.url()).hostname;if(host==='127.0.0.1')return;const key=`${host}:${res.status()}`;responses[key]=(responses[key]||0)+1;});
   await page.goto(base+'/?graphicsReview=1&diag=1',{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>window.__fly?.launchSetup&&window.__flyStats?.frame);
   if(await page.getByRole('button',{name:'Hide',exact:true}).count())await page.getByRole('button',{name:'Hide',exact:true}).click();
-  renderer=await page.evaluate(()=>{const gl=[...document.querySelectorAll('canvas')].map(c=>c.getContext('webgl2')).find(Boolean);const e=gl.getExtension('WEBGL_debug_renderer_info');return gl.getParameter(e.UNMASKED_RENDERER_WEBGL);});
+  // SHIP PASS FRAME (FR-7): ask three's own canvas (data-engine) for its context; getContext('webgl2')
+  // on every canvas makes a context on each spare one; the fixture soak's page was found closed at this read twice.
+  renderer=await page.evaluate(()=>{const c=document.querySelector('canvas[data-engine]');const gl=c?c.getContext('webgl2'):[...document.querySelectorAll('canvas')].map(c=>c.getContext('webgl2')).find(Boolean);const e=gl.getExtension('WEBGL_debug_renderer_info');return gl.getParameter(e.UNMASKED_RENDERER_WEBGL);});
   if(/swiftshader|llvmpipe|software/i.test(renderer)&&!FIXTURE)throw Error('Software renderer cannot certify this hardware route');
   console.log('SOAK renderer',renderer);
   await page.evaluate(()=>{

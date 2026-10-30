@@ -58,6 +58,37 @@ try {
 } catch {
   BASE = null;
 }
+/**
+ * FRAME's own changes, so the diff-based checks hold on a merged tree too
+ * (the lead's trial merge of all five streams put LIGHT's shader edits in a
+ * plain BASE..HEAD diff): every non-merge commit since the merge-base whose
+ * subject starts "Ship Pass FRAME". Returns [{ file, added[], removed[] }]
+ * from those commits' own diffs; an empty list when there are none (on main
+ * after the merge, BASE is HEAD and there is nothing of FRAME's to check).
+ */
+const frameCommits = () => {
+  if (!BASE) return [];
+  try {
+    return git('log', '--no-merges', '--format=%H', '--grep', '^Ship Pass FRAME', `${BASE}..HEAD`).split('\n').filter(Boolean);
+  } catch {
+    return [];
+  }
+};
+const frameDiff = (...paths) => {
+  const out = new Map();
+  for (const sha of frameCommits()) {
+    let file = null;
+    for (const l of git('show', '-U0', '--format=', sha, '--', ...paths).split('\n')) {
+      if (l.startsWith('+++ ')) {
+        file = l.slice(4).replace(/^b\//, '');
+        if (!out.has(file)) out.set(file, { file, added: [], removed: [] });
+      } else if (l.startsWith('--- ')) continue;
+      else if (file && file !== '/dev/null' && l.startsWith('+')) out.get(file).added.push(l.slice(1));
+      else if (file && file !== '/dev/null' && l.startsWith('-')) out.get(file).removed.push(l.slice(1));
+    }
+  }
+  return [...out.values()];
+};
 const atBase = (rel) => {
   if (!BASE) return null;
   try {
@@ -785,22 +816,14 @@ const atBase = (rel) => {
     if (!BASE) return 'no merge-base: skipped';
     // Per file, the number of raw class CALLS may not grow (a moved or
     // rewritten call is not a new one; a new gate is).
+    // Counted over FRAME's own commits (frameDiff), so another stream's
+    // call in a merged tree is not charged to FRAME.
     const RAW = /\b(isPhoneClass|isMobileGraphicsClass)\(/g;
-    const files = git('diff', '--name-only', BASE, '--', 'lib', 'components', 'stores', 'hooks', 'app').split('\n').filter((f) => /\.(m?js|jsx)$/.test(f) && !/device-(class|policy)\.js$/.test(f));
-    const bad = [];
-    for (const f of files) {
-      let now = '';
-      try {
-        now = read(f);
-      } catch {
-        continue; // deleted
-      }
-      const then = atBase(f) ?? '';
-      const count = (t) => (t.replace(/\r\n/g, '\n').replace(/^\s*(\/\/|\*).*$/gm, '').match(RAW) ?? []).length;
-      if (count(now) > count(then)) bad.push(`${f}: ${count(then)} → ${count(now)}`);
-    }
+    const count = (lines) => lines.filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join('\n').match(RAW)?.length ?? 0;
+    const files = frameDiff('lib', 'components', 'stores', 'hooks', 'app').filter((d) => /\.(m?js|jsx)$/.test(d.file) && !/device-(class|policy)\.js$/.test(d.file));
+    const bad = files.filter((d) => count(d.added) > count(d.removed)).map((d) => `${d.file}: -${count(d.removed)} +${count(d.added)}`);
     assert(!bad.length, bad.join(' | '));
-    return `${files.length} changed source files checked`;
+    return `${files.length} source files in ${frameCommits().length} FRAME commits checked`;
   });
 }
 
@@ -875,10 +898,12 @@ const atBase = (rel) => {
   });
   await check('flags (c) FRAME edits no shader text: no anchored substitution, onBeforeCompile or customProgramCacheKey in FRAME\'s diff', () => {
     if (!BASE) return 'no merge-base: skipped';
-    const diff = git('diff', '-U0', BASE, '--', 'lib', 'components');
-    const added = diff.split('\n').filter((l) => l.startsWith('+') && !l.startsWith('+++'));
-    const bad = added.filter((l) => /onBeforeCompile|customProgramCacheKey|ShaderChunk|fragmentShader\s*=|vertexShader\s*=/.test(l) && !/gpu-benchmark/.test(l));
+    // FRAME's own commits only (frameDiff): a merged tree carries SKY / CITY /
+    // LIGHT shader edits that are theirs to own, not FRAME's.
+    const diffs = frameDiff('lib', 'components');
+    const bad = diffs.flatMap((d) => d.added.filter((l) => /onBeforeCompile|customProgramCacheKey|ShaderChunk|fragmentShader\s*=|vertexShader\s*=/.test(l)).map((l) => `${d.file}: ${l.trim().slice(0, 100)}`)).filter((l) => !/gpu-benchmark/.test(l));
     assert(!bad.length, bad.slice(0, 3).join(' | '));
+    return `${diffs.length} files in ${frameCommits().length} FRAME commits`;
   });
 }
 

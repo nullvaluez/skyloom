@@ -49,7 +49,8 @@ const FLAGS = {
 const SHIPPED = (() => {
   const src = require('node:fs').readFileSync(path.resolve('lib/fly/fly-constants.js'), 'utf8').replace(/\r\n/g, '\n');
   const out = {};
-  for (const f of FRAME_FLAGS) out[f] = new RegExp(`export const ${f} = \\{\\n\\s*enabled: true,`).test(src);
+  // The block's own top-level `enabled:` (comment lines may come first).
+  for (const f of FRAME_FLAGS) out[f] = new RegExp(`export const ${f} = \\{\\n(?:\\s*//.*\\n)*\\s*enabled: true,`).test(src);
   return out;
 })();
 /** Is `name` on in this arm (explicit token, else the shipped default)? */
