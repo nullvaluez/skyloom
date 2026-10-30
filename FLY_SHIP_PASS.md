@@ -963,7 +963,51 @@ Severity and effort are the auditors' estimates. "Where" names the requirement t
 ### CITY
 
 <!-- SHIP PASS CITY report begin -->
-(not started)
+**Status (2026-10-30, cloud venue, branch `ship/city`): IN PROGRESS.** CT-1
+landed; CT-2 plumbing is in (flag off); the SK-1 city arms, CT-6, CT-3, CT-4,
+CT-5 and CT-7 follow in later commits. Every number below is the offline
+fixture on SwiftShader or a node gate, never a device number (3.8).
+
+**CT-1 — diagnosis pins (P0, landed).** `window.__flyCityDiag = { fadeStartM?,
+fadeEndM?, skylinePremix?: 0 | 1 }` is read live (every frame) by the city code
+whether or not CITY_RANGE is on, through `lib/fly/city-range.js`
+(`cityDiag`, `buildingBand`, `cityRangeRequest`). Absent = today's band exactly
+(node gate: the band equals SAT_BLDG_FADE / SAT_BUILDINGS and `bandFade` is the
+engine's old expression, `Object.is` at ten heights). A fade pin needs both
+ends; it moves the detail ring's dissolve, keeps the shipped 200 m evict
+margin past the pinned end and arms the ring up to the pinned end (so a warp
+to 10,000 ft streams the city it pins); the skyline's hole choreography and
+coverage mask follow the same band. `skylinePremix: 0` rides the skyline build
+request as `premix: false`. When a consumer honours a pin it sets
+`window.__flyCityDiagApplied = true`. **Finding:** the Enhanced skyline bakes
+no grey premix at all (the worker's `visuals` palette path never applied
+`SAT_SKYLINE.hazeMix`; only the Classic colour did), measured: Enhanced output
+with `premix: false` is byte-identical on 12 fixture tiles, Classic output
+changes. So the skyline-premix arm's share of the veil is structurally zero in
+Enhanced; the city's share is the detail-ring fade.
+
+**CT-2 — CITY_RANGE (P1, plumbing in, flag `enabled:false`).** Tunables in the
+CITY_RANGE block. Desktop High/Ultra (`deviceFeature('CITY_RANGE').budget.detailedM`):
+detailed ring live to ~4,500 m (lite LOD past 2,400 m: body range only and the
+surface-detail term off; Bayer dissolve 4,500-5,000 m into the skyline mass,
+which the coverage mask fills in under the same fade; evict 5,200 m, re-arm
+5,000 m). Every allowed device: a dense-core skyline (a z14 tile with >= 40
+polygons mapped >= 35 m admits its mapped 20-35 m blocks into the cap the
+shipped selection leaves; a capped core keeps its towers byte for byte, a
+suburb or desert tile is byte-identical). The CITY_FACADES regional palette
+already reaches the skyline program (Play Pass, on), and Enhanced already drops
+the baked premix (above), so those two sub-items need no new code.
+Worker flag-off identity: byte-identical to `main`'s worker on 48 fixture
+builds (skyline, buildings, roads, Classic skyline).
+
+**Gates.** `scripts/verify-ship-city.mjs` (node, starts the fixture itself): 19/19. `ship-pass-gates`: 32 PASS, 2 KNOWN-RED, 0 FAIL, seam rule PASS.
+`FLY_TILE_FIXTURE=1 verify-worker-window` 4/4, `verify-true-areas` 7/7.
+
+**Contract requests.** None yet.
+
+**Known issues.** In this venue the device policy classes SwiftShader as
+`software`, which CITY_RANGE refuses; the probe uses the harness pin
+`window.__flyCityDeviceClass` ('dgpu' / 'phone') to see each arm.
 <!-- SHIP PASS CITY report end -->
 
 ### LIGHT

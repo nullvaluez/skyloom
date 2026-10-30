@@ -33,13 +33,14 @@ import { nightCityOn } from '@/lib/fly/night-city';
 import { getSatBldgFade, setSatBldgFade } from '@/lib/fly/toy-world/world-bend';
 import { chunkFadeOn } from '@/lib/fly/toy-world/chunk-fade';
 import { satelliteVisualsOn, satelliteVisualProfile } from '@/lib/fly/satellite-visuals';
-import { setSatelliteArchitectureDetail } from '@/lib/fly/satellite-architecture-material';
 import { useFlyStore } from '@/stores/fly-store';
 import { SatVegLayer } from './SatVegLayer';
 // R24 B (GROUND_VIS, recon A6/T8) — AGL fade bands read the DAMPED ground.
 import { eyeAglVis } from '@/lib/fly/ground-vis';
 // PLAY PASS CITY (CITY_FACADES): the region palette the facade pass reads.
 import { CITY_FACADES_ON, updateCityFacades, cityFacadesState, setCityFacadesSky } from '@/lib/fly/city-facades';
+// SHIP PASS CITY (CT-2): CITY_RANGE resolved per tier through the device policy.
+import { cityRangeFor } from '@/lib/fly/city-range';
 
 const TIERS = ['low', 'medium', 'high']; // mirrors FlyCanvas's quality ladder
 const atLeastTier = (tier, min) => TIERS.indexOf(tier) >= TIERS.indexOf(min);
@@ -109,7 +110,10 @@ export function SatBuildingLayer({ runtime, flight }) {
     engine.setCoverage(
       satelliteVisualsOn() ? { ringM: SAT_COVERAGE.high.ringM, maxChunks: satelliteVisualProfile(qualityTier).buildingChunks } : SAT_COVERAGE.enabled && qualityTier === 'high' ? SAT_COVERAGE.high : null
     );
-    setSatelliteArchitectureDetail(engine.material, satelliteVisualProfile(qualityTier).normalMaps);
+    // SHIP PASS CITY (CT-2): through the engine, so its lite LOD can ease the
+    // same term out at altitude; with CITY_RANGE off this is the old call.
+    engine.setArchitectureDetail(satelliteVisualProfile(qualityTier).normalMaps);
+    engine.setCityRange(cityRangeFor(qualityTier));
     if (CITY_FACADES_ON) setCityFacadesSky(satelliteVisualProfile(qualityTier).normalMaps); // PLAY PASS CITY
   }, [engine, qualityTier]);
   // Round 19 — the two SAT_SHADOWS mesh flags for THIS layer's meshes (the
@@ -166,7 +170,14 @@ export function SatBuildingLayer({ runtime, flight }) {
     runtime.satBuildingsBandM = SAT_BLDG_FADE.enabled
       ? SAT_BLDG_FADE.evictAglM
       : SAT_BUILDINGS.cullAglOffM;
+    // SHIP PASS CITY (CT-1, CT-2): a diagnosis pin or CITY_RANGE moves the
+    // ring's eviction height; the arrival gate follows it. With neither, the
+    // engine republishes exactly the value written above.
+    engine.setBandListener((evictM) => {
+      runtime.satBuildingsBandM = evictM;
+    });
     return () => {
+      engine.setBandListener(null);
       if (runtime.satBuildings === engine) runtime.satBuildings = null;
     };
   }, [engine, runtime]);

@@ -19,6 +19,8 @@ import {
 } from '@/lib/fly/settle';
 import { satelliteVisualsOn, satelliteVisualProfile } from '@/lib/fly/satellite-visuals';
 import { useFlyStore } from '@/stores/fly-store';
+// SHIP PASS CITY (CT-2): CITY_RANGE resolved per tier through the device policy.
+import { cityRangeFor } from '@/lib/fly/city-range';
 // R24 B (GROUND_VIS, recon A6/T8) — AGL fade bands read the DAMPED ground.
 import { eyeAglVis, groundElevVis } from '@/lib/fly/ground-vis';
 
@@ -70,6 +72,7 @@ export function SatSkylineLayer({ runtime, flight }) {
   // the desired set just grows.
   useEffect(() => {
     engine.setMaxChunks((satelliteVisualsOn() ? satelliteVisualProfile(qualityTier).skylineChunks : SAT_SKYLINE.maxChunksByTier[qualityTier]) ?? 0);
+    engine.setCityRange(cityRangeFor(qualityTier)); // SHIP PASS CITY (CT-2)
   }, [engine, qualityTier]);
 
   useEffect(() => {
