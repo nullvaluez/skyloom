@@ -1,12 +1,25 @@
 /* Real-provider production endurance route. No fixture, governor pin or
  * feature override. Headless timing is diagnostic, not display/tearing or
- * human-feel certification. Never run alongside another GPU benchmark. */
+ * human-feel certification. Never run alongside another GPU benchmark.
+ *
+ * SHIP PASS FRAME (FR-6, FR-7): limits come from the one budget table
+ * (lib/fly/tier-budgets.js), and every >100 ms interval is classified by phase
+ * (program link, tile upload, worker finalize, GC, React commit) by the app's
+ * own stall census (lib/fly/stall-census.js, installed with ?diag=1); the
+ * tally lands in soak.json `stalls` and `programs`. BETA_GPU_TRACE=1 keeps its
+ * per-call GL timings beside it.
+ *
+ * BETA_SOAK_FIXTURE=1 is the INSTRUMENT PROOF mode for the cloud venue
+ * (FLY_SHIP_PASS.md 3.8): it soaks a running dev server (FLY_URL) on the
+ * offline world fixture, accepts a software renderer, and labels the report
+ * as instrument evidence only. Its numbers certify nothing. */
 const {chromium}=require('playwright');
 const {spawn}=require('node:child_process');
 const {mkdirSync,writeFileSync}=require('node:fs');
 const path=require('node:path');
-const OUT=path.resolve(process.env.BETA_SOAK_OUT||'.graphics-review/beta'),PORT=3095,base=`http://127.0.0.1:${PORT}`;
-const minutes=Number(process.env.BETA_SOAK_MINUTES||20);
+const FIXTURE=process.env.BETA_SOAK_FIXTURE==='1';
+const OUT=path.resolve(process.env.BETA_SOAK_OUT||(FIXTURE?'.graphics-review/ship-pass/frame/soak-fixture':'.graphics-review/beta')),PORT=3095,base=FIXTURE?(process.env.FLY_URL||'http://localhost:3131'):`http://127.0.0.1:${PORT}`;
+const minutes=Number(process.env.BETA_SOAK_MINUTES||(FIXTURE?2:20));
 if(!(minutes>0&&minutes<=30))throw Error('Expected 1–30 minutes');
 mkdirSync(OUT,{recursive:true});
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
@@ -23,12 +36,17 @@ const legs=process.env.BETA_SOAK_ROUTE==='airports'?allLegs.filter(l=>l.ops).map
 const quantile=(rows,q)=>rows.length?[...rows].sort((a,b)=>a-b)[Math.min(rows.length-1,Math.floor(rows.length*q))]:null;
 (async()=>{
  let browser,server,page,log='',renderer,cpu,lastProgress=Date.now();const errors=[],samples=[],events=[],responses={};const began=Date.now();
- const watchdog=setInterval(()=>{if(Date.now()-lastProgress>90000){errors.push('Browser did not report progress for 90 seconds');writeFileSync(path.join(OUT,'soak-stalled.json'),JSON.stringify({at:new Date().toISOString(),errors,samples,events},null,2));browser?.close().catch(()=>{});server?.kill();}},10000);
+ // SHIP PASS FRAME (FR-7): SwiftShader boots in minutes, not seconds; the fixture proof waits STALL_MS for progress.
+ const STALL_MS=FIXTURE?600000:90000;
+ const watchdog=setInterval(()=>{if(Date.now()-lastProgress>STALL_MS){errors.push(`Browser did not report progress for ${STALL_MS/1000} seconds`);writeFileSync(path.join(OUT,'soak-stalled.json'),JSON.stringify({at:new Date().toISOString(),errors,samples,events},null,2));browser?.close().catch(()=>{});server?.kill();}},10000);
  try {
-  server=spawn(process.execPath,['node_modules/next/dist/bin/next','start','-p',String(PORT)],{env:{...process.env,FLY_BUILD_DIR:'.next-explorer',NEXT_TELEMETRY_DISABLED:'1'},stdio:['ignore','pipe','pipe'],windowsHide:true});server.stdout.on('data',b=>log+=b);server.stderr.on('data',b=>log+=b);
+  const {BUDGET_TABLE,missedShare}=await import('../lib/fly/tier-budgets.js');
+  if(!FIXTURE){server=spawn(process.execPath,['node_modules/next/dist/bin/next','start','-p',String(PORT)],{env:{...process.env,FLY_BUILD_DIR:'.next-explorer',NEXT_TELEMETRY_DISABLED:'1'},stdio:['ignore','pipe','pipe'],windowsHide:true});server.stdout.on('data',b=>log+=b);server.stderr.on('data',b=>log+=b);}
   for(let i=0;i<120;i++){try{if((await fetch(base)).ok)break;}catch{}if(i===119)throw Error('Server unavailable');await delay(500);}
-  browser=await chromium.launch({args:[...(process.platform==='win32'?['--use-angle=d3d11']:[]),'--ignore-gpu-blocklist']});
-  const context=await browser.newContext({viewport:{width:1920,height:1080},deviceScaleFactor:1});
+  browser=await chromium.launch({args:[...(process.platform==='win32'?['--use-angle=d3d11']:[]),'--ignore-gpu-blocklist',...(FIXTURE?['--enable-unsafe-swiftshader','--use-angle=swiftshader']:[])]});
+  // FIXTURE: a quarter of the pixels, so the software rasterizer reports at all.
+  const context=await browser.newContext({viewport:FIXTURE?{width:960,height:540}:{width:1920,height:1080},deviceScaleFactor:1});
+  if(FIXTURE){const {attachFixture,fixturePin}=require('./_fixture');const fx=await attachFixture(context);await context.addInitScript(pin=>{window.__flyTileFixture=pin;window.__flyWeatherOverride='baseline';},fixturePin(fx.url,15));}
   if(process.env.BETA_GPU_TRACE==='1')await context.addInitScript(()=>{
     const trace=window.__betaGpuCalls={totals:{},slow:[]};
     for(const name of ['compileShader','linkProgram','getProgramParameter','getShaderParameter','getActiveUniform','getActiveAttrib','getUniformLocation','getAttribLocation','getShaderInfoLog','getProgramInfoLog','getParameter','checkFramebufferStatus','readPixels','blitFramebuffer','useProgram','texImage2D','texSubImage2D','bufferData','bufferSubData','drawElements','drawElementsInstanced','drawArrays']){
@@ -37,14 +55,16 @@ const quantile=(rows,q)=>rows.length?[...rows].sort((a,b)=>a-b)[Math.min(rows.le
     }
   });
   await context.addInitScript(()=>{if(location.protocol!=='http:')return;localStorage.setItem('fly-sound-on','0');localStorage.setItem('fly-crash-mode','forgiving');localStorage.setItem('fly-explorer-preferences-v1',JSON.stringify({version:1,settings:{tutorial:'skipped'}}));});
-  page=await context.newPage();page.setDefaultTimeout(90000);page.on('pageerror',e=>errors.push(e.message));
+  page=await context.newPage();page.setDefaultTimeout(STALL_MS);page.on('pageerror',e=>errors.push(e.message));page.on('crash',()=>errors.push('renderer process crashed'));
   if(process.env.BETA_CPU_TRACE==='1'){cpu=await context.newCDPSession(page);await cpu.send('Profiler.enable');await cpu.send('Profiler.start');}
   page.on('response',res=>{const host=new URL(res.url()).hostname;if(host==='127.0.0.1')return;const key=`${host}:${res.status()}`;responses[key]=(responses[key]||0)+1;});
   await page.goto(base+'/?graphicsReview=1&diag=1',{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>window.__fly?.launchSetup&&window.__flyStats?.frame);
   if(await page.getByRole('button',{name:'Hide',exact:true}).count())await page.getByRole('button',{name:'Hide',exact:true}).click();
-  renderer=await page.evaluate(()=>{const gl=[...document.querySelectorAll('canvas')].map(c=>c.getContext('webgl2')).find(Boolean);const e=gl.getExtension('WEBGL_debug_renderer_info');return gl.getParameter(e.UNMASKED_RENDERER_WEBGL);});
-  if(/swiftshader|llvmpipe|software/i.test(renderer))throw Error('Software renderer cannot certify this hardware route');
+  // SHIP PASS FRAME (FR-7): ask three's own canvas (data-engine) for its context; getContext('webgl2')
+  // on every canvas makes a context on each spare one.
+  renderer=await page.evaluate(()=>{const c=document.querySelector('canvas[data-engine]');const gl=c?c.getContext('webgl2'):[...document.querySelectorAll('canvas')].map(c=>c.getContext('webgl2')).find(Boolean);const e=gl.getExtension('WEBGL_debug_renderer_info');return gl.getParameter(e.UNMASKED_RENDERER_WEBGL);});
+  if(/swiftshader|llvmpipe|software/i.test(renderer)&&!FIXTURE)throw Error('Software renderer cannot certify this hardware route');
   console.log('SOAK renderer',renderer);
   await page.evaluate(()=>{
     const probe=window.__betaSoak={last:0,steady:[],transition:[],lastAction:performance.now(),frames:0};
@@ -90,11 +110,23 @@ const quantile=(rows,q)=>rows.length?[...rows].sort((a,b)=>a-b)[Math.min(rows.le
   const summarize=values=>({count:values.length,p50:quantile(values,.5),p95:quantile(values,.95),p99:quantile(values,.99),over100:values.filter(n=>n>100).length,max:values.length?values.reduce((a,b)=>Math.max(a,b),0):null});
   const report={at:new Date().toISOString(),route:process.env.BETA_SOAK_ROUTE||'world',minutes,wallMs:Date.now()-began,renderer,venue:'1920×1080 DPR1 headless Chromium; live providers; scripted input; High default with governor free',steady:summarize(frames.steady),transitions:summarize(frames.transition),samples,events,errors,responses};
   if(process.env.BETA_GPU_TRACE==='1')report.gpuCalls=await page.evaluate(()=>window.__betaGpuCalls);
+  // SHIP PASS FRAME (FR-7): the app's own phase classification of every >100 ms interval.
+  Object.assign(report,await page.evaluate(()=>{const c=window.__flyStats?.census;const p=c?.programs;return {stalls:c?.stalls?.summary?.()??null,programs:p?{total:p.total,afterRevealCount:p.afterRevealCount,afterReveal:p.afterReveal.slice(0,60),worstMs:p.worstMs,linkFailures:p.linkFailures}:null,textureMiB:c?.textureBytes?Math.round(c.textureBytes.totalBytes/1048576):null};}));
+  if(FIXTURE)report.venue='INSTRUMENT PROOF ONLY: offline world fixture, '+renderer+'; no number here is a device measurement (FLY_SHIP_PASS.md 3.8)';
   if(cpu){const {profile}=await cpu.send('Profiler.stop');writeFileSync(path.join(OUT,'cpu-profile.json'),JSON.stringify(profile));}
-  report.limits={p95Frame:20,p99Frame:33.3,p95Draws:375,p95Triangles:2200000};
+  // SHIP PASS FRAME (FR-6): the budget row this route is held to (the soak runs the
+  // automation default, High) and the missed-vblank share alongside section 2's p95/p99.
+  const row=BUDGET_TABLE[samples.some(s=>s.preset==='ultra')?'ultra':'high'];
+  report.limits={p95Frame:20,p99Frame:33.3,p95Draws:row.draws,p95Triangles:row.triangles,missedFrac:row.missedFrac,stallsPerMin:row.stallsPerMin,budgetRow:row.label,provisional:row.provisional};
+  report.steady.missed=missedShare(frames.steady,row.targetFps);
   report.resource={p95Draws:quantile(samples.map(s=>s.draws).filter(Number.isFinite),.95),p95Triangles:quantile(samples.map(s=>s.triangles).filter(Number.isFinite),.95)};
-  report.passes={noUncaughtErrors:errors.length===0,operationsRoute:samples.some(s=>s.takeoffs>0)&&samples.some(s=>s.landings>0)&&!samples.some(s=>s.ops==='crashed'),frameTarget:report.steady.count>=1000&&report.steady.p95<=20&&report.steady.p99<=33.3,noRecurringStalls:report.steady.over100<=1,drawCeiling:report.resource.p95Draws!=null&&report.resource.p95Draws<=375,triangleCeiling:report.resource.p95Triangles!=null&&report.resource.p95Triangles<=2200000};
-  writeFileSync(path.join(OUT,'soak.json'),JSON.stringify(report,null,2));console.log('SOAK complete',JSON.stringify({steady:report.steady,resources:report.resource,passes:report.passes}));if(Object.values(report.passes).some(v=>!v))process.exitCode=1;
+  report.passes={noUncaughtErrors:errors.length===0,operationsRoute:samples.some(s=>s.takeoffs>0)&&samples.some(s=>s.landings>0)&&!samples.some(s=>s.ops==='crashed'),frameTarget:report.steady.count>=1000&&report.steady.p95<=20&&report.steady.p99<=33.3,noRecurringStalls:report.steady.over100<=1,drawCeiling:report.resource.p95Draws!=null&&report.resource.p95Draws<=row.draws,triangleCeiling:report.resource.p95Triangles!=null&&report.resource.p95Triangles<=row.triangles};
+    // SHIP PASS FRAME (FR-7): the fixture proof certifies the INSTRUMENT (a clean run whose every >100 ms
+  // interval landed in the phase tally), never the frame/stall passes, which SwiftShader cannot meet.
+  if(FIXTURE)report.instrumentProof={noUncaughtErrors:errors.length===0,stallTally:!!report.stalls&&report.stalls.count>0&&Object.values(report.stalls.byPhase).reduce((a,b)=>a+b,0)===report.stalls.count};
+  writeFileSync(path.join(OUT,'soak.json'),JSON.stringify(report,null,2));console.log('SOAK complete',JSON.stringify({steady:report.steady,resources:report.resource,passes:report.passes,instrumentProof:report.instrumentProof}));if(Object.values(FIXTURE?report.instrumentProof:report.passes).some(v=>!v))process.exitCode=1;
  }catch(e){console.error(e);errors.push(e.message);writeFileSync(path.join(OUT,'soak-error.json'),JSON.stringify({at:new Date().toISOString(),renderer,errors,samples,events,responses},null,2));process.exitCode=1;}
- finally{clearInterval(watchdog);server?.kill();await browser?.close();writeFileSync(path.join(OUT,'soak-server.log'),log);}
+ finally{clearInterval(watchdog);server?.kill();await browser?.close();writeFileSync(path.join(OUT,'soak-server.log'),log);
+  // SHIP PASS FRAME: the fixture server (scripts/_fixture.js) keeps the event loop alive after the report.
+  if(FIXTURE)setTimeout(()=>process.exit(process.exitCode??0),2000).unref();}
 })();

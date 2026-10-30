@@ -79,8 +79,16 @@ const readFrame = (page) =>
     const f = window.__flyStats?.frame;
     if (!f?.sample) return null;
     const s = f.sample();
-    return { programs: s.programs, programsDelta: s.programsDelta, worstDt: s.worstDt, count: s.count };
+    // SHIP PASS FRAME (FR-1): the program census (when installed) names what
+    // first compiled; `census` is its afterReveal cursor at this read.
+    const p = window.__flyStats?.census?.programs;
+    return { programs: s.programs, programsDelta: s.programsDelta, worstDt: s.worstDt, count: s.count, census: p ? p.afterReveal.length : null };
   });
+/** SHIP PASS FRAME (FR-1): the program keys first used between two readFrame()s (null without the census). */
+const programsBetween = (page, a, b) =>
+  a?.census == null || b?.census == null
+    ? Promise.resolve(null)
+    : page.evaluate(([i, j]) => window.__flyStats.census.programs.afterReveal.slice(i, j).map((e) => `${e.key} ${e.ms}ms`), [a.census, b.census]);
 
 (async () => {
   const browser = await chromium.launch({
@@ -161,6 +169,8 @@ const readFrame = (page) =>
     `\nDUSK CROSSING (${SUN_WALK.join('° → ')}°): programs ${a0.programs} → ${a1.programs}, ` +
       `delta ${a1.programsDelta}, worst frame ${a1.worstDt.toFixed(0)}ms over ${a1.count} frames`
   );
+  const duskKeys = await programsBetween(page, a0, a1);
+  if (duskKeys) info('(1i) PROGRAMS FIRST USED ACROSS THE DUSK CROSSING (program census)', duskKeys.join(' · ') || 'none');
   gate(
     '(1) NO PROGRAM COMPILES ACROSS A DUSK CROSSING',
     a1.programsDelta === 0,
@@ -192,6 +202,8 @@ const readFrame = (page) =>
     `TIER STEPS (4 forced, shadows on): programs ${b0.programs} → ${b1.programs}, delta ` +
       `${b1.programsDelta}, worst frame ${b1.worstDt.toFixed(0)}ms, tier now ${tiersSeen}`
   );
+  const tierKeys = await programsBetween(page, b0, b1);
+  if (tierKeys) info('(2i) PROGRAMS FIRST USED ACROSS THE TIER STEPS (program census)', tierKeys.join(' · ') || 'none');
   gate(
     '(2) NO PROGRAM COMPILES ACROSS A TIER STEP WITH SHADOWS ON',
     b1.programsDelta === 0,

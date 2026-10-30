@@ -2,12 +2,24 @@
 
 import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { ENV_UNIFORM, PREWARM, SETTLE_CALM } from '@/lib/fly/fly-constants';
+import { ENV_UNIFORM as ENV_UNIFORM_BLOCK, PREWARM, SETTLE_CALM } from '@/lib/fly/fly-constants';
+import { pinned } from '@/lib/fly/fly-pins';
+// SHIP PASS FRAME (FR-3): ENV_UNIFORM through its pin (?flags=ENV_UNIFORM), as prewarm.js.
+const ENV_UNIFORM = pinned(ENV_UNIFORM_BLOCK, '__flyEnvUniformOverride');
 import { compileCriticalTerrain, prewarmPending, prewarmSliceStep, prewarmState, pumpRequeue, requeueForEnvironment, runPrewarm } from '@/lib/fly/prewarm';
 import { terrainArrivalCovered } from '@/lib/fly/critical-terrain-prewarm.mjs';
 import { cinemaOn } from '@/lib/fly/cinema-policy';
 import { bumpArrival, noteFrame, popinState, settleOn } from '@/lib/fly/settle';
 import { useFlyStore } from '@/stores/fly-store';
+// SHIP PASS FRAME (FR-3, SHADER_READY): the registry rescan triggers.
+import { queueRegistryWarm } from '@/lib/fly/prewarm';
+import { prewarmEntries } from '@/lib/fly/prewarm-registry';
+import { registryWarmState, resetRegistryWarm } from '@/lib/fly/registry-warm';
+import { shipPassOn } from '@/lib/fly/ship-pass';
+import { sliceBarSec } from '@/lib/fly/pace-adapt';
+import { cadenceState } from '@/lib/fly/frame-api';
+// Flag off: the identity (today's 24 ms bar).
+const SLICE_BAR = (base) => sliceBarSec(base, cadenceState().targetFps);
 
 /**
  * ROUND 21 (A GOVERNOR, §3.2) — the mount point for the boot shader pre-warm.
@@ -104,7 +116,10 @@ export function PrewarmRig({ runtime }) {
     // is actually delivering — still never a frame that is ALREADY the worst
     // one, which is the whole rule.
     sliceWaitRef.current += delta;
-    const bar = sliceWaitRef.current > 20 ? 0.05 : 0.024;
+    // SHIP PASS FRAME (FR-7, PACE_ADAPT.sliceBar): the bar follows the
+    // governor's target interval (sliceBarSec), so a 30 Hz page drains at
+    // ~48 ms instead of waiting 20 s for a 24 ms frame it never draws.
+    const bar = sliceWaitRef.current > 20 ? Math.max(0.05, SLICE_BAR(0.024)) : SLICE_BAR(0.024);
     if (delta > bar) return;
     sliceWaitRef.current = 0;
     sliceRef.current = true;
@@ -184,6 +199,53 @@ export function PrewarmRig({ runtime }) {
       }
     };
   }, [gl, camera, scene, runtime]);
+
+  // SHIP PASS FRAME (FR-3, SHADER_READY) — the registry consumer's other
+  // triggers (the boot drain is in runPrewarm): a tier or preset step queues
+  // what is still missing for the new tier; every 2 s it rescans for entries
+  // registered late (a stream's lazily loaded module, the title) and for a
+  // new scene.environment (the day/night bucket crossing re-bakes it). A
+  // lost context drops the retained registry programs. Flag off: no effect,
+  // no timer, no subscription.
+  useEffect(() => {
+    if (!PREWARM.enabled || !shipPassOn('SHADER_READY')) return undefined;
+    const run = (reason, tiers) => {
+      if (!prewarmState().started) return; // runPrewarm owns the boot warm
+      queueRegistryWarm({ gl, camera, scene, tiers, reason });
+    };
+    let prevTier = useFlyStore.getState().qualityTier;
+    let prevPreset = useFlyStore.getState().qualityPreset;
+    const unsub = useFlyStore.subscribe((st) => {
+      if (st.qualityTier === prevTier && st.qualityPreset === prevPreset) return;
+      prevTier = st.qualityTier;
+      prevPreset = st.qualityPreset;
+      run('tier', [st.qualityTier]);
+    });
+    let count = prewarmEntries().length;
+    let env = scene.environment;
+    const id = setInterval(() => {
+      const n = prewarmEntries().length;
+      if (n !== count) {
+        count = n;
+        run('rescan');
+      }
+      if (scene.environment && scene.environment !== env) {
+        env = scene.environment;
+        run('env');
+      }
+    }, 2000);
+    const lost = () => resetRegistryWarm();
+    gl.domElement?.addEventListener('webglcontextrestored', lost);
+    // The consumer's live state for harnesses and the console, published now
+    // (the `prewarm` record itself appears only when the boot warm finishes,
+    // which verify-settle reads as its completion time).
+    if (typeof window !== 'undefined') (window.__flyStats ??= {}).prewarmRegistry = registryWarmState();
+    return () => {
+      unsub();
+      clearInterval(id);
+      gl.domElement?.removeEventListener('webglcontextrestored', lost);
+    };
+  }, [gl, camera, scene]);
 
   // R24 B (ENV_UNIFORM, recon A5) — the late-HDRI repair. When the warm ran
   // WITHOUT a scene.environment (a throttled network beat PREWARM.envWaitMs),

@@ -15,7 +15,8 @@ import { register } from 'node:module';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
 register('./_node-resolve.mjs', import.meta.url);
-const { gradeReport, TIER_BUDGETS } = await import('../lib/fly/tier-budgets.js');
+// SHIP PASS FRAME (FR-6): the one budget table (lib/fly/tier-budgets.js).
+const { gradeReport, BUDGET_TABLE, missedShare } = await import('../lib/fly/tier-budgets.js');
 const { gpuClass } = await import('../lib/fly/device-class.js');
 
 const ROOT = path.resolve(import.meta.dirname, '..');
@@ -33,10 +34,10 @@ if (files.length) {
     const report = JSON.parse(readFileSync(file, 'utf8'));
     const g = gradeReport(report);
     console.log(`\n${path.relative(ROOT, file)}`);
-    console.log(`  ${report.gpu?.renderer ?? 'GPU unknown'} → ${report.gpu?.class} (${g.label})`);
+    console.log(`  ${report.gpu?.renderer ?? 'GPU unknown'} → ${report.gpu?.class} (${g.label}${g.provisional ? ', PROVISIONAL budget row' : ''})`);
     console.log(`  build ${report.build?.sha || '?'} · ${report.benchmark ? `benchmark ${report.benchmark.id}, reveal ${report.benchmark.revealMs} ms` : 'snapshot (no benchmark)'} · flags ${JSON.stringify(report.flags?.resolved ?? {})}`);
     for (const r of g.rows) {
-      const verdict = r.pass === true ? 'PASS' : r.pass === false ? 'FAIL' : 'UNMEASURED';
+      const verdict = r.info ? 'INFO' : r.pass === true ? 'PASS' : r.pass === false ? 'FAIL' : 'UNMEASURED';
       console.log(`  ${verdict.padEnd(10)} ${r.name}: ${r.value ?? '—'} (limit ${r.limit ?? '—'})`);
     }
     console.log(`  ${g.pass ? 'WITHIN BUDGET' : 'NOT WITHIN BUDGET'}`);
@@ -76,14 +77,25 @@ const cases = [
 const wrong = cases.filter(([r, coarse, want]) => gpuClass(r, { coarse }).cls !== want).map(([r, c, w]) => `${r || '(empty)'}${c ? ' [touch]' : ''} → ${gpuClass(r, { coarse: c }).cls}, want ${w}`);
 check('(1) gpuClass sorts real renderer strings into the tier budgets', wrong.length === 0, wrong.join(' | '));
 
-const ok = gradeReport({ gpu: { class: 'phone' }, frame: { p95: 18, p99: 40, long100PerMin: 0 }, renderer: { trianglesPeak: 1.0e6, callsPeak: 200 } });
-const over = gradeReport({ gpu: { class: 'high' }, frame: { p95: 13, p99: 19, long100PerMin: 0 }, renderer: { trianglesPeak: 3e6, callsPeak: 300 } });
+const MiB = 1048576;
+const ok = gradeReport({ gpu: { class: 'phone' }, device: { phoneClass: true }, frame: { p95: 18, p99: 40, long100PerMin: 0, missed: { frac: 0.02, targetFps: 60 } }, renderer: { trianglesPeak: 1.0e6, callsPeak: 200, textureBytes: 200 * MiB } });
+const over = gradeReport({ gpu: { class: 'high' }, frame: { p95: 13, p99: 19, long100PerMin: 0, missed: { frac: 0 } }, renderer: { trianglesPeak: 3e6, callsPeak: 300, textureBytes: 100 * MiB } });
 const blind = gradeReport({ gpu: { class: 'medium' }, frame: {}, renderer: {} });
 check(
   '(2) the grader passes in-budget, fails over-budget, and never passes unmeasured rows',
-  ok.pass === true && ok.tier === 'phone' && over.pass === false && over.rows.find((r) => r.name === 'frame p95 (ms)').pass === false &&
-    blind.pass === false && blind.rows.every((r) => r.pass === null),
+  ok.pass === true && ok.tier === 'phone' && over.pass === false && over.rows.find((r) => r.name === 'triangles (peak)').pass === false &&
+    blind.pass === false && blind.rows.filter((r) => !r.info).every((r) => r.pass === null),
 );
-check('(3) every tier has frame, long-frame, triangle and draw limits', Object.values(TIER_BUDGETS).every((b) => b.p95Ms > 0 && b.triangles > 0 && b.draws > 0 && b.long100PerMin >= 0));
+check(
+  '(3) every budget row has missed-share, stall, triangle, draw and texture limits',
+  Object.values(BUDGET_TABLE).every((b) => b.missedFrac > 0 && b.stallsPerMin >= 0 && b.triangles > 0 && b.draws > 0 && b.textureMiB > 0),
+);
+// FR-6: a 60 Hz session with no missed vblank (every interval 16.7 ms, i.e.
+// p95 16.7 — which the pre-pass p95 ≤ 12 ms High budget failed) passes.
+const sixty = Array.from({ length: 600 }, () => 16.7);
+const clean = gradeReport({ gpu: { class: 'high' }, quality: { preset: 'high' }, frame: { p95: 16.7, p99: 16.7, long100PerMin: 0, missed: missedShare(sixty, 60) }, renderer: { trianglesPeak: 2e6, callsPeak: 360, textureBytes: 250 * MiB } });
+check('(4) a synthetic 60 Hz report with no missed vblank grades as a pass (FR-6)', clean.pass === true && clean.rows[0].value === 0, JSON.stringify(clean.rows.map((r) => [r.name, r.pass])));
+const dropped = missedShare([...sixty.slice(0, 590), ...Array(10).fill(33.4)], 60);
+check('(5) a dropped vblank (33.4 ms at 60) counts as a miss; 30 Hz frames at 33.4 do not', dropped.over === 10 && missedShare(Array(10).fill(33.4), 30).over === 0);
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

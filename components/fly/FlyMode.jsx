@@ -78,6 +78,12 @@ import { ENCOUNTER_FEEL_ACTIVE } from '@/lib/fly/play-pass';
 // SHIP PASS RELEASE imports end
 
 // SHIP PASS FRAME imports begin
+import { BatterySaverHint } from './hud/BatterySaverHint';
+import { shipPassOn } from '@/lib/fly/ship-pass';
+import { deviceFeature } from '@/lib/fly/device-policy';
+import { CALM as CALM_FRAME } from './hud/calm-hud';
+// FR-9: the Battery saver suggestion host (touch, PACE_ADAPT, calm HUD).
+const BATTERY_HINT = shipPassOn('PACE_ADAPT') && CALM_FRAME;
 // SHIP PASS FRAME imports end
 
 // Last in-flight position, persisted ~10s + pagehide. R25 A: nothing reads it
@@ -433,6 +439,7 @@ export function FlyMode({ onClose }) {
       {/* SHIP PASS RELEASE mounts begin */}
       {/* SHIP PASS RELEASE mounts end */}
       {/* SHIP PASS FRAME mounts begin */}
+      {BATTERY_HINT && deviceFeature('BATTERY_SAVER').allowed && <BatterySaverHint runtime={runtime} />}
       {/* SHIP PASS FRAME mounts end */}
 
       {mobileNote && (
