@@ -340,5 +340,76 @@ console.log('SHIP PASS RELEASE gate (verify-ship-release)\n');
     JSON.stringify(frame.FRAME_CADENCE_MODES) === JSON.stringify(['60', 'display', '30']) && !bad({ 'fly-frame-rate-v1': 'display' }));
 }
 
+// === D  RL-4 deep links =========================================================
+{
+  console.log('\n[D] Deep links (DEEP_LINKS)');
+  register(pathToFileURL(path.join(ROOT, 'scripts/_node-resolve.mjs')));
+  const DL = await import(pathToFileURL(path.join(ROOT, 'lib/fly/deep-link.mjs')).href);
+  const { LOUNGE_AIRPORTS } = await import(pathToFileURL(path.join(ROOT, 'lib/fly/lounge-airports.mjs')).href);
+  const { DESTINATIONS } = await import(pathToFileURL(path.join(ROOT, 'lib/fly/destinations.js')).href);
+  const { ADVENTURES } = await import(pathToFileURL(path.join(ROOT, 'lib/fly/adventures.mjs')).href);
+  const { resolveDestination } = await import(pathToFileURL(path.join(ROOT, 'lib/fly/flight-plan.js')).href);
+  const P = DL.parseDeepLink;
+  const valid = [
+    ['?watch=KJFK', (r) => r.kind === 'watch' && r.airportId === 'KJFK'],
+    ['?watch=kjfk', (r) => r.kind === 'watch' && r.airportId === 'KJFK'],
+    ['?fly=grand-canyon', (r) => r.kind === 'fly' && r.destinationId === 'grand-canyon' && r.aircraftId === null],
+    ['?fly=grand-canyon&aircraft=glider', (r) => r.kind === 'fly' && r.aircraftId === 'glider'],
+    ['?at=40.7484,-73.9857', (r) => r.kind === 'at' && r.altFt === 5000 && r.dest.altM === 1524],
+    ['?at=46.5,8.0,12000&aircraft=airliner', (r) => r.kind === 'at' && r.altFt === 12000 && r.aircraftId === 'airliner'],
+    ['?at=-33.8568%2C151.2153', (r) => r.kind === 'at' && r.lat === -33.8568],
+    [`?journey=${ADVENTURES[0].id}`, (r) => r.kind === 'journey' && r.adventureId === ADVENTURES[0].id],
+    ['?flags=CHALLENGE&fly=grand-canyon', (r) => r.kind === 'fly'],
+  ];
+  const vbad = valid.filter(([q, ok]) => { const r = P(q); return !(r?.ok && ok(r)); }).map(([q]) => `${q} → ${JSON.stringify(P(q))?.slice(0, 80)}`);
+  gate(`D1 valid links of every kind parse (${valid.length})`, vbad.length === 0, vbad.join(' | '));
+  const none = ['', '?', '?flags=-CHALLENGE_LAYER', '?graphicsReview=1&diag=1', null, undefined, 42];
+  gate('D2 no link → null (other parameters are not links)', none.every((q) => P(q) === null));
+  const junk = [
+    '?watch=ZZZZ', '?watch=KJF', '?watch=K JFK', '?fly=atlantis', '?fly=Grand-Canyon', '?journey=nope',
+    '?at=91,0', '?at=86,0', '?at=0,181', '?at=0,0,100', '?at=0,0,46000', '?at=0,0,5000.5', '?at=0', '?at=0,0,0,0', '?at=1e2,3', '?at=0x10,1', '?at=NaN,1',
+    '?fly=grand-canyon&aircraft=spaceship', '?watch=KJFK&aircraft=glider', '?aircraft=glider', '?fly=grand-canyon&watch=KJFK',
+    '?fly=grand-canyon&fly=yosemite', `?fly=${'a'.repeat(600)}`,
+    '?fly=<script>alert(1)</script>', '?watch=%3Cimg%20src%3Dx%3E', '?journey=../../etc/passwd', "?fly=grand-canyon'%22;--", '?at=40.7,-73.9,<b>', '?fly=__proto__', '?journey=constructor',
+  ];
+  const jbad = junk.filter((q) => { const r = P(q); return !(r && r.ok === false && r.kind === 'invalid' && typeof r.reason === 'string'); });
+  gate(`D3 invalid, junk, out-of-range and injection links are refused (${junk.length})`, jbad.length === 0, jbad.join(' | '));
+  const echo = junk.map((q) => JSON.stringify(P(q))).filter((t) => /<|script|passwd|proto|constructor|alert|img/i.test(t));
+  gate('D4 a refusal never echoes what the URL carried', echo.length === 0, echo.slice(0, 3).join(' | '));
+  const everyWatch = LOUNGE_AIRPORTS.every((a) => P(`?watch=${a.ident}`)?.airportId === a.id);
+  const everyFly = DESTINATIONS.every((d) => P(`?fly=${d.id}`)?.destinationId === d.id);
+  const everyJourney = ADVENTURES.every((a) => P(`?journey=${a.id}`)?.adventureId === a.id);
+  gate(`D5 every catalog row is linkable (${LOUNGE_AIRPORTS.length} airports, ${DESTINATIONS.length} destinations, ${ADVENTURES.length} journeys)`, everyWatch && everyFly && everyJourney);
+  const at = P('?at=27.9881,86.925,30000');
+  const atDest = resolveDestination(at.dest);
+  gate('D6 an ?at= point resolves as a Free Flight destination (flight-plan validatePoiDest)', !!atDest && atDest.altM === 9144 && atDest.lat === 27.9881, JSON.stringify(atDest && { id: atDest.id, altM: atDest.altM }));
+  const base = 'https://skyloom.example';
+  const round = [
+    { kind: 'watch', airportId: 'KJFK', ident: 'KJFK' }, { kind: 'fly', destinationId: 'grand-canyon', aircraftId: 'glider' },
+    { kind: 'at', lat: 46.55, lon: 7.98, altFt: 11000 }, { kind: 'journey', adventureId: ADVENTURES[0].id },
+  ];
+  const rbad = round.filter((l) => { const url = DL.buildDeepLink(l, base); const r = P(new URL(url).search); return !(url.startsWith(`${base}/?`) && r?.ok && r.kind === l.kind); });
+  let throws = false;
+  try { DL.buildDeepLink({ kind: 'fly', destinationId: 'atlantis' }, base); } catch { throws = true; }
+  gate('D7 Copy link builds URLs the parser accepts, and refuses an unknown place', rbad.length === 0 && throws, rbad.map((l) => l.kind).join(','));
+  gate('D8 stripping keeps other parameters and drops every link parameter',
+    DL.stripDeepLink('?flags=CHALLENGE&fly=x&aircraft=y&diag=1') === '?flags=CHALLENGE&diag=1' && DL.stripDeepLink('?watch=KJFK') === '');
+  // One-shot consumption against a fake window: parsed once, URL cleaned once.
+  const calls = [];
+  const win = { location: { pathname: '/', search: '?fly=grand-canyon&flags=X', hash: '' }, history: { state: null, replaceState: (s, t, u) => calls.push(u) } };
+  const first = DL.consumeDeepLink(win);
+  win.location.search = '?fly=yosemite';
+  const second = DL.consumeDeepLink(win);
+  gate('D9 consumed once: history.replaceState strips the link, a second read is the same answer', first?.destinationId === 'grand-canyon' && second === first && calls.length === 1 && calls[0] === '/?flags=X', JSON.stringify(calls));
+  // The pre-mount blocks: flag-gated, bypass pins win, env-injected gates untouched.
+  const fd = read('lib/fly/front-door.js');
+  const fp = read('lib/fly/flight-plan.js');
+  const entry = fd.slice(fd.indexOf('SHIP PASS RELEASE entry begin'), fd.indexOf('SHIP PASS RELEASE entry end'));
+  const spawn = fp.slice(fp.indexOf('SHIP PASS RELEASE spawn begin'), fp.indexOf('SHIP PASS RELEASE spawn end'));
+  gate('D10 the entry and spawn blocks act only with DEEP_LINKS on, and a harness bypass pin wins',
+    /shipPassOn\('DEEP_LINKS'\) && frontDoorOn\(\) && !titleBypassPinned\(\) && consumeDeepLink\(\)/.test(entry) &&
+      /shipPassOn\('DEEP_LINKS'\) && flightPlanOn\(\) && env\.title === undefined && !titleBypassPinned\(\)/.test(spawn));
+}
+
 console.log(`\nverify-ship-release: ${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

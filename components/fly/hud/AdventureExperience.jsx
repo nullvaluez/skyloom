@@ -16,6 +16,7 @@ import { adventureRecovery } from '@/lib/fly/adventure-guidance.mjs';
 import './adventures.css';
 // The library opens as a full-bleed sheet in the cinema title's language.
 import './cinema-menus.css';
+import { CopyLink } from './CopyLink';
 
 const medals=['','Bronze','Silver','Gold'];
 function Dialog({title,onClose,children,className='',style}){
@@ -62,6 +63,8 @@ function AdventureLibrary({runtime}){
       <p className="journey-meta"><Plane size={15}/>{aircraftName(route.aircraftId)} recommended · all nine aircraft available</p>
       {replace&&<p role="alert">Choose another journey? Your unfinished route is replaced only when you launch. Earned stamps and liveries stay yours.</p>}{error&&<p role="alert">{error}</p>}
       <button className="journey-primary" disabled={!ready||!access.allowed} onClick={launch} data-testid="adventure-launch">{!ready?'Preparing flight…':resuming?'Prepare to continue':replace?'Choose aircraft for this journey':'Choose your aircraft'}<ArrowRight size={20}/></button>
+      {/* SHIP PASS RL-4 (DEEP_LINKS): share this journey's briefing (nothing with the flag off). */}
+      <CopyLink link={{kind:'journey',adventureId:route.id}} testid="copy-link-journey"/>
       {replace&&<button onClick={()=>setReplace(false)}>Keep current journey</button>}
       <small>Complete this journey to earn {LIVERIES[route.reward].name}. {access.reason==='preview'?'Free during preview.':''}</small>
     </div></article>

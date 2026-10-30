@@ -1,0 +1,41 @@
+/* SHIP PASS RL-4 (DEEP_LINKS): Copy link. Specific selectors so the airport
+   browser's `.ab-featured button` card rules never style the link button. */
+.copy-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 999px;
+  font-size: 12px;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+  cursor: pointer;
+}
+.copy-link:hover { background: rgba(255, 255, 255, 0.14); }
+.copy-link:focus-visible { outline: 2px solid rgba(147, 197, 253, 0.9); outline-offset: 2px; }
+.copy-link[data-state='copied'] { box-shadow: inset 0 0 0 1px rgba(134, 239, 172, 0.55); }
+.copy-link-compact { min-width: 32px; min-height: 32px; padding: 0; justify-content: center; }
+.copy-link-vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.copy-link-card { position: relative; display: grid; }
+.copy-link-card > button:first-child { width: 100%; height: 100%; }
+.ab-featured .copy-link-card button.copy-link-corner {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  min-height: 32px;
+  min-width: 32px;
+  padding: 0;
+  border-radius: 999px;
+  background: rgba(10, 16, 30, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+  overflow: visible;
+}
+.ab-featured .copy-link-card button.copy-link-corner::after { content: none; }
+.ab-featured .copy-link-card button.copy-link-corner:hover:not(:disabled) { transform: none; background: rgba(24, 36, 62, 0.92); }
+@media (pointer: coarse) {
+  .copy-link, .copy-link-compact, .ab-featured .copy-link-card button.copy-link-corner { min-width: 44px; min-height: 44px; }
+}

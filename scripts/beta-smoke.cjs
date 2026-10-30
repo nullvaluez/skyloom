@@ -12,6 +12,45 @@ const flags=process.env.BETA_FLAGS||'';
 const rows=[];
 function check(name,ok,detail){rows.push({name,ok,detail});console.log(`${ok?'PASS':'FAIL'} ${name}${detail?' '+JSON.stringify(detail):''}`);if(!ok)throw Error(name);}
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
+// SHIP PASS RL-1 (FLY_SHIP_PASS.md 4.1 W0.5b): on software GL (SwiftShader:
+// the CI runner and the cloud venue) the live title renders at 1-3 fps and a
+// trusted Playwright click never completes — the actionability log reads
+// "done scrolling" and the CDP mouse dispatch is never acknowledged (measured:
+// `title-settings` and `Invert pitch` each sat 90 s). The product is fine on a
+// GPU; the input pipeline is starved. So on software GL every press asserts
+// what Playwright's actionability would (attached, visible, enabled, in view,
+// and the topmost element at its centre is the control itself) IN THE PAGE,
+// then clicks through the DOM; keys are dispatched as DOM KeyboardEvents. Every
+// check still asserts the EFFECT. On a GPU the trusted path is unchanged.
+let software=false;const presses={trusted:0,dom:0};
+async function reachable(locator){
+  await locator.waitFor({state:'visible'});
+  const r=await locator.evaluate(el=>{
+    el.scrollIntoView({block:'center',inline:'center'});
+    const b=el.getBoundingClientRect(),x=b.left+b.width/2,y=b.top+b.height/2,hit=document.elementFromPoint(x,y);
+    const style=getComputedStyle(el);
+    return{size:b.width>0&&b.height>0,enabled:!el.disabled&&el.getAttribute('aria-disabled')!=='true',events:style.pointerEvents!=='none'&&style.visibility!=='hidden',
+      hit:!!hit&&(hit===el||el.contains(hit)||[...(el.labels||[])].some(l=>l===hit||l.contains(hit))),top:hit?hit.outerHTML.slice(0,120):null};
+  });
+  if(!(r.size&&r.enabled&&r.events&&r.hit))throw Error('control is not actionable: '+JSON.stringify(r));
+}
+async function press(locator){
+  if(!software){await locator.click();presses.trusted++;return;}
+  await reachable(locator);await locator.evaluate(el=>el.click());presses.dom++;
+}
+async function tick(locator){
+  if(!software){await locator.check();presses.trusted++;return;}
+  await reachable(locator);
+  if(!await locator.evaluate(el=>{if(!el.checked)el.click();return el.checked;}))throw Error('checkbox did not check');
+  presses.dom++;
+}
+const KEY_CODES={Escape:'Escape',p:'KeyP',l:'KeyL'};
+async function key(page,k){
+  if(!software){await page.keyboard.press(k);presses.trusted++;return;}
+  await page.evaluate(([k,code])=>{const t=document.activeElement&&document.activeElement!==document.body?document.activeElement:document;
+    for(const type of['keydown','keyup'])t.dispatchEvent(new KeyboardEvent(type,{key:k,code,bubbles:true,cancelable:true,composed:true}));},[k,KEY_CODES[k]||k]);
+  presses.dom++;
+}
 async function ready(){for(let i=0;i<120;i++){try{if((await fetch(base)).ok)return;}catch{}await delay(500);}throw Error('Production server did not become ready');}
 (async()=>{
  let server,browser,fixture,page;let log='',renderer='unavailable';
@@ -32,22 +71,24 @@ async function ready(){for(let i=0;i<120;i++){try{if((await fetch(base)).ok)retu
   await page.getByTestId('title-screen').waitFor({timeout:60000});
   renderer=await page.evaluate(()=>{const g=document.createElement('canvas').getContext('webgl2');const e=g?.getExtension('WEBGL_debug_renderer_info');const name=e?g.getParameter(e.UNMASKED_RENDERER_WEBGL):'unknown';g?.getExtension('WEBGL_lose_context')?.loseContext();return name;});
   console.log('Renderer',renderer);
+  software=process.env.BETA_TRUSTED_INPUT!=='1'&&/SwiftShader|llvmpipe|softpipe|Software/i.test(renderer);console.log('Input',software?'DOM presses (software GL)':'trusted');
   check('production title offers destination discovery',await page.getByTestId('title-explore').isVisible());
-  await page.getByTestId('title-settings').click();
+  await press(page.getByTestId('title-settings'));
   check('settings keep weather and time live without condition presets',await page.getByTestId('conditions-panel').count()===0);
+  check('?graphicsReview=1 keeps both look rows (PLAYER_SURFACE review surface)',await page.getByTestId('settings-visuals-classic').isVisible()&&await page.getByTestId('settings-visuals-enhanced').isVisible()&&await page.getByTestId('settings-style-toy').isVisible());
   await page.getByLabel('Steering sensitivity',{exact:true}).fill('1.25');
-  await page.getByLabel('Invert pitch',{exact:true}).check();
+  await tick(page.getByLabel('Invert pitch',{exact:true}));
   check('comfort settings persist',await page.evaluate(()=>JSON.parse(localStorage.getItem('fly-explorer-preferences-v1')).settings.invertPitch));
-  await page.getByTestId('settings-close').click();
-  await page.getByTestId('title-logbook').click();
+  await press(page.getByTestId('settings-close'));
+  await press(page.getByTestId('title-logbook'));
   await page.getByText('Your world, one flight at a time',{exact:true}).waitFor();
   check('journal has six regional collections',await page.locator('.explorer-collections article').count()===6);
   await page.screenshot({path:path.join(OUT,'journal-desktop.png'),timeout:30000});
-  await page.keyboard.press('Escape');
-  await page.getByTestId('title-takeoff-landing').click();
+  await key(page,'Escape');
+  await press(page.getByTestId('title-takeoff-landing'));
   await page.getByTestId('hangar').waitFor();
   await page.getByLabel('Find an airport or runway').fill('LOWI');
-  await page.getByRole('button').filter({hasText:'Innsbruck'}).first().click();
+  await press(page.getByRole('button').filter({hasText:'Innsbruck'}).first());
   await waitForDeparture(page,'LOWI:');
   check('regional airport loads into preparation',await departureId(page).then(v=>!!v&&v.startsWith('LOWI:')));
   check('generic airport does not promise apron operations',await page.getByRole('button',{name:'Apron',exact:true}).count()===0);
@@ -67,15 +108,15 @@ async function ready(){for(let i=0;i<120;i++){try{if((await fetch(base)).ok)retu
     try{await rpc('init');const z=14,lon=-73.9857,lat=40.7484,x=Math.floor((lon+180)/360*2**z),y=Math.floor((1-Math.log(Math.tan(Math.PI/4+lat*Math.PI/360))/Math.PI)/2*2**z);const tile=await rpc('buildTile',[z,x,y,'full',{}]);return {empty:tile.empty,vertices:tile.building?.pos?.length||tile.land?.pos?.length||0,keys:Object.keys(tile)};}finally{w.terminate();}
   },workerFile);
   check('bundled worker builds real fixture geometry',worker.vertices>0&&!worker.empty,worker);
-  await page.getByTestId('hangar-back').click();
-  await page.getByTestId('title-explore').click();
-  await page.getByTestId('hangar-fly').click();
+  await press(page.getByTestId('hangar-back'));
+  await press(page.getByTestId('title-explore'));
+  await press(page.getByTestId('hangar-fly'));
   await page.getByTestId('explorer-guide').waitFor({timeout:90000});
   check('first flight starts with skippable guidance',await page.getByRole('button',{name:'Skip tips',exact:true}).isVisible());
-  await page.getByRole('button',{name:'Skip tips',exact:true}).click();
+  await press(page.getByRole('button',{name:'Skip tips',exact:true}));
   await page.waitForFunction(()=>window.__fly?.worldLoading!==true&&window.__flyBoot?.pct===100);
   await page.waitForFunction(()=>window.__fly.weather?.wx.source==='beta-fixture');
-  await page.keyboard.press('p');await page.getByTestId('photo-composition').waitFor();
+  await key(page,'p');await page.getByTestId('photo-composition').waitFor();
   check('photo composition has no weather or time override controls',await page.getByTestId('flight-conditions').count()===0&&await page.getByTestId('photo-conditions').count()===0&&await page.getByTestId('conditions-panel').count()===0);
   const frozen=await page.evaluate(()=>({position:window.__fly.flight.pos.toArray(),time:window.__fly.explorerVisualTime}));
   await delay(2000);
@@ -87,43 +128,45 @@ async function ready(){for(let i=0;i<120;i++){try{if((await fetch(base)).ok)retu
   check('legacy condition choices cannot alter the frozen live scene',await page.evaluate(before=>JSON.stringify(window.__fly.weather.wx)===before,liveWeather));
   // The failed encode must not earn a photograph or leave the shutter busy.
   await page.evaluate(()=>{window.__betaToBlob=HTMLCanvasElement.prototype.toBlob;HTMLCanvasElement.prototype.toBlob=function(callback){callback(null);};});
-  await page.getByTestId('photo-shutter').click();await page.getByText('capture failed',{exact:true}).first().waitFor();
+  await press(page.getByTestId('photo-shutter'));await page.getByText('capture failed',{exact:true}).first().waitFor();
   check('failed photo encoding awards no photograph',await page.evaluate(()=>!(JSON.parse(localStorage.getItem('fly-exploration-v1')||'{"photos":[]}').photos?.length)));
   await page.evaluate(()=>{HTMLCanvasElement.prototype.toBlob=window.__betaToBlob;delete window.__betaToBlob;});
-  const downloading=page.waitForEvent('download');await page.getByTestId('photo-shutter').click();const download=await downloading;
+  const downloading=page.waitForEvent('download');await press(page.getByTestId('photo-shutter'));const download=await downloading;
   await download.saveAs(path.join(OUT,'flight-memory.png'));
   check('photo export produces a PNG',download.suggestedFilename().endsWith('.png'));
-  await page.getByTestId('photo-exit').click();
-  await page.keyboard.press('Escape');
+  await press(page.getByTestId('photo-exit'));
+  await key(page,'Escape');
   check('flight and pause menus have no manual condition controls',await page.getByTestId('flight-conditions').count()===0&&await page.getByTestId('conditions-panel').count()===0);
-  await page.getByRole('button',{name:'Resume',exact:true}).click();
+  await press(page.getByRole('button',{name:'Resume',exact:true}));
   await delay(1500);
   check('photo exit automatically resumes feed weather despite legacy preferences',await page.evaluate(()=>{const w=window.__fly.weather;return w.wx.source===w.data.source&&w.wx.source!=='player'&&w.wx.source!=='adventure';}));
-  await page.keyboard.press('l');
+  await key(page,'l');
   await page.locator('.explorer-photos figure').first().waitFor();
   check('successful photograph appears in the journal',await page.locator('.explorer-photos figure').count()===1);
-  await page.screenshot({path:path.join(OUT,'memory-journal.png'),timeout:30000});await page.keyboard.press('Escape');
+  await page.screenshot({path:path.join(OUT,'memory-journal.png'),timeout:30000});await key(page,'Escape');
   await context.route('**/api/aircraft?**',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ac:[],availability:'unavailable',error:'offline'})}));
   await page.getByText('Live traffic is unavailable. You can keep exploring.',{exact:true}).waitFor({timeout:60000});
   check('feed loss leaves exploration available',await page.getByTestId('title-screen').count()===0);
   await page.evaluate(()=>{const gl=[...document.querySelectorAll('canvas')].map(c=>c.getContext('webgl2')).find(Boolean);window.__betaContext=gl.getExtension('WEBGL_lose_context');if(!window.__betaContext)throw Error('Context-loss extension missing');window.__betaContext.loseContext();});
   await page.getByRole('alertdialog',{name:'Graphics recovery'}).waitFor();
   check('context loss exposes a recovery action',await page.getByRole('button',{name:'Restart Skyloom',exact:true}).isVisible());
-  await page.evaluate(()=>window.__betaContext.restoreContext());await page.getByRole('button',{name:'Resume flight',exact:true}).click();
+  await page.evaluate(()=>window.__betaContext.restoreContext());await press(page.getByRole('button',{name:'Resume flight',exact:true}));
   check('restored graphics resume through an explicit action',await page.getByRole('alertdialog',{name:'Graphics recovery'}).count()===0);
   await context.close();
   const phone=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:1});await attachFixture(phone);
   await phone.addInitScript(pin=>{window.__flyTileFixture=pin;localStorage.setItem('fly-quality-tier','low');Object.defineProperty(navigator,'webdriver',{get:()=>false});},fixturePin(fixture.url));
   const p=await phone.newPage();p.setDefaultTimeout(90000);p.on('pageerror',e=>errors.push(e.message));await p.goto(base+'/'+(flags?'?flags='+encodeURIComponent(flags):''),{waitUntil:'domcontentloaded'});await p.getByTestId('title-explore').waitFor({timeout:60000});
   check('phone viewport title has no horizontal overflow',await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
-  await p.getByTestId('title-settings').click();await p.getByLabel('Steering sensitivity',{exact:true}).waitFor();
+  await press(p.getByTestId('title-settings'));await p.getByLabel('Steering sensitivity',{exact:true}).waitFor();
   check('phone settings have no manual condition controls',await p.getByTestId('conditions-panel').count()===0);
-  check('ordinary players retain visual choices without review or automation exceptions',await p.getByTestId('settings-visuals-classic').isVisible()&&await p.getByTestId('settings-visuals-enhanced').isVisible());
+  // SHIP PASS RL-3 (D11, PLAYER_SURFACE on): an ordinary player gets one look,
+  // so the Visuals and Map style rows are gone outside review and automation.
+  check('ordinary players get one look: no Visuals or Map style rows',await p.getByTestId('settings-visuals').count()===0&&await p.getByTestId('settings-visuals-classic').count()===0&&await p.getByTestId('settings-style-toy').count()===0);
   await p.screenshot({path:path.join(OUT,'settings-phone.png'),timeout:30000});
-  await p.getByTestId('settings-close').click();await p.getByTestId('title-explore').click();await p.getByTestId('hangar').waitFor();await p.screenshot({path:path.join(OUT,'prepare-phone.png'),timeout:30000});
+  await press(p.getByTestId('settings-close'));await press(p.getByTestId('title-explore'));await p.getByTestId('hangar').waitFor();await p.screenshot({path:path.join(OUT,'prepare-phone.png'),timeout:30000});
   check('phone preparation supports the same destination flow',await p.getByTestId('hangar-mode').getAttribute('data-mode')==='free');
   check('production browser has no uncaught errors',errors.length===0,errors);
   await phone.close();
  }catch(e){rows.push({name:'smoke completed',ok:false,detail:e.stack});console.error(e.message);if(page&&!page.isClosed()){await page.screenshot({path:path.join(OUT,'failure.png'),timeout:10000}).catch(()=>{});const state=await page.evaluate(()=>({boot:window.__flyBoot,loading:window.__fly?.worldLoading,phase:window.__flyStore?.getState().phase,camera:window.__flyStore?.getState().cameraMode,screen:window.__flyStore?.getState().screen})).catch(()=>null);console.error('Failure state',state);}process.exitCode=1;}
- finally{await browser?.close();await fixture?.close();server?.kill();writeFileSync(path.join(OUT,'production-server.log'),log);writeFileSync(path.join(OUT,'smoke.json'),JSON.stringify({at:new Date().toISOString(),venue:renderer+'; phone viewport emulated',flags,rows},null,2));}
+ finally{await browser?.close();await fixture?.close();server?.kill();writeFileSync(path.join(OUT,'production-server.log'),log);writeFileSync(path.join(OUT,'smoke.json'),JSON.stringify({at:new Date().toISOString(),venue:renderer+'; phone viewport emulated',input:software?'dom (software GL)':'trusted',presses,flags,rows},null,2));}
 })();
