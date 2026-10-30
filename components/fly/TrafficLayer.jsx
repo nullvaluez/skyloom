@@ -33,6 +33,7 @@ import { TouchdownSmoke } from '@/lib/fly/fleet-smoke';
 import { FLEET_VIEW } from '@/lib/fly/observation-config';
 import { getR25Sky } from '@/lib/fly/r25-sky';
 import { worldToSite } from '@/lib/fly/lounge-site';
+import { createTrafficOperatorPaint, attachTrafficOperatorPaint, detachTrafficOperatorPaint, bindTrafficOperatorGeometry, writeTrafficOperatorPaint } from '@/lib/fly/traffic-operator-paint';
 
 // Upload only the instances that will be drawn. A full-capacity upload of
 // every pool every frame was ~0.5 MB of buffer traffic for a handful of
@@ -158,6 +159,15 @@ export function TrafficLayer({ runtime, flight, origin }) {
       }),
     []
   );
+  useEffect(() => {
+    const paint = createTrafficOperatorPaint();
+    if (!paint) return;
+    meshes.forEach((mesh, archetype) => attachTrafficOperatorPaint(mesh, archetype, paint, TRAFFIC.maxPerArchetype));
+    return () => {
+      meshes.forEach(detachTrafficOperatorPaint);
+      paint.dispose();
+    };
+  }, [meshes]);
 
   const billboards = useMemo(() => {
     const material = new MeshBasicMaterial({
@@ -234,6 +244,7 @@ export function TrafficLayer({ runtime, flight, origin }) {
         if (!geo || !mesh) return;
         mesh.geometry.dispose();
         mesh.geometry = geo;
+        bindTrafficOperatorGeometry(mesh);
         mesh.material.vertexColors = true;
         mesh.material.needsUpdate = true;
         mesh._isModel = true;
@@ -397,6 +408,7 @@ export function TrafficLayer({ runtime, flight, origin }) {
         projectModelMatrix(_dummy.matrix,1/Math.cos(it.fix1.latRad));
         mesh.setMatrixAt(mesh._used, _dummy.matrix);
         mesh.setColorAt(mesh._used, _color);
+        writeTrafficOperatorPaint(mesh, it, mesh._used, mapStyleNow === 'satellite');
         mesh._used += 1;
         // GLB / primitive archetypes: their shader carries the navigation
         // lights (applyNavLights); add the anti-collision beacon and strobes.
@@ -438,6 +450,7 @@ export function TrafficLayer({ runtime, flight, origin }) {
       mesh.count = mesh._used;
       uploadPrefix(mesh.instanceMatrix, mesh._used);
       if (mesh.instanceColor) uploadPrefix(mesh.instanceColor, mesh._used);
+      uploadPrefix(mesh.userData.operatorAttribute, mesh._used);
     }
     const exposure = getR25Sky().exposure || 1;
     // GATE TO GATE: the player's own lights and tyre smoke join the shared

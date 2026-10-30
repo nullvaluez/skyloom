@@ -1,0 +1,328 @@
+{
+  "flag": true,
+  "cards": [
+    {
+      "callsign": "DAL123",
+      "scheme": "Delta Air Lines",
+      "id": "b737"
+    },
+    {
+      "callsign": "SWA123",
+      "scheme": "Southwest Airlines",
+      "id": "b737"
+    },
+    {
+      "callsign": "UAL123",
+      "scheme": "United Airlines",
+      "id": "b737"
+    },
+    {
+      "callsign": "AAL123",
+      "scheme": "American Airlines",
+      "id": "b777"
+    },
+    {
+      "callsign": "FDX123",
+      "scheme": "FedEx Express",
+      "id": "b767"
+    },
+    {
+      "callsign": "UPS123",
+      "scheme": "UPS Airlines",
+      "id": "b767"
+    },
+    {
+      "callsign": "RCH123",
+      "scheme": "U.S. Air Force",
+      "id": "c17"
+    },
+    {
+      "callsign": "RRR123",
+      "scheme": "Royal Air Force",
+      "id": "c130"
+    },
+    {
+      "callsign": "ZZZ123",
+      "scheme": "Neutral / unknown",
+      "id": "a320"
+    }
+  ],
+  "compiled": [
+    "a320:hero",
+    "a320:mid",
+    "a320:far",
+    "b737:hero",
+    "b737:mid",
+    "b737:far",
+    "a330:hero",
+    "a330:mid",
+    "a330:far",
+    "a350:hero",
+    "a350:mid",
+    "a350:far",
+    "b777:hero",
+    "b777:mid",
+    "b777:far",
+    "b787:hero",
+    "b787:mid",
+    "b787:far",
+    "b747:hero",
+    "b747:mid",
+    "b747:far",
+    "a380:hero",
+    "a380:mid",
+    "a380:far",
+    "crj:hero",
+    "crj:mid",
+    "crj:far",
+    "ejet:hero",
+    "ejet:mid",
+    "ejet:far",
+    "atr:hero",
+    "atr:mid",
+    "atr:far",
+    "dash8:hero",
+    "dash8:mid",
+    "dash8:far",
+    "business:hero",
+    "business:mid",
+    "business:far",
+    "piston:hero",
+    "piston:mid",
+    "piston:far",
+    "twin:hero",
+    "twin:mid",
+    "twin:far",
+    "helicopter:hero",
+    "helicopter:mid",
+    "helicopter:far",
+    "lowwing-piston:hero",
+    "lowwing-piston:mid",
+    "lowwing-piston:far",
+    "single-turboprop:hero",
+    "single-turboprop:mid",
+    "single-turboprop:far",
+    "twin-utility:hero",
+    "twin-utility:mid",
+    "twin-utility:far",
+    "b757:hero",
+    "b757:mid",
+    "b757:far",
+    "b767:hero",
+    "b767:mid",
+    "b767:far",
+    "a300:hero",
+    "a300:mid",
+    "a300:far",
+    "erj:hero",
+    "erj:mid",
+    "erj:far",
+    "md80:hero",
+    "md80:mid",
+    "md80:far",
+    "a220:hero",
+    "a220:mid",
+    "a220:far",
+    "c130:hero",
+    "c130:mid",
+    "c130:far",
+    "k35r:hero",
+    "k35r:mid",
+    "k35r:far",
+    "c17:hero",
+    "c17:mid",
+    "c17:far",
+    "md11:hero",
+    "md11:mid",
+    "md11:far",
+    "military:primitive",
+    "military:glb"
+  ],
+  "errors": [],
+  "drawCalls": 194,
+  "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "sample": [
+    214,
+    216,
+    217,
+    255
+  ],
+  "programs": [
+    {
+      "name": "fleet:a320:depth",
+      "runnable": true
+    },
+    {
+      "name": "fleet:a320",
+      "runnable": true
+    },
+    {
+      "name": "fleet:a320:depth",
+      "runnable": true
+    },
+    {
+      "name": "",
+      "runnable": true
+    }
+  ],
+  "control": {
+    "flag": false,
+    "cards": [],
+    "compiled": [
+      "a320:hero",
+      "a320:mid",
+      "a320:far",
+      "b737:hero",
+      "b737:mid",
+      "b737:far",
+      "a330:hero",
+      "a330:mid",
+      "a330:far",
+      "a350:hero",
+      "a350:mid",
+      "a350:far",
+      "b777:hero",
+      "b777:mid",
+      "b777:far",
+      "b787:hero",
+      "b787:mid",
+      "b787:far",
+      "b747:hero",
+      "b747:mid",
+      "b747:far",
+      "a380:hero",
+      "a380:mid",
+      "a380:far",
+      "crj:hero",
+      "crj:mid",
+      "crj:far",
+      "ejet:hero",
+      "ejet:mid",
+      "ejet:far",
+      "atr:hero",
+      "atr:mid",
+      "atr:far",
+      "dash8:hero",
+      "dash8:mid",
+      "dash8:far",
+      "business:hero",
+      "business:mid",
+      "business:far",
+      "piston:hero",
+      "piston:mid",
+      "piston:far",
+      "twin:hero",
+      "twin:mid",
+      "twin:far",
+      "helicopter:hero",
+      "helicopter:mid",
+      "helicopter:far",
+      "lowwing-piston:hero",
+      "lowwing-piston:mid",
+      "lowwing-piston:far",
+      "single-turboprop:hero",
+      "single-turboprop:mid",
+      "single-turboprop:far",
+      "twin-utility:hero",
+      "twin-utility:mid",
+      "twin-utility:far",
+      "b757:hero",
+      "b757:mid",
+      "b757:far",
+      "b767:hero",
+      "b767:mid",
+      "b767:far",
+      "a300:hero",
+      "a300:mid",
+      "a300:far",
+      "erj:hero",
+      "erj:mid",
+      "erj:far",
+      "md80:hero",
+      "md80:mid",
+      "md80:far",
+      "a220:hero",
+      "a220:mid",
+      "a220:far",
+      "c130:hero",
+      "c130:mid",
+      "c130:far",
+      "k35r:hero",
+      "k35r:mid",
+      "k35r:far",
+      "c17:hero",
+      "c17:mid",
+      "c17:far",
+      "md11:hero",
+      "md11:mid",
+      "md11:far",
+      "military:primitive",
+      "military:glb"
+    ],
+    "errors": [],
+    "drawCalls": 194,
+    "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "sample": [
+      130,
+      136,
+      162,
+      255
+    ],
+    "programs": [
+      {
+        "name": "fleet:a320:depth",
+        "runnable": true
+      },
+      {
+        "name": "fleet:a320",
+        "runnable": true
+      },
+      {
+        "name": "fleet:a320:depth",
+        "runnable": true
+      },
+      {
+        "name": "",
+        "runnable": true
+      }
+    ]
+  },
+  "pixelChecks": [
+    {
+      "callsign": "DAL123",
+      "changed": true
+    },
+    {
+      "callsign": "SWA123",
+      "changed": true
+    },
+    {
+      "callsign": "UAL123",
+      "changed": true
+    },
+    {
+      "callsign": "AAL123",
+      "changed": true
+    },
+    {
+      "callsign": "FDX123",
+      "changed": true
+    },
+    {
+      "callsign": "UPS123",
+      "changed": true
+    },
+    {
+      "callsign": "RCH123",
+      "changed": true
+    },
+    {
+      "callsign": "RRR123",
+      "changed": true
+    },
+    {
+      "callsign": "ZZZ123",
+      "changed": false
+    }
+  ]
+}

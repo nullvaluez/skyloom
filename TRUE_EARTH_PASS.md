@@ -34,6 +34,11 @@ A flag's default flips to `true` in its own one-line commit after its run list p
 
 ### Flags
 
+2026-10-30 addition: `OPERATOR_LIVERIES` is built on `main`, **off by default**.
+`?flags=OPERATOR_LIVERIES` previews callsign-matched airline and military paint.
+See [FLY_OPERATOR_LIVERIES.md](FLY_OPERATOR_LIVERIES.md) for coverage, verification
+and the desktop/iPhone run list.
+
 | Flag | Phase | Default | What it changes | Gate |
 |---|---|---|---|---|
 | `TWILIGHT_FIX` | 0 | off | Sun disc and halo stay on the real sun at sunset; the moon gets its own disc; the key light switches sun→moon at −4° under an intensity dip instead of dragging the "sun" up the sky | `verify-twilight.mjs` 6/6 |
