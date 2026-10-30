@@ -62,11 +62,18 @@
  *            that boot's ?flags=, default AERIAL_CLARITY)
  *            --alts=5000,6000,7500,8500,10000   --depression=20  --crop=0.16
  *            --fadeStartM=4500 --fadeEndM=5000 (the city-fade arm's pin)
- *            --width=960 --height=600 --quality=high --settle=4000
- *            --firstSharp=240000 (a boot group's first pose: the far warp
- *            from the spawn streams Manhattan from nothing)
- *            --sharpTimeout=60000 --bootWait=90000 --legTimeout=300000
- *            --out=.graphics-review/ship-pass/sky/veil
+ *            --width --height (default 1280x800 live, 480x300 on the fixture:
+ *            this venue renders one Enhanced High 960x600 frame in ~30 s, so a
+ *            capture cost ~80 s and five altitudes did not fit a lock hold)
+ *            --quality=high --settle=4000
+ *            --firstSharp (a boot group's first pose, after the far warp from
+ *            the spawn; default 240000 live, 45000 on the fixture, whose
+ *            terrain sat at z7 of a z16 target after 550 s here and never
+ *            reports sharp) --sharpTimeout (60000 live, 20000 fixture)
+ *            --bootWait=90000 --legTimeout=300000 --out=.graphics-review/ship-pass/sky/veil
+ * Altitudes are MEASURED in priority order (8,500 and 6,000 ft first: the
+ * veil's own comparison, then 10,000 / 7,500 / 5,000), so a run cut short by
+ * a lock hold still carries the deciding rows; the table is ascending.
  * Writes veil.json, veil.md (the table) and one PNG per arm and altitude.
  * Exit code 0 when every requested, measurable cell was captured.
  */
@@ -86,21 +93,23 @@ const { attachFixture, fixturePin } = require('./_fixture');
 
 const url = (args.url || process.env.FLY_URL || 'http://localhost:3132').replace(/\/$/, '');
 const out = path.resolve(args.out || '.graphics-review/ship-pass/sky/veil');
-const viewport = { width: Number(args.width || 960), height: Number(args.height || 600) };
+const viewport = FIXTURE ? { width: Number(args.width || 480), height: Number(args.height || 300) } : { width: Number(args.width || 1280), height: Number(args.height || 800) };
 const quality = args.quality || 'high';
 const settleMs = Number(args.settle || 4000);
 const legTimeout = Number(args.legTimeout || 300000);
 // terrain `sharp` and the streamers are waited on with their own, shorter cap:
 // at SwiftShader's 1-3 fps a settle that never reports sharp would otherwise
 // spend the whole leg timeout per pose (the first fixture run lost 300 s a pose).
-const sharpTimeout = Number(args.sharpTimeout || 60000);
-const firstSharp = Number(args.firstSharp || 240000);
+const sharpTimeout = Number(args.sharpTimeout || (FIXTURE ? 20000 : 60000));
+const firstSharp = Number(args.firstSharp || (FIXTURE ? 45000 : 240000));
 const bootWait = Number(args.bootWait || 90000);
 const T0 = Date.now();
 const log = (...m) => console.log(`[+${Math.round((Date.now() - T0) / 1000)}s]`, ...m);
 const depressionDeg = Number(args.depression || 20);
 const cropK = Number(args.crop || 0.16);
 const ALTS_FT = String(args.alts || '5000,6000,7500,8500,10000').split(',').map(Number);
+const PRIORITY = [8500, 6000, 10000, 7500, 5000];
+const RUN_ORDER = [...ALTS_FT].sort((a, b) => (PRIORITY.indexOf(a) + 1 || 99) - (PRIORITY.indexOf(b) + 1 || 99));
 const FT = 0.3048;
 const MIDTOWN = { lat: 40.7549, lon: -73.984 };
 const APPROACH_DEG = 22; // the aircraft sits SSW of Midtown and flies NNE at it
@@ -419,7 +428,7 @@ async function runBootGroup(browser, group) {
       }
       report.arms[lead] = { applied };
     }
-    for (const [li, altFt] of ALTS_FT.entries()) {
+    for (const [li, altFt] of RUN_ORDER.entries()) {
       const p = poseFor(altFt);
       log(`  ${group} ${altFt} ft: aircraft ${(p.dM / 1000).toFixed(2)} km from Midtown`);
       try {

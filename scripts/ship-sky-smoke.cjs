@@ -19,8 +19,10 @@
  *
  *   FLY_URL=http://localhost:3132 FLY_TILE_FIXTURE=1 node scripts/ship-sky-smoke.cjs
  *   options: --arms=off,on  --poses=noon,night,medium  --out=.graphics-review/ship-pass/sky/smoke
- *            --width=960 --height=600 --legTimeout=300000 --settle=4000 --sharpTimeout=60000
- *            --firstSharp=240000 (an arm's first pose, after the far warp) --bootWait=90000
+ *            --width --height (1280x800 live, 480x300 on the fixture: see
+ *            ship-sky-veil.cjs) --legTimeout=300000 --settle=4000 --bootWait=90000
+ *            --firstSharp (an arm's first pose, after the far warp; 240000 live,
+ *            45000 fixture) --sharpTimeout (60000 live, 20000 fixture)
  */
 const { chromium } = require('playwright');
 const fs = require('node:fs');
@@ -36,12 +38,12 @@ const { attachFixture, fixturePin } = require('./_fixture');
 
 const url = (args.url || process.env.FLY_URL || 'http://localhost:3132').replace(/\/$/, '');
 const out = path.resolve(args.out || '.graphics-review/ship-pass/sky/smoke');
-const viewport = { width: Number(args.width || 960), height: Number(args.height || 600) };
+const viewport = FIXTURE ? { width: Number(args.width || 480), height: Number(args.height || 300) } : { width: Number(args.width || 1280), height: Number(args.height || 800) };
 const legTimeout = Number(args.legTimeout || 300000);
 const settleMs = Number(args.settle || 4000);
 // Terrain `sharp` gets its own shorter cap (SwiftShader: see ship-sky-veil.cjs).
-const sharpTimeout = Number(args.sharpTimeout || 60000);
-const firstSharp = Number(args.firstSharp || 240000);
+const sharpTimeout = Number(args.sharpTimeout || (FIXTURE ? 20000 : 60000));
+const firstSharp = Number(args.firstSharp || (FIXTURE ? 45000 : 240000));
 const bootWait = Number(args.bootWait || 90000);
 const T0 = Date.now();
 const log = (...m) => console.log(`[+${Math.round((Date.now() - T0) / 1000)}s]`, ...m);
