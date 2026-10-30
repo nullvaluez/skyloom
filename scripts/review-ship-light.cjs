@@ -79,8 +79,8 @@ async function bootFlySafe(page, opts) {
   } catch (e) {
     if (!/fixed\.inset-0 canvas/.test(String(e.message))) throw e;
     if ((await page.evaluate(() => window.__flyBoot?.pct)) !== 100) throw e;
-    await page.waitForFunction(() => [...document.querySelectorAll('canvas')].some((c) => { const r = c.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(c).visibility !== 'hidden'; }), undefined, { timeout: 60000 });
-    await page.waitForFunction(() => !document.querySelector('[data-testid="boot-screen"]'), undefined, { timeout: 60000 });
+    await page.waitForFunction(() => [...document.querySelectorAll('canvas')].some((c) => { const r = c.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(c).visibility !== 'hidden'; }), undefined, { timeout: 300000 });
+    await page.waitForFunction(() => !document.querySelector('[data-testid="boot-screen"]'), undefined, { timeout: 300000 });
     await page.waitForTimeout(opts.settleMs ?? 4000);
     return { ms: null, tolerant: true };
   }

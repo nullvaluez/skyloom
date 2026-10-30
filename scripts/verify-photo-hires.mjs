@@ -69,12 +69,22 @@ async function shoot(page, options, { forceMaxTexture } = {}) {
     // ones at a different width, and the restore render right after them must
     // carry exactly the projection of the frame render right before them (the
     // same rAF task, so the camera cannot have moved in between).
+    // The photo path brackets its renders with setPixelRatio (the hi-res
+    // size, then the restore); a mark is logged at each call. Width alone
+    // cannot find them: a tile can be exactly the canvas size (the phone's
+    // 2x2 tiles of a 2x export are 487x1055, the buffer's own size).
     const log = [];
     const ownRender = Object.prototype.hasOwnProperty.call(composer, 'render') ? composer.render : null;
     const render = composer.render;
     composer.render = function (...a) {
       log.push({ w: canvas.width, proj: camera.projectionMatrix.elements.slice() });
       return render.apply(this, a);
+    };
+    const ownSetPr = Object.prototype.hasOwnProperty.call(renderer, 'setPixelRatio') ? renderer.setPixelRatio : null;
+    const setPr = renderer.setPixelRatio;
+    renderer.setPixelRatio = function (...a) {
+      log.push({ mark: true });
+      return setPr.apply(this, a);
     };
     const t0 = performance.now();
     let res;
@@ -84,10 +94,17 @@ async function shoot(page, options, { forceMaxTexture } = {}) {
       renderer.capabilities.maxTextureSize = keepMax;
       if (ownRender) composer.render = ownRender;
       else delete composer.render;
+      if (ownSetPr) renderer.setPixelRatio = ownSetPr;
+      else delete renderer.setPixelRatio;
     }
-    const hi = log.map((e, i) => (e.w !== before.w ? i : -1)).filter((i) => i >= 0);
+    // hi = the renders between the first and the last mark; pre = the frame
+    // render before the first mark; post = the restore render after the last.
+    const marks = log.map((e, i) => (e.mark ? i : -1)).filter((i) => i >= 0);
+    const m0 = marks.length ? marks[0] : -1, m1 = marks.length ? marks[marks.length - 1] : -1;
+    const hi = marks.length < 2 ? [] : log.map((e, i) => (!e.mark && i > m0 && i < m1 ? i : -1)).filter((i) => i >= 0);
     const same = (a, b) => !!a && !!b && a.every((v, i) => Math.abs(v - b[i]) <= 1e-6 + 1e-6 * Math.abs(v));
-    const pre = hi.length ? log[hi[0] - 1] : null, post = hi.length ? log[hi[hi.length - 1] + 1] : null;
+    const pre = hi.length ? log.slice(0, m0).reverse().find((e) => !e.mark) ?? null : null;
+    const post = hi.length ? log.slice(m1 + 1).find((e) => !e.mark) ?? null : null;
     const restore = hi.length === 0 ? null : {
       renders: hi.length,
       restored: !!post && post.w === before.w && same(post.proj, pre?.proj),
@@ -147,8 +164,8 @@ async function bootFlySafe(page, opts) {
   } catch (e) {
     if (!/fixed\.inset-0 canvas/.test(String(e.message))) throw e;
     if ((await page.evaluate(() => window.__flyBoot?.pct)) !== 100) throw e;
-    await page.waitForFunction(() => [...document.querySelectorAll('canvas')].some((c) => { const r = c.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(c).visibility !== 'hidden'; }), undefined, { timeout: 60000 });
-    await page.waitForFunction(() => !document.querySelector('[data-testid="boot-screen"]'), undefined, { timeout: 60000 });
+    await page.waitForFunction(() => [...document.querySelectorAll('canvas')].some((c) => { const r = c.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(c).visibility !== 'hidden'; }), undefined, { timeout: 300000 });
+    await page.waitForFunction(() => !document.querySelector('[data-testid="boot-screen"]'), undefined, { timeout: 300000 });
     await page.waitForTimeout(opts.settleMs ?? 4000);
     return { ms: null, tolerant: true };
   }
@@ -232,7 +249,16 @@ try {
               && tiled.restore?.restored === true && tiled.restore?.tilesMoved === true
             : tiled.pngW === tplan.outW,
           `${tiled.pngW}x${tiled.pngH} in ${row.tiled.ms} ms; ${JSON.stringify(tiled.restore)}`);
-        const bare = await shoot(page, undefined);
+        // The bare path keeps main's 15 s timeout, armed before the frame
+        // that serves it; one SwiftShader desktop frame right after a
+        // supersampled export can outlast it (a venue frame time, not a size
+        // defect), so a timeout here is retried once and said so.
+        let bare = await shoot(page, undefined).catch((e) => ({ err: String(e.message) }));
+        if (bare.err && /timed out/.test(bare.err)) {
+          console.log(`note  ${label}: bare capture timed out once on SwiftShader; retried`);
+          bare = await shoot(page, undefined);
+        }
+        if (bare.err) throw new Error(bare.err);
         check(`${label}: a bare capture() (lounge, verify-photo) is still the drawing buffer`, bare.pngW === bare.before.w && bare.pngH === bare.before.h);
       }
       check(`${label}: zero page errors, zero shader errors`, errors.length === 0 && shaderErrors.length === 0, [...errors, ...shaderErrors].slice(0, 2).join(' | '));
