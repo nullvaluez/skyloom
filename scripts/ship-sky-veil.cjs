@@ -59,7 +59,7 @@
  *            --alts=5000,6000,7500,8500,10000   --depression=20  --crop=0.16
  *            --fadeStartM=4500 --fadeEndM=5000 (the city-fade arm's pin)
  *            --width=960 --height=600 --quality=high --settle=4000
- *            --legTimeout=300000 --out=.graphics-review/ship-pass/sky/veil
+ *            --sharpTimeout=120000 --legTimeout=300000 --out=.graphics-review/ship-pass/sky/veil
  * Writes veil.json, veil.md (the table) and one PNG per arm and altitude.
  * Exit code 0 when every requested, measurable cell was captured.
  */
@@ -83,6 +83,10 @@ const viewport = { width: Number(args.width || 960), height: Number(args.height 
 const quality = args.quality || 'high';
 const settleMs = Number(args.settle || 4000);
 const legTimeout = Number(args.legTimeout || 300000);
+// terrain `sharp` and the streamers are waited on with their own, shorter cap:
+// at SwiftShader's 1-3 fps a settle that never reports sharp would otherwise
+// spend the whole leg timeout per pose (the first fixture run lost 300 s a pose).
+const sharpTimeout = Number(args.sharpTimeout || 120000);
 const depressionDeg = Number(args.depression || 20);
 const cropK = Number(args.crop || 0.16);
 const ALTS_FT = String(args.alts || '5000,6000,7500,8500,10000').split(',').map(Number);
@@ -280,14 +284,18 @@ async function settle(page) {
   const t0 = Date.now(), ready = {};
   const wait = async (name, fn, ms) => { try { await page.waitForFunction(fn, undefined, { timeout: ms, polling: 1000 }); ready[name] = true; } catch { ready[name] = false; } };
   await wait('worldLoading', () => !window.__fly.worldLoading, legTimeout);
-  await wait('terrainSharp', () => window.__fly.terraStats?.sharp === true, legTimeout);
+  await wait('terrainSharp', () => (window.__fly.terraStats ?? window.__fly.engine?.terraStats)?.sharp === true, Math.min(legTimeout, sharpTimeout));
   await wait('streamers', () => {
     const rt = window.__fly;
     return ['satBuildings', 'satRoads', 'satSkyline', 'satVeg'].every((k) => {
       const s = rt[k]?.stats;
       return !s || ['queued', 'building', 'sampling'].every((f) => Number(s[f] ?? 0) === 0);
     });
-  }, legTimeout);
+  }, Math.min(legTimeout, sharpTimeout));
+  ready.terra = await page.evaluate(() => {
+    const t = window.__fly.terraStats ?? window.__fly.engine?.terraStats;
+    return t ? { sharp: t.sharp, reason: t.sharpReason ?? null, camTileZ: t.camTileZ, targetZ: t.targetZ, downloading: t.downloading } : null;
+  });
   await page.waitForTimeout(settleMs);
   ready.ms = Date.now() - t0;
   return ready;
@@ -345,10 +353,25 @@ async function capture(page, arm, altFt, pts) {
   };
 }
 
+// Both city arms ride one pin object and one publisher (CITY's
+// `__flyCityDiagApplied`): once a booted tree has said it does not honour
+// `window.__flyCityDiag`, the other city arm is pending without its own boot.
+let cityHonoured = null;
+const markPending = (arm, why) => {
+  report.arms[arm] = { applied: false };
+  for (const a of ALTS_FT) report.arms[arm][a] = { pending: 'pending merged tree' };
+  console.log(`  ${arm}: ${why} — pending merged tree`);
+  save();
+};
+
 async function runBootGroup(browser, group) {
   const arms = wanted.filter((a) => ARMS[a].boot === group);
   if (!arms.length) return;
   const lead = arms[0];
+  if (ARMS[lead].cityPin && cityHonoured === false) {
+    markPending(lead, 'this tree does not honour window.__flyCityDiag (seen on the first city boot)');
+    return;
+  }
   console.log(`BOOT ${group} (${arms.join(', ')})`);
   let page;
   try {
@@ -357,13 +380,12 @@ async function runBootGroup(browser, group) {
     if (ARMS[lead].cityPin) {
       await page.waitForTimeout(3000);
       const applied = await page.evaluate(() => window.__flyCityDiagApplied === true);
-      report.arms[lead] = { applied };
+      cityHonoured = applied;
       if (!applied) {
-        for (const a of ALTS_FT) report.arms[lead][a] = { pending: 'pending merged tree' };
-        console.log(`  ${lead}: this tree does not honour window.__flyCityDiag (no __flyCityDiagApplied) — pending merged tree`);
-        save();
+        markPending(lead, 'this tree does not honour window.__flyCityDiag (no __flyCityDiagApplied after boot)');
         return;
       }
+      report.arms[lead] = { applied };
     }
     for (const altFt of ALTS_FT) {
       const p = poseFor(altFt);

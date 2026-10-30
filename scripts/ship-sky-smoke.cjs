@@ -19,7 +19,7 @@
  *
  *   FLY_URL=http://localhost:3132 FLY_TILE_FIXTURE=1 node scripts/ship-sky-smoke.cjs
  *   options: --arms=off,on  --poses=noon,night,medium  --out=.graphics-review/ship-pass/sky/smoke
- *            --width=960 --height=600 --legTimeout=300000 --settle=4000
+ *            --width=960 --height=600 --legTimeout=300000 --settle=4000 --sharpTimeout=120000
  */
 const { chromium } = require('playwright');
 const fs = require('node:fs');
@@ -38,6 +38,8 @@ const out = path.resolve(args.out || '.graphics-review/ship-pass/sky/smoke');
 const viewport = { width: Number(args.width || 960), height: Number(args.height || 600) };
 const legTimeout = Number(args.legTimeout || 300000);
 const settleMs = Number(args.settle || 4000);
+// Terrain `sharp` gets its own shorter cap (SwiftShader: see ship-sky-veil.cjs).
+const sharpTimeout = Number(args.sharpTimeout || 120000);
 const FT = 0.3048;
 const MIDTOWN = { lat: 40.7549, lon: -73.984 };
 const ARMS = { off: '', on: 'REAL_MOON,AERIAL_CLARITY,SKY_LITE' };
@@ -129,9 +131,13 @@ async function place(page, p) {
 
 async function settle(page) {
   const ready = {};
-  const wait = async (name, fn) => { try { await page.waitForFunction(fn, undefined, { timeout: legTimeout, polling: 1000 }); ready[name] = true; } catch { ready[name] = false; } };
+  const wait = async (name, fn, ms = legTimeout) => { try { await page.waitForFunction(fn, undefined, { timeout: ms, polling: 1000 }); ready[name] = true; } catch { ready[name] = false; } };
   await wait('worldLoading', () => !window.__fly.worldLoading);
-  await wait('terrainSharp', () => window.__fly.terraStats?.sharp === true);
+  await wait('terrainSharp', () => (window.__fly.terraStats ?? window.__fly.engine?.terraStats)?.sharp === true, Math.min(legTimeout, sharpTimeout));
+  ready.terra = await page.evaluate(() => {
+    const t = window.__fly.terraStats ?? window.__fly.engine?.terraStats;
+    return t ? { sharp: t.sharp, reason: t.sharpReason ?? null, camTileZ: t.camTileZ, targetZ: t.targetZ, downloading: t.downloading } : null;
+  });
   // The sun is re-solved on a 2 s cadence: give the pinned instant time to land.
   await page.waitForTimeout(settleMs);
   return ready;
