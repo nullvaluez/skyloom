@@ -1,7 +1,9 @@
 # Ship Pass — plan and record (2026-10-30)
 
-Status: **W0 landed 2026-10-30 in the cloud venue (section 4.1); the five
-streams are running in worktrees (section 3.8).** This file is the plan, the requirements
+Status: **MERGED to `main` 2026-10-30 with every flag ON, at the owner's
+request, while the streams were still verifying (section 8.5 is the merge
+record). No look flag has had its 5080 motion check: the section 9 run list is
+the first real-hardware read.** W0 landed in the cloud venue (section 4.1). This file is the plan, the requirements
 and (as the pass runs) the record for a five-agent parallel pass, in the
 FLY_PLAY_PASS.md format. Each stream adds its report under "Stream reports"
 in its first commit and updates it on every landing.
@@ -688,6 +690,111 @@ default flags, `verify-ops-golden`, and a 5080 still diff.
 - Update the CLAUDE.md banner.
 - Update EXPLORER_BETA.md's evidence ledger rows.
 - Push only when the owner asks.
+
+### 8.5 Merge to main (2026-10-30, the lead, cloud venue)
+
+The owner asked, mid-pass, to "merge to main and turn the flags off so the
+features are enabled". The lead stopped the five stream agents and merged
+their COMMITTED heads, without the remaining browser evidence, the 3.7
+cross-review or the 8.3 cleanup wave.
+
+**What merged** (`--no-ff`, onto W0 `940b751`, zero conflicts between streams):
+FRAME `c749b4a`, SKY `fbb3a28`, CITY `594c516`, LIGHT `bba7809`, RELEASE
+`8a60f9e`; then the owner's `75afafa` (laptop controls), which had landed on
+`origin/main` after W0. One conflict: `FlyMode.jsx`. The owner's commit removed
+the small-window `mobileNote` banner and the streams had put the SHIP PASS
+RELEASE / FRAME mount blocks next to it. Resolved by keeping both: the banner
+is gone and the mount blocks stay.
+
+**Flags: all 21 ship `enabled:true`.** That is the 20 Ship Pass blocks (FRAME
+SHADER_READY, PACE_ADAPT, DEVICE_POLICY, ULTRA_SUPERSAMPLE; SKY AERIAL_CLARITY,
+REAL_MOON, SKY_LITE; CITY CITY_RANGE, NIGHT_LITE, NIGHT_RHYTHM; LIGHT
+TERRAIN_SHADOW, TRAFFIC_SHADOWS, AIRFRAME_SHADOW, SHADOW_REACH, PHOTO_HIRES,
+HANGAR_EXPOSURE; RELEASE CHALLENGE_LAYER, DEEP_LINKS, ANALYTICS_V2,
+OFFLINE_SHELL) plus PLAYER_SURFACE. Sub-switches keep the streams' values
+(e.g. `PACE_ADAPT.turn` stays off). This waives the 3.6 motion bar by the
+owner's call, so every look flag is unproven on real hardware.
+`?flags=-NAME` restores the pre-pass behaviour for one page load. A first
+merge commit (`fd0a334`) shipped them all off; it was a misreading of the
+request and is superseded by the merge commit that turns them on.
+
+**Lead fixes at the merge:**
+- `scripts/_ship-pass-base.mjs`: the stream gates' identity base is the W0
+  commit. `merge-base HEAD main` became HEAD once the streams were in main, so
+  FRAME's W0 rows broke and CITY's / LIGHT's compared the tree with itself.
+- The stream gates were re-premised for flags shipping on: off arms now pin
+  the flag off rather than reading the shipped state, and "ships off" rows
+  read "ships on". No assertion was removed; each re-premise had an
+  independent reviewer looking for a weakened row.
+- Flag leaks found by the merge audit: the Atlas destination card rendered an
+  empty Copy-link wrapper with DEEP_LINKS off, and ReleaseAnalytics evaluated
+  `deviceClassOf()` (a throwaway WebGL context) with ANALYTICS_V2 off.
+- `beta-smoke.cjs`: evidence screenshots get the software-GL allowance and are
+  non-fatal on software GL only. CI run 51 failed on a 30 s screenshot
+  timeout while every check before it had passed.
+
+**Verification at the merge (venue: fixture + SwiftShader, no device numbers):**
+- `node scripts/ship-pass-gates.mjs --require-stream-gates
+  --also=verify-laptop-controls.mjs`: 38 PASS, 0 FAIL, 0 known reds, 1 SKIP
+  (seam rule, lead tree). Stream gates: FRAME 56/0, SKY 49/0, CITY 49/0,
+  LIGHT 67/0, RELEASE 83/0.
+- With every flag pinned off, the off arms still reproduce W0. CITY: the
+  architecture programs and the NIGHT_LIGHTS text match `940b751`'s sha, and
+  worker output is byte-identical over 48 fixture builds. SKY: the program
+  texts match W0's sha. LIGHT and FRAME: the same, pinned.
+- `next build`: compiled, no errors (one warning: `metadataBase` unset, see
+  RL-5 below).
+- Production boot (`verify-ship-frame-browser --arms=default`, every flag
+  on), with zero page errors, zero shader errors and 0 link failures:
+  - Neon revealed in 88 s, 107 programs.
+  - Satellite (Enhanced) revealed in 75 s, 114 programs.
+  - All four FRAME flags resolve on, and the Frame rate row is present.
+- The owner's `verify-laptop-browser` (75afafa): 51/51 on the merged
+  production build. That run was before the flags were turned on.
+- `smoke:beta` (CI's step) run locally: 18 checks pass. It then hit a red
+  that predates this pass: the feed-loss step waited for the pre-CALM_HUD
+  status text. That is fixed in `beta-smoke.cjs`, which now waits for the
+  runtime's traffic state and records whichever notice the player sees.
+  CI had never reached this step; earlier runs died at `npm audit`, and run
+  51 died at a screenshot timeout.
+- Gate re-premise notes for the owner:
+  - DEVICE_POLICY on also enables FR-13's dynamic near plane on renderers
+    without reversed depth (no iPhone report yet), and runs the boot
+    micro-benchmark (up to 1.5 s, PROVISIONAL thresholds).
+  - ULTRA_SUPERSAMPLE boots a DPR-1 Ultra dGPU display at 1.5× render scale
+    (FR-12's 5080 check has not run).
+  - TERRAIN_SHADOW makes the shipped desktop-Ultra earth fragment use
+    exactly 16 of 16 texture units (zero headroom on a 16-unit GPU).
+  - PHOTO_HIRES's phone 2,560 px row is proven in node (touch maxScale 3)
+    but `verify-photo-hires` never re-ran in a browser on the merged tree.
+
+**Not done when the streams stopped:**
+- FRAME: the stall root causes need the 5080 trace (FR-7); FR-8's turn budget
+  ships off.
+- SKY: the SK-1 veil table run was in flight.
+- CITY: with CITY_RANGE on, two frozen browser premises move and must be
+  re-read: `verify-skyline` (B) "detail ring gone at 5,000 m" (the range
+  evicts at 5,200 m: probe at 5,400 m) and `verify-sat-night` (E) "fade
+  strictly inside (0,1) at 2,700 m" (the range dissolves at 4,500–5,000 m).
+  Neither browser harness ran on the merged tree.
+- LIGHT: LT-1 is owner-pending; the LT-2 / LT-3 / LT-7 browser sessions and
+  the KJFK lounge capture were queued and never ran.
+- RELEASE: RL-1 (CI green) was still in progress; RL-4 (deep links) never had
+  its browser check before shipping on.
+- 8.3 cleanup wave: not done. `ship/close` holds partial, uncommitted
+  AERIAL_LAW work and is not merged. LENS_FLARE's block and reader still exist,
+  but SK-5 deleted its code, so `?flags=LENS_FLARE` renders nothing.
+
+**The owner should know (from the merge audit):**
+- RL-10 (no flag, per the plan): after the first completed flight the app
+  calls `navigator.storage.persist()`. Firefox can answer that with a
+  "store data in persistent storage" prompt.
+- RL-5: `og:url` / `og:image` resolve through `metadataBase`, which needs
+  `NEXT_PUBLIC_SITE_URL` on any non-Vercel deploy (the build warns and uses
+  `http://localhost:3000` otherwise).
+- OFFLINE_SHELL on registers `public/sw.js` in production builds. Turning the
+  flag off is the kill switch: the next load unregisters it.
+- CITY's `window.__flyCityDiag` pin is read in production (console only).
 
 ## 9. Owner run list (consolidated, about 90 minutes)
 

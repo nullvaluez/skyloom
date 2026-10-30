@@ -65,7 +65,9 @@ export function ReleaseAnalytics({ runtime }) {
     let firstDone = readFlag(FIRST_FLIGHT_KEY);
     let ended = false;
     const seenMoments = new Set();
-    track('session_start', { device_class: deviceClassOf() });
+    // deviceClassOf() can open a throwaway WebGL context to read the GPU, so it
+    // is asked only when the event will be sent (track() is a no-op flag off).
+    if (analyticsV2On()) track('session_start', { device_class: deviceClassOf() });
 
     const completeFirstFlight = () => {
       if (firstDone) return;
@@ -112,7 +114,7 @@ export function ReleaseAnalytics({ runtime }) {
       ended = true;
       tick();
       const s = useFlyStore.getState();
-      track('session_end', { minutes_by_mode: minutes, preset: s.qualityPreset, device_class: deviceClassOf() });
+      if (analyticsV2On()) track('session_end', { minutes_by_mode: minutes, preset: s.qualityPreset, device_class: deviceClassOf() });
       const perf = frameSessionSummary?.();
       if (perf && (perf.p95Bucket != null || perf.stallsPerMin != null || perf.rung != null)) {
         track('perf_summary', { p95_bucket: perf.p95Bucket ?? undefined, stalls_per_min: perf.stallsPerMin ?? undefined, rung: perf.rung ?? undefined });

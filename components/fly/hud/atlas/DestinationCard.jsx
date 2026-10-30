@@ -6,6 +6,7 @@ import { useDeviceLayout } from '@/hooks/use-device-layout';
 import { ATLAS_KIND, CARD_THEME } from './atlas-tokens';
 // SHIP PASS RL-4 (DEEP_LINKS): share this place (renders nothing with the flag off).
 import { CopyLink } from '../CopyLink';
+import { shipPassOn } from '@/lib/fly/ship-pass';
 
 const NM_PER_DEG = 60;
 
@@ -176,7 +177,8 @@ export function DestinationCard({ entry, runtime, onWarp }) {
           arrives ~2nm out, nose on the field
         </p>
       )}
-      {Number.isFinite(entry.lat) && Number.isFinite(entry.lon) && (
+      {/* The wrapper only exists with DEEP_LINKS on: flag off, the card is W0's to the pixel. */}
+      {shipPassOn('DEEP_LINKS') && Number.isFinite(entry.lat) && Number.isFinite(entry.lon) && (
         <div className="mt-2 flex justify-center">
           <CopyLink link={{ kind: 'at', lat: entry.lat, lon: entry.lon }} testid="atlas-copy-link" />
         </div>

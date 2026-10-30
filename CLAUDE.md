@@ -7,10 +7,15 @@
 >   Enhanced Satellite is the default on every device
 >   (`VISUALS.defaultProfile:'enhanced'`), and `R25_SKY` / `R25_GROUND` ship
 >   `enabled:true`.
-> - **Ship Pass (2026-10-30, IN PROGRESS, owner-requested; W0 landed on `main` in the
->   cloud venue — FLY_SHIP_PASS.md 3.8 and 4.1 — and the five streams run in
->   `/home/user/skyloom-<stream>` worktrees; look flags stay off until the owner's
->   5080 motion bar):**
+> - **Ship Pass (2026-10-30, MERGED to `main` with EVERY flag ON at the owner's
+>   request — FLY_SHIP_PASS.md 8.5 is the merge record):** the five streams were
+>   stopped mid-verification and their committed heads merged; all 21 flags
+>   (the 20 in `lib/fly/ship-pass.js` plus PLAYER_SURFACE) ship `enabled:true`,
+>   look flags included, with NO 5080 motion check yet — the owner's section 9
+>   run list is the first real-hardware read, and `?flags=-NAME` is the
+>   pre-pass behaviour for one page load. The 8.3 cleanup wave, the 3.7
+>   cross-review and each stream's queued browser evidence did not run.
+>   Original plan line:
 >   [FLY_SHIP_PASS.md](FLY_SHIP_PASS.md) is the gap analysis (about 115 gaps
 >   with evidence), the owner's 16 decisions and the requirements for a
 >   five-agent polish and certify pass, run locally on the owner's RTX 5080:

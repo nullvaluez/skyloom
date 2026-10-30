@@ -21,6 +21,19 @@
  * Browser-only facts (GLSL compiling under ANGLE, texture-unit headroom,
  * pixels) belong to scripts/review-ship-light.cjs and verify-photo-hires.mjs;
  * fps and motion belong to the owner's RTX 5080 and iPhone (FLY_SHIP_PASS.md 9).
+ *
+ * RE-PREMISED (merge to main, 2026-10-30): the owner ships every Ship Pass
+ * flag ON, LIGHT's six included (TERRAIN_SHADOW, TRAFFIC_SHADOWS,
+ * AIRFRAME_SHADOW, SHADOW_REACH, PHOTO_HIRES, HANGAR_EXPOSURE). This gate was
+ * written while they shipped off, when an unpinned probe WAS the off arm. Now
+ * the off / identity arm is the W0 frame PINNED: every Ship Pass flag (the
+ * ship-pass.js table) and PLAYER_SURFACE set `{ enabled:false }` before
+ * anything is imported (the `?flags=-NAME` page load), and the arm proves it
+ * resolved them off (0e). Every flag-on arm is that W0 frame plus its own
+ * flag(s), as it was when the base shipped off, so "the flag-off key plus one
+ * token" and "the patch is purely additive" still compare one feature against
+ * W0. The shipped (now on) state has its own rows, (S1)-(S7), probed with no
+ * flag pins at all (only the device-class pin, which is not a flag).
  */
 import { spawnSync, execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -62,7 +75,18 @@ if (probeArg) {
     out.mode = ts.terrainShadowMode();
     const depth = compile(ts.createTerrainShadowDepthMaterial());
     out.depth = { key: depth.key, vert: depth.vert, frag: depth.frag };
+    // What this process resolved (ship-pass.js reads the pins once, at load).
+    out.flags = (await mod('lib/fly/ship-pass.js')).shipPassFlags();
+    out.flags.PLAYER_SURFACE = (await mod('lib/fly/player-surface.js')).PLAYER_SURFACE_ACTIVE.enabled === true;
     out.photoActive = (await mod('lib/fly/photo-hires.js')).photoHiresActive({ tier: 'high' });
+    // HangarScene's own gate line ((7d) holds the source to it), through the
+    // stream's reader: the exposure block or null, and what StageBay builds.
+    {
+      const sl = await mod('lib/fly/ship-light.js');
+      const hs = await mod('components/fly/hud/hangar-stage.js');
+      const EXPOSURE = sl.shipPassOn('HANGAR_EXPOSURE') ? sl.lightBlock('HANGAR_EXPOSURE') : null;
+      out.hangar = { exposure: EXPOSURE !== null, reflector: { medium: hs.hangarReflectorResolution('medium', EXPOSURE), high: hs.hangarReflectorResolution('high', EXPOSURE) }, white: EXPOSURE ? hs.hangarExposureScale(0.85, EXPOSURE) : 1 };
+    }
     const cs = await mod('lib/fly/cinema-shadows.js');
     const st = useFlyStore.getState();
     out.airframeOn = { high: cs.airframeShadowOn(st), medium: cs.airframeShadowOn({ ...st, qualityTier: 'medium', qualityPreset: 'medium' }) };
@@ -190,7 +214,9 @@ function probe(root, pins = {}, light = true) {
   return JSON.parse(r.stdout.slice(at + 7));
 }
 const count = (s, sub) => s.split(sub).length - 1;
-const ON = (name) => ({ [`__fly${name.toLowerCase().split('_').map((w) => w[0].toUpperCase() + w.slice(1)).join('')}Override`]: { enabled: true } });
+const pinName = (name) => `__fly${name.toLowerCase().split('_').map((w) => w[0].toUpperCase() + w.slice(1)).join('')}Override`;
+const ON = (name) => ({ [pinName(name)]: { enabled: true } });
+const LIGHT = ['TERRAIN_SHADOW', 'TRAFFIC_SHADOWS', 'AIRFRAME_SHADOW', 'SHADOW_REACH', 'PHOTO_HIRES', 'HANGAR_EXPOSURE'];
 
 // --- base snapshot ----------------------------------------------------------
 const baseArg = process.argv.find((a) => a.startsWith('--base='))?.slice(7) ?? null;
@@ -217,12 +243,23 @@ try {
   const { register } = await import('node:module');
   register(pathToFileURL(path.join(ROOT, 'scripts/_node-resolve.mjs')).href, import.meta.url);
 
+  // The W0 frame: every Ship Pass flag (ship-pass.js's own table, read here
+  // with no window, so its values are the SHIPPED states) and PLAYER_SURFACE
+  // pinned off, `?flags=-NAME` for each. Every off arm below is W0 and every
+  // flag-on arm is W0 plus its own flag(s).
+  const SHIPPED = (await import('../lib/fly/ship-pass.js')).shipPassFlags();
+  SHIPPED.PLAYER_SURFACE = (await import('../lib/fly/player-surface.js')).PLAYER_SURFACE_ACTIVE.enabled === true;
+  const W0 = Object.fromEntries(Object.keys(SHIPPED).map((name) => [pinName(name), { enabled: false }]));
+  const W0_ON = (...names) => Object.assign({ ...W0 }, ...names.map(ON));
+
   // =========================================================================
   // (0) FLAG-OFF IDENTITY — the earth surface (the one patched material).
   // =========================================================================
-  const cur = probe(ROOT, {});
+  const cur = probe(ROOT, W0);
+  check('(0e) the W0 arm is pinned: it resolves every Ship Pass flag and PLAYER_SURFACE off, the six LIGHT flags among them',
+    Object.keys(SHIPPED).length >= 21 && [...LIGHT, 'PLAYER_SURFACE'].every((f) => f in cur.flags) && Object.values(cur.flags).every((v) => v === false), JSON.stringify(cur.flags));
   if (baseRef && existsSync(path.join(SNAP, 'lib/fly/r25-ground.js'))) {
-    const base = probe(SNAP, {}, false);
+    const base = probe(SNAP, W0, false);
     check('(0a) flags off: the terrain program key equals the base tree', cur.earth.key === base.earth.key, `${baseRef.slice(0, 7)} ${base.earth.key.slice(-40)}`);
     check('(0b) flags off: terrain fragment + vertex text sha256 equal the base tree', cur.earth.frag === base.earth.frag && cur.earth.vert === base.earth.vert, `frag ${cur.earth.frag} vs ${base.earth.frag}`);
   } else check('(0a) base snapshot available', false, `no base for ${baseArg}`);
@@ -232,9 +269,9 @@ try {
   // =========================================================================
   // (1) LT-2 TERRAIN_SHADOW — the anchored patch, both paths.
   // =========================================================================
-  const map = probe(ROOT, { ...ON('TERRAIN_SHADOW'), __flyLightDeviceClass: 'dgpu' });
-  const hor = probe(ROOT, { ...ON('TERRAIN_SHADOW'), __flyLightDeviceClass: 'phone' });
-  const soft = probe(ROOT, { ...ON('TERRAIN_SHADOW'), __flyLightDeviceClass: 'software' });
+  const map = probe(ROOT, { ...W0_ON('TERRAIN_SHADOW'), __flyLightDeviceClass: 'dgpu' });
+  const hor = probe(ROOT, { ...W0_ON('TERRAIN_SHADOW'), __flyLightDeviceClass: 'phone' });
+  const soft = probe(ROOT, { ...W0_ON('TERRAIN_SHADOW'), __flyLightDeviceClass: 'software' });
   check('(1a) desktop path is the depth map, touch is the horizon map, software is refused', map.mode === 'map' && hor.mode === 'horizon' && soft.mode === null, `${map.mode}/${hor.mode}/${soft.mode}`);
   check('(1b) flag on: the key is the flag-off key plus one path token', map.earth.key.replace('|ts-map-v1', '') === cur.earth.key && hor.earth.key.replace('|ts-horizon-v1', '') === cur.earth.key
     && count(map.earth.key, '|ts-map-v1') === 1 && count(hor.earth.key, '|ts-horizon-v1') === 1, map.earth.key.slice(-60));
@@ -365,25 +402,25 @@ try {
     check('(1o) horizon bind: the first cell centre maps to uv (0.5/n, 0.5/n), the texture is the lit grid', Math.abs(c.x - 0.5 / n) < 1e-9 && Math.abs(c.y - 0.5 / n) < 1e-9 && u.uTsMap.value === hm.texture && u.uTsParams.value.x === 1);
   }
 
+  // The 16-unit fragment sampler ceiling. ANGLE on D3D11 (Chrome on Windows,
+  // the owner's RTX 5080) and iPhone WebGL2 both expose 16 fragment texture
+  // units, and SwiftShader may expose more, so a venue link proves nothing
+  // here. The upper bound: every custom sampler the patched earth fragment
+  // REFERENCES (a declared-only one is compiled out), plus three's map and
+  // envMap (satellite imagery, the Enhanced environment) and one shadow map
+  // per cascade at the class's largest profile (desktop Ultra, phone).
+  // TERRAIN_SHADOW adds one (uTsMap); another stream adding a sampler to the
+  // earth chain on the merged tree turns this row (and the shipped (S3)) red.
+  const { CINEMA_PROFILES } = await import('../lib/fly/cinema-profile.js');
+  const desktopCascades = Math.max(...['ultra', 'high', 'medium'].map((p) => CINEMA_PROFILES[p].cascades));
+  const census = (text, cascades) => {
+    const names = [...text.matchAll(/^\s*uniform\s+(?:(?:lowp|mediump|highp)\s+)?sampler\w*\s+(\w+)/gm)].map((m) => m[1]);
+    // three's own optional maps sit in #ifdef blocks the live tile never
+    // defines (specularColorMap, sheenColorMap, ...), so only custom names count.
+    const custom = [...new Set(names)].filter((n) => /^u[A-Z]/.test(n) && count(text, n) > 1);
+    return { custom, total: custom.length + 2 + cascades };
+  };
   {
-    // The 16-unit fragment sampler ceiling. ANGLE on D3D11 (Chrome on Windows,
-    // the owner's RTX 5080) and iPhone WebGL2 both expose 16 fragment texture
-    // units, and SwiftShader may expose more, so a venue link proves nothing
-    // here. The upper bound: every custom sampler the patched earth fragment
-    // REFERENCES (a declared-only one is compiled out), plus three's map and
-    // envMap (satellite imagery, the Enhanced environment) and one shadow map
-    // per cascade at the class's largest profile (desktop Ultra, phone).
-    // TERRAIN_SHADOW adds one (uTsMap); another stream adding a sampler to the
-    // earth chain on the merged tree turns this row red.
-    const { CINEMA_PROFILES } = await import('../lib/fly/cinema-profile.js');
-    const desktopCascades = Math.max(...['ultra', 'high', 'medium'].map((p) => CINEMA_PROFILES[p].cascades));
-    const census = (text, cascades) => {
-      const names = [...text.matchAll(/^\s*uniform\s+(?:(?:lowp|mediump|highp)\s+)?sampler\w*\s+(\w+)/gm)].map((m) => m[1]);
-      // three's own optional maps sit in #ifdef blocks the live tile never
-      // defines (specularColorMap, sheenColorMap, ...), so only custom names count.
-      const custom = [...new Set(names)].filter((n) => /^u[A-Z]/.test(n) && count(text, n) > 1);
-      return { custom, total: custom.length + 2 + cascades };
-    };
     const off = census(cur.earth.text, desktopCascades), on = census(map.earth.text, desktopCascades), ph = census(hor.earth.text, CINEMA_PROFILES.phone.cascades);
     check('(1p) earth fragment samplers stay within 16 units with the flag on (desktop Ultra cascades, phone)',
       on.total <= 16 && ph.total <= 16 && on.total === off.total + 1 && on.custom.includes('uTsMap'),
@@ -413,8 +450,8 @@ try {
     check('(4d) refit hysteresis', cs.airframeRefit(null, 50) && cs.airframeRefit(50, null) && !cs.airframeRefit(null, null) && !cs.airframeRefit(50, 54) && cs.airframeRefit(50, 60));
   }
   {
-    const on = probe(ROOT, { ...ON('AIRFRAME_SHADOW'), ...ON('SHADOW_REACH'), __flyLightDeviceClass: 'dgpu' });
-    const phone = probe(ROOT, { ...ON('AIRFRAME_SHADOW'), ...ON('SHADOW_REACH'), __flyLightDeviceClass: 'phone' });
+    const on = probe(ROOT, { ...W0_ON('AIRFRAME_SHADOW', 'SHADOW_REACH'), __flyLightDeviceClass: 'dgpu' });
+    const phone = probe(ROOT, { ...W0_ON('AIRFRAME_SHADOW', 'SHADOW_REACH'), __flyLightDeviceClass: 'phone' });
     check('(4e) airframe receive: High/Ultra desktop only (not Medium, not phones)', on.airframeOn.high === true && on.airframeOn.medium === false && phone.airframeOn.high === false);
     check('(5a) reach: Medium desktop only (not High, not touch)', on.reach.high === null && on.reach.medium?.shadowMaxRangeM === 1200 && phone.reach.medium === null);
     check('(4f) program keys never move with the airframe/reach flags (uniform-only features)', on.earth.key === cur.earth.key && on.earth.frag === cur.earth.frag);
@@ -427,9 +464,11 @@ try {
   // =========================================================================
   // (3) LT-3 TRAFFIC_SHADOWS.
   // =========================================================================
+  let trafficOn = null, prewarmOn = null; // the pinned-on arms, for the shipped rows
   {
     check('(3a) flags off: the live fleet builds no shadow system (today\'s meshes and draws)', cur.traffic.shadows === false && cur.traffic.groupChildren === 0);
-    const on = probe(ROOT, { ...ON('TRAFFIC_SHADOWS'), __flyLightDeviceClass: 'dgpu' });
+    const on = probe(ROOT, { ...W0_ON('TRAFFIC_SHADOWS'), __flyLightDeviceClass: 'dgpu' });
+    trafficOn = on;
     const p = on.traffic.paths;
     check('(3b) paths: desktop High casts, desktop Medium/Low and touch get blobs, software none',
       p['dgpu/high'] === 'caster' && p['igpu/high'] === 'caster' && p['dgpu/medium'] === 'blob' && p['phone/high'] === 'blob' && p['tablet/medium'] === 'blob' && p['software/high'] === null && cur.traffic.paths['dgpu/high'] === null,
@@ -496,7 +535,7 @@ try {
     const src = (await import('node:fs')).readFileSync(path.join(ROOT, 'components/fly/PhotoCapture.jsx'), 'utf8').replace(/\r\n/g, '\n');
     check('(6f) capture holds the governor (frame-api), emits track(\'photo_taken\'), keeps the watermark, restores pixel ratio + composer',
       src.includes("holdGovernor('photo-hires')") && src.includes("track('photo_taken')") && src.includes('drawWatermark(ctx, w, h, mapStyle)') && /finally \{[\s\S]*gl\.setPixelRatio\(pr\);[\s\S]*composer\.setSize\(css\.x, css\.y\);[\s\S]*composer\.render\(0\)/.test(src));
-    const off = probe(ROOT, {});
+    const off = probe(ROOT, W0);
     check('(6g) flags off: no hi-res path (the action ignores scale)', off.photoActive === false);
   }
 
@@ -521,13 +560,16 @@ try {
     check('(7c) livery luminance: area-weighted material x vertex colour; a paint preset reads its hull', Math.abs(l - 0.6) < 1e-6 && Math.abs(hs.liveryLuminance(painted) - 0.75) < 1e-12 && hs.liveryLuminance(new THREE.Group()) === 0.5, l.toFixed(4));
     const hsrc = (await import('node:fs')).readFileSync(path.join(ROOT, 'components/fly/hud/HangarScene.jsx'), 'utf8');
     check('(7d) hangar: flag off = no exposure state read (EXPOSURE null) and today\'s reflector size', hsrc.includes("const EXPOSURE = shipPassOn('HANGAR_EXPOSURE') ? lightBlock('HANGAR_EXPOSURE') : null;") && hsrc.includes('const exposure=EXPOSURE&&liveryLuma!==null?hangarExposureScale(liveryLuma,EXPOSURE):1;'));
+    check('(7e) flags off (W0, pinned): the gate line yields no exposure block, today\'s 512 / 1024 reflector, a white livery at today\'s light',
+      cur.hangar.exposure === false && cur.hangar.reflector.medium === 512 && cur.hangar.reflector.high === 1024 && cur.hangar.white === 1, JSON.stringify(cur.hangar));
   }
 
   // =========================================================================
   // (8) Prewarm: every new LIGHT program variant is registered.
   // =========================================================================
   {
-    const all = probe(ROOT, { ...ON('TERRAIN_SHADOW'), ...ON('TRAFFIC_SHADOWS'), __flyLightDeviceClass: 'dgpu' });
+    const all = probe(ROOT, { ...W0_ON('TERRAIN_SHADOW', 'TRAFFIC_SHADOWS'), __flyLightDeviceClass: 'dgpu' });
+    prewarmOn = all;
     const by = Object.fromEntries(all.prewarm.map((e) => [e.key, e]));
     const keys = all.prewarm.flatMap((e) => e.keys);
     check('(8a) four LIGHT entries, each gated on its flag', ['LIGHT:terrain-shadowed-earth', 'LIGHT:terrain-shadow-depth', 'LIGHT:traffic-caster', 'LIGHT:traffic-blob'].every((k) => by[k]) && all.prewarm.every((e) => e.when.flags?.length === 1), Object.keys(by).join(','));
@@ -557,6 +599,37 @@ try {
     check('(9a) requestShadowCasters: bounded casters while the cascades exist, parked without them, scene-only',
       on === 2 && armed.join() === 'true,true,false' && orphan.castShadow === false && offN === 0 && parked.join() === 'false,true,false', `${on} ${armed} ${parked}`);
     check('(9b) release restores each object\'s own castShadow; no request = nothing touched', restored.join() === 'false,true,false' && empty === 0 && objs.every((o) => o.userData.shipCastPrev === undefined));
+  }
+
+  // =========================================================================
+  // (S) SHIPPED DEFAULT — no flag pins at all (the device class is pinned,
+  // which is not a flag): what a player gets since the merge to main.
+  // =========================================================================
+  {
+    const desk = probe(ROOT, { __flyLightDeviceClass: 'dgpu' });
+    const phone = probe(ROOT, { __flyLightDeviceClass: 'phone' });
+    check('(S1) shipped default: TERRAIN_SHADOW, TRAFFIC_SHADOWS, AIRFRAME_SHADOW, SHADOW_REACH, PHOTO_HIRES and HANGAR_EXPOSURE ship on (owner, merge to main 2026-10-30)',
+      LIGHT.every((f) => SHIPPED[f] === true && desk.flags[f] === true && phone.flags[f] === true), LIGHT.map((f) => `${f}=${SHIPPED[f]}`).join(' '));
+    check('(S2) shipped default earth: desktop the depth map, touch the horizon map, each exactly the pinned TERRAIN_SHADOW arm (key, fragment, vertex), so the W0 key plus one token and the W0 text plus the patch',
+      desk.mode === 'map' && phone.mode === 'horizon'
+        && desk.earth.key === map.earth.key && desk.earth.frag === map.earth.frag && desk.earth.vert === map.earth.vert
+        && phone.earth.key === hor.earth.key && phone.earth.frag === hor.earth.frag && phone.earth.vert === hor.earth.vert,
+      `${desk.mode}/${phone.mode} ${desk.earth.frag} vs ${map.earth.frag}, ${phone.earth.frag} vs ${hor.earth.frag}`);
+    const sd = census(desk.earth.text, desktopCascades), sp = census(phone.earth.text, CINEMA_PROFILES.phone.cascades);
+    check('(S3) shipped default: earth fragment samplers stay within 16 units (desktop Ultra cascades, phone)', sd.total <= 16 && sp.total <= 16 && sd.custom.includes('uTsMap') && sp.custom.includes('uTsMap'),
+      `desktop ${sd.total}, phone ${sp.total}`);
+    check('(S4) shipped default: airframe receive on High/Ultra desktop only, the Medium-desktop reach to 1.2 km, neither on touch',
+      desk.airframeOn.high === true && desk.airframeOn.medium === false && phone.airframeOn.high === false && desk.reach.high === null && desk.reach.medium?.shadowMaxRangeM === 1200 && phone.reach.medium === null);
+    check('(S5) shipped default: the live fleet builds the shadow system, with the pinned-on arm\'s path table and simulated caster / blob / re-arm frames',
+      desk.traffic.shadows === true && desk.traffic.groupChildren === trafficOn?.traffic.groupChildren && desk.traffic.paths['dgpu/high'] === 'caster'
+        && JSON.stringify(desk.traffic.paths) === JSON.stringify(trafficOn?.traffic.paths) && JSON.stringify(desk.traffic.caster) === JSON.stringify(trafficOn?.traffic.caster)
+        && JSON.stringify(desk.traffic.blob) === JSON.stringify(trafficOn?.traffic.blob) && JSON.stringify(desk.traffic.rearm) === JSON.stringify(trafficOn?.traffic.rearm),
+      `shadows ${desk.traffic.shadows} children ${desk.traffic.groupChildren}`);
+    check('(S6) shipped default: the hi-res photo path is live; the hangar reads its exposure block (a white livery dims to 0.55, Medium reflector 256, High 1024)',
+      desk.photoActive === true && desk.hangar.exposure === true && desk.hangar.white === 0.55 && desk.hangar.reflector.medium === 256 && desk.hangar.reflector.high === 1024, JSON.stringify(desk.hangar));
+    const keys = desk.prewarm.flatMap((e) => e.keys);
+    check('(S7) shipped default: the LIGHT prewarm builds carry the shipped live earth key and the pinned arm\'s keys, none throws',
+      keys.includes(desk.earth.key) && JSON.stringify(desk.prewarm) === JSON.stringify(prewarmOn?.prewarm) && !keys.some((k) => k.startsWith('THROW')));
   }
 } finally {
   rmSync(SNAP, { recursive: true, force: true });

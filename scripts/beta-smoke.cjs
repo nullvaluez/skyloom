@@ -51,6 +51,15 @@ async function key(page,k){
     for(const type of['keydown','keyup'])t.dispatchEvent(new KeyboardEvent(type,{key:k,code,bubbles:true,cancelable:true,composed:true}));},[k,KEY_CODES[k]||k]);
   presses.dom++;
 }
+// Evidence screenshots are not checks. On software GL the live canvas can keep
+// Playwright's screenshot waiting on a frame for minutes (the R24 lesson; CI run
+// 51 sat 30 s on journal-desktop.png and failed a run whose checks all passed),
+// so they get the software allowance and, there only, a miss is logged instead
+// of failing the smoke. On a GPU a screenshot failure still fails the run.
+async function shot(pg,file){
+  try{await pg.screenshot({path:path.join(OUT,file),timeout:software?120000:30000});}
+  catch(e){if(!software)throw e;console.log(`NOTE screenshot ${file} not captured on software GL (evidence only): ${String(e.message).split('\n')[0]}`);}
+}
 async function ready(){for(let i=0;i<120;i++){try{if((await fetch(base)).ok)return;}catch{}await delay(500);}throw Error('Production server did not become ready');}
 (async()=>{
  let server,browser,fixture,page;let log='',renderer='unavailable';
@@ -87,7 +96,7 @@ async function ready(){for(let i=0;i<120;i++){try{if((await fetch(base)).ok)retu
   await press(page.getByTestId('title-logbook'));
   await page.getByText('Your world, one flight at a time',{exact:true}).waitFor();
   check('journal has six regional collections',await page.locator('.explorer-collections article').count()===6);
-  await page.screenshot({path:path.join(OUT,'journal-desktop.png'),timeout:30000});
+  await shot(page,'journal-desktop.png');
   await key(page,'Escape');
   await press(page.getByTestId('title-takeoff-landing'));
   await page.getByTestId('hangar').waitFor();
@@ -96,7 +105,7 @@ async function ready(){for(let i=0;i<120;i++){try{if((await fetch(base)).ok)retu
   await waitForDeparture(page,'LOWI:');
   check('regional airport loads into preparation',await departureId(page).then(v=>!!v&&v.startsWith('LOWI:')));
   check('generic airport does not promise apron operations',await page.getByRole('button',{name:'Apron',exact:true}).count()===0);
-  await page.screenshot({path:path.join(OUT,'airport-desktop.png'),timeout:30000});
+  await shot(page,'airport-desktop.png');
   // Execute the actual webpack worker asset, using Comlink's wire protocol.
   // This catches errors hidden by a successful bundler/static lint pass.
   const chunks=path.resolve('.next-explorer/static/chunks');
@@ -147,9 +156,19 @@ async function ready(){for(let i=0;i<120;i++){try{if((await fetch(base)).ok)retu
   await key(page,'l');
   await page.locator('.explorer-photos figure').first().waitFor();
   check('successful photograph appears in the journal',await page.locator('.explorer-photos figure').count()===1);
-  await page.screenshot({path:path.join(OUT,'memory-journal.png'),timeout:30000});await key(page,'Escape');
+  await shot(page,'memory-journal.png');await key(page,'Escape');
+  // The player is told the feed is gone: the classic status line ("Live traffic
+  // is unavailable...") or, with CALM_HUD (on since the Play Pass), the dock
+  // notice ("Live traffic is offline for now..."), which shows 15 s after the
+  // loss for 9 s. An in-page observer records whichever text appears, so a
+  // starved software-GL page cannot miss the 9 s window between polls.
+  await page.evaluate(()=>{window.__betaTrafficNotice=null;const re=/Live traffic is (?:unavailable|offline)[^.]*\./;
+    const look=t=>{if(!window.__betaTrafficNotice&&t){const m=re.exec(t);if(m)window.__betaTrafficNotice=m[0];}};
+    new MutationObserver(ms=>{for(const m of ms){if(m.type==='characterData')look(m.target.data);for(const n of m.addedNodes){if(n.nodeType===3)look(n.data);else if(n.nodeType===1&&n.tagName!=='SCRIPT')look(n.textContent);}}}).observe(document.body,{subtree:true,childList:true,characterData:true});});
   await context.route('**/api/aircraft?**',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ac:[],availability:'unavailable',error:'offline'})}));
-  await page.getByText('Live traffic is unavailable. You can keep exploring.',{exact:true}).waitFor({timeout:software?300000:60000});
+  await page.waitForFunction(()=>window.__fly?.dataStatus?.traffic?.state==='unavailable',null,{timeout:software?300000:60000});
+  await page.waitForFunction(()=>!!window.__betaTrafficNotice,null,{timeout:software?300000:60000});
+  check('feed loss is told to the player',/^Live traffic is (unavailable|offline)/.test(await page.evaluate(()=>window.__betaTrafficNotice)),await page.evaluate(()=>window.__betaTrafficNotice));
   check('feed loss leaves exploration available',await page.getByTestId('title-screen').count()===0);
   await page.evaluate(()=>{const gl=[...document.querySelectorAll('canvas')].map(c=>c.getContext('webgl2')).find(Boolean);window.__betaContext=gl.getExtension('WEBGL_lose_context');if(!window.__betaContext)throw Error('Context-loss extension missing');window.__betaContext.loseContext();});
   await page.getByRole('alertdialog',{name:'Graphics recovery'}).waitFor();
@@ -166,8 +185,8 @@ async function ready(){for(let i=0;i<120;i++){try{if((await fetch(base)).ok)retu
   // SHIP PASS RL-3 (D11, PLAYER_SURFACE on): an ordinary player gets one look,
   // so the Visuals and Map style rows are gone outside review and automation.
   check('ordinary players get one look: no Visuals or Map style rows',await p.getByTestId('settings-visuals').count()===0&&await p.getByTestId('settings-visuals-classic').count()===0&&await p.getByTestId('settings-style-toy').count()===0);
-  await p.screenshot({path:path.join(OUT,'settings-phone.png'),timeout:30000});
-  await press(p.getByTestId('settings-close'));await press(p.getByTestId('title-explore'));await p.getByTestId('hangar').waitFor();await p.screenshot({path:path.join(OUT,'prepare-phone.png'),timeout:30000});
+  await shot(p,'settings-phone.png');
+  await press(p.getByTestId('settings-close'));await press(p.getByTestId('title-explore'));await p.getByTestId('hangar').waitFor();await shot(p,'prepare-phone.png');
   check('phone preparation supports the same destination flow',await p.getByTestId('hangar-mode').getAttribute('data-mode')==='free');
   check('production browser has no uncaught errors',errors.length===0,errors);
   await phone.close();

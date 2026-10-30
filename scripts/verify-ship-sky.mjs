@@ -15,13 +15,24 @@
  *        the horizon, exposure bounded); cinema-environment's flag-off output
  *        is byte-identical to main's; the phase terminator lands in the
  *        composite only with the flag on.
- *  TEXT  The default-flag program texts this stream owns (cloud march /
+ *  TEXT  The W0-frame program texts this stream owns (cloud march /
  *        composite / filter, Classic and Enhanced; aerial Classic and
- *        Enhanced) hash to main's (sha256): the default frame is unchanged.
+ *        Enhanced) hash to main's (sha256): with the pass's flags off the
+ *        frame is unchanged. The shipped frame is those texts plus exactly
+ *        SKY's three edits.
  *
  * Program texts are built in child processes (`--leg=NAME`), because every
  * flag is a page-load decision in the app (lib/fly/ship-pass.js resolves its
  * pins at module load), exactly like scripts/verify-living-sky.mjs.
+ *
+ * RE-PREMISED (merge to main, 2026-10-30): the owner ships every Ship Pass
+ * flag ON, SKY's AERIAL_CLARITY / REAL_MOON / SKY_LITE included. This gate was
+ * written while they shipped off, when "absent = shipped" WAS the off arm. Now
+ * every off / identity arm PINS its flags off (`window.__fly<Name>Override =
+ * { enabled:false }` before ship-pass.js loads — the `?flags=-NAME` page
+ * load), every flag-on leg is that W0 base plus its one flag (so "the ONLY
+ * change" still compares one edit against W0), and the shipped (now on) state
+ * has its own "shipped default" rows: SK-3 (p), SK-4 (i), SK-2 (h), TEXT (c)/(d).
  *
  * Run: node scripts/verify-ship-sky.mjs
  */
@@ -37,14 +48,33 @@ const leg = process.argv.find((a) => a.startsWith('--leg='))?.slice(6);
 const sha = (s) => createHash('sha256').update(String(s ?? '')).digest('hex');
 const pinName = (f) => `__fly${f.toLowerCase().split('_').map((w) => w[0].toUpperCase() + w.slice(1)).join('')}Override`;
 
-/** The pins of each leg (Ship Pass / Living World flags; absent = shipped state). */
+/**
+ * The Ship Pass flags, from lib/fly/ship-pass.js's own table (W0 seeded every
+ * one off; the merge to main ships every one on).
+ */
+const SHIP_FLAGS = [...fs.readFileSync(path.join(ROOT, 'lib/fly/ship-pass.js'), 'utf8').matchAll(/^ {2}([A-Z][A-Z0-9_]*): \1_ACTIVE,$/gm)].map((m) => m[1]);
+/** The W0 frame: every Ship Pass flag pinned off (`?flags=-NAME` for each). */
+const W0_PINS = Object.fromEntries(SHIP_FLAGS.map((f) => [f, false]));
+
+/**
+ * The pins of each leg (Ship Pass / Living World flags; absent = shipped
+ * state). `default` is the SHIPPED frame (no pins: every Ship Pass flag on
+ * since the merge to main); `w0` is the identity arm; each flag-on leg is
+ * the W0 base plus its own flag, as it was when the base shipped off.
+ */
 const LEGS = {
   default: {},
-  'real-moon': { REAL_MOON: true },
-  shafts: { LIGHT_SHAFTS: true },
-  lens: { LIGHT_SHAFTS: true, LENS_FLARE: true },
-  'sky-lite': { SKY_LITE: true },
-  'aerial-clarity': { AERIAL_CLARITY: true },
+  w0: { ...W0_PINS },
+  // The shipped frame without SKY's three (every other flag as shipped), and
+  // W0 plus CITY's NIGHT_RHYTHM (whose seam edit lands in the aerial text):
+  // TEXT (c) / (d) account for every difference of the shipped frame from W0.
+  others: { AERIAL_CLARITY: false, REAL_MOON: false, SKY_LITE: false },
+  'night-rhythm': { ...W0_PINS, NIGHT_RHYTHM: true },
+  'real-moon': { ...W0_PINS, REAL_MOON: true },
+  shafts: { ...W0_PINS, LIGHT_SHAFTS: true },
+  lens: { ...W0_PINS, LIGHT_SHAFTS: true, LENS_FLARE: true },
+  'sky-lite': { ...W0_PINS, SKY_LITE: true },
+  'aerial-clarity': { ...W0_PINS, AERIAL_CLARITY: true },
 };
 
 async function buildLeg(name) {
@@ -94,8 +124,50 @@ async function buildLeg(name) {
   const CL_DECL = /uniform vec4 \w*[uU]ShipClarity;\n\/\/ SHIP PASS SKY \(AERIAL_CLARITY\)[^\n]*\n\/\/[^\n]*\nfloat \w*[sS]hipClarity\(float km\)\{[^\n]*\}\n/g;
   const clarityCount = Object.fromEntries(Object.entries(texts).map(([k, v]) => [k, v == null ? 0 : (v.match(CL_RE) ?? []).length]));
   const clarityReverted = Object.fromEntries(Object.entries(texts).map(([k, v]) => [k, v == null ? null : sha(v.replace(CL_RE, '*$1').replace(CL_DECL, ''))]));
+  // Both edits reverted (the shipped frame carries SKY_LITE and AERIAL_CLARITY together).
+  const bothReverted = Object.fromEntries(Object.entries(texts).map(([k, v]) => [k, v == null ? null : sha(v.replace(LITE_RE, '').replace(CL_RE, '*$1').replace(CL_DECL, ''))]));
+  // What this process resolved (ship-pass.js reads the pins once, at load),
+  // and SKY's modules at their DEFAULT arguments — the shipped behaviour on
+  // the unpinned leg — against the same calls with the flag argument explicit.
+  const SM = await imp('lib/fly/sun-model.js');
+  const CE = await imp('lib/fly/cinema-environment.js');
+  const SL = await imp('lib/fly/sky-lite.js');
+  const AC = await imp('lib/fly/aerial-clarity.js');
+  const G = await imp('lib/fly/atmosphere/glsl.js');
+  const SP = await imp('lib/fly/ship-pass.js');
+  const same = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
+  let moonDefaultIsOn = true, moonDefaultIsOff = true, cinemaDefaultIsOn = true, cinemaDefaultIsOff = true;
+  for (let i = 0; i < 200; i++) {
+    const s = SM.computeSun(-74 + i * 1.7, 40 - i * 0.4, Date.UTC(2026, 0, 1) + i * 7.3e6);
+    const d = SM.moonDirFromSun(s.az, [0, 0, 0]);
+    if (!same(d, SM.moonDirFromSun(s.az, [0, 0, 0], true))) moonDefaultIsOn = false;
+    if (!same(d, SM.moonDirFromSun(s.az, [0, 0, 0], false))) moonDefaultIsOff = false;
+    const w = { overcastT: 0, fogT: 0 }, tw = { enabled: true, switchElDeg: -4, fadeDeg: 2 };
+    const eD = CE.createCinemaEnvironment(), eOn = CE.createCinemaEnvironment(), eOff = CE.createCinemaEnvironment();
+    CE.evaluateCinemaEnvironment(eD, s, w, tw);
+    CE.evaluateCinemaEnvironment(eOn, s, w, tw, true);
+    CE.evaluateCinemaEnvironment(eOff, s, w, tw, false);
+    if (JSON.stringify(eD) !== JSON.stringify(eOn)) cinemaDefaultIsOn = false;
+    if (JSON.stringify(eD) !== JSON.stringify(eOff)) cinemaDefaultIsOff = false;
+  }
+  const CL_SAMPLE = 'x+apS*uPskySunIllum+pskyNightAir(apDir)*(1.-apT);void mainImage(';
+  const probe = {
+    shipFlags: SP.shipPassFlags(),
+    moonDefaultIsOn,
+    moonDefaultIsOff,
+    cinemaDefaultIsOn,
+    cinemaDefaultIsOff,
+    liteLookupIsEdited: SL.PSKY_AERIAL_LOOKUP_GLSL === G.skyLiteAerialGLSL(G.ATMO_AERIAL_LOOKUP_GLSL, true) && SL.PSKY_AERIAL_LOOKUP_GLSL !== G.ATMO_AERIAL_LOOKUP_GLSL,
+    liteSwitch: [SL.skyLiteAerialSwitch('high', { cls: 'dgpu' }), SL.skyLiteAerialSwitch('medium', { cls: 'dgpu' }), SL.skyLiteAerialSwitch('high', { cls: 'phone' })],
+    liteReach: [SL.skyLiteFarReachM('phone', 180, 'medium', { cls: 'phone' }), SL.skyLiteFarReachM('phone-economy', 180, 'high', { cls: 'tablet' }), SL.skyLiteFarReachM('phone-low', 180, 'low', { cls: 'phone' }), SL.skyLiteFarReachM('high', 180, 'high', { cls: 'dgpu' })],
+    clarityK: AC.aerialClarityK(3048, { day: 1, overcast: 0, fog: 0 }),
+    clarityShaderIsOn: AC.aerialClarityShader(CL_SAMPLE) === AC.aerialClarityShader(CL_SAMPLE, true) && AC.aerialClarityShader(CL_SAMPLE) !== CL_SAMPLE,
+  };
   return {
     texts: process.env.DUMP_TEXTS ? texts : undefined,
+    flags: { REAL_MOON: SM.REAL_MOON_ON, SKY_LITE: SL.SKY_LITE_ON, AERIAL_CLARITY: AC.AERIAL_CLARITY_ON },
+    probe,
+    bothReverted,
     clarityCount,
     clarityReverted,
     effectUniforms: [...enhanced.uniforms.keys()].sort(),
@@ -122,10 +194,26 @@ const row = (name, ok, detail = '') => {
   ok ? passed++ : failed++;
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? `  — ${detail}` : ''}`);
 };
-const legOut = (name) => JSON.parse(execFileSync(process.execPath, [fileURLToPath(import.meta.url), `--leg=${name}`], { cwd: ROOT, maxBuffer: 64 << 20 }).toString());
+const legCache = new Map();
+const legOut = (name) => {
+  if (!legCache.has(name)) legCache.set(name, JSON.parse(execFileSync(process.execPath, [fileURLToPath(import.meta.url), `--leg=${name}`], { cwd: ROOT, maxBuffer: 64 << 20 }).toString()));
+  return legCache.get(name);
+};
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8').replace(/\r\n/g, '\n');
 
 register('./_node-resolve.mjs', import.meta.url);
+// The flag-off arms of this process (SK-3 (e)/(f)/(l), SK-4 (c)/(h), SK-2 (a))
+// PIN SKY's three flags off — the `?flags=-AERIAL_CLARITY,-REAL_MOON,-SKY_LITE`
+// page load — now that they ship on. ship-pass.js resolves its pins once, at
+// module load, so the window carries them only while it loads; nothing else in
+// this process sees a window (as before), and every other flag is as shipped.
+// The flag-on arms pass the flag explicitly; the shipped state is read from the
+// unpinned `default` leg (SK-3 (p), SK-4 (i), SK-2 (h), TEXT (c) / (d)).
+const SKY_OFF_PINS = { AERIAL_CLARITY: false, REAL_MOON: false, SKY_LITE: false };
+globalThis.window = { location: { search: '', href: 'http://localhost/' } };
+for (const [f, on] of Object.entries(SKY_OFF_PINS)) globalThis.window[pinName(f)] = { enabled: on };
+await import('../lib/fly/ship-pass.js');
+delete globalThis.window;
 const SM = await import('../lib/fly/sun-model.js');
 const CE = await import('../lib/fly/cinema-environment.js');
 const C = await import('../lib/fly/fly-constants.js');
@@ -229,7 +317,7 @@ const DEG = Math.PI / 180;
     const l = legacy(s.az);
     if (out[0] !== l[0] || out[1] !== l[1] || out[2] !== l[2]) offSame = false;
   }
-  row('SK-3 (e) REAL_MOON off (the shipped state): moonDirFromSun is the legacy anti-solar moon, bit for bit', SM.REAL_MOON_ON === false && offSame);
+  row('SK-3 (e) REAL_MOON off (pinned: `?flags=-REAL_MOON`): moonDirFromSun is the legacy anti-solar moon, bit for bit', SM.REAL_MOON_ON === false && offSame);
   const st = SM.moonState({ sunAz: 1.2 });
   row('SK-3 (f) REAL_MOON off: moonState() is today\'s moon (full, fixed elevation, lightK 1)',
     st.phase === 0.5 && st.illum === 1 && st.real === false && st.lightK === 1 && Math.abs(st.altDeg - C.SKY_LIVE.nightSky.moonElRad / DEG) < 1e-12 && Math.abs(st.azDeg - ((1.2 + Math.PI) / DEG) % 360) < 1e-9);
@@ -340,14 +428,23 @@ const DEG = Math.PI / 180;
       n >= 10 && worst <= 0.03, `${n} moon-up dates, worst ${(worst * 100).toFixed(2)}%`);
   }
   row('SK-3 (m) REAL_MOON on, deep night: key <= today\'s full moon, ground light >= the floor, no key or disc once the moon has set, exposure only opens', nightOk && sawSet > 5 && sawUp > 5, nightWhy || `${sawUp} moon-up and ${sawSet} moon-set nights checked; floor ground ${floorLuma.toFixed(4)} vs today ${ground(today).toFixed(4)}`);
+  // Shipped default (the unpinned leg): the moon every consumer gets by default
+  // is the ephemeris moon (g), not the legacy one (e), and so is cinema-environment's.
+  const shipped = legOut('default');
+  row('SK-3 (p) shipped default: REAL_MOON ships on (owner, merge to main 2026-10-30) — unpinned, moonDirFromSun and cinema-environment at their default argument are the REAL_MOON-on ones over 200 computeSun states, and not the legacy moon',
+    shipped.flags.REAL_MOON === true && shipped.probe.shipFlags.REAL_MOON === true && shipped.probe.moonDefaultIsOn && !shipped.probe.moonDefaultIsOff && shipped.probe.cinemaDefaultIsOn && !shipped.probe.cinemaDefaultIsOff,
+    JSON.stringify({ flag: shipped.flags.REAL_MOON, moonOn: shipped.probe.moonDefaultIsOn, moonLegacy: shipped.probe.moonDefaultIsOff, cinemaOn: shipped.probe.cinemaDefaultIsOn, cinemaLegacy: shipped.probe.cinemaDefaultIsOff }));
 }
 
-// ---- program texts: default frame unchanged; REAL_MOON's terminator -------
+// ---- program texts: the W0 frame unchanged; the shipped frame; REAL_MOON's terminator
 {
+  const w0 = legOut('w0');
   const def = legOut('default');
   const moon = legOut('real-moon');
   // Frozen from main@940b751 (W0) with this gate's `--leg=default` run on a
-  // `git archive main` tree: the texts the shipped default frame compiles.
+  // `git archive main` tree: the texts W0's default frame compiles (every Ship
+  // Pass flag off). Since the merge to main ships the flags on, the `w0` leg
+  // reproduces that frame by pinning every Ship Pass flag off.
   const MAIN_TEXT = {
     classicMarch: '03821508333b904513d51928b7e43d8e0204fef57ba84690666f1ce41d1bc1e5',
     classicComposite: 'bf4a2acce654864dcbd2bf69e7653d6d54794269ceba1e1c8fe06c97fd858a76',
@@ -360,11 +457,44 @@ const DEG = Math.PI / 180;
     aerialMerged: '6858bc1b736ebd70a88560ff969d7b1afb2bd787e686a4faf5c5ff0747bb9ba3',
     aerialMergedDefines: '3d6d630c952d59c8b953fc3d91e8bd13e976057c37625a65b2f3712dcafa42f8',
   };
-  const diff = Object.keys(MAIN_TEXT).filter((k) => def.hashes[k] !== MAIN_TEXT[k]);
-  row('TEXT (a) default flags: every SKY program text and the merged aerial defines hash to main\'s (sha256)', !diff.length, diff.length ? `differs: ${diff.join(', ')}` : `${Object.keys(MAIN_TEXT).length} texts`);
-  row('TEXT (b) default flags: no phase terminator, no REAL_MOON uniform', !def.compositeHasPhase && !def.uniforms.includes('uShipMoon'));
-  row('SK-3 (n) REAL_MOON on: the composite draws the terminator and binds uShipMoon; every other program is the default one',
-    moon.compositeHasPhase && moon.uniforms.includes('uShipMoon') && Object.keys(MAIN_TEXT).filter((k) => k !== 'composite').every((k) => moon.hashes[k] === def.hashes[k]));
+  const w0Pinned = SHIP_FLAGS.length === 20 && Object.keys(w0.probe.shipFlags).length === SHIP_FLAGS.length
+    && Object.values(w0.probe.shipFlags).every((v) => v === false) && Object.values(w0.flags).every((v) => v === false);
+  const diff = Object.keys(MAIN_TEXT).filter((k) => w0.hashes[k] !== MAIN_TEXT[k]);
+  row('TEXT (a) W0 frame (every Ship Pass flag pinned off): every SKY program text and the merged aerial defines hash to main\'s (sha256)', w0Pinned && !diff.length,
+    `${SHIP_FLAGS.length} flags pinned off; ${diff.length ? `differs: ${diff.join(', ')}` : `${Object.keys(MAIN_TEXT).length} texts`}`);
+  row('TEXT (b) W0 frame: no phase terminator, no REAL_MOON uniform', w0Pinned && !w0.compositeHasPhase && !w0.uniforms.includes('uShipMoon'));
+  row('SK-3 (n) REAL_MOON on: the composite draws the terminator and binds uShipMoon; every other program is the W0 one',
+    moon.flags.REAL_MOON === true && moon.compositeHasPhase && moon.uniforms.includes('uShipMoon') && Object.keys(MAIN_TEXT).filter((k) => k !== 'composite').every((k) => moon.hashes[k] === w0.hashes[k]));
+  // The shipped frame (no pins: every Ship Pass flag on since the merge to
+  // main). (c) first: with SKY's three pinned off, the other streams' shipped
+  // flags reach SKY's programs only through CITY's NIGHT_RHYTHM (its seam edit
+  // of the VIIRS near fade in the Enhanced / merged aerial; verify-ship-city
+  // owns that edit): every program is W0's, or W0 + NIGHT_RHYTHM's while
+  // NIGHT_RHYTHM ships on.
+  const others = legOut('others'), nr = legOut('night-rhythm');
+  const PROGRAMS = Object.keys(MAIN_TEXT);
+  const nrShipped = others.probe.shipFlags.NIGHT_RHYTHM === true;
+  const othersMoved = PROGRAMS.filter((k) => others.hashes[k] !== w0.hashes[k]);
+  const nrMoved = PROGRAMS.filter((k) => nr.hashes[k] !== w0.hashes[k]);
+  row('TEXT (c) shipped default, SKY\'s three pinned off: no other stream\'s shipped flag reaches SKY\'s programs but CITY\'s NIGHT_RHYTHM — every text is W0\'s, or W0 + NIGHT_RHYTHM\'s while it ships on',
+    Object.values(others.flags).every((v) => v === false) && Object.values(nr.flags).every((v) => v === false) && nr.probe.shipFlags.NIGHT_RHYTHM === true
+    && PROGRAMS.every((k) => others.hashes[k] === (nrShipped ? nr : w0).hashes[k]),
+    `NIGHT_RHYTHM ships ${nrShipped ? 'on' : 'off'}; moved off W0: shipped minus SKY ${othersMoved.join(', ') || 'none'}, W0 + NIGHT_RHYTHM ${nrMoved.join(', ') || 'none'}`);
+  // (d): SKY's three on the shipped frame add exactly their edits, once each,
+  // and nothing else. With both text edits reverted, the march and the aerial
+  // programs are the shipped-minus-SKY ones; the composite is W0's plus
+  // REAL_MOON's terminator (SK-3 (n)'s composite), the shipped-minus-SKY
+  // composite being W0's; every program no SKY flag edits is as it is without SKY.
+  const withLite = ['march', 'composite', 'aerialEnhanced', 'aerialMerged'];
+  const shippedDiff = [
+    ...['march', 'aerialEnhanced', 'aerialMerged'].filter((k) => def.bothReverted[k] !== others.hashes[k]),
+    ...(def.bothReverted.composite !== moon.hashes.composite || others.hashes.composite !== w0.hashes.composite ? ['composite'] : []),
+    ...PROGRAMS.filter((k) => !withLite.includes(k) && def.hashes[k] !== others.hashes[k]),
+  ];
+  row('TEXT (d) shipped default: AERIAL_CLARITY, REAL_MOON and SKY_LITE ship on (owner, merge to main 2026-10-30) — the shipped SKY programs are the frame without them plus exactly their edits: the terminator and uShipMoon in the composite, the reach edit once in the march / composite / Enhanced / merged aerial, the clarity term once in the Enhanced / merged aerial, and nothing else',
+    Object.values(def.flags).every((v) => v === true) && def.compositeHasPhase && def.uniforms.includes('uShipMoon') && withLite.every((k) => def.liteCount[k] === 1)
+    && def.clarityCount.aerialEnhanced === 1 && def.clarityCount.aerialMerged === 1 && def.effectUniforms.includes('uShipClarity') && !shippedDiff.length,
+    shippedDiff.length ? `differs beyond the edits: ${shippedDiff.join(', ')}` : JSON.stringify({ flags: def.flags, lite: Object.fromEntries(withLite.map((k) => [k, def.liteCount[k]])), clarity: { enhanced: def.clarityCount.aerialEnhanced, merged: def.clarityCount.aerialMerged } }));
 }
 
 // ---- SK-5: the lens flare is deleted (D10); LIGHT_SHAFTS untouched ----------
@@ -385,7 +515,7 @@ const DEG = Math.PI / 180;
     !/livLens|livSunVisible|uLivFlare|FLARE_ON|LENS_FLARE_ACTIVE|livingWorldOn\('LENS_FLARE'\)/.test(src));
   row('SK-5 (b) ?flags=LENS_FLARE reaches no program: with LIGHT_SHAFTS + LENS_FLARE pinned on, every text equals LIGHT_SHAFTS alone, and no flare uniform exists',
     Object.keys(shafts.hashes).every((k) => lens.hashes[k] === shafts.hashes[k]) && !lens.compositeHasLens && !lens.uniformsHaveFlare);
-  row('SK-5 (c) LIGHT_SHAFTS untouched: its source and blur programs are main\'s, and its composite is main\'s minus exactly the lens',
+  row('SK-5 (c) LIGHT_SHAFTS untouched (on the W0 frame, every Ship Pass flag pinned off): its source and blur programs are main\'s, and its composite is main\'s minus exactly the lens',
     shafts.hashes.shaftSource === MAIN_SHAFTS.shaftSource && shafts.hashes.shaftBlur === MAIN_SHAFTS.shaftBlur && shafts.hashes.composite === MAIN_SHAFTS.compositeMinusLens && shafts.compositeHasShafts,
     `composite ${shafts.hashes.composite.slice(0, 12)}`);
   row('SK-5 (d) LIGHT_SHAFTS still ships off; the LENS_FLARE block stays for the lead\'s close (8.3)', C.LIGHT_SHAFTS.enabled === false && C.LENS_FLARE?.enabled === false);
@@ -409,8 +539,8 @@ const DEG = Math.PI / 180;
   const src = read('lib/fly/sky-lite.js');
   row('SK-4 (b) no raw device-class call and no GPU object: SKY_LITE is uniforms and one GLSL edit (+0 draws, +0 passes, +0 targets)',
     !/isPhoneClass|isMobileGraphicsClass|new (ShaderMaterial|WebGLRenderTarget|Mesh|EffectPass|Pass)\b/.test(src));
-  // (c) flag off: nothing reads the policy, the uniform stays 0, the deck rule is the previous one.
-  row('SK-4 (c) flag off (shipped): the aerial switch is 0 and the far deck keeps its rule on every device',
+  // (c) flag off (pinned in this process): nothing reads the policy, the uniform stays 0, the deck rule is the previous one.
+  row('SK-4 (c) flag off (pinned: `?flags=-SKY_LITE`): the aerial switch is 0 and the far deck keeps its rule on every device',
     SL.SKY_LITE_ON === false && SL.skyLiteAerialSwitch('medium', { cls: 'phone' }) === 0 && SL.skyLiteFarReachM('phone', 180, 'medium', { cls: 'phone' }) === null
     && G.skyLiteAerialGLSL('x') === 'x' && !G.ATMO_AERIAL_LOOKUP_GLSL.includes('uPskyAp.z'));
   // (d) flag on: the switch and the far deck follow the policy.
@@ -435,10 +565,10 @@ const DEG = Math.PI / 180;
     }
   }
   row('SK-4 (e) past the reach: continuous at the last slice, T falls, S rises to its asymptote S / (1 - T)', mathOk);
-  const lite = legOut('sky-lite'), def = legOut('default');
+  const lite = legOut('sky-lite'), def = legOut('w0');
   const withAerial = ['march', 'composite', 'aerialEnhanced', 'aerialMerged'];
-  row('SK-4 (f) flag on: the reach edit is in every program that looks the volume up (aerial pass, cloud march, cloud composite), once, and is the ONLY change',
-    withAerial.every((k) => lite.liteCount[k] >= 1 && lite.reverted[k] === def.hashes[k]) && ['classicMarch', 'classicComposite', 'classicFilter', 'aerialClassic', 'filter'].every((k) => lite.hashes[k] === def.hashes[k]),
+  row('SK-4 (f) flag on (on the W0 frame): the reach edit is in every program that looks the volume up (aerial pass, cloud march, cloud composite), once, and is the ONLY change',
+    lite.flags.SKY_LITE === true && withAerial.every((k) => lite.liteCount[k] >= 1 && lite.reverted[k] === def.hashes[k]) && ['classicMarch', 'classicComposite', 'classicFilter', 'aerialClassic', 'filter'].every((k) => lite.hashes[k] === def.hashes[k]),
     JSON.stringify(Object.fromEntries(withAerial.map((k) => [k, lite.liteCount[k]]))));
   const rig = read('components/fly/AtmosphereRig.jsx'), lc = read('lib/fly/living-clouds.js');
   row('SK-4 (g) wiring: AtmosphereRig writes uPskyAp.z from the policy switch; the far deck reads the lite reach before its old rule',
@@ -453,10 +583,18 @@ const DEG = Math.PI / 180;
     execFileSync(process.execPath, ['--input-type=module', '-e', "await import('./lib/fly/atmosphere/glsl.js'); await import('./lib/fly/cinema-sky.js');"], { cwd: ROOT, stdio: 'pipe' });
   } catch (e) { plain = String(e.stderr || e.message).match(/ERR_[A-Z_]+|Cannot find module '[^']+'/)?.[0] ?? 'failed'; }
   const MAIN_AERIAL_LOOKUP = 'f44601900ebffff7d656f9485bc0681057b146017ea6c5cd1edaa92623423b1a'; // git archive main
-  row('SK-4 (h) lib/fly/atmosphere/glsl.js stays dependency-free (imports only ./model.js) and plain-node importable with cinema-sky.js (verify-phys-sky\'s node half); its lookup text is main\'s, and the consumers include sky-lite\'s',
+  row('SK-4 (h) lib/fly/atmosphere/glsl.js stays dependency-free (imports only ./model.js) and plain-node importable with cinema-sky.js (verify-phys-sky\'s node half); its lookup text is main\'s (and sky-lite\'s export with SKY_LITE pinned off), and the consumers include sky-lite\'s',
     glslImports.join() === './model.js' && plain === 'ok' && sha(G.ATMO_AERIAL_LOOKUP_GLSL) === MAIN_AERIAL_LOOKUP && SL.PSKY_AERIAL_LOOKUP_GLSL === G.ATMO_AERIAL_LOOKUP_GLSL
     && ['lib/fly/immersive-cloud-pass.js', 'lib/fly/living-clouds.js', 'components/fly/AerialPerspective.jsx'].every((f) => /PSKY_AERIAL_LOOKUP_GLSL as ATMO_AERIAL_LOOKUP_GLSL \} from '[^']*sky-lite/.test(read(f)) && !/atmosphere\/glsl/.test(read(f).match(/import \{[^}]*ATMO_AERIAL_LOOKUP_GLSL[^}]*\} from '[^']+'/g)?.join() ?? '')),
     `imports ${glslImports.join(', ')}; plain node: ${plain}`);
+  // Shipped default (the unpinned leg): SK-4 (d)'s on-behaviour at the modules'
+  // default arguments, and the consumers' lookup through the reach edit.
+  const shipped = legOut('default');
+  const [swHighD, swMedD, swHighP] = shipped.probe.liteSwitch, [rPhone, rTablet, rPhoneLow, rHigh] = shipped.probe.liteReach;
+  row('SK-4 (i) shipped default: SKY_LITE ships on (owner, merge to main 2026-10-30) — unpinned, the consumers\' lookup is glsl.js\'s through the reach edit, and at their default argument the aerial switch and the far deck follow the policy (SK-4 (d))',
+    shipped.flags.SKY_LITE === true && shipped.probe.shipFlags.SKY_LITE === true && shipped.probe.liteLookupIsEdited
+    && swHighD === 0 && swMedD === 1 && swHighP === 1 && rPhone === 90000 && rTablet === 90000 && rPhoneLow === null && rHigh === null,
+    JSON.stringify({ flag: shipped.flags.SKY_LITE, lookupEdited: shipped.probe.liteLookupIsEdited, switch: shipped.probe.liteSwitch, reach: shipped.probe.liteReach }));
 }
 
 // ---- SK-2: AERIAL_CLARITY -----------------------------------------------------
@@ -464,12 +602,13 @@ const DEG = Math.PI / 180;
   const AC = await import('../lib/fly/aerial-clarity.js');
   const VM = await import('./ship-sky-veil-model.mjs');
   const P = C.AERIAL_CLARITY;
-  row('SK-2 (a) flag off (shipped): the aerial text is the input, k = 0, the effect gains no uniform',
+  // (a) flag off: this process and the `w0` leg pin it off (`?flags=-AERIAL_CLARITY`).
+  row('SK-2 (a) flag off (pinned: `?flags=-AERIAL_CLARITY`): the aerial text is the input, k = 0, the effect gains no uniform',
     AC.AERIAL_CLARITY_ON === false && AC.aerialClarityShader('x+apS*uPskySunIllum+pskyNightAir(apDir)*(1.-apT);void mainImage(') === 'x+apS*uPskySunIllum+pskyNightAir(apDir)*(1.-apT);void mainImage('
-    && AC.aerialClarityK(3000, { day: 1, overcast: 0, fog: 0 }) === 0 && !legOut('default').effectUniforms.includes('uShipClarity'));
-  const cl = legOut('aerial-clarity'), def = legOut('default');
-  row('SK-2 (b) flag on: the clarity term is in the Enhanced aerial text and the merged pass, once, and is the ONLY change; every other SKY program is default',
-    cl.clarityCount.aerialEnhanced === 1 && cl.clarityCount.aerialMerged === 1 && cl.clarityReverted.aerialEnhanced === def.hashes.aerialEnhanced && cl.clarityReverted.aerialMerged === def.hashes.aerialMerged
+    && AC.aerialClarityK(3000, { day: 1, overcast: 0, fog: 0 }) === 0 && legOut('w0').flags.AERIAL_CLARITY === false && !legOut('w0').effectUniforms.includes('uShipClarity'));
+  const cl = legOut('aerial-clarity'), def = legOut('w0');
+  row('SK-2 (b) flag on (on the W0 frame): the clarity term is in the Enhanced aerial text and the merged pass, once, and is the ONLY change; every other SKY program is the W0 one',
+    cl.flags.AERIAL_CLARITY === true && cl.clarityCount.aerialEnhanced === 1 && cl.clarityCount.aerialMerged === 1 && cl.clarityReverted.aerialEnhanced === def.hashes.aerialEnhanced && cl.clarityReverted.aerialMerged === def.hashes.aerialMerged
     && cl.effectUniforms.includes('uShipClarity') && ['march', 'composite', 'filter', 'classicMarch', 'classicComposite', 'classicFilter', 'aerialClassic'].every((k) => cl.hashes[k] === def.hashes[k]),
     JSON.stringify({ enhanced: cl.clarityCount.aerialEnhanced, merged: cl.clarityCount.aerialMerged }));
   const env = (o) => ({ day: 1, overcast: 0, fog: 0, ...o });
@@ -498,6 +637,13 @@ const DEG = Math.PI / 180;
   row('SK-2 (g) the veil harness\'s control pin `__flySkyDiag.clarity === 0`: flag-on only, after the k write, k = 0 keeps S exactly',
     kAt > 0 && pinAt > kAt && [0, 5, 12, 30, 45, 120].every((km) => AC.clarityKeep(0, km) === 1)
     && read('scripts/ship-sky-veil.cjs').includes("'clarity-k0': { boot: 'clarity', live: { set: 'window.__flySkyDiag = { clarity: 0 }'"));
+  // Shipped default (the unpinned leg): SK-2 (b)'s edit and SK-2 (c)'s k at the
+  // modules' default arguments.
+  const shipped = legOut('default');
+  row('SK-2 (h) shipped default: AERIAL_CLARITY ships on (owner, merge to main 2026-10-30) — unpinned, the effect binds uShipClarity, the Enhanced and merged aerial carry the term once, and at their default argument the text edit is the on one and k(10,000 ft clear noon) is the full strength',
+    shipped.flags.AERIAL_CLARITY === true && shipped.probe.shipFlags.AERIAL_CLARITY === true && shipped.effectUniforms.includes('uShipClarity')
+    && shipped.clarityCount.aerialEnhanced === 1 && shipped.clarityCount.aerialMerged === 1 && shipped.probe.clarityShaderIsOn && Math.abs(shipped.probe.clarityK - P.strength) < 1e-12,
+    JSON.stringify({ flag: shipped.flags.AERIAL_CLARITY, k: shipped.probe.clarityK, enhanced: shipped.clarityCount.aerialEnhanced, merged: shipped.clarityCount.aerialMerged }));
 }
 
 // ---- SK-6: the sky LUT cadence is kept ----------------------------------------

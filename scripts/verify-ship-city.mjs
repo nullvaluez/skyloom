@@ -19,6 +19,12 @@
  *        output untouched (no baked premix exists there).
  *  ...   later sections are appended by later commits (see the report).
  *
+ * CITY_RANGE, NIGHT_LITE and NIGHT_RHYTHM ship ON since the merge to main
+ * (owner, 2026-10-30). Every flag-off / W0-identity arm therefore PINS its
+ * flag off (`window.__fly<Name>Override = { enabled: false }`, the W0 arm
+ * too), so it never reads the shipped state; each flag has its own
+ * "ships on" row over a no-pin arm.
+ *
  * Run: node scripts/verify-ship-city.mjs
  * (the worker rows start the offline fixture server themselves; no network).
  */
@@ -464,19 +470,22 @@ async function main() {
   };
 
   // ===================== CT-1 / CT-2: pure logic ===========================
-  const off = runChild(['--child=logic', JSON.stringify({})]);
+  // The off arm PINS CITY_RANGE off: the flag ships on since the merge to main
+  // (owner, 2026-10-30), so an absent pin would read the shipped (on) state.
+  // "No pin" in the CT-1 rows is the CT-1 diagnosis pin (__flyCityDiag).
+  const off = runChild(['--child=logic', JSON.stringify({ __flyCityRangeOverride: { enabled: false } })]);
   {
     const { F, S } = off.shipped;
     const b = off.band;
     check(
-      'CT-1 no pin, CITY_RANGE off: the band is exactly SAT_BLDG_FADE / SAT_BUILDINGS (source shipped)',
+      'CT-1 no pin, CITY_RANGE pinned off: the band is exactly SAT_BLDG_FADE / SAT_BUILDINGS (source shipped)',
       b.source === 'shipped' && b.fadeStartM === F.fadeStartAglM && b.fadeEndM === F.fadeEndAglM && b.evictM === F.evictAglM && b.armOnM === S.on && b.liteStartM === null,
       `${b.fadeStartM}-${b.fadeEndM} m, evict ${b.evictM}, arm ${b.armOnM}`,
     );
     check('CT-1 bandFade over the shipped band is the engine\'s old expression (Object.is at 10 heights)', off.fadeSame === true);
     check('CT-1 no pin: nothing claims a pin was honoured (no __flyCityDiagApplied)', off.diag === null && !off.applied0 && !off.applied1);
-    check('CT-2 flag off: cityRangeFor() is null on every class and tier', Object.values(off.range).every((r) => r === null));
-    check('CT-2 flag off: the skyline request is the SAME object (verify-true-areas (7) text kept)', off.requestSame === true && off.requestOn === 'same');
+    check('CT-2 flag pinned off: cityRangeFor() is null on every class and tier', Object.values(off.range).every((r) => r === null));
+    check('CT-2 flag pinned off: the skyline request is the SAME object (verify-true-areas (7) text kept)', off.requestSame === true && off.requestOn === 'same');
     check('CT-2 the lite LOD switch is off by default and only the engine sets it', off.liteDefault === false && off.liteSet === true);
     check('CT-1 the engines\' per-frame band is memoised (no allocation) and still sees a pin edited in place or cleared', off.memo.same && off.memo.edited && off.memo.cleared, JSON.stringify(off.memo));
   }
@@ -523,6 +532,17 @@ async function main() {
       'CT-2 CITY_RANGE on: the skyline request carries the dense-core rule',
       on.requestOn?.cityRange?.denseMinH === R.skyline.denseMinH && on.requestOn?.cityRange?.denseTallCount === R.skyline.denseTallCount && R.skyline.denseMinH < 35,
       JSON.stringify(on.requestOn),
+    );
+  }
+  {
+    // The shipped default (no pin at all): the off arm above used to double as
+    // it while CITY_RANGE shipped off.
+    const sd = runChild(['--child=logic', JSON.stringify({})]);
+    check(
+      'CT-2 CITY_RANGE ships on (owner, merge to main 2026-10-30): with no pin every class and tier resolves as the pinned-on arm and the skyline request carries the dense-core rule; with no CT-1 pin the null-range band is still the shipped band and nothing claims a pin',
+      sd.shipped.R.enabled === true && JSON.stringify(sd.range) === JSON.stringify(on.range) && JSON.stringify(sd.requestOn) === JSON.stringify(on.requestOn) && sd.requestOn?.cityRange != null &&
+        sd.requestSame === true && JSON.stringify(sd.band) === JSON.stringify(off.band) && sd.fadeSame === true && sd.diag === null && !sd.applied0 && !sd.applied1,
+      `dgpu/high ${sd.range['dgpu/high']?.band?.source}, phone/high ${sd.range['phone/high']?.band?.source}, software/high ${sd.range['software/high']}; request ${JSON.stringify(sd.requestOn)}`,
     );
   }
 
@@ -636,7 +656,7 @@ async function main() {
   {
     const D = runChild(['--child=drawrange']);
     check(
-      'CT-3 a partly visible chunk: the shipped colour pass submits one draw per visible region run; CITY_RANGE\'s merge submits ONE',
+      'CT-3 a partly visible chunk: the split colour pass (W0, and CITY_RANGE\'s long band) submits one draw per visible region run; CITY_RANGE\'s merge submits ONE',
       D.regions === 16 && D.split.submissions > 1 && D.merged.submissions === 1 && D.mergeDefault === false,
       `${D.regions} regions: split ${D.split.submissions} submissions -> merged ${D.merged.submissions}`,
     );
@@ -649,13 +669,21 @@ async function main() {
 
   // ===================== CT-4: NIGHT_LITE =====================================
   {
-    const nOff = runChild(['--child=night', JSON.stringify({})]);
+    // The off arm PINS NIGHT_LITE off (it ships on since the merge to main,
+    // owner, 2026-10-30); the shipped default is its own arm below.
+    const nOff = runChild(['--child=night', JSON.stringify({ __flyNightLiteOverride: { enabled: false } })]);
     const nOn = runChild(['--child=night', JSON.stringify({ __flyNightLiteOverride: { enabled: true } })]);
+    const nShipped = runChild(['--child=night', JSON.stringify({})]);
     const fly = read('components/fly/FlyScene.jsx');
     const block = fly.slice(fly.indexOf('SHIP PASS CITY mounts begin'), fly.indexOf('SHIP PASS CITY mounts end'));
     check(
-      'CT-4 flag off: NIGHT_LITE_ON is false and FlyScene mounts SatNightLite only behind it (no worker, no draw, no global)',
+      'CT-4 flag pinned off: NIGHT_LITE_ON is false and FlyScene mounts SatNightLite only behind it (no worker, no draw, no global)',
       nOff.on === false && nOn.on === true && /NIGHT_LITE_ON && mapStyle === 'satellite' && satelliteVisualsOn\('lighting'\) && \(\s*<SatNightLite /.test(block),
+    );
+    check(
+      'CT-4 NIGHT_LITE ships on (owner, merge to main 2026-10-30): with no pin NIGHT_LITE_ON is true and the block, program, pool, ramp, placement, policy and prewarm are the pinned-on arm\'s',
+      nShipped.on === true && JSON.stringify(nShipped) === JSON.stringify(nOn),
+      `on ${nShipped.on}`,
     );
     check(
       "CT-4 FlyScene's own gated SatCityGlow mount is untouched (still !satelliteVisualsOn('lighting'))",
@@ -721,17 +749,30 @@ async function main() {
     }
     const archCur = path.join(ROOT, 'lib/fly/satellite-architecture-material.js');
     const nlCur = path.join(ROOT, 'lib/fly/night-lights-atlas.js');
-    const cur = runChild(['--child=programs', JSON.stringify({}), archCur, nlCur]);
+    // `cur` is the flag-OFF arm: it PINS NIGHT_RHYTHM off (the flag ships on
+    // since the merge to main, owner, 2026-10-30), and the W0 arm carries the
+    // same pin, so the one file is the only difference between the two.
+    const OFF_PIN = JSON.stringify({ __flyNightRhythmOverride: { enabled: false } });
+    const cur = runChild(['--child=programs', OFF_PIN, archCur, nlCur]);
     const on = runChild(['--child=programs', JSON.stringify({ __flyNightRhythmOverride: { enabled: true } }), archCur, nlCur]);
+    const shippedP = runChild(['--child=programs', JSON.stringify({}), archCur, nlCur]);
     if (haveMain) {
-      const base = runChild(['--child=programs', JSON.stringify({}), archMain, nlMain]);
+      const base = runChild(['--child=programs', OFF_PIN, archMain, nlMain]);
       const diff = Object.keys(base.programs).filter((k) => base.programs[k].vs !== cur.programs[k].vs || base.programs[k].fs !== cur.programs[k].fs || base.programs[k].key !== cur.programs[k].key || cur.programs[k].error);
       check(
-        "CT-5 flag off: the four architecture programs (near/far x Enhanced/Classic) are main's text and keys, byte for byte",
+        "CT-5 flag pinned off: the four architecture programs (near/far x Enhanced/Classic) are main's text and keys, byte for byte",
         diff.length === 0,
         diff.length ? `differ: ${diff.join(', ')}` : Object.values(cur.programs).map((p) => `${p.fs}`).join(' '),
       );
-      check("CT-5 flag off: NIGHT_LIGHTS' aerial-pass text is main's, byte for byte", base.nl.sha === cur.nl.sha, cur.nl.sha);
+      check("CT-5 flag pinned off: NIGHT_LIGHTS' aerial-pass text is main's, byte for byte", base.nl.sha === cur.nl.sha, cur.nl.sha);
+    }
+    {
+      const same = Object.keys(on.programs).filter((k) => shippedP.programs[k]?.vs === on.programs[k].vs && shippedP.programs[k]?.fs === on.programs[k].fs && shippedP.programs[k]?.key === on.programs[k].key && !shippedP.programs[k]?.error);
+      check(
+        'CT-5 NIGHT_RHYTHM ships on (owner, merge to main 2026-10-30): with no pin the four architecture programs and the NIGHT_LIGHTS text are the pinned-on arm\'s, byte for byte (keys carry |night-rhythm-v1)',
+        same.length === 4 && Object.values(shippedP.programs).every((p) => p.key.includes('|night-rhythm-v1')) && shippedP.nl.sha === on.nl.sha,
+        `${same.length}/4 programs; NIGHT_LIGHTS ${shippedP.nl.sha}`,
+      );
     }
     rmSync(tmp, { recursive: true, force: true });
     const errs = Object.entries(on.programs).filter(([, p]) => p.error);

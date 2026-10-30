@@ -93,6 +93,30 @@ const atBase = (rel) => {
     return null;
   }
 };
+/**
+ * A fresh instance of the one flag reader (lib/fly/ship-pass.js) resolved
+ * under a `?flags=` URL exactly as a page load resolves it: installUrlFlags
+ * writes the `window.__fly<Name>Override` pins, then the reader evaluates.
+ * Every FRAME flag ships ON since the merge to main (owner, 2026-10-30), so a
+ * flag-off arm PINS its flag off through this (`?flags=-NAME`) instead of
+ * reading the shipped constant as its off state; an on arm pins it on.
+ */
+let pinSeq = 0;
+async function shipPassUnder(search) {
+  const { installUrlFlags } = await mod('lib/fly/fly-pins.js');
+  await mod('lib/fly/fly-constants.js'); // loaded before the fake window goes up
+  const had = Object.prototype.hasOwnProperty.call(globalThis, 'window');
+  const prev = globalThis.window;
+  const win = { location: { search } };
+  installUrlFlags(win);
+  globalThis.window = win;
+  try {
+    return await import(`${path.join(ROOT, 'lib/fly/ship-pass.js')}?pin=${++pinSeq}`);
+  } finally {
+    if (had) globalThis.window = prev;
+    else delete globalThis.window;
+  }
+}
 
 // ===========================================================================
 // FR-2 — checkShaderErrors: false only in production, outside automation
@@ -711,10 +735,43 @@ const atBase = (rel) => {
     const { benchmarkScore, resetBenchmark } = await mod('lib/fly/gpu-benchmark.js');
     resetBenchmark(undefined);
     let measured = 0;
-    assert(benchmarkScore({ measure: () => (measured++, hi) }) === null && measured === 0, 'flag off: no score, no measurement');
+    // DEVICE_POLICY ships on (owner, merge to main 2026-10-30): this module
+    // call says no for want of a window (node), not of the flag. The flag-off
+    // arm is the pinned A/B below.
+    assert(benchmarkScore({ measure: () => (measured++, hi) }) === null && measured === 0, 'node (no window): no score, no measurement');
+    // The flag-off arm, PINNED (?flags=-DEVICE_POLICY through the one reader),
+    // against the same evaluation pinned on (?flags=DEVICE_POLICY), both with a
+    // window and storage, so the flag is the only thing that can say no.
+    const benchIn = (reader) => {
+      const code = src.replace(/^import[\s\S]*?;\n/gm, '').replace(/^export /gm, '');
+      const store = new Map();
+      const ctx = vm.createContext({
+        shipPassOn: reader.shipPassOn,
+        shipPassBlock: reader.shipPassBlock,
+        process: { env: {} },
+        window: { localStorage: { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, v) } },
+      });
+      vm.runInContext(`${code}\n;globalThis.__api = { benchmarkScore, resetBenchmark };`, ctx);
+      return { api: ctx.__api, store };
+    };
+    const off = await shipPassUnder('?flags=-DEVICE_POLICY');
+    const on = await shipPassUnder('?flags=DEVICE_POLICY');
+    assert(off.shipPassOn('DEVICE_POLICY') === false && on.shipPassOn('DEVICE_POLICY') === true, 'the ?flags= pins reach the one reader');
+    const b0 = benchIn(off);
+    let offMeasured = 0;
+    b0.api.resetBenchmark(undefined);
+    assert(b0.api.benchmarkScore({ measure: () => (offMeasured++, hi), renderer: 'NVIDIA GeForce RTX 5080' }) === null, 'pinned off: no score');
+    b0.api.resetBenchmark(undefined);
+    assert(b0.api.benchmarkScore({ measure: () => (offMeasured++, hi), skip: 'software' }) === null, 'pinned off: not even the fixed software score');
+    assert(offMeasured === 0 && b0.store.size === 0, `pinned off: measured ${offMeasured}, stored ${b0.store.size}`);
+    const b1 = benchIn(on);
+    let onMeasured = 0;
+    b1.api.resetBenchmark(undefined);
+    assert(b1.api.benchmarkScore({ measure: () => (onMeasured++, hi), renderer: 'NVIDIA GeForce RTX 5080' }) != null && onMeasured === 1 && b1.store.size === 1, 'pinned on (control): the same evaluation measures once and stores');
     const fs = read('lib/fly/fly-settings.js');
     const block = fs.slice(fs.indexOf('// SHIP PASS FRAME start tier begin'), fs.indexOf('// SHIP PASS FRAME start tier end'));
     assert(/benchmarkStart\(\)/.test(block) && /if \(bench\?\.tier\) return bench\.tier;/.test(block), 'the start-tier block consults the benchmark first');
+    return `?flags=-DEVICE_POLICY: no score, 0 measured, 0 stored; ?flags=DEVICE_POLICY: measured ${onMeasured}, stored ${b1.store.size}`;
   });
   await check('FR-10 (d) with DEVICE_POLICY on, a software renderer is not measured (fixed low score, nothing stored); any other class measures once and caches; a doubled batch that would pass the cap is never issued', () => {
     // gpu-benchmark.js evaluated with the flag ON (its ship-pass import
@@ -888,11 +945,55 @@ const atBase = (rel) => {
     g.force(-1, 0);
     eq(events, ['dpr:1'], 'the first step sheds supersampling and nothing else');
   });
-  await check('FR-12 (b) off by default; needs a DPR-1 display, Ultra, a dGPU and a high benchmark', async () => {
+  await check('FR-12 (b) ships on (owner, merge to main 2026-10-30); needs a DPR-1 display, Ultra, a dGPU and a high benchmark', async () => {
     const { ULTRA_SUPERSAMPLE } = await mod('lib/fly/fly-constants.js');
-    assert(ULTRA_SUPERSAMPLE.enabled === false && ULTRA_SUPERSAMPLE.maxScale === 1.5);
+    assert(ULTRA_SUPERSAMPLE.enabled === true && ULTRA_SUPERSAMPLE.maxScale === 1.5);
+    const { shipPassOn } = await mod('lib/fly/ship-pass.js');
+    assert(shipPassOn('ULTRA_SUPERSAMPLE') === true, 'the one reader, unpinned, resolves the shipped state on');
     const src = read('lib/fly/render-resolution.js');
     for (const need of ["shipPassOn('ULTRA_SUPERSAMPLE')", '(window.devicePixelRatio || 1) !== 1', "deviceFeature('ULTRA_SUPERSAMPLE'", "benchmarkStart()?.grade !== 'high'"]) assert(src.includes(need), need);
+  });
+  await check('FR-12 (c) pinned arms (?flags= through the one reader): -ULTRA_SUPERSAMPLE never supersamples, a DPR-1 Ultra dGPU with a high benchmark boots at DPR 1 (the pre-pass rule); ULTRA_SUPERSAMPLE boots it at 1.5 and nothing else', async () => {
+    // render-resolution.js evaluated with its imports stubbed: the real policy
+    // table (device-policy.js deviceFeature with the class and score given),
+    // the real decideStart, and the stub benchmarkStart mirroring
+    // device-policy.js's own gate (no score without DEVICE_POLICY).
+    const dpSrc = read('lib/fly/device-policy.js');
+    assert(/export function benchmarkStart\(\) \{\n  if \(start !== undefined\) return start;\n  if \(!shipPassOn\('DEVICE_POLICY'\) \|\| typeof window === 'undefined'\) return \(start = null\);/.test(dpSrc), 'benchmarkStart is gated on DEVICE_POLICY (the stub below mirrors it)');
+    const code = read('lib/fly/render-resolution.js').replace(/^import[\s\S]*?;\n/gm, '').replace(/^export /gm, '');
+    const { CANVAS } = await mod('lib/fly/fly-constants.js');
+    const dp = await mod('lib/fly/device-policy.js');
+    const { decideStart } = await mod('lib/fly/gpu-benchmark.js');
+    const boot = (reader, { dpr = 1, preset = 'ultra', cls = 'dgpu', grade = 'high' } = {}) => {
+      const score = { grade };
+      const start = decideStart({ score, cls });
+      const ctx = vm.createContext({
+        CANVAS,
+        isMobileGraphicsClass: () => cls === 'phone' || cls === 'tablet',
+        useFlyStore: { getState: () => ({ qualityPreset: preset }) },
+        benchmarkStart: () => (reader.shipPassOn('DEVICE_POLICY') ? start : null),
+        deviceFeature: (f, c) => dp.deviceFeature(f, { ...c, cls, score }),
+        shipPassOn: reader.shipPassOn,
+        shipPassBlock: reader.shipPassBlock,
+        window: { devicePixelRatio: dpr },
+      });
+      vm.runInContext(`${code}\n;globalThis.__api = { ultraSupersampleScale, initialRenderDpr };`, ctx);
+      return { ss: ctx.__api.ultraSupersampleScale(), dpr: ctx.__api.initialRenderDpr() };
+    };
+    const off = await shipPassUnder('?flags=DEVICE_POLICY,-ULTRA_SUPERSAMPLE');
+    const on = await shipPassUnder('?flags=DEVICE_POLICY,ULTRA_SUPERSAMPLE');
+    const noPolicy = await shipPassUnder('?flags=-DEVICE_POLICY,ULTRA_SUPERSAMPLE');
+    assert(off.shipPassOn('ULTRA_SUPERSAMPLE') === false && off.shipPassOn('DEVICE_POLICY') === true, 'off arm pins');
+    assert(on.shipPassOn('ULTRA_SUPERSAMPLE') === true && on.shipPassOn('DEVICE_POLICY') === true, 'on arm pins');
+    assert(noPolicy.shipPassOn('ULTRA_SUPERSAMPLE') === true && noPolicy.shipPassOn('DEVICE_POLICY') === false, 'no-policy arm pins');
+    const o = boot(off);
+    assert(o.ss === null && o.dpr === 1, `pinned off on the eligible device: ${JSON.stringify(o)}`);
+    const n = boot(on);
+    assert(n.ss === 1.5 && n.dpr === 1.5, `pinned on on the eligible device: ${JSON.stringify(n)}`);
+    const miss = { 'DPR 2': boot(on, { dpr: 2 }), High: boot(on, { preset: 'high' }), iGPU: boot(on, { cls: 'igpu' }), 'medium benchmark': boot(on, { grade: 'medium' }), 'no DEVICE_POLICY': boot(noPolicy) };
+    const bad = Object.entries(miss).filter(([, r]) => r.ss !== null).map(([k, r]) => `${k}: ${r.ss}`);
+    assert(!bad.length, `supersampled without its condition: ${bad.join(', ')}`);
+    return `off ${JSON.stringify(o)}, on ${JSON.stringify(n)}; null on ${Object.keys(miss).join(', ')}`;
   });
 }
 
@@ -923,9 +1024,15 @@ const atBase = (rel) => {
 // ===========================================================================
 {
   const C = await mod('lib/fly/fly-constants.js');
-  await check('flags (a) DEVICE_POLICY and ULTRA_SUPERSAMPLE ship off (device evidence); PACE_ADAPT.turn ships off', () => {
-    assert(C.DEVICE_POLICY.enabled === false && C.ULTRA_SUPERSAMPLE.enabled === false && C.PACE_ADAPT.turn.enabled === false);
-    return `SHADER_READY ${C.SHADER_READY.enabled}, PACE_ADAPT ${C.PACE_ADAPT.enabled}, DEVICE_POLICY ${C.DEVICE_POLICY.enabled}, ULTRA_SUPERSAMPLE ${C.ULTRA_SUPERSAMPLE.enabled}`;
+  await check('flags (a) SHADER_READY, PACE_ADAPT, DEVICE_POLICY and ULTRA_SUPERSAMPLE ship on (owner, merge to main 2026-10-30); PACE_ADAPT.turn ships off', async () => {
+    // The owner enabled every Ship Pass flag at the merge to main without the
+    // 5080 motion check; the sub-switches did not move (turn stays off).
+    assert(C.SHADER_READY.enabled === true && C.PACE_ADAPT.enabled === true && C.DEVICE_POLICY.enabled === true && C.ULTRA_SUPERSAMPLE.enabled === true && C.PACE_ADAPT.turn.enabled === false);
+    // The shipped default as a page load with no pin resolves it (the one reader).
+    const { shipPassFlags } = await mod('lib/fly/ship-pass.js');
+    const f = shipPassFlags();
+    assert(f.SHADER_READY === true && f.PACE_ADAPT === true && f.DEVICE_POLICY === true && f.ULTRA_SUPERSAMPLE === true, `the one reader, unpinned: ${JSON.stringify(f)}`);
+    return `SHADER_READY ${C.SHADER_READY.enabled}, PACE_ADAPT ${C.PACE_ADAPT.enabled}, DEVICE_POLICY ${C.DEVICE_POLICY.enabled}, ULTRA_SUPERSAMPLE ${C.ULTRA_SUPERSAMPLE.enabled}, PACE_ADAPT.turn ${C.PACE_ADAPT.turn.enabled}`;
   });
   await check('flags (b) flag-off identity: every cinema profile\'s rendering fields and every resolveCinemaProfile answer equal the W0 module', async () => {
     const seed = atBase('lib/fly/cinema-profile.js');
