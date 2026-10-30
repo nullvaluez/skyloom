@@ -973,6 +973,34 @@ iPhone number.
 | Prewarm | registered | SKY block of `lib/fly/prewarm-registry.js`: `SKY:real-moon-composite` (REAL_MOON), `SKY:sky-lite-clouds` and `SKY:sky-lite-aerial` (SKY_LITE). SKY's flag-on texts REPLACE default ones for the page load, so each entry builds clones of the live materials (the cloud pass's Enhanced pair; the composer's merged aerial pass), published through `lib/fly/sky-prewarm.js`; the existing chain prewarm (`prewarm.js` through `buildPassList`) builds the flag-on text by construction. | `verify-ship-sky` PREWARM row: three keys, each reachable only with its flag, each `build()` an Object3D |
 | SK-2 | not started (waits on SK-1's table) | | |
 
+**SK-1 — the atmosphere's share of the veil (SKY's half of the table).**
+Two instruments. (1) `scripts/ship-sky-veil-model.mjs`: the shipped
+atmosphere's own CPU mirror (`lib/fly/atmosphere/model.js`, the same medium and
+integrator as the GPU tables), the harness geometry (Midtown 20° below the
+horizon, July clear noon, sun behind the eye, city albedo 0.12), metric = the
+contrast transfer G·T / (G·T + S) of the ground under the aerial in-scatter
+(1 = no veil). Venue-independent and exact for the atmosphere term alone:
+
+| Eye height | 5,000 ft | 6,000 ft | 7,500 ft | 8,500 ft | 10,000 ft | 50 km sight line (10,000 ft) |
+|---|---|---|---|---|---|---|
+| shipped atmosphere: transfer (vs 6,000 ft) | 0.817 (+3.2%) | 0.792 | 0.758 (−4.3%) | 0.738 (−6.8%) | 0.711 (−10.2%) | 0.283 |
+| aerosol removed (turbidity 0) | 0.830 | 0.805 | 0.771 | 0.751 (−6.7%) | 0.724 (−10.0%) | 0.306 |
+| Rayleigh removed | 0.986 | 0.984 | 0.983 | 0.982 (−0.2%) | 0.982 (−0.3%) | 0.907 |
+
+So the atmosphere alone costs Midtown ≈ 7% of its contrast from 6,000 to
+8,500 ft and ≈ 10% to 10,000 ft (inside the 15% row by itself), and that
+share is **Rayleigh in-scatter over dark imagery, not aerosol**: taking the
+Mie medium out entirely moves it by 0.1–0.2 points. The haze mix is already
+scene-linear in the physical path (`lit = ground·T + S·E`), and the ground
+mist burns off by a 19° sun, so neither "Mie density with altitude", "the
+haze-mix colour space" nor "mist coupling" can remove it — the in-scatter on
+the near and mid field is the lever (SK-2). (2) `scripts/ship-sky-veil.cjs`:
+the rendered fixture matrix (arms baseline / `aerial-pin` / `air-off` /
+`no-mist` / CITY's two), fixture/SwiftShader — **its run is queued on the
+shared heavy lock; its rows land here when it completes**; CITY's arms read
+"pending merged tree" on this branch and the lead re-runs the harness on the
+merged tree.
+
 **Flags.** `AERIAL_CLARITY`, `REAL_MOON`, `SKY_LITE`: `enabled:false` (look
 flags; section 3.8 — the owner flips each after the 5080 motion bar).
 `REAL_MOON` tunables live in its block (`floorK`, `horizonBandDeg`,
@@ -998,7 +1026,8 @@ shape kept; additive `lightK` is the ground's moonlight relative to today's
 (1 with REAL_MOON off), the number a night exposure balance wants.
 
 **Files outside the listed ownership:** new and SKY's own — `lib/fly/sky-diag.js`,
-`lib/fly/sky-lite.js`, `lib/fly/sky-prewarm.js`, `scripts/ship-sky-veil.cjs`; edited minimally — `scripts/verify-living-sky.mjs`
+`lib/fly/sky-lite.js`, `lib/fly/sky-prewarm.js`, `scripts/ship-sky-veil.cjs`,
+`scripts/ship-sky-veil-model.mjs`; edited minimally — `scripts/verify-living-sky.mjs`
 (one marker line, SK-5).
 <!-- SHIP PASS SKY report end -->
 

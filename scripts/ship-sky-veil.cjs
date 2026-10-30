@@ -55,6 +55,7 @@
  * USAGE (one browser at a time: hold /home/user/ship-pass-shared/heavy.lock):
  *   FLY_URL=http://localhost:3132 FLY_TILE_FIXTURE=1 node scripts/ship-sky-veil.cjs
  *   options: --arms=baseline,aerial-pin,air-off,no-mist,city-fade,city-premix
+ *            (and `clarity`, ?flags=AERIAL_CLARITY, SK-2's own arm, opt-in)
  *            --alts=5000,6000,7500,8500,10000   --depression=20  --crop=0.16
  *            --fadeStartM=4500 --fadeEndM=5000 (the city-fade arm's pin)
  *            --width=960 --height=600 --quality=high --settle=4000
@@ -98,8 +99,11 @@ const ARMS = {
   'no-mist': { boot: 'no-mist', flags: '-GROUND_MIST' },
   'city-fade': { boot: 'city-fade', cityPin: { ...CITY_FADE } },
   'city-premix': { boot: 'city-premix', cityPin: { skylinePremix: 0 } },
+  // SK-2 (opt-in with --arms): the fix's own arm, against the baseline.
+  clarity: { boot: 'clarity', flags: 'AERIAL_CLARITY' },
 };
-const wanted = String(args.arms || Object.keys(ARMS).join(',')).split(',').filter((a) => ARMS[a]);
+const SK1_ARMS = ['baseline', 'aerial-pin', 'air-off', 'no-mist', 'city-fade', 'city-premix'];
+const wanted = String(args.arms || SK1_ARMS.join(',')).split(',').filter((a) => ARMS[a]);
 
 /** UTC epoch of local SOLAR noon at a longitude on a fixed summer date. */
 const solarNoon = (lon, day = Date.UTC(2026, 6, 18)) => day + (12.5 - lon / 15) * 3600000;
