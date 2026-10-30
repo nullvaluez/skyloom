@@ -975,5 +975,12 @@ Severity and effort are the auditors' estimates. "Where" names the requirement t
 ### RELEASE
 
 <!-- SHIP PASS RELEASE report begin -->
-(not started)
+**Status (2026-10-30, cloud venue, branch `ship/release`): IN PROGRESS.**
+Order: P0 (RL-11, RL-2, RL-3, RL-1) then P1 (RL-4, RL-6, RL-9, RL-5) then P2.
+
+| ID | Status | What landed / evidence |
+|---|---|---|
+| RL-11 | done | `CinemaTitle.jsx`: the Takeoff & Landing row reads "Real runways, worldwide."; the Continue sub-label "From the gate" shows only while `GATE_TO_GATE` is on (falls back to "Takeoff & landing"). No testid moved. |
+
+Flags: all RELEASE blocks `enabled:false` so far.
 <!-- SHIP PASS RELEASE report end -->
