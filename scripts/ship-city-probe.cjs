@@ -271,6 +271,19 @@ async function stillDiff(page, a, b) {
   );
 }
 
+/** Hide the DOM overlays and the uncontrolled movers for a still pair. */
+async function stillQuiet(page) {
+  await page.addStyleTag({ content: '* { visibility: hidden !important; } canvas[data-engine] { visibility: visible !important; }' });
+  await page.evaluate(() => {
+    if (window.__flyPlayer) window.__flyPlayer.visible = false;
+    let scene = window.__flyPlayer ?? window.__fly?.engine?.object ?? null;
+    while (scene && scene.parent) scene = scene.parent;
+    scene?.traverse((o) => {
+      if (o.isInstancedMesh && (o._isModel !== undefined || o._painted !== undefined)) o.visible = false;
+    });
+  });
+}
+
 async function shot(page, name) {
   const png = await page.screenshot({ path: path.join(OUT, `${name}.png`), timeout: 120000 });
   return png;
@@ -524,9 +537,16 @@ async function smoke() {
       const row = { m, ...st, ...L, ...(attr ? { census: { settledMs, ...attr } } : {}) };
       // --still=MS: a second still of the same pose MS later (the crawl check).
       if (args.still && m === poses[poses.length - 1]) {
+        // The pair reads the WORLD only: the HUD (tips card, toasts) and the
+        // movers the probe does not control (the bobbing player rig, the
+        // traffic instances; verify-sat-night's R17 idiom) are hidden first,
+        // so what moves between the two stills is the ground's own crawl.
+        await stillQuiet(page);
+        await page.waitForTimeout(1500);
+        const a = await shot(page, `${tag}-still0`);
         await page.waitForTimeout(Number(args.still));
         const png2 = await shot(page, `${tag}-still`);
-        row.still = await stillDiff(page, png, png2);
+        row.still = await stillDiff(page, a, png2);
       }
       res.poses.push(row);
       log('POSE', arm, m, st, L, row.still ? { still: row.still } : '');
@@ -755,7 +775,11 @@ async function settleProbe() {
   else if (MODE === 'census') await census();
   else if (MODE === 'smoke') await smoke();
   else throw new Error(`unknown --mode=${MODE}`);
-})().catch((e) => {
+})()
+  // Exit explicitly: a fixture route / pending timer can keep node alive after
+  // the browser closes, and a hung probe holds the shared heavy lock to its timeout.
+  .then(() => process.exit(process.exitCode ?? 0))
+  .catch((e) => {
   log('PROBE FAILED:', String(e.stack || e.message).slice(0, 800));
   process.exit(1);
 });
