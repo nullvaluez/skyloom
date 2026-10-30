@@ -143,7 +143,10 @@ try {
       } catch {
         /* defaults */
       }
+      // LIGHT's pin, and FRAME's general one (deviceClassOf() on its branch):
+      // the same class before and after the two branches meet.
       window.__flyLightDeviceClass = cls;
+      window.__flyDeviceClassOverride = cls;
       window.__flySunOverride = Date.UTC(2026, 8, 27, 17);
     }, { cls, tier: phone ? 'medium' : 'high' });
     try {
@@ -154,12 +157,22 @@ try {
       if (hires.err) throw new Error(hires.err);
       fs.writeFileSync(path.join(OUT, `${arm}-auto.png`), Buffer.from(hires.b64, 'base64'));
       const policy = deviceFeature('PHOTO_HIRES', { cls, tier: phone ? 'medium' : 'high' });
-      const plan = on ? photoExportPlan({ bufW: hires.before.w, bufH: hires.before.h, request: 'auto', budget: policy.budget, block: PHOTO_HIRES, limits: hires.limits }) : { outW: hires.before.w, outH: hires.before.h, scale: 1, tiles: 1 };
+      const plan = on ? photoExportPlan({ bufW: hires.before.w, bufH: hires.before.h, request: 'auto', budget: policy.budget, block: PHOTO_HIRES, limits: hires.limits, touch: phone }) : { outW: hires.before.w, outH: hires.before.h, scale: 1, tiles: 1 };
       const row = { buffer: [hires.before.w, hires.before.h], export: [hires.pngW, hires.pngH], plan, ms: Math.round(hires.ms), bytes: hires.bytes, bright: hires.bright, stats: hires.stats };
       summary.arms[arm] = row;
       const label = `${arm} (${hires.before.w}x${hires.before.h} buffer)`;
       check(`${label}: a real PNG at the planned size ${plan.outW}x${plan.outH}`, hires.magic.join() === PNG.join() && Math.abs(hires.pngW - plan.outW) <= 2 && Math.abs(hires.pngH - plan.outH) <= 2, `${hires.pngW}x${hires.pngH} in ${row.ms} ms (SwiftShader)`);
       if (on) check(`${label}: the export is supersampled (scale ${plan.scale.toFixed(3)}, long side ${Math.max(hires.pngW, hires.pngH)} px)`, plan.scale > 1 && Math.max(hires.pngW, hires.pngH) > Math.max(hires.before.w, hires.before.h));
+      // LT-6 acceptance: an iPhone export of at least 2,560 px on the long
+      // side; desktop up to 4,096. The phone row reads the policy's maxScale:
+      // at 2 (W0's seed) a 1266 px buffer reaches 2,532, and FRAME's contract
+      // (touch maxScale 3, device-policy.js) is what lets minLongPx land.
+      if (on && phone) {
+        const long = Math.max(hires.pngW, hires.pngH);
+        check(`${label}: LT-6 iPhone export >= 2,560 px on the long side`, long >= 2560,
+          `${long} px at policy maxScale ${policy.budget.maxScale}${long < 2560 ? ` (needs maxScale >= ${(2560 / Math.max(hires.before.w, hires.before.h)).toFixed(3)}: FRAME's touch maxScale 3 contract)` : ''}`);
+      }
+      if (on && !phone) check(`${label}: LT-6 desktop export within 4,096 px`, Math.max(hires.pngW, hires.pngH) <= 4096, `${Math.max(hires.pngW, hires.pngH)} px`);
       check(`${label}: attribution plate burned in at the export's scale`, hires.bright >= 40 && (hires.stats?.watermark ?? true) === true, `${hires.bright} bright px in ${hires.plate.join('x')}`);
       check(`${label}: renderer, composer and camera restored; no context loss`,
         !hires.lost && hires.after.pr === hires.before.pr && hires.after.w === hires.before.w && hires.after.h === hires.before.h

@@ -14,7 +14,7 @@ import { Matrix4, Vector2 } from 'three';
 import { holdGovernor } from '@/lib/fly/frame-api';
 import { track } from '@/lib/fly/analytics';
 import { getComposer } from '@/lib/fly/step-safe';
-import { lightBlock, lightFeature } from '@/lib/fly/ship-light';
+import { lightBlock, lightFeature, lightTouch } from '@/lib/fly/ship-light';
 import { glPhotoLimits, photoExportPlan, photoHiresActive, photoTileMatrix } from '@/lib/fly/photo-hires';
 
 /**
@@ -70,7 +70,7 @@ export function PhotoCapture({runtime}) {
         pendingRef.current?.reject?.(new Error('superseded'));
         let settled=false;
         const timeout=setTimeout(()=>{settled=true;reject(new Error('Photo timed out. Resume the scene and try again.'));},15000);
-        pendingRef.current = { get settled(){return settled;}, resolve:value=>{clearTimeout(timeout);settled=true;resolve(value);}, reject:error=>{clearTimeout(timeout);settled=true;reject(error);}, t0: performance.now(), scale: options?.scale };
+        pendingRef.current = { get settled(){return settled;}, resolve:value=>{clearTimeout(timeout);settled=true;resolve(value);}, reject:error=>{clearTimeout(timeout);settled=true;reject(error);}, t0: performance.now(), scale: options?.scale, picked: () => clearTimeout(timeout) };
       });
     registerRuntimeActions({ capturePhoto });
     return () => {
@@ -102,10 +102,14 @@ export function PhotoCapture({runtime}) {
       // buffer exactly as before.
       const fly = useFlyStore.getState();
       const hires = req.scale !== undefined && photoHiresActive({ tier: fly.qualityTier, preset: fly.qualityPreset })
-        ? photoExportPlan({ bufW: w, bufH: h, request: req.scale, budget: lightFeature('PHOTO_HIRES', { tier: fly.qualityTier, preset: fly.qualityPreset }).budget, limits: glPhotoLimits(gl) })
+        ? photoExportPlan({ bufW: w, bufH: h, request: req.scale, budget: lightFeature('PHOTO_HIRES', { tier: fly.qualityTier, preset: fly.qualityPreset }).budget, limits: glPhotoLimits(gl), touch: lightTouch() })
         : null;
       let out;
       if (hires && hires.scale > 1) {
+        // The 15 s timeout guards a scene that never draws the request; this
+        // frame has it now, and a slow GPU's long supersampled frame must not
+        // reject a photo that is about to land.
+        req.picked();
         holdRef.current?.release();
         const block = lightBlock('PHOTO_HIRES');
         holdRef.current = { release: holdGovernor('photo-hires'), frames: Math.max(1, block.releaseFrames ?? 3) };

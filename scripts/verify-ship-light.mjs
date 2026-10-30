@@ -423,13 +423,17 @@ try {
     const ph = await import('../lib/fly/photo-hires.js');
     const block = { scale: 3, minLongPx: 2560, maxTiles: 16 };
     const desk = ph.photoExportPlan({ bufW: 1920, bufH: 1080, request: 'auto', budget: { maxScale: 3, maxLongPx: 4096 }, block, limits: { maxTexture: 16384, maxRenderbuffer: 16384, maxViewport: [16384, 16384] } });
-    const phone2 = ph.photoExportPlan({ bufW: 585, bufH: 1266, request: 'auto', budget: { maxScale: 2, maxLongPx: 4096 }, block });
-    const phone3 = ph.photoExportPlan({ bufW: 585, bufH: 1266, request: 'auto', budget: { maxScale: 3, maxLongPx: 4096 }, block });
+    const tblock = { ...block, touchScale: 2 };
+    const phone2 = ph.photoExportPlan({ bufW: 585, bufH: 1266, request: 'auto', budget: { maxScale: 2, maxLongPx: 4096 }, block: tblock, touch: true });
+    const phone3 = ph.photoExportPlan({ bufW: 585, bufH: 1266, request: 'auto', budget: { maxScale: 3, maxLongPx: 4096 }, block: tblock, touch: true });
+    const desk3 = ph.photoExportPlan({ bufW: 585, bufH: 1266, request: 'auto', budget: { maxScale: 3, maxLongPx: 4096 }, block: tblock });
+    const odd = [977, 1170, 1279, 1333, 1266].map((L) => ph.photoExportPlan({ bufW: Math.round(L * 0.46), bufH: L, request: 'auto', budget: { maxScale: 3, maxLongPx: 4096 }, block: tblock, touch: true }).outH - Math.max(2560, 2 * L));
     const one = [ph.photoExportPlan({ bufW: 800, bufH: 600, request: undefined, budget: { maxScale: 3 }, block }), ph.photoExportPlan({ bufW: 800, bufH: 600, request: 1, budget: { maxScale: 3 }, block })];
     const tiled = ph.photoExportPlan({ bufW: 2000, bufH: 1000, request: 2, budget: { maxScale: 3, maxLongPx: 4096 }, block, limits: { maxTexture: 2048, maxRenderbuffer: 2048, maxViewport: [2048, 2048] } });
     const bounded = ph.photoExportPlan({ bufW: 2000, bufH: 1000, request: 2, budget: { maxScale: 3, maxLongPx: 4096 }, block: { ...block, maxTiles: 1 }, limits: { maxTexture: 2048 } });
     check('(6a) desktop: 2-3x up to the 4,096 px long side, one offscreen render', desk.outW === 4096 && desk.outH === 2304 && desk.tiles === 1 && Math.abs(desk.scale - 4096 / 1920) < 1e-12, JSON.stringify(desk));
-    check('(6b) phone: the policy caps the scale (2x -> 2532 px; 3x -> 3798 px, >= 2,560)', phone2.outH === 2532 && phone3.outH === 3798 && phone3.outH >= 2560);
+    check('(6b) phone: touch aims at touchScale 2, raised to exactly 2,560 px only where the policy allows (maxScale 2 -> 2,532; maxScale 3 -> 2,560; non-touch 3x -> 3,798; never under 2,560 to a float floor)',
+      phone2.outH === 2532 && phone3.outH === 2560 && desk3.outH === 3798 && odd.every((d) => d === 0), `${phone2.outH} ${phone3.outH} ${desk3.outH} ${odd.join(',')}`);
     check('(6c) no request or scale 1: the drawing buffer exactly (verify-photo\'s contract)', one.every((o) => o.scale === 1 && o.outW === 800 && o.outH === 600 && o.tiles === 1));
     check('(6d) past MAX_TEXTURE_SIZE the export is tiled; the tile bound shrinks it rather than exceed', tiled.tiles === 2 && tiled.outW === 4000 && tiled.tileW <= 2048 && bounded.tiles === 1 && bounded.outW <= 2048, `${JSON.stringify(tiled)} ${JSON.stringify(bounded)}`);
     {

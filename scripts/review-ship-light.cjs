@@ -103,6 +103,7 @@ const SHADER_ERR = /Shader Error|WebGLProgram|shader|GL_INVALID|TERRAIN_SHADOW|C
           /* storage blocked: defaults */
         }
         window.__flyLightDeviceClass = cls;
+        window.__flyDeviceClassOverride = cls; // FRAME's general pin (merged tree)
         window.__flySunOverride = sun;
       }, { tier: arm.tier, cls: arm.cls, sun: arm.sun, close: !!arm.photo });
       try {
@@ -196,6 +197,8 @@ const SHADER_ERR = /Shader Error|WebGLProgram|shader|GL_INVALID|TERRAIN_SHADOW|C
             cinemaShadows: rt.cinemaShadows ?? null,
             fleet: rt.liveFleet ? { displayed: rt.liveFleet.displayed, near: rt.liveFleet.near, mid: rt.liveFleet.mid, draws: rt.liveFleet.draws, shadows: rt.liveFleet.shadows ?? null } : null,
             samplers,
+            // The composer's effects (MOBILE_ENHANCED: MobileBloomEffect on a phone).
+            effects: (composer?.passes ?? []).flatMap((p) => (p.effects ? p.effects.map((e) => e.constructor?.name) : [p.constructor?.name])),
             draws: renderer?.info?.render?.calls,
             programs: renderer?.info?.programs?.length,
             contextLost: gl?.isContextLost?.() ?? null,
