@@ -261,6 +261,38 @@ console.log('SHIP PASS RELEASE gate (verify-ship-release)\n');
     /if \(s !== 'forgiving'\) window\.__flyChallengeOverride = true;/.test(crash) && (juiceGate.match(/window\.__flyChallengeOverride = true;/g) || []).length === 2);
 }
 
+// === R  RL-3 PLAYER_SURFACE ON ================================================
+{
+  console.log('\n[R] One look (PLAYER_SURFACE)');
+  const c = read('lib/fly/fly-constants.js');
+  const blk = c.slice(c.indexOf('export const PLAYER_SURFACE = {'), c.indexOf('};', c.indexOf('export const PLAYER_SURFACE = {')));
+  gate('R1 PLAYER_SURFACE ships enabled:true', /\n  enabled: true,\n/.test(blk));
+  // A second boot after the migration: the stored Day / Enhanced simply stay.
+  const leg = (saved) => {
+    const code = `
+      import { register } from 'node:module';
+      register(${JSON.stringify(pathToFileURL(path.join(ROOT, 'scripts/_node-resolve.mjs')).href)});
+      const store = new Map(${JSON.stringify(Object.entries(saved))});
+      globalThis.window = { location: { search: '' }, localStorage: { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k) } };
+      Object.defineProperty(globalThis, 'navigator', { value: { webdriver: false }, configurable: true });
+      const imp = (r) => import(${JSON.stringify(pathToFileURL(ROOT).href)} + '/' + r);
+      const { resolveInitialMapStyle } = await imp('lib/fly/map-style.js');
+      const { resolveInitialVisuals } = await imp('lib/fly/visuals-profile.js');
+      const { useFlyStore } = await imp('stores/fly-store.js');
+      resolveInitialMapStyle(); resolveInitialVisuals();
+      const s = useFlyStore.getState();
+      process.stdout.write(JSON.stringify({ mapStyle: s.mapStyle, visuals: s.visuals, saved: Object.fromEntries(store) }));`;
+    const r = spawnSync(process.execPath, ['--input-type=module', '-e', code], { encoding: 'utf8', env: { ...process.env, NODE_NO_WARNINGS: '1' } });
+    return JSON.parse(r.stdout || '{}');
+  };
+  const first = leg({ 'fly-map-style-2': 'toy', 'fly-visuals': 'classic' });
+  const second = leg(first.saved || {});
+  gate('R2 a saved Neon + Classic player boots Day / Enhanced once, and the next boot stays there',
+    first.mapStyle === 'satellite' && first.visuals === 'enhanced' && second.mapStyle === 'satellite' && second.visuals === 'enhanced' &&
+      second.saved?.['fly-map-style-2'] === 'satellite' && second.saved?.['fly-visuals'] === 'enhanced',
+    JSON.stringify({ first: [first.mapStyle, first.visuals], second: [second.mapStyle, second.visuals] }));
+}
+
 // === T  RL-11 title copy ======================================================
 {
   console.log('\n[T] Title copy');
