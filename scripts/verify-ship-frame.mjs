@@ -13,7 +13,7 @@
  *   FR-4  the layer and GPU-memory census
  *   FR-5  the 30 Hz hold (5 simulated minutes at rung 0) and the 30 Hz overload step
  *   FR-6  the one budget table and its consumers
- *   FR-7  the stall classifier
+ *   FR-7  the stall classifier and the whole-session tally
  *   FR-9  frame-rate modes, holds, the session summary
  *   FR-10 the benchmark decision table
  *   FR-11 the policy table (every class, W0 seed rows unchanged, no new raw class calls)
@@ -423,6 +423,26 @@ const atBase = (rel) => {
     const t = tallyIntervals([{ dtMs: 300, programMs: 240 }, { dtMs: 150, uploadMs: 140 }, { dtMs: 500 }]);
     eq([t.count, t.byPhase['program-link'], t.byPhase['tile-upload'], t.byPhase.unattributed, t.worstMs], [3, 1, 1, 1, 500]);
   });
+  await check('FR-7 (d) the session tally covers every interval, not only the 64-interval ring (a long soak keeps its early stalls)', async () => {
+    // The venue's 2-minute fixture soak recorded 182 intervals; the ring kept 64.
+    const hadWindow = 'window' in globalThis;
+    globalThis.window ??= {};
+    try {
+      const sc = await mod('lib/fly/stall-census.js');
+      const st = sc.installStallCensus(() => null);
+      let at = 0;
+      for (let i = 0; i < 200; i++) {
+        sc.noteLongInterval(at, at + 150 + i, i % 2 ? ['finalize:sat-roads'] : []);
+        at += 1000;
+      }
+      sc.noteLongInterval(at, at + 80); // under 100 ms: not a stall
+      const s = st.summary();
+      eq([s.count, s.total, st.intervals.length, s.byPhase['worker-finalize'], s.byPhase.unattributed, s.worstMs], [200, 200, 64, 100, 100, 349]);
+      return `200 intervals: ring 64, tally ${s.count} (${s.byPhase['worker-finalize']} worker-finalize, ${s.byPhase.unattributed} unattributed)`;
+    } finally {
+      if (!hadWindow) delete globalThis.window;
+    }
+  });
 }
 
 // ===========================================================================
@@ -699,6 +719,37 @@ const atBase = (rel) => {
     const fs = read('lib/fly/fly-settings.js');
     const block = fs.slice(fs.indexOf('// SHIP PASS FRAME start tier begin'), fs.indexOf('// SHIP PASS FRAME start tier end'));
     assert(/benchmarkStart\(\)/.test(block) && /if \(bench\?\.tier\) return bench\.tier;/.test(block), 'the start-tier block consults the benchmark first');
+  });
+  await check('FR-10 (d) with DEVICE_POLICY on, a software renderer is not measured (fixed low score, nothing stored); any other class measures once and caches; a doubled batch that would pass the cap is never issued', () => {
+    // gpu-benchmark.js evaluated with the flag ON (its ship-pass import
+    // stubbed): the venue's policy smoke measured SwiftShader at 1,991 ms of
+    // boot for an answer decideStart fixes at Low anyway.
+    const src = read('lib/fly/gpu-benchmark.js');
+    assert(/performance\.now\(\) - t0 \+ 2 \* ms >= budget/.test(src), 'the doubling guard');
+    const code = src.replace(/^import[\s\S]*?;\n/gm, '').replace(/^export /gm, '');
+    const store = new Map();
+    const ctx = vm.createContext({
+      shipPassOn: (n) => n === 'DEVICE_POLICY',
+      shipPassBlock: () => ({ benchmark: {} }),
+      process: { env: {} },
+      window: { localStorage: { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, v) } },
+    });
+    vm.runInContext(`${code}\n;globalThis.__api = { benchmarkScore, resetBenchmark };`, ctx);
+    const api = ctx.__api;
+    let measured = 0;
+    const measure = () => (measured++, { ...hi, ms: 900, grade: 'high' });
+    api.resetBenchmark(undefined);
+    const sw = api.benchmarkScore({ measure, skip: 'software' });
+    assert(sw && sw.grade === 'low' && sw.skipped === 'software' && sw.ms === 0 && measured === 0 && store.size === 0, `software: ${JSON.stringify(sw)}, measured ${measured}, stored ${store.size}`);
+    eq(decideStart({ score: sw, cls: 'software', thresholds: t }).tier, 'low', 'software start');
+    api.resetBenchmark(undefined);
+    const dg = api.benchmarkScore({ measure, renderer: 'NVIDIA GeForce RTX 5080' });
+    assert(dg?.grade === 'high' && measured === 1 && store.size === 1, 'dgpu measures once and stores');
+    api.benchmarkScore({ measure });
+    assert(measured === 1, 'cached for the session');
+    const dp = read('lib/fly/device-policy.js');
+    assert(/const sessionScore = \(\) => benchmarkScore\(\{ skip: deviceClassOf\(\) === 'software' \? 'software' : null \}\);/.test(dp) && !/[^.]benchmarkScore\(\)/.test(dp), 'every policy read goes through sessionScore');
+    return 'software skipped (0 ms), dgpu measured once and cached';
   });
 }
 

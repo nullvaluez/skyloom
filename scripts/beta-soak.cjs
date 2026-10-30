@@ -62,7 +62,7 @@ const quantile=(rows,q)=>rows.length?[...rows].sort((a,b)=>a-b)[Math.min(rows.le
   await page.waitForFunction(()=>window.__fly?.launchSetup&&window.__flyStats?.frame);
   if(await page.getByRole('button',{name:'Hide',exact:true}).count())await page.getByRole('button',{name:'Hide',exact:true}).click();
   // SHIP PASS FRAME (FR-7): ask three's own canvas (data-engine) for its context; getContext('webgl2')
-  // on every canvas makes a context on each spare one; the fixture soak's page was found closed at this read twice.
+  // on every canvas makes a context on each spare one.
   renderer=await page.evaluate(()=>{const c=document.querySelector('canvas[data-engine]');const gl=c?c.getContext('webgl2'):[...document.querySelectorAll('canvas')].map(c=>c.getContext('webgl2')).find(Boolean);const e=gl.getExtension('WEBGL_debug_renderer_info');return gl.getParameter(e.UNMASKED_RENDERER_WEBGL);});
   if(/swiftshader|llvmpipe|software/i.test(renderer)&&!FIXTURE)throw Error('Software renderer cannot certify this hardware route');
   console.log('SOAK renderer',renderer);
@@ -121,7 +121,12 @@ const quantile=(rows,q)=>rows.length?[...rows].sort((a,b)=>a-b)[Math.min(rows.le
   report.steady.missed=missedShare(frames.steady,row.targetFps);
   report.resource={p95Draws:quantile(samples.map(s=>s.draws).filter(Number.isFinite),.95),p95Triangles:quantile(samples.map(s=>s.triangles).filter(Number.isFinite),.95)};
   report.passes={noUncaughtErrors:errors.length===0,operationsRoute:samples.some(s=>s.takeoffs>0)&&samples.some(s=>s.landings>0)&&!samples.some(s=>s.ops==='crashed'),frameTarget:report.steady.count>=1000&&report.steady.p95<=20&&report.steady.p99<=33.3,noRecurringStalls:report.steady.over100<=1,drawCeiling:report.resource.p95Draws!=null&&report.resource.p95Draws<=row.draws,triangleCeiling:report.resource.p95Triangles!=null&&report.resource.p95Triangles<=row.triangles};
-  writeFileSync(path.join(OUT,'soak.json'),JSON.stringify(report,null,2));console.log('SOAK complete',JSON.stringify({steady:report.steady,resources:report.resource,passes:report.passes}));if(Object.values(report.passes).some(v=>!v))process.exitCode=1;
+    // SHIP PASS FRAME (FR-7): the fixture proof certifies the INSTRUMENT (a clean run whose every >100 ms
+  // interval landed in the phase tally), never the frame/stall passes, which SwiftShader cannot meet.
+  if(FIXTURE)report.instrumentProof={noUncaughtErrors:errors.length===0,stallTally:!!report.stalls&&report.stalls.count>0&&Object.values(report.stalls.byPhase).reduce((a,b)=>a+b,0)===report.stalls.count};
+  writeFileSync(path.join(OUT,'soak.json'),JSON.stringify(report,null,2));console.log('SOAK complete',JSON.stringify({steady:report.steady,resources:report.resource,passes:report.passes,instrumentProof:report.instrumentProof}));if(Object.values(FIXTURE?report.instrumentProof:report.passes).some(v=>!v))process.exitCode=1;
  }catch(e){console.error(e);errors.push(e.message);writeFileSync(path.join(OUT,'soak-error.json'),JSON.stringify({at:new Date().toISOString(),renderer,errors,samples,events,responses},null,2));process.exitCode=1;}
- finally{clearInterval(watchdog);server?.kill();await browser?.close();writeFileSync(path.join(OUT,'soak-server.log'),log);}
+ finally{clearInterval(watchdog);server?.kill();await browser?.close();writeFileSync(path.join(OUT,'soak-server.log'),log);
+  // SHIP PASS FRAME: the fixture server (scripts/_fixture.js) keeps the event loop alive after the report.
+  if(FIXTURE)setTimeout(()=>process.exit(process.exitCode??0),2000).unref();}
 })();

@@ -132,7 +132,8 @@ async function runArm(browser, arm) {
   });
   if (arm === 'policy') {
     const d = s.devicePolicy;
-    check(arm, 'DEVICE_POLICY: the boot benchmark ran inside the hold and chose a start (FR-10)', !!d?.score && !!d?.start?.tier && d.score.ms <= 1600, d ? `class ${d.cls}, score ${JSON.stringify(d.score)}, start ${JSON.stringify(d.start)}; tier ${s.tier}, preset ${s.preset}` : 'absent');
+    // A software renderer (this venue's SwiftShader) is not measured: its start is Low whatever it scores.
+    check(arm, `DEVICE_POLICY: the boot benchmark ${d?.cls === 'software' ? 'is skipped on a software renderer (fixed low score)' : 'ran inside the hold'} and chose a start (FR-10)`, !!d?.score && !!d?.start?.tier && d.score.ms <= 1600 && (d.cls !== 'software' || (d.score.skipped === 'software' && d.start.tier === 'low')), d ? `class ${d.cls}, score ${JSON.stringify(d.score)}, start ${JSON.stringify(d.start)}; tier ${s.tier}, preset ${s.preset}` : 'absent');
   }
   check(arm, 'zero page errors', errors.length === 0, errors.slice(0, 3).join(' | '));
   check(arm, 'zero shader compile/link errors in the console', shaderErrors.length === 0, shaderErrors.slice(0, 2).join(' | '));
