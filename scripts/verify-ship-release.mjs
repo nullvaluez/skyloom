@@ -525,5 +525,44 @@ console.log('SHIP PASS RELEASE gate (verify-ship-release)\n');
       /^Fly the real Earth/.test(man.description) && !/neon/i.test(man.description));
 }
 
+// === E  RL-7 entitlement seam ===================================================
+{
+  console.log('\n[E] Entitlement seam');
+  const E = await import(pathToFileURL(path.join(ROOT, 'lib/fly/entitlements.js')).href);
+  const CA = await import(pathToFileURL(path.join(ROOT, 'lib/fly/content-access.mjs')).href);
+  const O = await import(pathToFileURL(path.join(ROOT, 'lib/fly/offer.mjs')).href);
+  gate('E1 currentGrants() grants nothing (frozen [])', Array.isArray(E.currentGrants()) && E.currentGrants().length === 0 && Object.isFrozen(E.currentGrants()));
+  const ca = read('lib/fly/content-access.mjs');
+  gate('E2 contentAccess() takes its grants from currentGrants() by default', /export function contentAccess\(id,progress=\{\},grants=currentGrants\(\),packs=PACKS\)/.test(ca));
+  // Every call site in the app: none may supply its own grants (third argument).
+  const files = execFileSync('git', ['-C', ROOT, 'ls-files', 'components', 'lib', 'stores', 'app', 'hooks'], { encoding: 'utf8' }).split('\n').filter((f) => /\.(m?js|jsx)$/.test(f));
+  const sites = [];
+  for (const f of files) {
+    const src = read(f);
+    for (const m of src.matchAll(/contentAccess\(/g)) {
+      if (src.slice(Math.max(0, m.index - 16), m.index).includes('function ')) continue;
+      let depth = 0, args = 1, i = m.index + 'contentAccess('.length;
+      for (; i < src.length; i++) {
+        const ch = src[i];
+        if ('([{'.includes(ch)) depth++;
+        else if (')]}'.includes(ch)) { if (depth === 0) break; depth--; }
+        else if (ch === ',' && depth === 0) args++;
+      }
+      sites.push({ f, args });
+    }
+  }
+  const own = sites.filter((s) => s.args > 2);
+  gate(`E3 every contentAccess call site (${sites.length}) passes grants through the resolver (none supplies its own)`, sites.length >= 8 && own.length === 0, own.map((s) => s.f).join(', '));
+  const progress = { rewards: [] };
+  const same = Object.keys(CA.CONTENT).every((id) => JSON.stringify(CA.contentAccess(id, progress)) === JSON.stringify(CA.contentAccess(id, progress, [])));
+  gate('E4 behaviour unchanged: every content id answers exactly as with grants []', same, `${Object.keys(CA.CONTENT).length} ids`);
+  gate('E5 the server seam keeps only known pack ids', JSON.stringify(E.grantsFromList('wild-earth, nope,first-flights,wild-earth,__proto__', CA.PACKS)) === JSON.stringify(['wild-earth', 'first-flights']) && E.grantsFromList(undefined, CA.PACKS).length === 0);
+  const offerText = JSON.stringify([O.FREE_CORE, O.SKYLOOM_PASS]);
+  gate('E6 the offer is data with no prices, currencies or purchase URLs, and names only real packs',
+    !/price|currency|usd|eur|\$|http/i.test(offerText) && O.offerPackIds().length === [...O.FREE_CORE.includes, ...O.SKYLOOM_PASS.includes].filter((x) => x.kind === 'pack').length);
+  const route = read('app/api/entitlements/route.js');
+  gate('E7 /api/entitlements answers {grants} from the validated server env only, uncached', /grants: grantsFromList\(process\.env\.SKYLOOM_GRANTS, PACKS\)/.test(route) && /no-store/.test(route));
+}
+
 console.log(`\nverify-ship-release: ${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
