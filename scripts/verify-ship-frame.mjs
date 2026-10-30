@@ -174,9 +174,13 @@ const atBase = (rel) => {
     assert(/^MeshStandardMaterial:a#[0-9a-f]{8}$/.test(programKey({ type: 'MeshStandardMaterial', name: 'a', cacheKey: 'x' })));
     assert(fnv1a('abc') === fnv1a('abc') && fnv1a('abc') !== fnv1a('abd'));
   });
-  await check('FR-1 (e) zero per-frame cost: nothing in the census runs from a frame loop', () => {
+  await check('FR-1 (e) zero per-frame cost: nothing in the program census runs from a frame loop; per-draw census only with ?diag=1 or automation', () => {
     const src = read('lib/fly/program-census.js');
     assert(!/useFrame|requestAnimationFrame|setInterval/.test(src), 'the program census must not poll');
+    assert(/export function deepCensusWanted\(\) \{\n  return diagRequested\(\) \|\| automated\(\);/.test(src), 'deep census = diag or automation');
+    const hub = read('lib/fly/census.js');
+    assert(/if \(!deepCensusWanted\(\)\) return true;/.test(hub), 'memory/stall census gated');
+    assert(/\{deepCensusWanted\(\) && <CensusRig \/>\}/.test(read('components/fly/FlyCanvas.jsx')), 'CensusRig gated');
   });
 }
 
@@ -257,6 +261,11 @@ const atBase = (rel) => {
     assert(n === 0);
     rw.resetRegistryWarm();
     assert(rw.registryWarmState().warmed === 0);
+  });
+  await check('FR-3 (f) ENV_UNIFORM is read through its pin (?flags=ENV_UNIFORM A/Bs it), the constant untouched', async () => {
+    const { ENV_UNIFORM } = await mod('lib/fly/fly-constants.js');
+    assert(ENV_UNIFORM.enabled === false, 'the shipped constant is not edited by FRAME');
+    for (const f of ['lib/fly/prewarm.js', 'components/fly/PrewarmRig.jsx']) assert(/const ENV_UNIFORM = pinned\(ENV_UNIFORM_BLOCK, '__flyEnvUniformOverride'\);/.test(read(f)), f);
   });
   await check('FR-3 (e) wiring: boot tier rides the boot drain, the ladder queues after it, PrewarmRig rescans tier/env/late entries; flag-gated', () => {
     const src = read('lib/fly/prewarm.js');

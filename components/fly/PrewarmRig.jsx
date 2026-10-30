@@ -2,7 +2,10 @@
 
 import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { ENV_UNIFORM, PREWARM, SETTLE_CALM } from '@/lib/fly/fly-constants';
+import { ENV_UNIFORM as ENV_UNIFORM_BLOCK, PREWARM, SETTLE_CALM } from '@/lib/fly/fly-constants';
+import { pinned } from '@/lib/fly/fly-pins';
+// SHIP PASS FRAME (FR-3): ENV_UNIFORM through its pin (?flags=ENV_UNIFORM), as prewarm.js.
+const ENV_UNIFORM = pinned(ENV_UNIFORM_BLOCK, '__flyEnvUniformOverride');
 import { compileCriticalTerrain, prewarmPending, prewarmSliceStep, prewarmState, pumpRequeue, requeueForEnvironment, runPrewarm } from '@/lib/fly/prewarm';
 import { terrainArrivalCovered } from '@/lib/fly/critical-terrain-prewarm.mjs';
 import { cinemaOn } from '@/lib/fly/cinema-policy';

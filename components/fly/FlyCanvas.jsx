@@ -33,7 +33,7 @@ import { configureCinemaAssets } from '@/lib/fly/cinema-material-assets';
 import { installContextResourceLifetime } from '@/lib/fly/context-resource-lifetime';
 // SHIP PASS FRAME (FR-1, FR-2, FR-4): shader-error policy, census, error telemetry.
 import { installFrameRenderer } from '@/lib/fly/census';
-import { censusWanted } from '@/lib/fly/program-census';
+import { deepCensusWanted } from '@/lib/fly/program-census';
 import { CensusRig } from './CensusRig';
 // SHIP PASS FRAME (FR-5, FR-9; PACE_ADAPT): the presentation cadence.
 import { shipPassOn } from '@/lib/fly/ship-pass';
@@ -252,7 +252,7 @@ export function FlyCanvas({ runtime }) {
       {/* TRUE EARTH: whole-frame draw/triangle totals, only with ?diag=1. */}
       {diagRequested() && <DiagFrameTotals />}
       {/* SHIP PASS FRAME (FR-4): per-layer draws/triangles, upload time. */}
-      {censusWanted() && <CensusRig />}
+      {deepCensusWanted() && <CensusRig />}
       {FRONT_DOOR.enabled && <StagePump runtime={runtime} />}
       {PERF_GOVERNOR.enabled ? (
         <>
