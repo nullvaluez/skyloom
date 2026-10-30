@@ -963,9 +963,9 @@ Severity and effort are the auditors' estimates. "Where" names the requirement t
 ### CITY
 
 <!-- SHIP PASS CITY report begin -->
-**Status (2026-10-30, cloud venue, branch `ship/city`): IN PROGRESS.** CT-1
-landed; CT-2 plumbing is in (flag off); the SK-1 city arms, CT-6, CT-3, CT-4,
-CT-5 and CT-7 follow in later commits. Every number below is the offline
+**Status (2026-10-30, cloud venue, branch `ship/city`): IN PROGRESS.** CT-1,
+CT-6 (node half) and CT-4 (built, flag off) landed; CT-2 plumbing is in (flag
+off); the SK-1 city arms (browser), CT-3, CT-5 and CT-7 follow. Every number below is the offline
 fixture on SwiftShader or a node gate, never a device number (3.8).
 
 **CT-1 — diagnosis pins (P0, landed).** `window.__flyCityDiag = { fadeStartM?,
@@ -1000,7 +1000,43 @@ the baked premix (above), so those two sub-items need no new code.
 Worker flag-off identity: byte-identical to `main`'s worker on 48 fixture
 builds (skyline, buildings, roads, Classic skyline).
 
-**Gates.** `scripts/verify-ship-city.mjs` (node, starts the fixture itself): 19/19. `ship-pass-gates`: 32 PASS, 2 KNOWN-RED, 0 FAIL, seam rule PASS.
+**CT-6 — the `verify-sat-buildings` F1 red (P0, re-derived, not re-baselined).**
+Cause, measured: since Living Earth the Enhanced builder keeps EVERY mapped
+footprint of a tile as a body (`vector-tile.worker.js`, "all mapped footprints
+retain a body") and the 500-polygon cap bounds the DETAILED subset
+(`meta.provenance.detailedBodies`: roof forms, entrances, stepped levels);
+`meta.kept` is now the coverage count, legitimately over 500 on a live Midtown
+tile (~1,500 footprints), so F1's `kept <= 500` and `max kept === 500` read the
+wrong number. F1 now reads the detailed subset, and its binding precondition is
+the implication "every chunk that parsed more footprints than the cap details
+exactly the cap" (the cap number 500 did not move). Node evidence
+(`verify-ship-city` CT-6): fixture Midtown parses at most 363 footprints per
+z14 tile, so the shipped cap cannot bind on the fixture (detailed = parsed on
+every tile); with the cap scaled to the fixture's density (200) the detailed
+subset never exceeds it and binds while kept = every body (363 > 200), which
+is the old red reproduced and explained. The browser half (verify-sat-buildings
+on the fixture, `PLAYWRIGHT_CHANNEL=` for the bundled Chromium) is pending a
+heavy-lock slot. `scripts/ship-pass-known-reds.json` is RELEASE's: the row can
+retire once the browser half reads green.
+
+**CT-4 — NIGHT_LITE (P1, built, flag `enabled:false`).** `lib/fly/night-lite.js`
++ `components/fly/SatNightLite.jsx`, mounted from FlyScene's CITY mounts block
+only with the flag on, in satellite, in Enhanced lighting (where FlyScene's own
+gated SatCityGlow mount at the old line is off and untouched); the device gate is
+`deviceFeature('NIGHT_LITE')` (touch, or Low). ONE instanced draw of flat
+ground light pools at the POI cities: a disc whose vertex colours fall from a
+hot core to exactly black at the rim (no dome, so no silhouette against the
+horizon), bent per vertex through the shared `world-bend` variant, additive, no
+depth write (the terrain behind writes depth, so the cloud composite never
+reads it as sky). Full strength from the road-ring hand-off to the policy's
+60 km reach, fading out by 75 km and never past the world edge band; hidden by
+day and whenever nothing is placed (zero draws); placement on a 2 s cadence
+(nothing moves between placements, so a still camera is still). Program
+registered in the CITY prewarm block (`CITY:night-lite-pools`, flag-gated).
+`verify-sat-night` reconciliation and the phone-emulation capture at 3 km are
+pending browser runs.
+
+**Gates.** `scripts/verify-ship-city.mjs` (node, starts the fixture itself): 31/31. `ship-pass-gates`: 32 PASS, 2 KNOWN-RED, 0 FAIL, seam rule PASS.
 `FLY_TILE_FIXTURE=1 verify-worker-window` 4/4, `verify-true-areas` 7/7.
 
 **Contract requests.** None yet.

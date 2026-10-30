@@ -116,6 +116,14 @@ async function childWorker(workerPath, realWorkerPath, requestsJSON) {
   });
   const requests = JSON.parse(requestsJSON);
   await import(workerURL);
+  // CT-6 instrument: scale the detail ring's polygon cap to the FIXTURE's
+  // density (its densest z14 tile parses ~360 footprints, live Midtown ~1,500),
+  // so the cap binds here the way it binds over the real city. The worker reads
+  // the same constants object at build time.
+  if (process.env.SHIP_CITY_POLYCAP) {
+    const C = await import(pathToFileURL(path.join(ROOT, 'lib/fly/fly-constants.js')).href);
+    C.SAT_POLY_COVER.maxPerChunk = Number(process.env.SHIP_CITY_POLYCAP);
+  }
   const api = globalThis.__shipCityApi;
   const { installNodeFetchFixture } = (await import(pathToFileURL(path.join(ROOT, 'scripts/_fixture.js')).href)).default;
   const fx = await installNodeFetchFixture();
@@ -132,9 +140,13 @@ async function childWorker(workerPath, realWorkerPath, requestsJSON) {
         idx: sky?.idx?.length ?? r?.satBuilding?.idx?.length ?? 0,
         dense: r?.skyMeta?.dense ?? null,
         kept: r?.skyMeta?.kept ?? r?.satBuilding?.meta?.kept ?? null,
-        // CT-6: the detail ring's per-chunk polygon cap and its total.
+        // CT-6: the detail ring's per-chunk accounting (Living Earth: every
+        // mapped footprint keeps a body; the polygon cap bounds the DETAILED
+        // subset, meta.provenance.detailedBodies).
         bkept: r?.satBuilding?.meta?.kept ?? null,
         btotal: r?.satBuilding?.meta?.total ?? null,
+        bdetail: r?.satBuilding?.meta?.provenance?.detailedBodies ?? null,
+        bcover: r?.satBuilding?.meta?.provenance?.coverageBodies ?? null,
       };
     }
   }
@@ -188,9 +200,66 @@ async function childLogic(windowJSON) {
   process.exit(0);
 }
 
+// CHILD: NIGHT_LITE (CT-4) under a window stub; argv: --child=night <windowJSON>
+async function childNight(windowJSON) {
+  const { register } = await import('node:module');
+  register('./_node-resolve.mjs', import.meta.url);
+  globalThis.window = JSON.parse(windowJSON);
+  const NL = await import(pathToFileURL(path.join(ROOT, 'lib/fly/night-lite.js')).href);
+  const PR = await import(pathToFileURL(path.join(ROOT, 'lib/fly/prewarm-registry.js')).href);
+  const { ShaderLib, UniformsUtils } = await import('three');
+  const B = NL.nightLiteBlock();
+  const out = { on: NL.NIGHT_LITE_ON, block: B };
+  // the program, compiled through its real onBeforeCompile against three's basic shader
+  const m = NL.createNightLiteMaterial();
+  const sh = { uniforms: UniformsUtils.clone(ShaderLib.basic.uniforms), vertexShader: ShaderLib.basic.vertexShader, fragmentShader: ShaderLib.basic.fragmentShader };
+  m.onBeforeCompile(sh, {});
+  out.program = { key: m.customProgramCacheKey(), bends: sh.vertexShader.includes('wPos.y -= bendD * bendD * uBendK;'), instancing: sh.vertexShader.includes('wPos = instanceMatrix * wPos;'), additive: m.blending === 2, depthWrite: m.depthWrite, transparent: m.transparent, vertexColors: m.vertexColors };
+  // the geometry's profile
+  const g = NL.createNightLiteGeometry();
+  const col = g.attributes.color.array;
+  const pos = g.attributes.position.array;
+  let rimMax = 0;
+  for (let i = 0; i < pos.length / 3; i++) {
+    const r = Math.hypot(pos[i * 3], pos[i * 3 + 2]);
+    if (r > 0.999) rimMax = Math.max(rimMax, col[i * 3], col[i * 3 + 1], col[i * 3 + 2]);
+  }
+  const prof = [0, 0.15, 0.3, 0.5, 0.75, 1].map((t) => NL.poolProfile(t)[0] + NL.poolProfile(t)[1] + NL.poolProfile(t)[2]);
+  out.geometry = { verts: g.attributes.position.count, tris: g.index.count / 3, rimMax, prof, flatY: Array.from(pos).filter((_, i) => i % 3 === 1).every((y) => y === 0) };
+  // the ramp and the placement (cities on a line due east of a NYC-latitude aircraft)
+  out.ramp = { day: NL.nightRamp(1), dusk: NL.nightRamp(B.dayFrac), deep: NL.nightRamp(0), mid: NL.nightRamp(B.dayFrac / 2) };
+  const z = -6.0e6 * 0 + (-4.97e6); // scene z near 40.7N (mercator, scene z = -mercY)
+  const k = NL.mercK(z);
+  const cities = [];
+  for (let km = 1; km <= 100; km++) cities.push({ name: `c${km}`, wx: km * 1000 * k, wz: z, lat: 40.7, lon: -74 });
+  const placed = NL.placeNightLite(cities, 0, z, { roadRingM: 9000, reachM: 60000, cap: 200 });
+  const at = (km) => placed.find((o) => o.c.name === `c${km}`);
+  out.place = { n: placed.length, k, f4: at(4)?.fade ?? 0, f8: at(8)?.fade ?? 0, f20: at(20)?.fade ?? 0, f60: at(60)?.fade ?? 0, f65: at(65)?.fade ?? 0, f80: at(80) ? at(80).fade : -1, r20: at(20)?.r, r70: at(70)?.r, nearestFirst: placed.every((o, i) => i === 0 || placed[i - 1].d <= o.d) };
+  const capped = NL.placeNightLite(cities, 0, z, { roadRingM: 9000, reachM: 60000, cap: 10 });
+  out.place.capN = capped.length;
+  out.place.capNearest = capped.every((o) => o.d <= capped[capped.length - 1].d);
+  // the device policy rows
+  out.policy = {};
+  for (const cls of ['phone', 'tablet', 'igpu', 'dgpu', 'software']) for (const tier of ['low', 'medium', 'high']) {
+    const p = NL.nightLitePolicy(tier, { __flyCityDeviceClass: cls });
+    out.policy[`${cls}/${tier}`] = p.allowed ? p.budget : null;
+  }
+  // the prewarm registry entry
+  const e = PR.prewarmEntries().find((x) => x.key === 'CITY:night-lite-pools');
+  let built = null;
+  if (e) {
+    const mesh = e.build();
+    built = { instanced: mesh.isInstancedMesh === true, instanceColor: !!mesh.instanceColor, key: mesh.material.customProgramCacheKey(), sameKey: mesh.material.customProgramCacheKey() === out.program.key, vertexColors: mesh.material.vertexColors };
+  }
+  out.prewarm = e ? { when: e.when, built, reachable: PR.entryReachable(e, { flagOn: () => true }), unreachableOff: !PR.entryReachable(e, { flagOn: () => false }) } : null;
+  console.log(`@@JSON${JSON.stringify(out)}`);
+  process.exit(0);
+}
+
 const childArg = process.argv.find((a) => a.startsWith('--child='));
 if (childArg === '--child=worker') await childWorker(process.argv[3], process.argv[4], process.argv[5]);
 else if (childArg === '--child=logic') await childLogic(process.argv[3]);
+else if (childArg === '--child=night') await childNight(process.argv[3]);
 else await main();
 
 // ---------------------------------------------------------------------------
@@ -340,7 +409,93 @@ async function main() {
       TILES.every((t) => w[`skyline-premix0|${t.name}`].digest === w[`skyline|${t.name}`].digest) &&
         TILES.some((t) => w[`classic|${t.name}`].idx > 0 && w[`classic-premix0|${t.name}`].geo !== w[`classic|${t.name}`].geo),
     );
+    // ===================== CT-6: the verify-sat-buildings F1 premise =========
+    // F1 asserted "no chunk's meta.kept exceeds the 500 POLYGON cap" and "the
+    // cap binds (max kept === 500)". Since Living Earth (vector-tile.worker.js:
+    // "all mapped footprints retain a body") the Enhanced builder keeps EVERY
+    // footprint as a body and the cap bounds the DETAILED subset instead
+    // (meta.provenance.detailedBodies); meta.kept is the coverage count and
+    // legitimately exceeds 500 on a dense tile. Re-derived on the fixture:
+    {
+      const C = await import(pathToFileURL(path.join(ROOT, 'lib/fly/fly-constants.js')).href);
+      const cap = C.SAT_POLY_COVER.enabled ? C.SAT_POLY_COVER.maxPerChunk : C.SAT_BUILDINGS.maxPerChunk;
+      const mids = TILES.filter((t) => t.name.startsWith('midtown'));
+      const at = (res) => mids.map((t) => res[`buildings|${t.name}`]);
+      const mid = at(cur);
+      const maxTotal = Math.max(...mid.map((m) => m.btotal ?? -1));
+      check(
+        'CT-6 shipped cap: every fixture Midtown tile keeps every footprint as a body and details all of them under the cap',
+        cap === 500 && mid.every((m) => m.bkept === m.bcover && m.bdetail === Math.min(m.btotal, cap)),
+        `cap ${cap}; fixture density max ${maxTotal} footprints/tile (live Midtown ~1,500), so the shipped cap cannot bind here`,
+      );
+      const scaledCap = 200;
+      const sc = at(runChild(['--child=worker', realWorker, realWorker, JSON.stringify([{ label: 'buildings', detail: 'sat-buildings', opts: { visuals: true } }])], { SHIP_CITY_POLYCAP: String(scaledCap) }));
+      const maxDetail = Math.max(...sc.map((m) => m.bdetail ?? -1));
+      const maxKept = Math.max(...sc.map((m) => m.bkept ?? -1));
+      check(
+        `CT-6 cap scaled to the fixture (${scaledCap}): the DETAILED subset never exceeds it and binds; kept = every body, past the cap (why the old F1 read red)`,
+        sc.every((m) => m.bdetail != null && m.bdetail <= scaledCap && m.bkept === m.bcover && m.bkept === m.btotal) && maxDetail === scaledCap && maxKept > scaledCap,
+        `detailed max ${maxDetail}, kept max ${maxKept}`,
+      );
+      const vsb = read('scripts/verify-sat-buildings.js');
+      check(
+        'CT-6 verify-sat-buildings F1 reads the detailed subset (provenance.detailedBodies), not the coverage count',
+        /provenance\?\.detailedBodies/.test(vsb) && /\(F1\) per-chunk DETAILED subset never exceeds the POLYGON cap/.test(vsb),
+      );
+    }
+
     globalThis.__shipCityWorker = { cur, w };
+  }
+
+  // ===================== CT-4: NIGHT_LITE =====================================
+  {
+    const nOff = runChild(['--child=night', JSON.stringify({})]);
+    const nOn = runChild(['--child=night', JSON.stringify({ __flyNightLiteOverride: { enabled: true } })]);
+    const fly = read('components/fly/FlyScene.jsx');
+    const block = fly.slice(fly.indexOf('SHIP PASS CITY mounts begin'), fly.indexOf('SHIP PASS CITY mounts end'));
+    check(
+      'CT-4 flag off: NIGHT_LITE_ON is false and FlyScene mounts SatNightLite only behind it (no worker, no draw, no global)',
+      nOff.on === false && nOn.on === true && /NIGHT_LITE_ON && mapStyle === 'satellite' && satelliteVisualsOn\('lighting'\) && \(\s*<SatNightLite /.test(block),
+    );
+    check(
+      "CT-4 FlyScene's own gated SatCityGlow mount is untouched (still !satelliteVisualsOn('lighting'))",
+      fly.includes("{mapStyle === 'satellite' && SAT_CITY_GLOW.enabled && !satelliteVisualsOn('lighting') && (") && fly.split('<SatCityGlow ').length === 2,
+    );
+    const P = nOn.program;
+    check(
+      'CT-4 one instanced draw: a basic, additive, no-depth-write, vertex+instance-coloured program bent per vertex (world-bend)',
+      P.key === 'world-bend' && P.bends && P.instancing && P.additive && P.depthWrite === false && P.transparent && P.vertexColors,
+      JSON.stringify(P),
+    );
+    const G = nOn.geometry;
+    const mono = G.prof.every((v, i) => i === 0 || v <= G.prof[i - 1] + 1e-12);
+    check('CT-4 the pool is flat, its light falls monotonically from a hot core to exactly black at the rim (no edge, no silhouette)', G.flatY && G.rimMax === 0 && mono && G.prof[0] > 0.5, `${G.verts} verts, ${G.tris} tris; profile ${G.prof.map((v) => v.toFixed(3)).join(' ')}`);
+    const R = nOn.ramp;
+    check('CT-4 night ramp: 0 by day and at sun.frac >= dayFrac (zero draws), 1 at deep night (the road network\'s gamma ramp)', R.day === 0 && R.dusk === 0 && R.deep === 1 && R.mid > 0 && R.mid < 1, JSON.stringify(R));
+    const L = nOn.place;
+    check(
+      'CT-4 city light reaches 60+ km: full strength from the road-ring hand-off to 60 km, still lit at 65 km, gone by 75 km; nearest first, capped',
+      L.f4 === 0 && L.f8 > 0 && L.f20 === 1 && L.f60 === 1 && L.f65 > 0 && L.f80 === -1 && L.nearestFirst && L.capN === 10 && L.capNearest && L.r70 > L.r20,
+      `fade 4km ${L.f4} · 8km ${L.f8.toFixed(2)} · 20km ${L.f20} · 60km ${L.f60} · 65km ${L.f65.toFixed(2)}; radius 20km ${Math.round(L.r20)} m, 70km ${Math.round(L.r70)} m`,
+    );
+    const pol = nOn.policy;
+    check(
+      'CT-4 device policy: phones and tablets at every tier and Low everywhere; desktop Medium/High and software refused; draws <= 2, reach 60 km',
+      ['phone/low', 'phone/medium', 'phone/high', 'tablet/high', 'igpu/low', 'dgpu/low'].every((k) => pol[k]?.draws <= 2 && pol[k]?.reachM >= 60000) &&
+        ['igpu/high', 'dgpu/high', 'dgpu/medium', 'igpu/medium', 'software/high', 'software/medium'].every((k) => pol[k] === null),
+      Object.entries(pol).filter(([, v]) => v).map(([k]) => k).join(' '),
+    );
+    check(
+      'CT-4 prewarm: the registry holds the exact program (same key, instance colour from the first frame), reachable only with the flag on',
+      nOn.prewarm?.built?.instanced && nOn.prewarm.built.instanceColor && nOn.prewarm.built.sameKey && nOn.prewarm.reachable && nOn.prewarm.unreachableOff && nOn.prewarm.when.flags?.[0] === 'NIGHT_LITE',
+      JSON.stringify(nOn.prewarm?.when),
+    );
+    const comp = read('components/fly/SatNightLite.jsx');
+    check(
+      'CT-4 the layer: one InstancedMesh, hidden by day and when nothing is placed, placement on a cadence (no per-frame work), dev-only stats, no console',
+      comp.split('<instancedMesh').length === 2 && /mesh\.visible = n > 0;/.test(comp) && /if \(nightK <= 0\) \{\s*mesh\.visible = false;/.test(comp) &&
+        /t - last\.t < block\.refreshSec/.test(comp) && !/console\./.test(comp) && /process\.env\.NODE_ENV === 'development'/.test(comp),
+    );
   }
 
   console.log(`\n${pass} passed, ${fail} failed`);
