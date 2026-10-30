@@ -717,6 +717,10 @@ export class AerialPerspectiveEffect extends Effect {
       // SHIP PASS SKY (AERIAL_CLARITY): this frame's clear-air k (eye AGL off
       // the same ground reference the height term uses).
       if(AERIAL_CLARITY_ON)updateAerialClarity(s.camPos[1]-s.groundY,cinemaEnvironment);
+      // SHIP PASS SKY (SK-2 A/B): `__flySkyDiag.clarity === 0` zeroes this
+      // frame's k, so the flag-on text keeps the whole in-scatter (S x 1.0,
+      // the shipped arithmetic) on the same settled pose as the clarity arm.
+      if(AERIAL_CLARITY_ON&&skyDiag()?.clarity===0){AERIAL_CLARITY_UNIFORMS.uShipClarity.value.x=0;markSkyDiagApplied('clarity');}
     }
     // R24 C (LINEAR_HAZE): Color.setRGB's default colorSpace is the WORKING
     // space, i.e. no conversion — which is exactly the L1 defect. Naming

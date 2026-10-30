@@ -483,6 +483,14 @@ const DEG = Math.PI / 180;
   row('SK-2 (f) wiring: the Enhanced effect builds the clarity text and writes k only in the cinema (physical) branch',
     ap.includes("const enhancedFragmentShaderClarity = aerialClarityShader(enhancedFragmentShaderLiving);") && ap.includes("r25 ? enhancedFragmentShaderClarity : fragmentShader")
     && ap.includes('if(AERIAL_CLARITY_ON)updateAerialClarity(s.camPos[1]-s.groundY,cinemaEnvironment);'));
+  // The same-pose A/B of ship-sky-veil.cjs (`clarity` against `clarity-k0`):
+  // the pin only zeroes k, only with the flag on, right after this frame's k
+  // write, and k = 0 is exactly the shipped in-scatter (keep = 1 at any km).
+  const kAt = ap.indexOf('if(AERIAL_CLARITY_ON)updateAerialClarity(');
+  const pinAt = ap.indexOf("if(AERIAL_CLARITY_ON&&skyDiag()?.clarity===0){AERIAL_CLARITY_UNIFORMS.uShipClarity.value.x=0;markSkyDiagApplied('clarity');}");
+  row('SK-2 (g) the veil harness\'s control pin `__flySkyDiag.clarity === 0`: flag-on only, after the k write, k = 0 keeps S exactly',
+    kAt > 0 && pinAt > kAt && [0, 5, 12, 30, 45, 120].every((km) => AC.clarityKeep(0, km) === 1)
+    && read('scripts/ship-sky-veil.cjs').includes("'clarity-k0': { boot: 'clarity', live: { set: 'window.__flySkyDiag = { clarity: 0 }'"));
 }
 
 // ---- SK-6: the sky LUT cadence is kept ----------------------------------------

@@ -19,7 +19,8 @@
  *
  *   FLY_URL=http://localhost:3132 FLY_TILE_FIXTURE=1 node scripts/ship-sky-smoke.cjs
  *   options: --arms=off,on  --poses=noon,night,medium  --out=.graphics-review/ship-pass/sky/smoke
- *            --width=960 --height=600 --legTimeout=300000 --settle=4000 --sharpTimeout=120000
+ *            --width=960 --height=600 --legTimeout=300000 --settle=4000 --sharpTimeout=60000
+ *            --firstSharp=240000 (an arm's first pose, after the far warp) --bootWait=90000
  */
 const { chromium } = require('playwright');
 const fs = require('node:fs');
@@ -39,7 +40,11 @@ const viewport = { width: Number(args.width || 960), height: Number(args.height 
 const legTimeout = Number(args.legTimeout || 300000);
 const settleMs = Number(args.settle || 4000);
 // Terrain `sharp` gets its own shorter cap (SwiftShader: see ship-sky-veil.cjs).
-const sharpTimeout = Number(args.sharpTimeout || 120000);
+const sharpTimeout = Number(args.sharpTimeout || 60000);
+const firstSharp = Number(args.firstSharp || 240000);
+const bootWait = Number(args.bootWait || 90000);
+const T0 = Date.now();
+const log = (...m) => console.log(`[+${Math.round((Date.now() - T0) / 1000)}s]`, ...m);
 const FT = 0.3048;
 const MIDTOWN = { lat: 40.7549, lon: -73.984 };
 const ARMS = { off: '', on: 'REAL_MOON,AERIAL_CLARITY,SKY_LITE' };
@@ -99,7 +104,7 @@ async function boot(browser, arm) {
     rt.operations.phase = 'airborne'; rt.operations.profile = null; rt.operations.warp(rt.flight);
     store.setHangarOpen(false);
   });
-  await page.waitForFunction(() => window.__flyBoot?.pct === 100, undefined, { timeout: legTimeout, polling: 1000 }).catch(() => {});
+  await page.waitForFunction(() => window.__flyBoot?.pct === 100, undefined, { timeout: bootWait, polling: 1000 }).catch(() => {});
   return page;
 }
 
@@ -129,11 +134,11 @@ async function place(page, p) {
   }, p);
 }
 
-async function settle(page) {
+async function settle(page, first = false) {
   const ready = {};
   const wait = async (name, fn, ms = legTimeout) => { try { await page.waitForFunction(fn, undefined, { timeout: ms, polling: 1000 }); ready[name] = true; } catch { ready[name] = false; } };
   await wait('worldLoading', () => !window.__fly.worldLoading);
-  await wait('terrainSharp', () => (window.__fly.terraStats ?? window.__fly.engine?.terraStats)?.sharp === true, Math.min(legTimeout, sharpTimeout));
+  await wait('terrainSharp', () => (window.__fly.terraStats ?? window.__fly.engine?.terraStats)?.sharp === true, Math.min(legTimeout, first ? firstSharp : sharpTimeout));
   ready.terra = await page.evaluate(() => {
     const t = window.__fly.terraStats ?? window.__fly.engine?.terraStats;
     return t ? { sharp: t.sharp, reason: t.sharpReason ?? null, camTileZ: t.camTileZ, targetZ: t.targetZ, downloading: t.downloading } : null;
@@ -150,17 +155,17 @@ const CANVAS_ONLY = 'body * { visibility:hidden!important; } canvas { visibility
   const browser = await chromium.launch({ headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'] });
   try {
     for (const arm of arms) {
-      console.log(`BOOT ${arm} ${ARMS[arm] || '(no flags)'}`);
+      log(`BOOT ${arm} ${ARMS[arm] || '(no flags)'}`);
       let page;
       try {
         page = await boot(browser, arm);
         report.arms[arm] = { flags: ARMS[arm] || null, poses: {} };
-        for (const name of poses) {
+        for (const [pi, name] of poses.entries()) {
           const p = POSES[name]?.();
           if (!p) continue;
           try {
             await place(page, p);
-            const ready = await settle(page);
+            const ready = await settle(page, pi === 0);
             const file = `${arm}-${name}.png`;
             await page.screenshot({ path: path.join(out, file), timeout: 300000, style: CANVAS_ONLY });
             const sky = await page.evaluate(() => {
@@ -169,10 +174,10 @@ const CANVAS_ONLY = 'body * { visibility:hidden!important; } canvas { visibility
               return { flags: h.flags(), moon: h.moon(), moonLight: h.moonLight(), clarityK: h.clarityK(), aerialReach: h.aerialReach(), env: h.env(), tier: window.__flyStore.getState().qualityTier };
             });
             report.arms[arm].poses[name] = { file, ready, sky };
-            console.log(`  ${arm} ${name}: ${JSON.stringify({ flags: sky?.flags, clarityK: sky?.clarityK, reach: sky?.aerialReach, moonAlt: sky?.moon?.altDeg?.toFixed?.(1), illum: sky?.moon?.illum?.toFixed?.(2), keySun: sky?.env?.sun?.toFixed?.(3), fill: sky?.env?.fill?.toFixed?.(3), tier: sky?.tier })}`);
+            log(`  ${arm} ${name}: ${JSON.stringify({ flags: sky?.flags, clarityK: sky?.clarityK, reach: sky?.aerialReach, moonAlt: sky?.moon?.altDeg?.toFixed?.(1), illum: sky?.moon?.illum?.toFixed?.(2), keySun: sky?.env?.sun?.toFixed?.(3), fill: sky?.env?.fill?.toFixed?.(3), tier: sky?.tier })}`);
           } catch (e) {
             report.errors.push({ arm, pose: name, kind: 'leg', message: e.message.split('\n')[0] });
-            console.log(`  ${arm} ${name} FAILED: ${e.message.split('\n')[0]}`);
+            log(`  ${arm} ${name} FAILED: ${e.message.split('\n')[0]}`);
           }
           save();
         }

@@ -55,11 +55,18 @@
  * USAGE (one browser at a time: hold /home/user/ship-pass-shared/heavy.lock):
  *   FLY_URL=http://localhost:3132 FLY_TILE_FIXTURE=1 node scripts/ship-sky-veil.cjs
  *   options: --arms=baseline,aerial-pin,air-off,no-mist,city-fade,city-premix
- *            (and `clarity`, ?flags=AERIAL_CLARITY, SK-2's own arm, opt-in)
+ *            (and `clarity`, ?flags=AERIAL_CLARITY, SK-2's own arm, opt-in: it
+ *            boots once and measures `clarity` and its same-pose control
+ *            `clarity-k0` = window.__flySkyDiag = { clarity: 0 }, k = 0, the
+ *            shipped in-scatter on the flag-on text; --clarityFlags= widens
+ *            that boot's ?flags=, default AERIAL_CLARITY)
  *            --alts=5000,6000,7500,8500,10000   --depression=20  --crop=0.16
  *            --fadeStartM=4500 --fadeEndM=5000 (the city-fade arm's pin)
  *            --width=960 --height=600 --quality=high --settle=4000
- *            --sharpTimeout=120000 --legTimeout=300000 --out=.graphics-review/ship-pass/sky/veil
+ *            --firstSharp=240000 (a boot group's first pose: the far warp
+ *            from the spawn streams Manhattan from nothing)
+ *            --sharpTimeout=60000 --bootWait=90000 --legTimeout=300000
+ *            --out=.graphics-review/ship-pass/sky/veil
  * Writes veil.json, veil.md (the table) and one PNG per arm and altitude.
  * Exit code 0 when every requested, measurable cell was captured.
  */
@@ -86,7 +93,11 @@ const legTimeout = Number(args.legTimeout || 300000);
 // terrain `sharp` and the streamers are waited on with their own, shorter cap:
 // at SwiftShader's 1-3 fps a settle that never reports sharp would otherwise
 // spend the whole leg timeout per pose (the first fixture run lost 300 s a pose).
-const sharpTimeout = Number(args.sharpTimeout || 120000);
+const sharpTimeout = Number(args.sharpTimeout || 60000);
+const firstSharp = Number(args.firstSharp || 240000);
+const bootWait = Number(args.bootWait || 90000);
+const T0 = Date.now();
+const log = (...m) => console.log(`[+${Math.round((Date.now() - T0) / 1000)}s]`, ...m);
 const depressionDeg = Number(args.depression || 20);
 const cropK = Number(args.crop || 0.16);
 const ALTS_FT = String(args.alts || '5000,6000,7500,8500,10000').split(',').map(Number);
@@ -103,11 +114,17 @@ const ARMS = {
   'no-mist': { boot: 'no-mist', flags: '-GROUND_MIST' },
   'city-fade': { boot: 'city-fade', cityPin: { ...CITY_FADE } },
   'city-premix': { boot: 'city-premix', cityPin: { skylinePremix: 0 } },
-  // SK-2 (opt-in with --arms): the fix's own arm, against the baseline.
-  clarity: { boot: 'clarity', flags: 'AERIAL_CLARITY' },
+  // SK-2 (opt-in with --arms): the fix's own arm, and its same-pose control
+  // (k = 0 on the same flag-on page: S x 1.0, the shipped in-scatter).
+  clarity: { boot: 'clarity', flags: String(args.clarityFlags || 'AERIAL_CLARITY') },
+  'clarity-k0': { boot: 'clarity', live: { set: 'window.__flySkyDiag = { clarity: 0 }', clear: 'delete window.__flySkyDiag', applied: 'clarity' } },
 };
+/** The lead arm of a boot group re-captured after its live arms: that pose's noise floor. */
+const RECAPTURE = { main: ['baseline', 'baseline-2'], clarity: ['clarity', 'clarity-2'] };
 const SK1_ARMS = ['baseline', 'aerial-pin', 'air-off', 'no-mist', 'city-fade', 'city-premix'];
 const wanted = String(args.arms || SK1_ARMS.join(',')).split(',').filter((a) => ARMS[a]);
+if (wanted.includes('clarity') && !wanted.includes('clarity-k0')) wanted.push('clarity-k0');
+const ROWS = () => [...wanted, ...Object.values(RECAPTURE).filter(([lead]) => wanted.includes(lead)).map(([, again]) => again)];
 
 /** UTC epoch of local SOLAR noon at a longitude on a fixed summer date. */
 const solarNoon = (lon, day = Date.UTC(2026, 6, 18)) => day + (12.5 - lon / 15) * 3600000;
@@ -180,7 +197,7 @@ function table() {
   const L = [`# Grey-veil matrix (${report.venue})`, '', `Midtown crop ${cropK} of viewport height, ${depressionDeg}° below the horizon; contrast = (P90−P10)/(P90+P10) luma; chroma = mean CIELAB C*.`, ''];
   L.push('| Arm | ' + ALTS_FT.map((a) => `${a} ft contrast / chroma`).join(' | ') + ' |');
   L.push('|---|' + ALTS_FT.map(() => '---').join('|') + '|');
-  for (const arm of [...wanted, 'baseline-2']) {
+  for (const arm of ROWS()) {
     const rows = report.arms[arm];
     if (!rows) continue;
     L.push(`| ${arm} | ` + ALTS_FT.map((a) => {
@@ -194,10 +211,23 @@ function table() {
   L.push('', '50 km ahead (SK-2 depth check): contrast per arm and altitude', '');
   L.push('| Arm | ' + ALTS_FT.map((a) => `${a} ft`).join(' | ') + ' |');
   L.push('|---|' + ALTS_FT.map(() => '---').join('|') + '|');
-  for (const arm of [...wanted, 'baseline-2']) {
+  for (const arm of ROWS()) {
     const rows = report.arms[arm];
     if (!rows) continue;
     L.push(`| ${arm} | ` + ALTS_FT.map((a) => (rows[a]?.far ? String(rows[a].far.contrast) : rows[a]?.pending ? 'pending' : '—')).join(' | ') + ' |');
+  }
+  // Δ against the control: live arms against their own pose's lead capture
+  // (same page, same settled frame); boot arms against the baseline of the
+  // same altitude (cross-boot: read against baseline-2's drift).
+  const CONTROL = { 'aerial-pin': 'baseline', 'air-off': 'baseline', 'baseline-2': 'baseline', 'clarity-k0': 'clarity', 'clarity-2': 'clarity', clarity: 'clarity-k0', 'no-mist': 'baseline', 'city-fade': 'baseline', 'city-premix': 'baseline' };
+  const pct = (v, c) => (Number.isFinite(v) && Number.isFinite(c) && c ? `${v >= c ? '+' : ''}${(((v - c) / c) * 100).toFixed(1)}%` : '—');
+  L.push('', 'Midtown contrast Δ against the control (clarity against its k = 0 control; no-mist and the city arms cross-boot against baseline)', '');
+  L.push('| Arm (vs control) | ' + ALTS_FT.map((a) => `${a} ft`).join(' | ') + ' |');
+  L.push('|---|' + ALTS_FT.map(() => '---').join('|') + '|');
+  for (const arm of ROWS()) {
+    const ctl = CONTROL[arm], rows = report.arms[arm];
+    if (!ctl || !rows) continue;
+    L.push(`| ${arm} (vs ${ctl}) | ` + ALTS_FT.map((a) => (rows[a]?.pending ? 'pending' : pct(rows[a]?.midtown?.contrast, report.arms[ctl]?.[a]?.midtown?.contrast))).join(' | ') + ' |');
   }
   return L.join('\n') + '\n';
 }
@@ -280,18 +310,19 @@ async function place(page, p) {
   }, p);
 }
 
-async function settle(page) {
+async function settle(page, first = false) {
   const t0 = Date.now(), ready = {};
+  const sharpCap = Math.min(legTimeout, first ? firstSharp : sharpTimeout);
   const wait = async (name, fn, ms) => { try { await page.waitForFunction(fn, undefined, { timeout: ms, polling: 1000 }); ready[name] = true; } catch { ready[name] = false; } };
   await wait('worldLoading', () => !window.__fly.worldLoading, legTimeout);
-  await wait('terrainSharp', () => (window.__fly.terraStats ?? window.__fly.engine?.terraStats)?.sharp === true, Math.min(legTimeout, sharpTimeout));
+  await wait('terrainSharp', () => (window.__fly.terraStats ?? window.__fly.engine?.terraStats)?.sharp === true, sharpCap);
   await wait('streamers', () => {
     const rt = window.__fly;
     return ['satBuildings', 'satRoads', 'satSkyline', 'satVeg'].every((k) => {
       const s = rt[k]?.stats;
       return !s || ['queued', 'building', 'sampling'].every((f) => Number(s[f] ?? 0) === 0);
     });
-  }, Math.min(legTimeout, sharpTimeout));
+  }, first ? sharpCap : Math.min(legTimeout, sharpTimeout));
   ready.terra = await page.evaluate(() => {
     const t = window.__fly.terraStats ?? window.__fly.engine?.terraStats;
     return t ? { sharp: t.sharp, reason: t.sharpReason ?? null, camTileZ: t.camTileZ, targetZ: t.targetZ, downloading: t.downloading } : null;
@@ -360,7 +391,7 @@ let cityHonoured = null;
 const markPending = (arm, why) => {
   report.arms[arm] = { applied: false };
   for (const a of ALTS_FT) report.arms[arm][a] = { pending: 'pending merged tree' };
-  console.log(`  ${arm}: ${why} — pending merged tree`);
+  log(`  ${arm}: ${why} — pending merged tree`);
   save();
 };
 
@@ -372,11 +403,12 @@ async function runBootGroup(browser, group) {
     markPending(lead, 'this tree does not honour window.__flyCityDiag (seen on the first city boot)');
     return;
   }
-  console.log(`BOOT ${group} (${arms.join(', ')})`);
+  log(`BOOT ${group} (${arms.join(', ')})${ARMS[lead].flags ? ` ?flags=${ARMS[lead].flags}` : ''}`);
   let page;
   try {
     page = await newPage(browser, lead);
-    await page.waitForFunction(() => window.__flyBoot?.pct === 100, undefined, { timeout: legTimeout, polling: 1000 }).catch(() => {});
+    await page.waitForFunction(() => window.__flyBoot?.pct === 100, undefined, { timeout: bootWait, polling: 1000 }).catch(() => {});
+    log(`  booted (pct ${await page.evaluate(() => window.__flyBoot?.pct ?? null)})`);
     if (ARMS[lead].cityPin) {
       await page.waitForTimeout(3000);
       const applied = await page.evaluate(() => window.__flyCityDiagApplied === true);
@@ -387,17 +419,19 @@ async function runBootGroup(browser, group) {
       }
       report.arms[lead] = { applied };
     }
-    for (const altFt of ALTS_FT) {
+    for (const [li, altFt] of ALTS_FT.entries()) {
       const p = poseFor(altFt);
-      console.log(`  ${group} ${altFt} ft: aircraft ${(p.dM / 1000).toFixed(2)} km from Midtown`);
+      log(`  ${group} ${altFt} ft: aircraft ${(p.dM / 1000).toFixed(2)} km from Midtown`);
       try {
       await place(page, p);
-      const ready = await settle(page);
+      const ready = await settle(page, li === 0);
+      log(`    settled ${JSON.stringify({ ...ready, terra: ready.terra && { sharp: ready.terra.sharp, z: ready.terra.camTileZ, target: ready.terra.targetZ } })}`);
       await freeze(page, true);
       await page.waitForTimeout(2500);
       const pts = await project(page, p);
-      for (const arm of [...arms, ...(group === 'main' && arms.includes('baseline') && arms.length > 1 ? ['baseline-2'] : [])]) {
-        const A = ARMS[arm] ?? ARMS.baseline;
+      const again = RECAPTURE[group] && arms.includes(RECAPTURE[group][0]) && arms.length > 1 ? [RECAPTURE[group][1]] : [];
+      for (const arm of [...arms, ...again]) {
+        const A = ARMS[arm] && arm !== lead && ARMS[arm].live ? ARMS[arm] : { live: null };
         try {
           if (A.live) {
             await page.evaluate((js) => { (0, eval)(js); }, A.live.set);
@@ -407,7 +441,7 @@ async function runBootGroup(browser, group) {
           cell.ready = ready; cell.pose = { ...p, agl: pts?.agl, cinema: pts?.cinema, visuals: pts?.visuals, tier: pts?.tier };
           if (A.live?.applied) cell.applied = await page.evaluate((k) => window.__flySkyDiagApplied?.[k] === true, A.live.applied);
           (report.arms[arm] ??= {})[altFt] = cell;
-          console.log(`    ${arm.padEnd(12)} midtown ${JSON.stringify(cell.midtown && { c: cell.midtown.contrast, chroma: cell.midtown.chroma, luma: cell.midtown.luma })} far ${cell.far?.contrast ?? '—'}`);
+          log(`    ${arm.padEnd(12)} midtown ${JSON.stringify(cell.midtown && { c: cell.midtown.contrast, chroma: cell.midtown.chroma, luma: cell.midtown.luma })} far ${cell.far?.contrast ?? '—'}`);
         } catch (e) {
           (report.arms[arm] ??= {})[altFt] = { error: e.message.split('\n')[0] };
         } finally {
@@ -418,7 +452,7 @@ async function runBootGroup(browser, group) {
       } catch (e) {
         for (const arm of arms) (report.arms[arm] ??= {})[altFt] ??= { error: e.message.split('\n')[0] };
         report.errors.push({ arm: group, altFt, kind: 'leg', message: e.message.split('\n')[0] });
-        console.log(`  ${group} ${altFt} ft FAILED: ${e.message.split('\n')[0]}`);
+        log(`  ${group} ${altFt} ft FAILED: ${e.message.split('\n')[0]}`);
       }
       save();
     }
