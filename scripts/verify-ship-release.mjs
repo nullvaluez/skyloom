@@ -478,5 +478,27 @@ console.log('SHIP PASS RELEASE gate (verify-ship-release)\n');
   gate('N10 pack_interest is emitted from the Wild Earth debrief', /trackAdventure\('pack_interest',\{packId:'wild-earth',answer:value\}\)/.test(adv) && /route\.packId==='wild-earth'&&progress\.interest==null&&<PackInterest\/>/.test(adv));
 }
 
+// === P  RL-9 POI letters ========================================================
+{
+  console.log('\n[P] POI letter heights');
+  register(pathToFileURL(path.join(ROOT, 'scripts/_node-resolve.mjs')));
+  const G = await import(pathToFileURL(path.join(ROOT, 'lib/fly/poi-ground.js')).href);
+  const { Vector3 } = await import('three');
+  let raycasts = 0;
+  const map = { rootTile: { isTile: false, scale: { z: 1 }, children: [] }, geo2world: (v) => new Vector3(v.x, 0, v.y), worldToLocal: (v) => v };
+  const engine = { map, getElevationAt: () => { raycasts++; throw new Error('raycast'); } };
+  const none = G.poiGroundAt(engine, -73.98, 40.75);
+  gate('P1 a three-tile map is queried through the bucketed ground query, never the raycast (no covering tile → null, no assert path)', none === null && raycasts === 0);
+  const poi = {};
+  const seq = [[{ elev: 10, tileZ: 8 }, 10], [null, 10], [{ elev: 55, tileZ: 14 }, 55], [{ elev: 12, tileZ: 9 }, 55], [{ elev: NaN, tileZ: 16 }, 55], [{ elev: 57, tileZ: 15 }, 57]];
+  const got = seq.map(([g]) => G.mergePoiGround(poi, g));
+  gate('P2 each POI keeps its finest answer: coarser or missing tiles never overwrite, a finer tile replaces it', JSON.stringify(got) === JSON.stringify(seq.map(([, w]) => w)) && poi.elevZ === 15, JSON.stringify(got));
+  const toy = { getElevationAt: () => 42 };
+  gate('P3 an engine without a three-tile map keeps its own getElevationAt', G.poiGroundAt(toy, 0, 0)?.elev === 42);
+  const pl = read('components/fly/PoiLetters.jsx');
+  gate('P4 PoiLetters samples through refreshPoiElevation and no longer calls getElevationAt', pl.includes('refreshPoiElevation(runtime.engine, poi)') && !pl.includes('getElevationAt('));
+  gate('P5 PoiLetters writes no ref during render (the two react-hooks errors)', !/^\s*(pickedRef|styleRef)\.current = /m.test(pl.replace(/useLayoutEffect\(\(\) => \{\n\s*(pickedRef|styleRef)\.current = [^\n]*\n/g, '')));
+}
+
 console.log(`\nverify-ship-release: ${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
