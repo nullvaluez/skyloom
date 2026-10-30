@@ -652,6 +652,24 @@ console.log('SHIP PASS RELEASE gate (verify-ship-release)\n');
   await warmDone;
   const warmWant = [`${O}/_next/static/chunks/app-1.js`, `${O}/models/m.glb`];
   gate('W7 the first visit warms the cache through the same allowlist (no /api, cross-origin or page URLs)', JSON.stringify(fetched) === JSON.stringify(warmWant) && [...stored.keys()].every((k) => warmWant.includes(k)), JSON.stringify(fetched));
+  // The kill switch retires the worker first: an unregistered worker still
+  // serves the pages it controls, and its caches.open() would re-create the
+  // cache the page deletes (measured in the venue: verify-offline-shell 'kill').
+  fetched.length = 0;
+  let retireDone = null;
+  let ack = null;
+  const deleted = [];
+  ctx2.caches.keys = async () => ['skyloom-shell-v1', 'other-cache'];
+  ctx2.caches.delete = async (k) => (deleted.push(k), true);
+  handlers.message({ data: { type: 'retire' }, ports: [{ postMessage: (m) => (ack = m) }], waitUntil: (p) => (retireDone = p) });
+  await retireDone;
+  const afterRetire = fetchEvent(`${O}/_next/static/chunks/main-abc.js`) || fetchEvent(`${O}/`, 'navigate');
+  let warm2 = null;
+  handlers.message({ data: { type: 'warm', urls: [`${O}/_next/static/chunks/x.js`] }, waitUntil: (p) => (warm2 = p) });
+  await warm2;
+  const offlineSrc = read('lib/fly/offline-shell.js');
+  gate('W12 retire: the worker deletes only Skyloom caches, acks, then answers and stores nothing; the kill switch retires before it unregisters',
+    JSON.stringify(deleted) === '["skyloom-shell-v1"]' && ack === 'retired' && !afterRetire && fetched.length === 0 && /await retireWorker\(r\.active\);\s*if \(await r\.unregister\(\)\) n\+\+;/.test(offlineSrc), JSON.stringify({ deleted, ack, afterRetire, fetched }));
   const offline = read('lib/fly/offline-shell.js');
   const host = read('components/fly/hud/OfflineShell.jsx');
   gate('W8 registration waits for the load event and an idle period (never inside the first minute\'s critical path)', /whenIdle\(\(\) => \{\s*syncOfflineShell\(action\)/.test(host) && /readyState === 'complete'/.test(offline) && /addEventListener\('load', go/.test(offline) && /requestIdleCallback\(run, \{ timeout \}\)/.test(offline));

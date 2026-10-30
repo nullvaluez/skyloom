@@ -19,6 +19,13 @@ const CACHE = `skyloom-shell-${VERSION}`;
 const SHELL = '/';
 const STATIC_PREFIXES = ['/models/', '/materials/', '/hdri/', '/textures/', '/fonts/', '/audio/', '/data/', '/atlas/', '/icons/', '/og/', '/adventures/', '/splash/'];
 const STATIC_FILES = ['/manifest.json', '/logo.webp'];
+// The kill switch (lib/fly/offline-shell.js, flag off) retires this worker
+// before unregistering it: an unregistered worker keeps serving the pages it
+// already controls, and any caches.open() would re-create the cache the page
+// just deleted. Retired, it answers nothing and stores nothing. (If the
+// browser restarts it mid-page, the next page load's kill switch deletes the
+// caches again, and that load is no longer controlled.)
+let retired = false;
 
 /** 'immutable' | 'static' | 'shell' | null — which strategy a request gets (null: not ours). */
 function shellCacheable(url, origin, mode, method) {
@@ -57,7 +64,17 @@ self.addEventListener('activate', (event) => {
 // and only what the cache does not hold yet.
 self.addEventListener('message', (event) => {
   const data = event.data;
-  if (!data || data.type !== 'warm' || !Array.isArray(data.urls)) return;
+  if (data && data.type === 'retire') {
+    retired = true;
+    event.waitUntil(
+      caches.keys()
+        .then((keys) => Promise.all(keys.filter((k) => k.startsWith('skyloom-shell-')).map((k) => caches.delete(k))))
+        .catch(() => {})
+        .then(() => event.ports && event.ports[0] && event.ports[0].postMessage('retired')),
+    );
+    return;
+  }
+  if (retired || !data || data.type !== 'warm' || !Array.isArray(data.urls)) return;
   const urls = data.urls.filter((u) => typeof u === 'string').slice(0, 400)
     .filter((u) => { const k = shellCacheable(u, self.location.origin, 'cors', 'GET'); return k === 'immutable' || k === 'static'; });
   event.waitUntil(caches.open(CACHE).then(async (c) => {
@@ -74,6 +91,7 @@ self.addEventListener('message', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  if (retired) return; // the network, untouched
   const req = event.request;
   const kind = shellCacheable(req.url, self.location.origin, req.mode, req.method);
   if (!kind || req.headers.has('range')) return; // not ours (or a ranged media read): the network, untouched
