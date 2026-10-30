@@ -1174,12 +1174,26 @@ resident chunks, `sat-skyline` 3). The s3 night still pair captured the HUD's
 tips card and toasts (11 % of pixels moved over 60 s), so the probe now hides
 the DOM overlays, the player rig and the traffic instances before a still pair
 (`dd41247`), and both probes exited only at their timeouts (fixed in the same
-commit). Queued (`chain2.sh`, one locked session at a time): s8 phone day
-CITY_RANGE census + phone night still pair off/on; s9 desktop night still pair
-off/on + desktop day census off/CITY_RANGE at 2,438 / 4,300 m; s10
-`verify-sat-buildings` + `verify-skyline`; s11 `verify-sat-night`; s12 the
-SK-1 veil arms at 10,000 / 8,500 ft (where the city's share is non-zero by
-construction).
+commit). Session s8 (14:18-14:43 UTC, snapshot `ecb5140`): **smoke PASS** for
+phone `?flags=CITY_RANGE` by day (900 m, 2,438 m) and for the phone night pair
+off / all three flags at 3,000 m; desktop night (`cls=dgpu`, tier High) all
+flags off at 900 m PASS, while its all-flags arm ran out of the session's
+budget before its first pose (re-queued as s9). CT-3 census (phone, day,
+2,438 m, per frame): all flags off, `sat-buildings` booked **7 draws for 5
+resident chunks** (a partly visible chunk splits); `?flags=CITY_RANGE`,
+**6 draws for 8 resident chunks** (at most one colour draw per chunk); the
+scene totals (199 vs 208) are dominated by the satellite map's 127-137 tile
+draws, which follow how far streaming had got when the bounded settle
+(75 s) expired, so they are not a CITY_RANGE delta. CT-4 still (phone, night,
+3,000 m, 60 s apart, HUD, player rig and traffic hidden): all flags off
+13.2 % of pixels moved (mean |dL| 4.85: the skyline was still landing,
+`skReady` 0), all three flags on 4.1 % (mean |dL| 1.65, 27 pools placed to
+54 km): the pools add no crawl the off arm does not already show. Desktop
+night off still at 900 m: 7.3 % (clouds and streaming). Queued
+(`chain2.sh`): s9 desktop night all flags at 900 m (still) + desktop day
+census off / CITY_RANGE at 2,438 / 4,300 m; s10 `verify-sat-buildings` + the
+SK-1 veil arms at 10,000 / 8,500 ft; s11 `verify-sat-night`; s12
+`verify-skyline`.
 
 **Known issues.** In this venue the device policy classes SwiftShader as
 `software`, which CITY_RANGE refuses; the probe uses the harness pin
