@@ -328,6 +328,30 @@ try {
       `${lit0} ${behind} ${away} ${high}`);
   }
 
+  {
+    // The horizon map end to end (a stub sampler over a ridge): it fills,
+    // marches, lights the sun side and shadows the lee; a small move keeps the
+    // grid (hysteresis) and the lit texture stays where it was marched.
+    const hm = new ts.HorizonShadowMap(32);
+    const ridgeAt = (x) => (Math.abs(x - 2000) < 400 ? 900 : 0); // a N-S wall at x = 2 km
+    const sampler = { sample: (lon) => ({ elev: ridgeAt(lon) }) };
+    const engine = { worldToGeo: (p) => ({ x: p.x, y: p.z }) };
+    const L = new THREE.Vector3(1, Math.tan((6 * Math.PI) / 180), 0).normalize(); // sun low in +x
+    const ctx = (now, x = 0) => ({ engine, sampler, player: { x, y: 500, z: 0 }, anchor: { x: 0, z: 0 }, L, k: 1, rangeM: 8000, hz: 1, now, epoch: 1, block: { horizonBudgetMs: 1000, horizonSoftM: 30, horizonResampleSec: 8 } });
+    for (let i = 0; i < 6 && !hm.valid; i++) hm.update(ctx(i));
+    const n = 32, cell = hm.litCell, ox = hm.litOrigin.x;
+    const litAt = (x) => hm.lit[16 * n + Math.floor((x - ox) / cell)] / 255;
+    const lee = litAt(500), sunSide = litAt(3500), behindFar = litAt(-7000);
+    const origin0 = hm.origin.x;
+    hm.update(ctx(1.2, 600)); // a few cells: inside the hysteresis band
+    check('(1n) horizon map: fills from the sampler, the lee of a 900 m wall under a 6 deg sun is dark, the sun side lit',
+      hm.valid && hm.stats.sampled === n * n && lee === 0 && sunSide === 1 && behindFar === 1 && hm.origin.x === origin0, `lee ${lee} sun ${sunSide} far ${behindFar}`);
+    const u = { uTsMatrix: { value: new THREE.Matrix4() }, uTsMap: { value: null }, uTsParams: { value: new THREE.Vector4() }, uTsLight: { value: new THREE.Vector3() } };
+    hm.bind(u, { x: 0, z: 0 }, 1);
+    const c = new THREE.Vector3(ox + cell * 0.5, 0, hm.litOrigin.y + cell * 0.5).applyMatrix4(u.uTsMatrix.value);
+    check('(1o) horizon bind: the first cell centre maps to uv (0.5/n, 0.5/n), the texture is the lit grid', Math.abs(c.x - 0.5 / n) < 1e-9 && Math.abs(c.y - 0.5 / n) < 1e-9 && u.uTsMap.value === hm.texture && u.uTsParams.value.x === 1);
+  }
+
   // =========================================================================
   // (4) LT-4 AIRFRAME_SHADOW and (5) LT-5 SHADOW_REACH.
   // =========================================================================
