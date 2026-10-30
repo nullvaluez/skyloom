@@ -969,7 +969,30 @@ Severity and effort are the auditors' estimates. "Where" names the requirement t
 ### LIGHT
 
 <!-- SHIP PASS LIGHT report begin -->
-(not started)
+**Status (2026-10-30, cloud venue, IN PROGRESS):** LT-4 AIRFRAME_SHADOW and LT-5
+SHADOW_REACH built; LT-2 TERRAIN_SHADOW built (both paths), browser smoke
+pending; LT-1, LT-3, LT-6, LT-7 next. Every LIGHT flag is `enabled:false`
+(look flags wait for the owner's RTX 5080 motion bar, FLY_SHIP_PASS.md 3.8).
+
+| ID | State | What landed | Evidence |
+|---|---|---|---|
+| LT-1 | in progress | — | node gates verify-mobile-enhanced 6/6, verify-mobile-bloom 6/6 (baseline) |
+| LT-2 | built, browser pending | `lib/fly/terrain-shadow.js` (desktop terrain-only ortho depth map, texel-snapped, 2 Hz; touch CPU horizon map from a wrapped `TerrainGroundQuery`, time-sliced), anchored patch in `earth-surface-material.js`, `components/fly/TerrainShadowRig.jsx` mounted from FlyScene's LIGHT block only with the flag on | `verify-ship-light` (0a)-(1m) |
+| LT-3 | not started | | |
+| LT-4 | built | `CinemaShadows.setAirframeFit` (custom split pinning cascade 0 past the airframe, cascade-0 normal bias in its own texels), `airframeShadowOn`; PlayerPlane LIGHT block toggles receiveShadow (a uniform: no recompile) | `verify-ship-light` (4a)-(4f) |
+| LT-5 | built | `shadowReachConfig` reuses MOBILE_ENHANCED's AGL rule on Medium desktops (CinemaShadowRig) | `verify-ship-light` (5a)-(5b) |
+| LT-6 | not started | | |
+| LT-7 | not started | | |
+
+**Device gating:** every LIGHT feature asks `deviceFeature()` through
+`lib/fly/ship-light.js`. This venue's SwiftShader is class 'software', which
+the policy refuses, so harnesses pin `window.__flyLightDeviceClass`
+(passed as `ctx.cls`, the frozen API's own field).
+
+**Contract requests:** (FRAME) a general device-class pin in
+`device-policy.js` (this stream's `__flyLightDeviceClass` then retires).
+
+**Gates:** `verify-ship-light` 28/28; seam rule PASS.
 <!-- SHIP PASS LIGHT report end -->
 
 ### RELEASE

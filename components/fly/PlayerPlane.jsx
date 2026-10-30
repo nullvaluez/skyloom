@@ -43,6 +43,9 @@ import { groundHullOffset, idleBobAmplitude, poseAircraftRig } from '@/lib/fly/a
 import { renderView } from '@/lib/fly/render-view';
 import { playerVisible } from '@/lib/fly/player-visibility';
 // SHIP PASS LIGHT imports begin
+import { airframeShadowOn } from '@/lib/fly/cinema-shadows';
+import { shipPassOn } from '@/lib/fly/ship-light';
+const AIRFRAME_SHADOW_FLAG = shipPassOn('AIRFRAME_SHADOW');
 // SHIP PASS LIGHT imports end
 
 /**
@@ -378,6 +381,22 @@ function PlayerModel({ flight, aircraft }) {
   // SHIP PASS LIGHT begin
   // FLY_SHIP_PASS.md LT-4 (AIRFRAME_SHADOW): receiveShadow and the cascade-0
   // fit for the player aircraft. Every edit to this file stays in this block.
+  // The airframe receives the cinema cascades on High/Ultra (wing-root and
+  // tail shadows); CinemaShadowRig fits cascade 0 to it in chase and photo.
+  // receiveShadow is a uniform in three r185, so neither way recompiles.
+  // Flag off: nothing here runs and the graded meshes keep receiveShadow
+  // false exactly as above.
+  const airframeReceive = useRef(null);
+  useFrame(() => {
+    if (!AIRFRAME_SHADOW_FLAG) return;
+    const on = airframeShadowOn(useFlyStore.getState());
+    const last = airframeReceive.current;
+    if (last && last.on === on && last.mats === gradedMats) return;
+    airframeReceive.current = { on, mats: gradedMats };
+    cloned.traverse((o) => {
+      if (o.isMesh && o.castShadow) o.receiveShadow = on;
+    });
+  });
   // SHIP PASS LIGHT end
   return (
     <group>

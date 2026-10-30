@@ -248,6 +248,10 @@ import { ENCOUNTER_FEEL_ACTIVE } from '@/lib/fly/play-pass';
 // SHIP PASS CITY imports end
 
 // SHIP PASS LIGHT imports begin
+import { TerrainShadowRig } from './TerrainShadowRig';
+import { shipPassOn as lightPassOn } from '@/lib/fly/ship-light';
+// TERRAIN_SHADOW: the rig exists only with the flag on (FLY_SHIP_PASS.md LT-2).
+const TERRAIN_SHADOW_RIG = lightPassOn('TERRAIN_SHADOW');
 // SHIP PASS LIGHT imports end
 
 // SHIP PASS RELEASE imports begin
@@ -3778,6 +3782,7 @@ export function FlyScene({ runtime }) {
       {/* SHIP PASS CITY mounts begin */}
       {/* SHIP PASS CITY mounts end */}
       {/* SHIP PASS LIGHT mounts begin */}
+      {TERRAIN_SHADOW_RIG && mapStyle === 'satellite' && <TerrainShadowRig runtime={runtime} engine={engine} />}
       {/* SHIP PASS LIGHT mounts end */}
       {/* SHIP PASS SKY mounts begin */}
       {/* SHIP PASS SKY mounts end */}
