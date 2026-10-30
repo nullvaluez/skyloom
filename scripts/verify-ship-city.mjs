@@ -250,6 +250,23 @@ async function childNight(windowJSON) {
   const clip = clipped.length ? Math.max(...clipped.map((o) => o.d)) : 0;
   const at = (km) => placed.find((o) => o.c.name === `c${km}`);
   out.place = { clipKm: clip / 1000, edgeEndKm: (0.98 * 120000) / k / 1000, n: placed.length, k, f4: at(4)?.fade ?? 0, f8: at(8)?.fade ?? 0, f20: at(20)?.fade ?? 0, f60: at(60)?.fade ?? 0, f65: at(65)?.fade ?? 0, f80: at(80) ? at(80).fade : -1, r20: at(20)?.r, r70: at(70)?.r, nearestFirst: placed.every((o, i) => i === 0 || placed[i - 1].d <= o.d) };
+  // A still camera is a still image: placement is a pure function of the pose
+  // (same pose twice -> the same pools, byte for byte), and continuous in it
+  // (a 1 m drift moves no pool in or out and no fade by more than 1e-3), so the
+  // 2 s cadence cannot step a pool between placements (CT-4 "no crawl").
+  const sig = (arr) => JSON.stringify(arr.map((o) => [o.c.name, o.d, o.fade, o.r]));
+  const again = NL.placeNightLite(cities, 0, z, { roadRingM: 9000, reachM: 60000, cap: 200 });
+  const drift = NL.placeNightLite(cities, 1 * k, z, { roadRingM: 9000, reachM: 60000, cap: 200 });
+  // A pool absent from one placement counts as fade 0 there: one entering at
+  // the very edge of the band enters dark, which is what continuity means.
+  const fadeOf = (arr) => new Map(arr.map((o) => [o.c.name, o.fade]));
+  const f0 = fadeOf(placed);
+  const f1 = fadeOf(drift);
+  const names = new Set([...f0.keys(), ...f1.keys()]);
+  out.still = {
+    same: sig(again) === sig(placed),
+    driftMaxFade: Math.max(...[...names].map((n) => Math.abs((f1.get(n) ?? 0) - (f0.get(n) ?? 0)))),
+  };
   const capped = NL.placeNightLite(cities, 0, z, { roadRingM: 9000, reachM: 60000, cap: 10 });
   out.place.capN = capped.length;
   out.place.capNearest = capped.every((o) => o.d <= capped[capped.length - 1].d);
@@ -658,6 +675,12 @@ async function main() {
       L.f4 === 0 && L.f8 > 0 && L.f20 === 1 && L.f60 === 1 && L.f65 > 0 && L.f80 === -1 && L.nearestFirst && L.capN === 10 && L.capNearest && L.r70 > L.r20 &&
         L.clipKm >= 60 && L.clipKm < L.edgeEndKm,
       `edge-clipped reach ${L.clipKm.toFixed(1)} km (< ${L.edgeEndKm.toFixed(1)} km dissolve end); fade 4km ${L.f4} · 8km ${L.f8.toFixed(2)} · 20km ${L.f20} · 60km ${L.f60} · 65km ${L.f65.toFixed(2)}; radius 20km ${Math.round(L.r20)} m, 70km ${Math.round(L.r70)} m`,
+    );
+    const S = nOn.still;
+    check(
+      'CT-4 a still camera is still: placement is a pure function of the pose and continuous in it (1 m drift: no pool steps by >= 1e-3)',
+      S.same && S.driftMaxFade < 1e-3,
+      `max fade change over 1 m ${S.driftMaxFade.toExponential(2)}`,
     );
     const pol = nOn.policy;
     check(
