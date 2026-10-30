@@ -244,6 +244,7 @@ import { noteHeading } from '@/lib/fly/turn-budget';
 // SHIP PASS FRAME imports end
 
 // SHIP PASS SKY imports begin
+import { ShipSkyDiag } from './ShipSkyDiag';
 // SHIP PASS SKY imports end
 
 // SHIP PASS CITY imports begin
@@ -3787,6 +3788,7 @@ export function FlyScene({ runtime }) {
       {/* SHIP PASS LIGHT mounts begin */}
       {/* SHIP PASS LIGHT mounts end */}
       {/* SHIP PASS SKY mounts begin */}
+      <ShipSkyDiag runtime={runtime} />
       {/* SHIP PASS SKY mounts end */}
       {/* One-shot neon confetti burst masking the warp cut. TRUE EARTH
           (PLAYER_SURFACE): Neon's own look; satellite players don't get it. */}

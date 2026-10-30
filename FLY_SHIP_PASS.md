@@ -1102,7 +1102,120 @@ Made by FRAME:
 ### SKY
 
 <!-- SHIP PASS SKY report begin -->
-(not started)
+**Status (2026-10-30, cloud venue, branch `ship/sky`): IN PROGRESS — every
+item built and node-gated; the browser rows are running through the shared
+heavy lock.** SK-2 to SK-6 are built (the three look flags `enabled:false`),
+SK-1's model attribution is in, and its rendered fixture matrix and the
+flag-on browser smoke are queued (a continuation after a usage-limit cutoff:
+the first agent's seven commits stand; this run fixed one red it had
+introduced, see "Reds fixed"). Every number below is the offline fixture
+under SwiftShader (section 3.8), never a 5080 or iPhone number.
+
+| ID | State | What landed | Evidence |
+|---|---|---|---|
+| SK-1 | instrument built, run in flight | `scripts/ship-sky-veil.cjs`: pinned clear noon (`__flySunOverride` = local solar noon, `__flyWeatherOverride='clear'`), Midtown 20° below the horizon at 5,000 / 6,000 / 7,500 / 8,500 / 10,000 ft, lens 60°, clock frozen; arms baseline, `aerial-pin` (`__flyAerialOverride=0`), `air-off` (SKY's new dev/review pin `window.__flySkyDiag={aerial:0}`, `lib/fly/sky-diag.js`: the whole Enhanced aerial post pass leaves the ground pixels), `no-mist` (`?flags=-GROUND_MIST`), and CITY's `city-fade` / `city-premix` through `window.__flyCityDiag` — measured only when the tree publishes `__flyCityDiagApplied === true`, otherwise "pending merged tree". Metric: percentile Michelson luma contrast, RMS contrast, mean CIELAB chroma and mean luma in a crop around the projected Midtown point, plus a 50 km crop for SK-2. | `verify-ship-sky` SK-1 (a)–(d); table: below, when the run lands |
+| SK-3 | built, flag OFF (look flag) | `lib/fly/sun-model.js`: truncated Meeus ch. 47 (26 Σl/Σr + 14 Σb rows, A1–A3 terms), topocentric parallax, phase and illuminated fraction (Meeus ch. 48); `computeSun` records the place and instant behind each `az`, so `moonDirFromSun(az)` returns the real moon with REAL_MOON on and FlyScene, the cloud pass and cinema-environment inherit it unedited; `moonLight()` (D15 floor 0.5 of today's key, never above today's full moon, shadowless fill up to the floor when the moon is low or set, no key/disc under the horizon, exposure opens ≤ 0.5 stop); `moonState()` implemented (frozen shape plus additive `compassAzDeg`, `lightK`, `real`). `cinema-environment.js`: key × keyK, fill top-up, disc weight × visibility, exposure adapt (flag off: main's expressions). `night-sky.js`: the phase terminator on the composite's disc (sphere normal lit by the true sun, earthshine 0.06) and a corona that follows the lit fraction. | `verify-ship-sky` SK-3 (a)–(o): Meeus 47.a; the terminator geometry (a CPU mirror of the shader, true sun on the ephemeris moon) lights the disc's real fraction within 0.61% on 14 moon-up dates; 20 JPL Horizons dates (worst 0.020° position, 0.63% illumination); flag-off bit identity of `moonDirFromSun` and of cinema-environment over 820 states (sha256 vs main); the light law over a 241 × 21 grid; 403 deep-night states with the flag on |
+| SK-5 | done | The lens flare (veiling glare, aperture starburst, five ghosts, `livSunVisible()` / `livLens()`, `uLivFlare*`, `FLARE_ON`) is deleted from `light-shafts.js`; the cloud pass's comments follow. `LIGHT_SHAFTS` is untouched and still off. The `LENS_FLARE` block, its `living-world.js` reader and its device-report entry stay for the lead's close (8.3). `verify-living-sky` (2a)'s LENS_FLARE marker now asserts the lens is gone (a file no stream lists; one line, unavoidable once the code is deleted). | `verify-ship-sky` SK-5 (a)–(d): default-frame program texts unchanged (TEXT (a), sha256 vs main); `?flags=LENS_FLARE` reaches no program; LIGHT_SHAFTS' source and blur programs are main's and its composite is main's minus exactly the lens text (sha256 of main's text with the lens cut out); `verify-living-sky` node rows green and its GPU compile/link rows green on SwiftShader |
+| SK-4 | built, flag OFF (look flag) | `lib/fly/sky-lite.js` + one anchored edit function in `lib/fly/atmosphere/glsl.js` (`skyLiteAerialGLSL(src, on)`, pure; sky-lite.js reads the flag and exports the consumers' `PSKY_AERIAL_LOOKUP_GLSL`, so glsl.js keeps no runtime dependency). What Medium and phones lost was REACH: the aerial volume is 450 km on High, 250 km on Medium, 160 km on touch devices and `pskyAerial()` clamped farther pixels to the last slice, so from altitude the outer band (and the clouds over it) stopped hazing where High keeps going; and the far cloud deck is 180 km on High, 90 km on Medium, none on phones. SKY_LITE, inside passes that already run: (1) past the last slice the optical depth continues linearly with distance and the in-scatter keeps its share of the opacity (continuous; a few ALU ops on the pixels beyond the range), switched per frame by `uPskyAp.z`, which `AtmosphereRig` sets from `deviceFeature('SKY_LITE')`; (2) phone profiles get the existing one-sample far deck at the policy's `cloudReach` (0.5 × 180 = 90 km) through the deck's existing reach uniform. Medium desktops keep their 90 km deck and get (1). | `verify-ship-sky` SK-4 (a)–(g): the policy (phones and tablets at any tier, desktops at Medium/Low, never a desktop at High); no raw device-class call, no GPU object; flag off = 0 switch and the old deck rule; flag on = the reach edit in the aerial pass, cloud march and composite, once each, and the ONLY difference (sha256 of each text with the edit reverted = default); the extrapolation continuous and monotone. Cost: **+0 draws, +0 passes, +0 targets, +0 programs at runtime** (structural, gated); GPU ms is the owner's (run list) |
+| SK-6 | kept | Nothing SKY added touches the LUT cadence. | `verify-ship-sky` SK-6 (a) PHYS_SKY `skyHz` 60/30/30 and `aerialHz` 30/15/10 unchanged and unwritten by SKY's modules; (b) `verify-mobile-enhanced` **6/6** (sky redraws 241 → 61 over 2 s at 120 Hz at the phone's 30 Hz budget, run from the gate) |
+| Prewarm | registered | SKY block of `lib/fly/prewarm-registry.js`: `SKY:real-moon-composite` (REAL_MOON), `SKY:sky-lite-clouds` and `SKY:sky-lite-aerial` (SKY_LITE). SKY's flag-on texts REPLACE default ones for the page load, so each entry builds clones of the live materials (the cloud pass's Enhanced pair; the composer's merged aerial pass), published through `lib/fly/sky-prewarm.js`; the existing chain prewarm (`prewarm.js` through `buildPassList`) builds the flag-on text by construction. | `verify-ship-sky` PREWARM row: three keys, each reachable only with its flag, each `build()` an Object3D |
+| SK-2 | built, flag OFF (look flag) | `lib/fly/aerial-clarity.js`, from SK-1's model attribution (the atmosphere's veil is near-field Rayleigh in-scatter, not aerosol, not the mix space, not mist): in clear daylight from altitude the near and mid field's physical in-scatter is cut, S' = S·(1 − k·(1 − smoothstep(nearKm, farKm, d))), k = strength × (1 − overcast)(1 − fog) × day × eye ramp; extinction untouched; S' still grows with distance (no ring); from `farKm` (45 km) out S is the physical one, so distant ridges, the 50 km band and the horizon keep exactly their depth; nothing below 900 m eye AGL. One anchored edit on the final Enhanced aerial text (after PHYS_SKY, TRUE_SCALE and the ground edits) and one uniform; tunables in the `AERIAL_CLARITY` block (`strength` 0.45, `nearKm` 12, `farKm` 45, `eyeRampM` [900, 2600]). Prewarm: the aerial entry builds the live merged pass. | `verify-ship-sky` SK-2 (a)–(f): flag-off identity; the edit is the only change (sha256 with the edit reverted = default, Enhanced and merged pass); k law; far field identical by construction and monotone; **the atmosphere's veil on the model: 8,500 / 10,000 ft vs 6,000 ft from −6.8% / −10.2% to 0.0% / −2.3%, 50 km sight line 0.283 → 0.283**. The rendered fixture arm (`--arms=baseline,clarity`) and the 5080 motion bar are pending (lock queue / owner) |
+
+**SK-1 — the atmosphere's share of the veil (SKY's half of the table).**
+Two instruments. (1) `scripts/ship-sky-veil-model.mjs`: the shipped
+atmosphere's own CPU mirror (`lib/fly/atmosphere/model.js`, the same medium and
+integrator as the GPU tables), the harness geometry (Midtown 20° below the
+horizon, July clear noon, sun behind the eye, city albedo 0.12), metric = the
+contrast transfer G·T / (G·T + S) of the ground under the aerial in-scatter
+(1 = no veil). Venue-independent and exact for the atmosphere term alone:
+
+| Eye height | 5,000 ft | 6,000 ft | 7,500 ft | 8,500 ft | 10,000 ft | 50 km sight line (10,000 ft) |
+|---|---|---|---|---|---|---|
+| shipped atmosphere: transfer (vs 6,000 ft) | 0.817 (+3.2%) | 0.792 | 0.758 (−4.3%) | 0.738 (−6.8%) | 0.711 (−10.2%) | 0.283 |
+| aerosol removed (turbidity 0) | 0.830 | 0.805 | 0.771 | 0.751 (−6.7%) | 0.724 (−10.0%) | 0.306 |
+| Rayleigh removed | 0.986 | 0.984 | 0.983 | 0.982 (−0.2%) | 0.982 (−0.3%) | 0.907 |
+
+So the atmosphere alone costs Midtown ≈ 7% of its contrast from 6,000 to
+8,500 ft and ≈ 10% to 10,000 ft (inside the 15% row by itself), and that
+share is **Rayleigh in-scatter over dark imagery, not aerosol**: taking the
+Mie medium out entirely moves it by 0.1–0.2 points. The haze mix is already
+scene-linear in the physical path (`lit = ground·T + S·E`), and the ground
+mist burns off by a 19° sun, so neither "Mie density with altitude", "the
+haze-mix colour space" nor "mist coupling" can remove it — the in-scatter on
+the near and mid field is the lever (SK-2). (2) `scripts/ship-sky-veil.cjs`:
+the rendered fixture matrix (arms baseline / `aerial-pin` / `air-off` /
+`no-mist` / CITY's two), fixture/SwiftShader — **its run is queued on the
+shared heavy lock; its rows land here when it completes**; CITY's arms read
+"pending merged tree" on this branch and the lead re-runs the harness on the
+merged tree.
+
+**SK-4 cost table (SKY_LITE on; structural rows are gated, GPU ms is the
+owner's).**
+
+| Device (policy class / tier) | SKY_LITE | Aerial reach | Far cloud deck | Draws / passes / targets / programs | GPU ms |
+|---|---|---|---|---|---|
+| phone, any tier | on | 160 km volume, continued past it (`uPskyAp.z = 1`) | none → 90 km, one sample (`cloudReach` 0.5) | +0 / +0 / +0 / +0 (the edits replace the default texts for the page load) | owner: iPhone device report at Medium and High, `?flags=SKY_LITE` vs default |
+| tablet, any tier | on | 160 km, continued | none → 90 km (the phone cinema profile) | +0 | owner (emulation only, D7) |
+| desktop Medium (dGPU / iGPU) | on | 250 km, continued | 90 km (unchanged) | +0 | owner: 5080 at Medium |
+| desktop High / Ultra | off (policy) | 450 km clamp (unchanged) | 180 km (unchanged) | +0 | — |
+| software (SwiftShader) | Medium / Low only | as Medium | as its profile | +0 | — |
+
+Per pixel, the reach edit is a uniform branch plus three `pow` and a few
+ALU ops on pixels beyond the volume's last slice only; the far deck on a
+phone costs what Medium's already does per cloud-resolution pixel (one shell
+intersection, one density sample, one light estimate). The 0.6 ms row of the
+policy budget is the owner's to read on the iPhone (run list, iPhone step 10).
+
+**Flags.** `AERIAL_CLARITY`, `REAL_MOON`, `SKY_LITE`: `enabled:false` (look
+flags; section 3.8 — the owner flips each after the 5080 motion bar).
+`REAL_MOON` tunables live in its block (`floorK`, `horizonBandDeg`,
+`minKeyElDeg`, `exposureAdapt`, `earthshine`, `terminatorSoft`).
+
+**Gates.** `node scripts/verify-ship-sky.mjs`: 42 passed, 0 failed (includes
+the default-flag program-text hashes vs main: cloud march / composite /
+filter, Classic and Enhanced; aerial Classic, Enhanced, merged pass and its
+defines; SK-4 (h) keeps `atmosphere/glsl.js` dependency-free). Existing, node:
+`verify-cinema-overhaul` 16/16, `verify-twilight` 6/6, `verify-sun-azimuth`
+5/5, `verify-cloud-calm` 6/6, `verify-true-earth-flags` 8/8,
+`verify-import-integrity` 4/4, `verify-living-sky` 21/21 (its GPU rows on
+SwiftShader). Existing, browser halves (bundled Chromium + SwiftShader under
+the heavy lock): `verify-hdr-guard` 4/4; `verify-cloud-silhouette-gpu` PASS
+(1,426 → 0 leaked hull pixels, 15 silhouettes, no GL errors) and
+`verify-cloud-reconstruction-gpu` PASS (cloud error 3.6e-8, foreground 0) —
+both ask for `channel: 'chrome'`, which the container lacks, so they ran
+unedited under `node --import ./scripts/ship-sky-pw-venue.mjs` (SKY's venue
+shim: the bundled Chromium instead); `verify-phys-sky` re-run queued (see
+"Reds fixed"). `node scripts/ship-pass-gates.mjs`: 32 PASS, 2 KNOWN-RED,
+0 FAIL, 4 SKIP, seam rule PASS. ESLint: no new problems — `FlyScene.jsx`
+26 errors / 2 warnings and `SkyDome.jsx` 3 errors on main and on the branch
+alike (pre-existing), every other touched file clean.
+
+**Reds fixed.** None from section 12.3. One red this branch had introduced:
+SK-4's flag read put `import … from '../ship-pass.js'` into
+`lib/fly/atmosphere/glsl.js`, whose header promises no runtime dependencies;
+`ship-pass.js` imports extensionless paths, so plain node could no longer
+import glsl.js (or `cinema-sky.js` through it) and `verify-phys-sky` crashed
+at its node half (`ERR_MODULE_NOT_FOUND …/lib/fly/fly-pins`). Fixed in
+`5c2cb0a`: the flag is read in `sky-lite.js`, glsl.js's lookup text is main's
+again (sha256), and `verify-ship-sky` SK-4 (h) holds the import set and a
+plain-node import.
+
+**Owner checks (run list, section 9).** RTX 5080 step 6: a night flight at
+the current moon with `?flags=REAL_MOON` against the default; a moonrise for
+the motion bar (pin one with `?sunUtc=`). iPhone step 10 / SK-3: a new and a
+full moon night over Manhattan (`?flags=REAL_MOON&sunUtc=2026-11-10T03:00:00Z`
+is a new moon, set; `?flags=REAL_MOON&sunUtc=2026-11-24T05:00:00Z` a full
+moon 70° up), each against the same URL without the flag.
+
+**Contract notes.** `moonState()` (section 6, CITY consumes it): frozen
+shape kept; additive `lightK` is the ground's moonlight relative to today's
+(1 with REAL_MOON off), the number a night exposure balance wants.
+
+**Files outside the listed ownership:** new and SKY's own — `lib/fly/sky-diag.js`,
+`lib/fly/sky-lite.js`, `lib/fly/sky-prewarm.js`, `lib/fly/aerial-clarity.js`,
+`components/fly/ShipSkyDiag.jsx`, `scripts/ship-sky-veil.cjs`,
+`scripts/ship-sky-veil-model.mjs`, `scripts/ship-sky-smoke.cjs`; edited minimally — `scripts/verify-living-sky.mjs`
+(one marker line, SK-5).
 <!-- SHIP PASS SKY report end -->
 
 ### CITY
