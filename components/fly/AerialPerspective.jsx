@@ -66,6 +66,8 @@ import {
 // __flyLinearHazeOverride dev pin), never off the constant — otherwise a pinned
 // A/B would decode the tile setters and leave this uniform on the other path.
 import { getEdgeFade, linearHazeOn } from '@/lib/fly/toy-world/world-bend';
+// SHIP PASS SKY (SK-1): the veil diagnosis pin (dev / ?graphicsReview=1 only).
+import { markSkyDiagApplied, skyDiag } from '@/lib/fly/sky-diag';
 import { depthSubOn } from '@/lib/fly/depth-pass';
 import { daylightNearHazeMix } from '@/lib/fly/daylight-depth';
 import { LIVING_AIR_GLSL } from '@/lib/fly/living-atmosphere';
@@ -723,6 +725,15 @@ export class AerialPerspectiveEffect extends Effect {
     u.get('uNear').value.set(s.nearStartM, s.nearMaxMix);
     if (this._r25) this._updateR25(u);
     if (this._r25 && LIVING_GROUND_ACTIVE) updateLivingGround(s, inputBuffer?.height);
+    // SHIP PASS SKY (SK-1): `__flySkyDiag.aerial === 0` takes the whole
+    // post-pass air out of the ground pixels for the veil attribution
+    // (lib/fly/sky-diag.js). A uniform write after every other one: the shader
+    // takes its strength-0 early-out, so no text or program key moves, and
+    // with no pin (production, every other harness) nothing is read.
+    if (skyDiag()?.aerial === 0) {
+      u.get('uMaxMix').value = 0;
+      markSkyDiagApplied('aerial');
+    }
   }
 
   /** R25 C: the Enhanced uniforms, from r25-sky's per-frame state. */

@@ -957,7 +957,44 @@ Severity and effort are the auditors' estimates. "Where" names the requirement t
 ### SKY
 
 <!-- SHIP PASS SKY report begin -->
-(not started)
+**Status (2026-10-30, cloud venue, branch `ship/sky`): IN PROGRESS.** SK-3
+(REAL_MOON) is built and gated; SK-1's instrument is written and its first
+fixture run is in flight; SK-2, SK-4, SK-5 and SK-6 follow. Every number
+below is the offline fixture under SwiftShader (section 3.8), never a 5080 or
+iPhone number.
+
+| ID | State | What landed | Evidence |
+|---|---|---|---|
+| SK-1 | instrument built, run in flight | `scripts/ship-sky-veil.cjs`: pinned clear noon (`__flySunOverride` = local solar noon, `__flyWeatherOverride='clear'`), Midtown 20° below the horizon at 5,000 / 6,000 / 7,500 / 8,500 / 10,000 ft, lens 60°, clock frozen; arms baseline, `aerial-pin` (`__flyAerialOverride=0`), `air-off` (SKY's new dev/review pin `window.__flySkyDiag={aerial:0}`, `lib/fly/sky-diag.js`: the whole Enhanced aerial post pass leaves the ground pixels), `no-mist` (`?flags=-GROUND_MIST`), and CITY's `city-fade` / `city-premix` through `window.__flyCityDiag` — measured only when the tree publishes `__flyCityDiagApplied === true`, otherwise "pending merged tree". Metric: percentile Michelson luma contrast, RMS contrast, mean CIELAB chroma and mean luma in a crop around the projected Midtown point, plus a 50 km crop for SK-2. | `verify-ship-sky` SK-1 (a)–(d); table: below, when the run lands |
+| SK-3 | built, flag OFF (look flag) | `lib/fly/sun-model.js`: truncated Meeus ch. 47 (26 Σl/Σr + 14 Σb rows, A1–A3 terms), topocentric parallax, phase and illuminated fraction (Meeus ch. 48); `computeSun` records the place and instant behind each `az`, so `moonDirFromSun(az)` returns the real moon with REAL_MOON on and FlyScene, the cloud pass and cinema-environment inherit it unedited; `moonLight()` (D15 floor 0.5 of today's key, never above today's full moon, shadowless fill up to the floor when the moon is low or set, no key/disc under the horizon, exposure opens ≤ 0.5 stop); `moonState()` implemented (frozen shape plus additive `compassAzDeg`, `lightK`, `real`). `cinema-environment.js`: key × keyK, fill top-up, disc weight × visibility, exposure adapt (flag off: main's expressions). `night-sky.js`: the phase terminator on the composite's disc (sphere normal lit by the true sun, earthshine 0.06) and a corona that follows the lit fraction. | `verify-ship-sky` SK-3 (a)–(n): Meeus 47.a; 20 JPL Horizons dates (worst 0.020° position, 0.63% illumination); flag-off bit identity of `moonDirFromSun` and of cinema-environment over 820 states (sha256 vs main); the light law over a 241 × 21 grid; 403 deep-night states with the flag on |
+| SK-2, SK-4, SK-5, SK-6 | not started | | |
+
+**Flags.** `AERIAL_CLARITY`, `REAL_MOON`, `SKY_LITE`: `enabled:false` (look
+flags; section 3.8 — the owner flips each after the 5080 motion bar).
+`REAL_MOON` tunables live in its block (`floorK`, `horizonBandDeg`,
+`minKeyElDeg`, `exposureAdapt`, `earthshine`, `terminatorSoft`).
+
+**Gates.** `node scripts/verify-ship-sky.mjs`: 20 passed, 0 failed (includes
+the default-flag program-text hashes vs main: cloud march / composite /
+filter, Classic and Enhanced; aerial Classic, Enhanced, merged pass and its
+defines). Existing: `verify-cinema-overhaul` 16/16, `verify-twilight` 6/6,
+`verify-sun-azimuth` 5/5, `verify-cloud-calm` 6/6, `verify-true-earth-flags`
+8/8, `verify-import-integrity` 4/4. ESLint: 0 errors on every touched file
+(main 0).
+
+**Owner checks (run list, section 9).** RTX 5080 step 6: a night flight at
+the current moon with `?flags=REAL_MOON` against the default; a moonrise for
+the motion bar (pin one with `?sunUtc=`). iPhone step 10 / SK-3: a new and a
+full moon night over Manhattan (`?flags=REAL_MOON&sunUtc=2026-11-10T03:00:00Z`
+is a new moon, set; `?flags=REAL_MOON&sunUtc=2026-11-24T05:00:00Z` a full
+moon 70° up), each against the same URL without the flag.
+
+**Contract notes.** `moonState()` (section 6, CITY consumes it): frozen
+shape kept; additive `lightK` is the ground's moonlight relative to today's
+(1 with REAL_MOON off), the number a night exposure balance wants.
+
+**Files outside the listed ownership (new, SKY's own):** `lib/fly/sky-diag.js`,
+`scripts/ship-sky-veil.cjs`.
 <!-- SHIP PASS SKY report end -->
 
 ### CITY
