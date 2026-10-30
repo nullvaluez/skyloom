@@ -421,6 +421,13 @@ console.log('SHIP PASS RELEASE gate (verify-ship-release)\n');
   gate('D12 the launcher reads the consumed link on its first tick, after FlyMode\'s pre-mount effect (a child effect runs before its parent\'s)',
     /const arm = \(\) => \{\s*link = pendingDeepLink\(\);/.test(host) && /if \(!link && !arm\(\)\) return;/.test(host) &&
       (host.match(/pendingDeepLink\(\)/g) || []).length === 1 && !/^\s*const link = pendingDeepLink\(\)/m.test(host) && body.length > 0);
+  // A lounge entry from a link retries "not ready" until the deadline and a
+  // cut-off data load a bounded number of times (venue: the 2.4 MB runway
+  // catalog's 15 s timeout fired once); an entry that resolves false is not
+  // reported as launched.
+  gate('D13 a linked lounge entry retries not-ready and (bounded) failed data loads, and never reports a false entry as launched',
+    /const WATCH_DATA_TRIES = \d+;/.test(host) && /if \(!late && \(notReady \|\| \(dataLoad && \+\+dataFailures < WATCH_DATA_TRIES\)\)\) return report\('waiting'\);/.test(host) &&
+      /\.then\(\(ok\) => \{\s*busy = false;\s*if \(ok !== false\) return finish\(''\);/.test(host) && !/\.then\(\(\) => finish\(''\)\)/.test(host));
 }
 
 // === N  RL-6 analytics =========================================================

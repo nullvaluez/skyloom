@@ -25,6 +25,8 @@ import { registerRuntimeActions } from '@/lib/fly/runtime-bus';
  */
 const DEADLINE_MS = 120000;
 const NOTICE_MS = 6500;
+// A lounge entry that fails on a data load is tried at most this often.
+const WATCH_DATA_TRIES = 4;
 
 function savedAircraft() {
   try {
@@ -66,8 +68,11 @@ export function DeepLinkHost({ runtime }) {
     let started = 0;
     // `window.__flyDeepLink` says where the link stands (harnesses, and an
     // owner reading a phone's state): waiting | launched | refused | stood-down.
+    let attempts = 0;
+    let dataFailures = 0;
+    let lastError = null;
     const report = (state, message = '') => {
-      window.__flyDeepLink = { kind: link.ok ? link.kind : 'invalid', state, message };
+      window.__flyDeepLink = { kind: link.ok ? link.kind : 'invalid', state, message, attempts, lastError, ms: Math.round(performance.now() - started) };
     };
     const finish = (message, state = message ? 'refused' : 'launched') => {
       done = true;
@@ -131,13 +136,32 @@ export function DeepLinkHost({ runtime }) {
       if (!livingAirportsOn()) return finish("Watching airports isn't available here. You're on the title.");
       if (!runtime.airportWatch) return late ? finish("That airport couldn't open. You're on the title.") : undefined;
       busy = true;
+      attempts++;
       runtime.airportWatch
         .enter(link.airportId, { origin: { kind: 'title' } })
-        .then(() => finish(''))
+        .then((ok) => {
+          busy = false;
+          if (ok !== false) return finish('');
+          // false: the world was not ready for a transfer yet (no engine), or a
+          // newer entry superseded this one; the screen check above stands the
+          // link down if that was the player's own choice.
+          if (late) finish("That airport couldn't open. You're on the title.");
+          else report('waiting');
+        })
         .catch((e) => {
           busy = false;
-          // "not ready" is the lounge asking for a moment; anything else is final.
-          if (late || !/not ready|still loading/i.test(String(e?.message))) finish(`${link.airport.name} couldn't open: ${String(e?.message || 'unknown error')}`);
+          // Worth another try before the deadline: "not ready" (the lounge
+          // asking for a moment), and — a few times — a data load that was cut
+          // off or failed (the runway catalog's first fetch is 2.4 MB under a
+          // 15 s timeout; measured in the venue: "The user aborted a
+          // request."). A player who taps an airport card can tap again; a link
+          // has no second tap.
+          const msg = String(e?.message || '');
+          lastError = `${e?.name || 'Error'}: ${msg.slice(0, 120)}`;
+          const notReady = /not ready|still loading/i.test(msg);
+          const dataLoad = e?.name === 'AbortError' || e?.name === 'TimeoutError' || /abort|timed out|could not load|failed to fetch|network/i.test(msg);
+          if (!late && (notReady || (dataLoad && ++dataFailures < WATCH_DATA_TRIES))) return report('waiting');
+          finish(`${link.airport.name} couldn't open right now. You're on the title.`);
         });
       return undefined;
     };

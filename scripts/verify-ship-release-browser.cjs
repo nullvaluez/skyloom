@@ -81,6 +81,16 @@ async function leg(browser, fixture, name, search, { consent = null, check }) {
   const shader = [];
   const asserts = [];
   page.on('pageerror', (e) => errors.push(e.message));
+  // Diagnostics printed only when a leg fails: failed requests and the last
+  // console warnings / errors (a refused link says why in __flyDeepLink).
+  const failedRequests = [];
+  const consoleTail = [];
+  page.on('requestfailed', (r) => failedRequests.push(`${r.failure()?.errorText || 'failed'} ${r.url().slice(0, 140)}`));
+  page.on('console', (m) => {
+    if (m.type() !== 'error' && m.type() !== 'warning') return;
+    consoleTail.push(`${m.type()}: ${m.text().slice(0, 160)}`);
+    if (consoleTail.length > 12) consoleTail.shift();
+  });
   page.on('console', (m) => {
     if (m.type() === 'error' && /shader|WebGLProgram|THREE\.WebGLShader/i.test(m.text())) shader.push(m.text().slice(0, 200));
     // RL-9: three-tile's console.assert (the PoiLetters flood) prints as an assert.
@@ -98,6 +108,8 @@ async function leg(browser, fixture, name, search, { consent = null, check }) {
       })
       .catch(() => null);
     gate(`${name}: leg completed`, false, `${String(e.message).slice(0, 200)} | state ${JSON.stringify(state)}`);
+    console.log(`   (${name}) failed requests: ${JSON.stringify(failedRequests.slice(-12))}`);
+    console.log(`   (${name}) console tail: ${JSON.stringify(consoleTail)}`);
     await page.screenshot({ path: path.join(OUT, `browser-${name}-failure.png`), timeout: 20000 }).catch(() => {});
   }
   // RL-6: every leg with ANALYTICS_V2 pinned on and no consent is also a
