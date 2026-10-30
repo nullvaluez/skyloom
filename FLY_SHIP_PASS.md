@@ -990,6 +990,29 @@ with `premix: false` is byte-identical on 12 fixture tiles, Classic output
 changes. So the skyline-premix arm's share of the veil is structurally zero in
 Enhanced; the city's share is the detail-ring fade.
 
+**SK-1 — the city's share of the veil (CITY's half of the table).** Two
+readings. (1) By construction (node, `city-range.js` `bandFade` over the
+shipped band, `verify-ship-city` CT-1): the detailed ring is fully drawn below
+2,400 m eye AGL and dithered away by 3,000 m (evicted at 3,200 m), i.e. it
+dissolves between about 7,900 and 9,850 ft, which is where the owner's veil
+begins (L-01, "from about 8,000 ft"). At the five SK-1 heights (eye AGL with
+the fixture's ~15 m Midtown ground):
+
+| Eye height | 5,000 ft (1,509 m) | 6,000 ft (1,814 m) | 7,500 ft (2,271 m) | 8,500 ft (2,576 m) | 10,000 ft (3,033 m) |
+|---|---|---|---|---|---|
+| detailed ring, shipped band | 1 | 1 | 1 | 0.79 | 0 (resident, invisible) |
+| detailed ring, `city-fade` pin (4,500/5,000 m) | 1 | 1 | 1 | 1 | 1 |
+| skyline premix, Enhanced | none baked | none baked | none baked | none baked | none baked |
+
+So the city's two arms cannot move a pixel at 5,000-7,500 ft (both bands
+read 1), the fade arm is the whole city share at 8,500 and 10,000 ft, and
+the premix arm is structurally zero in Enhanced (the worker's `visuals`
+palette never applied `SAT_SKYLINE.hazeMix`: Enhanced skyline output with
+`premix: false` is byte-identical on 12 fixture tiles; only Classic changes).
+(2) Rendered (fixture/SwiftShader, `ship-city-probe --mode=veil`, SKY's
+geometry and metric, baseline / `fade` / `baseline-2` as live pins on one
+boot, plus the draws per layer): queued, see "Venue" below.
+
 **CT-2 — CITY_RANGE (P1, plumbing in, flag `enabled:false`).** Tunables in the
 CITY_RANGE block. Desktop High/Ultra (`deviceFeature('CITY_RANGE').budget.detailedM`):
 detailed ring live to ~4,500 m (lite LOD past 2,400 m: body range only and the
@@ -1134,6 +1157,23 @@ dissolves at 4,500-5,000 m) and `verify-sat-buildings` (C-ii) is unaffected
 `FLY_TILE_FIXTURE=1 verify-worker-window` 4/4, `verify-true-areas` 7/7.
 
 **Contract requests.** None yet.
+
+**Venue (browser runs).** The first SK-1 attempt (SKY's own harness copied
+read-only, 07:29-07:45 UTC) showed that the city does not land on the fixture
+under SwiftShader inside SKY's 3 x 150 s settle (`worldLoading` true,
+streamers busy after 442 s; the still had the ESB model and no blocks), so
+the probe now waits on the city streamers themselves (bounded) before each
+capture. From about 08:22 UTC the shared heavy lock was held by an orphaned
+`next-server` (PID 28356, cwd `/home/user/skyloom-release`, port 3135, left
+running after RELEASE's session1 ended; it inherited the lock fd because that
+session's flock ran without `-o`), so every stream's browser session waited
+behind it; CITY's request to stop it was refused by its permission check and
+the lead was told. CITY's queued sessions (`.graphics-review/ship-pass/city/`
+`chain.sh`, one waiter at a time, `flock -o`): s2 veil 10,000 / 8,500 ft; s3
+phone day census off vs CITY_RANGE plus the phone night all-flags still;
+s4 phone night off still, desktop night all flags, desktop day CITY_RANGE
+census; s5 `verify-sat-buildings`; s6 `verify-sat-night`; s7 desktop day off
+census plus `verify-skyline`; s8 veil 7,500 / 6,000 / 5,000 ft.
 
 **Known issues.** In this venue the device policy classes SwiftShader as
 `software`, which CITY_RANGE refuses; the probe uses the harness pin
