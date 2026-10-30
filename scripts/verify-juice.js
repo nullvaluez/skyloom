@@ -203,6 +203,9 @@ async function quatSpread(page, samples, everyMs) {
   const page = await ctx.newPage();
   page.on('pageerror', (e) => errs.push(e.message));
   await page.addInitScript(() => {
+    // SHIP PASS RL-2: combos, near-miss and the run summary are Challenge
+    // mode (CHALLENGE_LAYER); this harness measures them, so it pins it on.
+    window.__flyChallengeOverride = true;
     try {
       localStorage.setItem('fly-quality-tier', 'high');
     } catch {
@@ -375,6 +378,7 @@ async function quatSpread(page, samples, everyMs) {
   const errs2 = [];
   page2.on('pageerror', (e) => errs2.push(e.message));
   await page2.addInitScript(() => {
+    window.__flyChallengeOverride = true; // SHIP PASS RL-2 (see above)
     window.__flyMusicOverride = 'off';
     try {
       localStorage.setItem('fly-quality-tier', 'high');

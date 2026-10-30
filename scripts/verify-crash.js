@@ -154,6 +154,11 @@ let CRASH_MIN_SPEED = 0;
     const page = await ctx.newPage();
     page.on('pageerror', (e) => errs.push(`${label}: ${e.message}`));
     await page.addInitScript((s) => {
+      // SHIP PASS RL-2: crashes are Challenge mode (CHALLENGE_LAYER), and a
+      // fresh profile is calm. Every stakes session pins Challenge ON (inert
+      // with the layer off); the seeded-forgiving session leaves it unpinned so
+      // the one-time fly-crash-mode migration is what turns it off.
+      if (s !== 'forgiving') window.__flyChallengeOverride = true;
       try {
         localStorage.setItem('fly-quality-tier', 'high');
         if (s) localStorage.setItem('fly-crash-mode', s);
@@ -613,13 +618,19 @@ let CRASH_MIN_SPEED = 0;
     const toggled = await page.evaluate(() => ({
       text: document.querySelector('[data-testid="pause-stakes"]').textContent.trim(),
       ls: localStorage.getItem('fly-crash-mode'),
+      challenge: localStorage.getItem('fly-challenge-v1'),
+      layer: window.__flyStats?.challenge?.source !== 'layer-off',
     }));
+    // SHIP PASS RL-2: with CHALLENGE_LAYER on, the same testid is the
+    // "Challenge mode" row; a click persists BOTH keys (the Round 18 one in
+    // step, so `?flags=-CHALLENGE_LAYER` follows the last choice).
     gate(
       '9a the pause menu carries the stakes row, and a CLICK persists it',
-      /Crashes ON/.test(rowText) &&
-        /Forgiving/.test(toggled.text) &&
-        toggled.ls === 'forgiving',
-      `"${rowText}" -> "${toggled.text}", storage ${toggled.ls}`
+      toggled.layer
+        ? /Challenge mode.*On/.test(rowText) && /Challenge mode.*Off/.test(toggled.text) &&
+            toggled.ls === 'forgiving' && toggled.challenge === '0'
+        : /Crashes ON/.test(rowText) && /Forgiving/.test(toggled.text) && toggled.ls === 'forgiving',
+      `"${rowText}" -> "${toggled.text}", storage ${toggled.ls} / challenge ${toggled.challenge}`
     );
   });
 

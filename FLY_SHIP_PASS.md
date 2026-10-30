@@ -976,11 +976,33 @@ Severity and effort are the auditors' estimates. "Where" names the requirement t
 
 <!-- SHIP PASS RELEASE report begin -->
 **Status (2026-10-30, cloud venue, branch `ship/release`): IN PROGRESS.**
-Order: P0 (RL-11, RL-2, RL-3, RL-1) then P1 (RL-4, RL-6, RL-9, RL-5) then P2.
+Order: P0 (RL-11, RL-2, RL-3, RL-1) then P1 (RL-4, RL-6, RL-9, RL-5) then P2
+(RL-10, RL-7, RL-8). Gate: `node scripts/verify-ship-release.mjs` (node, no
+browser). Every number below is the cloud venue's (offline fixture,
+SwiftShader); nothing here is a 5080 or iPhone result.
 
 | ID | Status | What landed / evidence |
 |---|---|---|
-| RL-11 | done | `CinemaTitle.jsx`: the Takeoff & Landing row reads "Real runways, worldwide."; the Continue sub-label "From the gate" shows only while `GATE_TO_GATE` is on (falls back to "Takeoff & landing"). No testid moved. |
+| RL-11 | done | `CinemaTitle.jsx`: the Takeoff & Landing row reads "Real runways, worldwide."; the Continue sub-label "From the gate" shows only while `GATE_TO_GATE` is on (falls back to "Takeoff & landing"). No testid moved. Gate rows T1–T3. |
+| RL-2 | done (flag ON) | `lib/fly/challenge.js` implements the W0 stub: `challengeOn()`, `resolveChallenge()`, `saveChallenge()`, the pure `resolveChallengeState()` and `CHALLENGE_TEMPLATE_IDS` (`buzz-tower`, `night-buzz`). Pin `window.__flyChallengeOverride` (true/false, 'on'/'off', `{enabled}` — so `?flags=CHALLENGE` / `?flags=-CHALLENGE` works on a phone). Migration: saved `fly-crash-mode='stakes'` → Challenge on (written `'1'` once), `'forgiving'` → off (written `'0'`), absent → off and nothing written. Consumers: the `fly-settings.js` RELEASE stakes block (crashes follow Challenge with the layer on), `JuiceSystems.jsx` (no combo chain, no near-miss scan or its shake, no run summary, no tower-buzz score or shake when calm; touch-and-go still scores), `juice.js` (`scoreEvent(…, chain)`), `contracts.js` (the buzzes are dealt only with Challenge on; the daily pool is the calm pool for everyone), and the Settings row ("Challenge mode: On/Off", testids `settings-stakes` / `pause-stakes` kept; a click writes both keys). The boost meter is untouched. Harness posture: `verify-crash` (stakes sessions; 9a reads the Challenge row) and `verify-juice` pin Challenge on; `verify-daily` c2 documents the new pool rule (registers the R24 `_node-resolve` hook, since `contracts.js` now imports `challenge.js`). Evidence: verify-ship-release A1–A20 — **flag off equals the W0 tree** (`git archive 940b751`, or recorded goldens on a shallow clone) for crashStakesOn() in 4 storage states, the daily pool, 400 days of daily picks, contract eligibility over 24 world contexts, and the juice scoring sequence; flag on: fresh profile calm with no crash, the migration table, the calm daily pool, buzz dealt only with Challenge on, ×1 with no chain when calm, W0 juice sequence when on. `verify-daily` 28/28 (flag on); `verify-living-contracts` DAY_A/DAY_B still draw different pairs (A12). |
+| RL-10 | partial | `save-backup.mjs` whitelists `fly-challenge-v1` ('0'/'1'), `fly-frame-rate-v1` (FRAME's modes '60'/'display'/'30') and `fly-flight-history-v2` (rows re-normalized by `normalizeHistoryRow`; one bad row rejects the backup). Gate rows S1–S4. `navigator.storage.persist()` not yet wired. |
 
-Flags: all RELEASE blocks `enabled:false` so far.
+**Flags.** `CHALLENGE_LAYER` **ON** (behaviour, not look: its acceptance is
+measurable here and its node gate passes). `DEEP_LINKS`, `ANALYTICS_V2`,
+`OFFLINE_SHELL` off (not landed yet). `PLAYER_SURFACE` off (RL-3 next).
+
+**Gates (venue).** `verify-ship-release` 27/27; `verify-daily` 28/28;
+`ship-pass-gates --quick` 31 PASS, 2 KNOWN-RED, 0 FAIL, seam rule PASS.
+ESLint on every touched file: no new errors (JuiceSystems.jsx 3 = main's 3).
+
+**Owner checks.** Run list 5080 #8: a private window boots calm (no crash on a
+commanded dive, no combo chip, no tower buzz in Contracts); Settings →
+"Challenge mode" On restores today's arcade layer; `?flags=-CHALLENGE_LAYER`
+is the pre-pass game.
+
+**Known issues.** The airport-buzz *toast* (`SpotToast.jsx`, not a RELEASE
+file) still shows when a calm player buzzes a tower; it no longer scores,
+shakes or advances a contract. `verify-crash`, `verify-juice`,
+`verify-living-contracts` and `verify-poi` launch `channel:'chrome'`, which
+this container does not have.
 <!-- SHIP PASS RELEASE report end -->
