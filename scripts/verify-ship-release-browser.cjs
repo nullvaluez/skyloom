@@ -17,6 +17,7 @@
  *   fly      ?fly=grand-canyon&aircraft=glider with the flags on and NO consent:
  *            Free Flight opens in the glider, the URL is cleaned, zero requests
  *            to the analytics host, zero page / shader errors
+ *   at       ?at=36.1,-112.1,9000: Free Flight opens at that point
  *   watch    ?watch=KJFK: the lounge opens at JFK
  *   journey  ?journey=<first>: that journey's briefing opens
  *   invalid  ?fly=atlantis: the title stays with the quiet notice; then the
@@ -37,7 +38,7 @@ const PH_HOST = process.env.SHIP_PH_HOST || 'http://127.0.0.1:3197';
 const LEG_MS = Number(process.env.LEG_MS || 480000);
 const ON = 'CHALLENGE_LAYER,DEEP_LINKS,ANALYTICS_V2,PLAYER_SURFACE';
 const OFF = '-CHALLENGE_LAYER,-DEEP_LINKS,-ANALYTICS_V2,-PLAYER_SURFACE';
-const wanted = (process.env.LEGS || 'meta,off,fly,watch,journey,invalid,consent').split(',');
+const wanted = (process.env.LEGS || 'meta,off,fly,at,watch,journey,invalid,consent').split(',');
 
 let passed = 0;
 let failed = 0;
@@ -140,6 +141,17 @@ const booted = (page) => page.waitForFunction(() => window.__flyBoot?.pct === 10
         await page.waitForTimeout(5000);
         gate('fly: without consent, zero requests reach the analytics host', analytics.length === 0, analytics.slice(0, 3));
         await page.screenshot({ path: path.join(OUT, 'browser-fly.png'), timeout: 60000 }).catch(() => {});
+      },
+    });
+    await leg(browser, fixture, 'at', `?graphicsReview=1&flags=${ON}&at=36.1,-112.1,9000`, {
+      async check(page) {
+        await page.waitForFunction(() => window.__flyStore?.getState?.().screen === 'flight', null, { polling: 2000 });
+        const s = await store(page);
+        const geo = await page.evaluate(() => {
+          const g = window.__fly?.geo;
+          return g ? { lon: g.x, lat: g.y } : null;
+        });
+        gate('at: ?at=<lat>,<lon>,<ft> opens Free Flight at that point', s?.flightMode === 'free' && !!geo && Math.abs(geo.lat - 36.1) < 0.2 && Math.abs(geo.lon + 112.1) < 0.2, { s, geo });
       },
     });
     await leg(browser, fixture, 'watch', `?graphicsReview=1&flags=${ON}&watch=KJFK`, {
