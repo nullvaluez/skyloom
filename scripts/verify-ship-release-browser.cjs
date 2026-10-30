@@ -3,7 +3,7 @@
  * fixture. SwiftShader proves correctness here, never performance.
  *
  *   FLY_BUILD_DIR=.next-release NEXT_PUBLIC_POSTHOG_KEY=phc_ship_release_test \
- *   NEXT_PUBLIC_POSTHOG_HOST=http://127.0.0.1:3199 \
+ *   NEXT_PUBLIC_POSTHOG_HOST=http://127.0.0.1:3197 \
  *     node node_modules/next/dist/bin/next build --webpack
  *   FLY_URL=http://localhost:3135 node scripts/verify-ship-release-browser.cjs   (server: next start -p 3135)
  *
@@ -31,7 +31,8 @@ const { attachFixture, fixturePin } = require('./_fixture');
 const BASE = process.env.FLY_URL || 'http://localhost:3135';
 const OUT = path.resolve('.graphics-review/ship-pass/release');
 mkdirSync(OUT, { recursive: true });
-const PH_HOST = process.env.SHIP_PH_HOST || 'http://127.0.0.1:3199';
+// Not 3199: that is the offline world fixture's port (scripts/_fixture.js).
+const PH_HOST = process.env.SHIP_PH_HOST || 'http://127.0.0.1:3197';
 const LEG_MS = Number(process.env.LEG_MS || 480000);
 const ON = 'CHALLENGE_LAYER,DEEP_LINKS,ANALYTICS_V2,PLAYER_SURFACE';
 const OFF = '-CHALLENGE_LAYER,-DEEP_LINKS,-ANALYTICS_V2,-PLAYER_SURFACE';
