@@ -168,6 +168,9 @@ const CANVAS_ONLY = 'body * { visibility:hidden!important; } canvas { visibility
       try {
         page = await boot(browser, arm);
         report.arms[arm] = { flags: ARMS[arm] || null, poses: {} };
+        // The first warp after boot can leave the terrain at z3 for minutes
+        // (measured in ship-sky-veil.cjs); warp once, let it start, warp again.
+        if (POSES[poses[0]]) { await place(page, POSES[poses[0]]()); await page.waitForTimeout(Number(args.prewarp ?? 30000)); }
         for (const [pi, name] of poses.entries()) {
           const p = POSES[name]?.();
           if (!p) continue;

@@ -447,6 +447,13 @@ async function runBootGroup(browser, group) {
       }
       report.arms[lead] = { applied };
     }
+    // Measured twice here: the FIRST warp after boot (from the hangar spawn,
+    // 760 km away) left the terrain at z3 of z15 for 6 minutes, while the
+    // next warp to a pose a few km off reached z11 in 80 s. So the group warps
+    // to its first pose once, lets the pipeline start, and warps again.
+    await place(page, poseFor(RUN_ORDER[0]));
+    await page.waitForTimeout(Number(args.prewarp ?? 30000));
+    log(`  pre-warp ${JSON.stringify(await page.evaluate(() => { const t = window.__fly.terraStats ?? window.__fly.engine?.terraStats; return t ? { z: t.camTileZ, target: t.targetZ } : null; }))}`);
     const order = [...RUN_ORDER];
     const remeasured = new Set();
     for (let li = 0; li < order.length; li++) {
