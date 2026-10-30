@@ -508,6 +508,25 @@
   display: flex;
   gap: 12px;
 }
+.lg-settings section[aria-label='Flight comfort'] > .flight-steering-input {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+  padding-block: 6px;
+}
+.lg-settings .flight-steering-input select {
+  width: 100%;
+  color-scheme: dark;
+  border-color: var(--lg-edge-hi);
+  background: var(--lg-well);
+  color: var(--lg-ice);
+  font: inherit;
+  font-size: 13px;
+}
+.lg-settings section[aria-label='Flight comfort'] > .flight-steering-note {
+  margin: 0 0 10px;
+  color: var(--lg-haze);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
 .lg-settings section[aria-label='Flight comfort'] output {
   justify-self: end;
   font: 500 12.5px/1 var(--lg-mono);
@@ -732,6 +751,7 @@
   font-size: 15px;
 }
 .lg-pane {
+  min-width: 0;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -779,7 +799,8 @@
       'nav settings'
       'keys keys';
     overflow-y: auto;
-    max-height: none;
+    max-height: 100%;
+    scroll-padding-top: 110px;
   }
   .lg-pane {
     overflow: visible;
@@ -797,6 +818,15 @@
   .lg-pane-keys .lg-keys {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     column-gap: 28px;
+  }
+}
+/* Short laptop windows keep Resume reachable while the menu itself scrolls. */
+@media (min-width: 761px) and (max-width: 1180px) {
+  .lg-pause-head {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--lg-glass-solid);
   }
 }
 @media (max-width: 760px) {
@@ -1028,6 +1058,7 @@ a.lg-credit-name:hover {
   max-height: 100%;
 }
 .lg-drawer-head {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;

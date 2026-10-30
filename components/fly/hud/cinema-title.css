@@ -416,6 +416,24 @@
 [data-device='phone'][data-orient='landscape'] .tcn-secondary button span{display:none}
 [data-device='phone'][data-orient='landscape'] .tcn .tcn-attr{grid-column:auto;justify-content:flex-end;text-align:right}
 
+/* A short laptop window has room for two columns, but not the tall stacked
+   deck. Keep the title actions and the journal/settings footer on screen. */
+@media (pointer:fine) and (min-width:761px) and (max-width:980px) and (max-height:700px){
+  .tcn{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto auto;grid-template-areas:"top top" "deck place" "deck tour" "foot foot";column-gap:24px;row-gap:8px}
+  .tcn-place{justify-self:end;text-align:right;align-self:center}
+  .tcn-name{font-size:clamp(34px,5vw,48px)}
+  .tcn-kicker,.tcn-region{justify-content:flex-end}
+  .tcn-deck{align-self:center}
+  .tcn-tour{justify-self:end;width:100%}
+  .tcn-pass{--stub:86px}
+  .tcn-pass-main{padding:12px}
+  .tcn-pass-art,.tcn-pass-seat{display:none}
+  .tcn-pass-fields{gap:12px}
+}
+@media (pointer:fine) and (max-width:760px){
+  .tcn{overflow-y:auto;grid-template-rows:auto minmax(min-content,1fr) auto auto auto}
+}
+
 /* --- stillness: reduced motion (the OS pick or the app's own) ------------------ */
 .tcn[data-motion='still'] *,.tcn[data-motion='still'] *::before,.tcn[data-motion='still'] *::after{animation:none!important;transition:none!important}
 .tcn[data-motion='still'] .tcn-shade[data-state='up'] .tcn-shade-panel{transform:none;opacity:0}

@@ -194,7 +194,10 @@ export function LabelCanvas({ runtime }) {
     // The touch tap tooltip: a sticky selection that outlives the finger.
     // NOT React state — this is drawn on a canvas, in a rAF loop.
     let poiTap = null; // {name, until} | null
+    let pointerPick = null;
     const onMove = (e) => {
+      if (pointerPick && e.pointerId === pointerPick.id &&
+          Math.hypot(e.clientX-pointerPick.x, e.clientY-pointerPick.y) > 6) pointerPick = null;
       cursor.x = e.clientX;
       cursor.y = e.clientY;
     };
@@ -231,6 +234,7 @@ export function LabelCanvas({ runtime }) {
     };
 
     const onDown = (e) => {
+      pointerPick = null;
       const store = useFlyStore.getState();
       if (store.phase !== 'flying' || store.inspectHex || store.atlasOpen) return;
       // Round 17: photo mode hides this canvas (display:none) but the window
@@ -271,10 +275,27 @@ export function LabelCanvas({ runtime }) {
       }
       // Mouse/pen: the desktop hover ring already resolved the target.
       if (e.button !== 0 || !runtime.hoverHex) return;
-      store.setInspectHex(runtime.hoverHex);
+      // Select on release so a trackpad drag can orbit, even when it starts
+      // over an aircraft label. Touch keeps its existing tap path above.
+      pointerPick = { id: e.pointerId, x: e.clientX, y: e.clientY, hex: runtime.hoverHex };
     };
+    const onUp = e => {
+      if (e.pointerId !== pointerPick?.id) return;
+      const pick = pointerPick;
+      pointerPick = null;
+      if (e.button !== 0) return;
+      if (Math.hypot(e.clientX-pick.x, e.clientY-pick.y) > 6) return;
+      const s = useFlyStore.getState();
+      if (s.phase === 'flying' && !s.inspectHex && !s.atlasOpen && !s.hangarOpen &&
+          !s.logbookOpen && s.cameraMode !== 'photo' &&
+          !e.target?.closest?.('[data-zone],[data-overlay]')) s.setInspectHex(pick.hex);
+    };
+    const cancelPick = () => { pointerPick = null; };
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerdown', onDown);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', cancelPick);
+    window.addEventListener('blur', cancelPick);
 
     const draw = () => {
       if(runtime.airportWatch?.active)return;
@@ -576,6 +597,9 @@ export function LabelCanvas({ runtime }) {
       if (runtime.hudDraw === draw) runtime.hudDraw = null;
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerdown', onDown);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', cancelPick);
+      window.removeEventListener('blur', cancelPick);
       runtime.hoverHex = null;
       runtime.adventureWaypoint = null;
     };

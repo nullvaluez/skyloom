@@ -10,6 +10,7 @@ import { CITIES } from '@/lib/fly/poi';
 import { FEATURED_DESTINATIONS, describeSetup, readLastSetup } from '@/lib/fly/flight-plan';
 import { enterHangarFromTitle, freeFlightAvailable } from '@/lib/fly/front-door';
 import { useDeviceLayout } from '@/hooks/use-device-layout';
+import { useDialogFocus } from '@/hooks/use-dialog-focus';
 import { computeSun } from '@/lib/fly/sun-model';
 import { SettingsRows } from './SettingsRows';
 import { CreditsPanel } from './CreditsPanel';
@@ -429,9 +430,8 @@ export function GlassSettingsSheet({ open, phone }) {
   const still = stillMotion();
   const p = usePresence(open, still ? 0 : GLASS_EXIT_MS);
   const closeRef = useRef(null);
-  useEffect(() => {
-    if (open) closeRef.current?.focus({ preventScroll: true });
-  }, [open]);
+  const dialogRef = useRef(null);
+  useDialogFocus(dialogRef, open);
   if (!p.mounted) return null;
   const close = () => useFlyStore.getState().setSettingsOpen(false);
   return (
@@ -442,6 +442,8 @@ export function GlassSettingsSheet({ open, phone }) {
       onClick={(e) => e.target === e.currentTarget && close()}
     >
       <section
+        ref={dialogRef}
+        tabIndex={-1}
         className="lg-panel lg-drawer"
         data-testid="settings-sheet"
         role="dialog"
@@ -485,15 +487,16 @@ export function GlassTitleCredits({ open }) {
 export function SettingsSheet({ phone }) {
   const close = () => useFlyStore.getState().setSettingsOpen(false);
   const closeRef = useRef(null);
-  useEffect(() => {
-    closeRef.current?.focus({ preventScroll: true });
-  }, []);
+  const dialogRef = useRef(null);
+  useDialogFocus(dialogRef, true);
   return (
     <div
       className={`fly-title-modal${phone ? ' fly-title-modal-sheet' : ''}`}
       onClick={(e) => e.target === e.currentTarget && close()}
     >
       <section
+        ref={dialogRef}
+        tabIndex={-1}
         className="fly-title-settings"
         data-testid="settings-sheet"
         role="dialog"

@@ -119,7 +119,7 @@ export function GlassNavItem({ icon: Icon, label, sep = ' — ', note, meta, kbd
   );
 }
 
-const NOT_KEYS = new Set(['Mouse', 'Click a plane', 'Hard stick input']);
+const NOT_KEYS = new Set(['Mouse', 'Click a plane', 'Hard stick input', 'Keyboard / trackpad']);
 
 /** The controls reference as keycaps ("WASD / arrows" -> two keys). */
 export function GlassKeys({ rows, keycaps = true }) {

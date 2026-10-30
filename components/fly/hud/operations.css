@@ -63,3 +63,9 @@
 .ops-free-stage{font-size:10px;color:#8fa6bf;margin:0 0 10px;min-height:14px}.ops-free-stage[data-state=ready]{color:#9ff0c6}.ops-free-stage[data-state=staging],.ops-free-stage[data-state=pending]{color:#c9e5f4}
 @media(max-width:650px){.ops-hangar .ops-hangar-back{margin-right:8px;padding:4px 10px 4px 6px}.ops-mode-chip{display:none}.ops-free{max-height:330px}.ops-free-grid{margin-top:10px}.ops-free-selected{flex-direction:row;align-items:baseline;gap:8px;margin-bottom:4px}.ops-free-selected small{display:none}}
 [data-device='phone'][data-orient='landscape'] .ops-mode-chip{display:none}[data-device='phone'][data-orient='landscape'] .ops-free-selected small{display:none}
+
+/* Browser chrome and display scaling leave many laptops only 540–700px tall.
+   Anchor the dispatch above the fleet instead of centering through the rail. */
+@media (pointer:fine) and (min-width:761px) and (max-height:820px){
+  .ops-hangar .ops-dispatch,.ops-hangar .aircraft-customization{top:94px;bottom:166px;transform:none;max-height:none}
+}

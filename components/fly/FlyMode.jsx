@@ -38,6 +38,7 @@ import { useFlyTraffic } from '@/hooks/use-fly-traffic';
 import { useFlyWeather } from '@/hooks/use-fly-weather';
 import { useFlyAudio } from '@/hooks/use-fly-audio';
 import { deviceAttr, useDeviceLayout } from '@/hooks/use-device-layout';
+import { editableTarget, reservedKeyEvent } from '@/lib/fly/keyboard-target';
 import { useGLTF } from '@react-three/drei';
 import { BOOT } from '@/lib/fly/fly-constants';
 import { resolveInitialMapStyle } from '@/lib/fly/map-style';
@@ -230,6 +231,7 @@ export function FlyMode({ onClose }) {
   // priority chain.
   useEffect(() => {
     const onKey = (e) => {
+      if (e.repeat || reservedKeyEvent(e)) return;
       const store = useFlyStore.getState();
       if (e.key === 'Escape') {
         if(useFlyStore.getState().airportBrowserOpen){useFlyStore.setState({airportBrowserOpen:false});return;}
@@ -255,8 +257,7 @@ export function FlyMode({ onClose }) {
       // Held keys must not strobe the overlay, and the Atlas search field is a
       // real text input — L belongs to whoever is typing.
       if (e.repeat) return;
-      const tag = e.target?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (editableTarget(e.target)) return;
       if (store.logbookOpen) {
         store.setLogbookOpen(false);
       } else if (!store.inspectHex && !store.atlasOpen) {
@@ -274,7 +275,7 @@ export function FlyMode({ onClose }) {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [runtime]);
 
   // R25 A (FRONT DOOR): the title / hangar / flight split for the chrome
   // below. Both are constant (false / true) with the flag off.
@@ -286,27 +287,6 @@ export function FlyMode({ onClose }) {
   const flyingNow = useFlyStore((s) => !frontDoorOn() || inFlight(s));
   // Exit: to the title over the live world (R25) — else today's reload.
   const exit = exitGoesToTitle() ? () => exitToTitle(runtime) : onClose;
-
-  // Small non-touch window heads-up: flying wants room. Touch devices get the
-  // on-screen controls instead of a "use a desktop" nudge, so skip it there.
-  // R25 A: it waits for the first actual flight (the title has its own
-  // layout); with the flag off `flyingNow` is constant true — mount, as today.
-  const [mobileNote, setMobileNote] = useState(false);
-  const noteShown = useRef(false);
-  useEffect(() => {
-    if (!flyingNow || noteShown.current) return;
-    noteShown.current = true;
-    const coarse = window.matchMedia?.('(pointer: coarse)').matches;
-    const hasTouch = navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
-    if (!(coarse && hasTouch) && window.innerWidth < 900) setMobileNote(true);
-  }, [flyingNow]);
-  // The 8 s hide rides the note itself, so leaving the flight (exit to title)
-  // can never cancel it and strand the note on screen.
-  useEffect(() => {
-    if (!mobileNote) return undefined;
-    const id = setTimeout(() => setMobileNote(false), 8000);
-    return () => clearTimeout(id);
-  }, [mobileNote]);
 
   // Leave no stale lock/telemetry behind for the next session.
   useEffect(() => {
@@ -421,12 +401,6 @@ export function FlyMode({ onClose }) {
 
       {/* PLAY PASS DIRECTOR begin */}
       {/* PLAY PASS DIRECTOR end */}
-
-      {mobileNote && (
-        <div className="pointer-events-none absolute left-1/2 top-16 z-20 -translate-x-1/2 rounded-md bg-zinc-900/85 px-3 py-2 text-xs text-zinc-200 shadow-lg">
-          Steer with the left stick. Open Actions for the map, camera, and journal.
-        </div>
-      )}
 
       {/* Desktop keeps the quick-exit X (top-right); touch replaces it with the
           Pause button in TouchControls, whose menu carries Exit. R25 A: it
