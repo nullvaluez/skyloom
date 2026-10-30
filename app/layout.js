@@ -13,8 +13,11 @@ const geistMono = Geist_Mono({
 });
 
 // SHIP PASS RL-5: share metadata. Absolute URLs come from NEXT_PUBLIC_SITE_URL
-// (the owner sets the domain); with it unset, Next resolves them against the
-// serving origin. The legacy shadowadsb.app domain is gone, and the copy leads
+// (the owner sets the domain). With it unset, Next falls back at BUILD time:
+// the Vercel production URL on Vercel, otherwise http://localhost:3000 (the
+// page is prerendered), so a self-hosted build must set it. Measured in the
+// venue: an unset build bakes localhost:3000 into og:image. The legacy
+// shadowadsb.app domain is gone, and the copy leads
 // with the real Earth (PLAYER_SURFACE: one look). The card is an in-game
 // capture (public/og/README.md).
 const SITE_URL = /^https?:\/\//.test(process.env.NEXT_PUBLIC_SITE_URL || "") ? process.env.NEXT_PUBLIC_SITE_URL : null;

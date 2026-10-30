@@ -115,8 +115,16 @@ const booted = (page) => page.waitForFunction(() => window.__flyBoot?.pct === 10
       const html = await (await fetch(`${BASE}/`)).text();
       const og = html.match(/<meta property="og:image" content="([^"]+)"/)?.[1];
       const tw = html.match(/<meta name="twitter:image" content="([^"]+)"/)?.[1];
-      const img = og ? await fetch(new URL(og, BASE)).then((r) => (r.ok ? r.headers.get('content-type') : null)).catch(() => null) : null;
-      gate('meta: the built HTML has og:image and twitter:image, served as an image', !!og && !!tw && /^image\//.test(img || ''), { og, tw, img });
+      // The card's ORIGIN is the build's metadataBase: NEXT_PUBLIC_SITE_URL, else
+      // Next's own fallback (the Vercel production URL on Vercel, otherwise
+      // http://localhost:3000 — a self-hosted build must set the env). So the
+      // card is fetched by its path from this server, and its origin is checked
+      // against SHIP_SITE_URL when the harness is told what the build used.
+      const ogPath = og ? new URL(og, BASE).pathname : null;
+      const img = ogPath ? await fetch(new URL(ogPath, BASE)).then((r) => (r.ok ? r.headers.get('content-type') : null)).catch(() => null) : null;
+      const site = process.env.SHIP_SITE_URL ? new URL(process.env.SHIP_SITE_URL).origin : null;
+      gate('meta: the built HTML has og:image and twitter:image (the 1200x630 card), served as an image', ogPath === '/og/skyloom.jpg' && !!tw && new URL(tw, BASE).pathname === ogPath && /^image\//.test(img || ''), { og, tw, img });
+      if (site) gate('meta: the card\'s absolute URL is on NEXT_PUBLIC_SITE_URL', new URL(og).origin === site, { og, site });
       gate('meta: no legacy shadowadsb.app URL in the built HTML', !/shadowadsb\.app/.test(html));
       const man = await (await fetch(`${BASE}/manifest.json`)).json();
       gate('meta: the served manifest leads with the real Earth', /real Earth/.test(man.description) && !/neon/i.test(man.description), man.description);
