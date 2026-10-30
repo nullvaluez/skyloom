@@ -958,22 +958,57 @@ const roadProbe = () => {
   // ==========================================================================
   await page.evaluate(pinScene, [40.7075, -74.0113, 6000, 2.6, -0.10]);
   await page.waitForTimeout(14000);
-  const cruise = await page.evaluate(() => ({
-    roads: window.__flyStats?.satRoads ?? null,
-    glowPlaced: window.__flyStats?.satCityGlowPlaced ?? -1,
-    glowMaxD: window.__flyStats?.satCityGlowMaxD ?? -1,
-    glowNightK: window.__flyStats?.satCityGlowNightK ?? -1,
-    draws: window.__flyStats?.drawCalls ?? -1,
-    toyBuilt: typeof window.__toyWorld !== 'undefined',
-  }));
+  const cruise = await page.evaluate(() => {
+    const lg = window.__flyLivingGround;
+    const nl = lg?.stats?.()?.nightLights ?? null;
+    const frac = window.__fly?.sun?.frac ?? window.__flyStats?.sunFactor ?? 1;
+    return {
+      roads: window.__flyStats?.satRoads ?? null,
+      glowPlaced: window.__flyStats?.satCityGlowPlaced ?? -1,
+      glowMaxD: window.__flyStats?.satCityGlowMaxD ?? -1,
+      glowNightK: window.__flyStats?.satCityGlowNightK ?? -1,
+      // SHIP PASS CITY (CT-4): the Enhanced lighting's far-city sources.
+      classicGlow: typeof window.__satCityGlow !== 'undefined',
+      nightLite: window.__flyStats?.nightLite ?? null,
+      nightLightsBlock: !!lg?.blocks?.NIGHT_LIGHTS,
+      nightLightsK: typeof nl?.nightK === 'number' ? nl.nightK : null,
+      // the road network's gamma ramp every city light shares (SAT_ROADS.night)
+      rampK: Math.max(0, 1 - frac / 0.3) ** 1.5,
+      draws: window.__flyStats?.drawCalls ?? -1,
+      toyBuilt: typeof window.__toyWorld !== 'undefined',
+    };
+  });
   await glShot('r16-satnight-08-cruise-glow.png');
   console.log('CRUISE:', JSON.stringify(cruise));
   gate('road ring disarms at cruise (ready 0, ringOn false)',
     cruise.roads?.ready === 0 && cruise.roads?.ringOn === false, JSON.stringify(cruise.roads));
-  gate('SatCityGlow keeps the far city alive (placed ≥ 5)',
-    cruise.glowPlaced >= 5, `placed=${cruise.glowPlaced} maxD=${Math.round(cruise.glowMaxD)}`);
-  gate('city glow is night-lit (nightK > 0.9)',
-    cruise.glowNightK > 0.9, `nightK=${cruise.glowNightK}`);
+  // SHIP PASS CITY (CT-4, 2026-10-30) — (D) RE-PREMISED, not re-baselined.
+  // These two rows asserted "SatCityGlow keeps the far city alive". SatCityGlow
+  // is the far-city light of the CLASSIC satellite lighting only: FlyScene
+  // mounts it behind !satelliteVisualsOn('lighting'), and the shipped Enhanced
+  // lighting retired it (its hemispheres stood up against the horizon), which
+  // is why the rows read red (placed -1, nightK -1: nothing was mounted to
+  // measure). Under Enhanced lighting the far city's light is the aerial pass's
+  // NIGHT_LIGHTS (VIIRS city lights, desktop; motion-checked on the RTX 5080
+  // 2026-10-20, FLY_LIVING_WORLD.md) or NIGHT_LITE (touch and Low, CT-4). So the
+  // rows ask the source THIS session's lighting owns, with the R16 numbers:
+  //   Classic      SatCityGlow placed >= 5, nightK > 0.9 (unchanged);
+  //   NIGHT_LITE   (where the flag and the device policy serve it) placed >= 5,
+  //                nightK > 0.9;
+  //   NIGHT_LIGHTS its block is live in this build and the night ramp it reads
+  //                is > 0.9. Its pixels need the aerial pass, which the fleet
+  //                pins off (__flyAerialOverride = 0; verify-aerial is the one
+  //                un-pinner) and NASA GIBS, which the cloud venue blocks: the
+  //                row says which source it read.
+  const farSrc = cruise.classicGlow ? 'SatCityGlow' : cruise.nightLite ? 'NIGHT_LITE' : 'NIGHT_LIGHTS';
+  const farPlaced =
+    farSrc === 'SatCityGlow' ? cruise.glowPlaced >= 5 : farSrc === 'NIGHT_LITE' ? cruise.nightLite.placed >= 5 : cruise.nightLightsBlock;
+  const farK =
+    farSrc === 'SatCityGlow' ? cruise.glowNightK : farSrc === 'NIGHT_LITE' ? cruise.nightLite.nightK : cruise.nightLightsK ?? cruise.rampK;
+  gate('the far city has a night-light source past the road ring (Classic: SatCityGlow placed ≥ 5; Enhanced: NIGHT_LIGHTS live, or NIGHT_LITE placed ≥ 5)',
+    farPlaced, farSrc === 'SatCityGlow' ? `SatCityGlow placed=${cruise.glowPlaced} maxD=${Math.round(cruise.glowMaxD)}` : farSrc === 'NIGHT_LITE' ? `NIGHT_LITE ${JSON.stringify(cruise.nightLite)}` : `NIGHT_LIGHTS block live=${cruise.nightLightsBlock} (aerial pass ${cruise.nightLightsK == null ? 'pinned off' : 'attached'})`);
+  gate('that far-city light is night-lit (nightK > 0.9)',
+    Number.isFinite(farK) && farK > 0.9, `${farSrc} nightK=${farK}`);
   gate('cruise draws ≤ 375', cruise.draws > 0 && cruise.draws <= 375, `draws=${cruise.draws}`);
 
   // ==========================================================================

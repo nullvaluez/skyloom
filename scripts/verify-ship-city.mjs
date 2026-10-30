@@ -673,9 +673,10 @@ async function main() {
     );
     const comp = read('components/fly/SatNightLite.jsx');
     check(
-      'CT-4 the layer: one InstancedMesh, hidden by day and when nothing is placed, placement on a cadence (no per-frame work), dev-only stats, no console',
+      'CT-4 the layer: one InstancedMesh, hidden by day and when nothing is placed, placement on a cadence, dev-only stats, no console; it stands down where the aerial pass draws VIIRS light',
       comp.split('<instancedMesh').length === 2 && /mesh\.visible = n > 0;/.test(comp) && /if \(nightK <= 0\) \{\s*mesh\.visible = false;/.test(comp) &&
-        /t - last\.t < block\.refreshSec/.test(comp) && !/console\./.test(comp) && /process\.env\.NODE_ENV === 'development'/.test(comp),
+        /t - last\.t < block\.refreshSec/.test(comp) && !/console\./.test(comp) && /process\.env\.NODE_ENV === 'development'/.test(comp) &&
+        /nightRamp\(runtime\.sun\?\.frac, block\) \* \(1 - viirs\)/.test(comp),
     );
   }
 

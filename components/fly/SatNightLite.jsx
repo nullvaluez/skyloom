@@ -7,6 +7,7 @@ import { buildPoiList } from '@/lib/fly/poi-data';
 import { SAT_ROADS } from '@/lib/fly/fly-constants';
 import { getEdgeFade } from '@/lib/fly/toy-world/world-bend';
 import { useFlyStore } from '@/stores/fly-store';
+import { NIGHT_LIGHTS_UNIFORMS } from '@/lib/fly/night-lights-atlas';
 import {
   createNightLiteGeometry,
   createNightLiteMaterial,
@@ -66,7 +67,12 @@ export function SatNightLite({ runtime, flight, origin, engine }) {
     last.ax = origin.anchor.x;
     last.az = origin.anchor.z;
 
-    const nightK = nightRamp(runtime.sun?.frac, block);
+    // Where the aerial pass IS drawing VIIRS city light (uNLParams.x is its
+    // live night weight, 0 whenever it is quiet: phone and Low profiles, day,
+    // atlas not loaded), the pools stand down by that weight, so a tablet whose
+    // profile keeps NIGHT_LIGHTS never draws the far city twice.
+    const viirs = Math.min(1, Math.max(0, NIGHT_LIGHTS_UNIFORMS.uNLParams.value.x));
+    const nightK = nightRamp(runtime.sun?.frac, block) * (1 - viirs);
     if (nightK <= 0) {
       mesh.visible = false;
       return;
