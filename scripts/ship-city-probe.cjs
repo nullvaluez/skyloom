@@ -16,8 +16,10 @@
  *           Measures block-to-street luma contrast (RMS and p90-p10 over the
  *           ground crop) and ground chroma; writes veil.json + PNGs.
  *   smoke   one boot per arm in --arms (e.g. "off,CITY_RANGE,NIGHT_LITE"):
- *           ?flags=NAME, Midtown at 900 m and 8,000 ft (and night when the
- *           arm is a NIGHT_* flag); counts page errors and shader compile
+ *           ?flags=NAME, Midtown at --poses (m AGL; default 900 m and 8,000 ft),
+ *           at night when the arm is a NIGHT_* flag or --night; --cls pins the
+ *           city's device class (window.__flyCityDeviceClass), --device=phone
+ *           emulates touch; counts page errors and shader compile
  *           errors; captures stills; prints a draw census per pose.
  *
  * Draws are counted by an instrument independent of the app: every
@@ -232,7 +234,7 @@ async function smoke() {
   const summary = [];
   for (const arm of arms) {
     const browser = await launch();
-    const night = /NIGHT/.test(arm);
+    const night = args.night === true || args.night === '1' || /NIGHT/.test(arm);
     const flags = arm === 'off' ? '' : `?flags=${arm}`;
     const pins = { __flySunOverride: night ? NIGHT_UTC : NOON_UTC };
     if (args.cls) pins.__flyCityDeviceClass = args.cls;
@@ -246,6 +248,7 @@ async function smoke() {
     const res = { arm, poses: [] };
     for (const m of poses) {
       await pinPose(page, { ...MIDTOWN, altM: m + 12, pitch: m > 2000 ? -0.5 : -0.3 });
+      if (args.dwellFirst && m === poses[0]) await page.waitForTimeout(Number(args.dwellFirst));
       await page.waitForTimeout(DWELL);
       const st = await stats(page);
       const png = await shot(page, `smoke-${arm.replace(/[^A-Za-z0-9_-]/g, '_')}-${m}m${args.device ? '-' + args.device : ''}`);
@@ -264,8 +267,77 @@ async function smoke() {
   process.exitCode = bad.length ? 1 : 0;
 }
 
+/**
+ * CT-3 census: per-layer draws by visibility toggle at the city poses (the
+ * verify-sat-buildings recipe), until FRAME's census (FR-4) lands. Each layer
+ * is hidden, the draw counter's median over the next frames is read, and the
+ * layer is restored. Fixture / SwiftShader draws: draw COUNTS are venue-
+ * independent for a given scene state (same streamed set, same culling), so
+ * they rank layers honestly; frame times are not read at all.
+ */
+async function census() {
+  const browser = await launch();
+  const pins = { __flySunOverride: args.night ? NIGHT_UTC : NOON_UTC };
+  if (args.cls) pins.__flyCityDeviceClass = args.cls;
+  const flags = args.flags ? `?flags=${args.flags}` : '';
+  const { page, errs } = await newPage(browser, { pins, unpin: ['__flyVisualsOverride', '__flyAerialOverride', '__flySatShadowOverride'], device: args.device || null });
+  const url = (process.env.FLY_URL || 'http://localhost:3000') + '/' + flags;
+  await bootFly(page, { style: 'satellite', url, geo: { lat: MIDTOWN.lat - 0.01, lon: MIDTOWN.lon, altM: 900, headingRad: 0 }, timeoutMs: 900000 });
+  if (args.tier) await page.evaluate((t) => window.__flyStore.getState().setQualityTier(t), args.tier);
+  const rows = [];
+  for (const m of (args.poses || '900,2438').split(',').map(Number)) {
+    await pinPose(page, { ...MIDTOWN, altM: m + 12, pitch: m > 2000 ? -0.5 : -0.3 });
+    await page.waitForTimeout(DWELL);
+    const median = async () => {
+      await page.waitForTimeout(Number(args.settle || 6000));
+      return page.evaluate(() => {
+        const d = (window.__cityDraws?.() ?? []).slice(-6).sort((a, b) => a - b);
+        return d.length ? d[Math.floor(d.length / 2)] : null;
+      });
+    };
+    const total = await median();
+    const layers = {};
+    for (const name of ['buildings', 'skyline', 'roads', 'veg', 'houseLights', 'homes', 'tint', 'clutter', 'beacons', 'nightLite']) {
+      const has = await page.evaluate((n) => {
+        const pick = {
+          buildings: () => window.__satBuildings?.object,
+          skyline: () => window.__satSkyline?.object,
+          roads: () => window.__satRoads?.object,
+          veg: () => window.__satVeg?.object ?? window.__satVeg?.mesh,
+          houseLights: () => window.__satVeg?.houseMesh,
+          homes: () => window.__satVeg?.homeMesh,
+          tint: () => window.__satVeg?.tintMesh,
+          clutter: () => window.__satClutter?.object,
+          beacons: () => window.__satBeacons,
+          nightLite: () => null,
+        }[n];
+        const o = pick?.();
+        if (!o || !o.isObject3D) return false;
+        window.__censusHidden = { o, was: o.visible };
+        o.visible = false;
+        return true;
+      }, name);
+      if (!has) continue;
+      const without = await median();
+      await page.evaluate(() => {
+        const h = window.__censusHidden;
+        if (h) h.o.visible = h.was;
+      });
+      layers[name] = total != null && without != null ? total - without : null;
+    }
+    const st = await stats(page);
+    const row = { m, total, layers, ...st };
+    rows.push(row);
+    log('CENSUS', row);
+    await shot(page, `census-${m}m${args.device ? '-' + args.device : ''}${args.flags ? '-' + args.flags : ''}`);
+  }
+  fs.writeFileSync(path.join(OUT, 'census.json'), JSON.stringify({ venue: 'fixture/SwiftShader', view: VIEW, device: args.device || 'desktop', tier: args.tier || 'default', flags: args.flags || '', rows, errors: { page: errs.page.length, shader: errs.shader.length } }, null, 1));
+  await browser.close();
+}
+
 (async () => {
   if (MODE === 'veil') await veil();
+  else if (MODE === 'census') await census();
   else if (MODE === 'smoke') await smoke();
   else throw new Error(`unknown --mode=${MODE}`);
 })().catch((e) => {

@@ -152,8 +152,11 @@ const roadProbe = () => {
 };
 
 (async () => {
+  // SHIP PASS CITY: PLAYWRIGHT_CHANNEL picks the browser (default 'chrome' as
+  // before; empty = Playwright's bundled Chromium, the cloud venue's only one).
+  const channel = process.env.PLAYWRIGHT_CHANNEL ?? 'chrome';
   const browser = await chromium.launch({
-    channel: 'chrome',
+    ...(channel ? { channel } : {}),
     headless: true,
     args: ['--enable-gpu', '--ignore-gpu-blocklist'],
   });

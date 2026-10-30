@@ -348,12 +348,67 @@ async function childRhythm() {
   process.exit(0);
 }
 
+// CHILD: the colour-pass submissions of one partly visible chunk (CT-3);
+// argv: --child=drawrange
+async function childDrawRange() {
+  const { register } = await import('node:module');
+  register('./_node-resolve.mjs', import.meta.url);
+  const THREE = await import('three');
+  const DR = await import(pathToFileURL(path.join(ROOT, 'lib/fly/architecture-draw-range.js')).href);
+  // A 4x4 field of 100 m blocks over a 2 km tile, one quad roof each: the body
+  // range is everything (no auxiliary tail), partitioned by the real helper.
+  const pos = [];
+  const idx = [];
+  const anchors = [];
+  for (let gz = 0; gz < 8; gz++) for (let gx = 0; gx < 8; gx++) {
+    const x = -1000 + gx * 250 + 50;
+    const z = -1000 + gz * 250 + 50;
+    const b = pos.length / 3;
+    pos.push(x, 30, z, x + 100, 30, z, x + 100, 30, z + 100, x, 30, z + 100);
+    for (let i = 0; i < 4; i++) anchors.push(x + 50, z + 50);
+    idx.push(b, b + 2, b + 1, b, b + 3, b + 2);
+  }
+  const position = new Float32Array(pos);
+  const part = DR.partitionArchitectureIndex(new Uint32Array(idx), position, idx.length, new Float32Array(anchors));
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(position, 3));
+  g.setIndex(new THREE.BufferAttribute(part.index, 1));
+  g.userData.architectureRegions = part.regions;
+  g.userData.auxiliaryIndexCount = idx.length;
+  const material = new THREE.MeshBasicMaterial();
+  const mesh = new THREE.Mesh(g, material);
+  DR.installArchitectureShadowRange(mesh);
+  mesh.updateMatrixWorld(true);
+  // A camera over the tile's west edge looking north: only the western half is in view.
+  const camera = new THREE.PerspectiveCamera(50, 1, 1, 20000);
+  camera.position.set(-900, 1500, 1200);
+  camera.lookAt(-900, 0, -400);
+  camera.updateMatrixWorld(true);
+  camera.updateProjectionMatrix();
+  const run = (merge) => {
+    DR.setArchitectureMergeColor(merge);
+    let calls = 0;
+    const renderer = { renderBufferDirect: () => calls++, getDrawingBufferSize: (v) => v.set(1000, 1000) };
+    g.setDrawRange(0, Infinity);
+    mesh.onBeforeRender(renderer, null, camera, g, material);
+    const after = g.drawRange.count; // 0 = the split path already submitted; else the standard draw follows
+    mesh.onAfterRender();
+    return { submissions: calls + (after > 0 ? 1 : 0) };
+  };
+  const out = { regions: part.regions.length, split: run(false), merged: run(true), mergeDefault: false };
+  DR.setArchitectureMergeColor(false);
+  out.mergeDefault = DR.architectureMergeColorOn();
+  console.log(`@@JSON${JSON.stringify(out)}`);
+  process.exit(0);
+}
+
 const childArg = process.argv.find((a) => a.startsWith('--child='));
 if (childArg === '--child=worker') await childWorker(process.argv[3], process.argv[4], process.argv[5]);
 else if (childArg === '--child=logic') await childLogic(process.argv[3]);
 else if (childArg === '--child=night') await childNight(process.argv[3]);
 else if (childArg === '--child=programs') await childPrograms(process.argv[3], process.argv[4], process.argv[5]);
 else if (childArg === '--child=rhythm') await childRhythm();
+else if (childArg === '--child=drawrange') await childDrawRange();
 else await main();
 
 // ---------------------------------------------------------------------------
@@ -539,6 +594,21 @@ async function main() {
     }
 
     globalThis.__shipCityWorker = { cur, w };
+  }
+
+  // ===================== CT-3: the city budget ================================
+  {
+    const D = runChild(['--child=drawrange']);
+    check(
+      'CT-3 a partly visible chunk: the shipped colour pass submits one draw per visible region run; CITY_RANGE\'s merge submits ONE',
+      D.regions === 16 && D.split.submissions > 1 && D.merged.submissions === 1 && D.mergeDefault === false,
+      `${D.regions} regions: split ${D.split.submissions} submissions -> merged ${D.merged.submissions}`,
+    );
+    const eng = read('lib/fly/toy-world/sat-building-engine.js');
+    check(
+      'CT-3 the merge is armed only by CITY_RANGE without the long band (Medium, touch) and handed back on dispose',
+      /setArchitectureMergeColor\(!!range && !range\.detailed\);/.test(eng) && /if \(this\._cityRange\) setArchitectureMergeColor\(false\);/.test(eng),
+    );
   }
 
   // ===================== CT-4: NIGHT_LITE =====================================
