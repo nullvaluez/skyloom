@@ -168,7 +168,10 @@ const atBase = (rel) => {
     d.getUniforms();
     assert(state.linkFailures === 2);
   });
-  await check('FR-1 (d) release (splice) keeps `live` honest; keys are short and stable', () => {
+  await check('FR-1 (d) release (three pops; splice too) keeps `live` honest; keys are short and stable', () => {
+    list[0] = list[list.length - 1];
+    list.pop(); // WebGLPrograms.releaseProgram
+    assert(state.live === list.length, `live ${state.live} vs ${list.length}`);
     list.splice(0, 1);
     assert(state.live === list.length, `live ${state.live} vs ${list.length}`);
     assert(/^MeshStandardMaterial:a#[0-9a-f]{8}$/.test(programKey({ type: 'MeshStandardMaterial', name: 'a', cacheKey: 'x' })));

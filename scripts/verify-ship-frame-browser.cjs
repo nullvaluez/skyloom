@@ -61,6 +61,10 @@ async function runArm(browser, arm) {
     const t = m.text();
     if (m.type() === 'error' && /Shader Error|WebGLProgram|shader compile|getProgramInfoLog|VALIDATE_STATUS/i.test(t)) shaderErrors.push(t.slice(0, 300));
   });
+  if (arm === 'policy') {
+    const d = s.devicePolicy;
+    check(arm, 'DEVICE_POLICY: the boot benchmark ran inside the hold and chose a start (FR-10)', !!d?.score && !!d?.start?.tier && d.score.ms <= 1600, d ? `class ${d.cls}, score ${JSON.stringify(d.score)}, start ${JSON.stringify(d.start)}; tier ${s.tier}, preset ${s.preset}` : 'absent');
+  }
   if (arm === 'player') {
     await page.addInitScript(() => {
       Object.defineProperty(Navigator.prototype, 'webdriver', { get: () => false, configurable: true });
@@ -99,6 +103,7 @@ async function runArm(browser, arm) {
       tier: window.__flyStore?.getState?.().qualityTier,
       preset: window.__flyStore?.getState?.().qualityPreset,
       frameRateMode: window.__flyStore?.getState?.().frameRateMode,
+      devicePolicy: st.devicePolicy ?? null,
     };
   });
   check(arm, 'zero page errors', errors.length === 0, errors.slice(0, 3).join(' | '));
