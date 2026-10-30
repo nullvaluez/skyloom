@@ -967,14 +967,15 @@ iPhone number.
 |---|---|---|---|
 | SK-1 | instrument built, run in flight | `scripts/ship-sky-veil.cjs`: pinned clear noon (`__flySunOverride` = local solar noon, `__flyWeatherOverride='clear'`), Midtown 20° below the horizon at 5,000 / 6,000 / 7,500 / 8,500 / 10,000 ft, lens 60°, clock frozen; arms baseline, `aerial-pin` (`__flyAerialOverride=0`), `air-off` (SKY's new dev/review pin `window.__flySkyDiag={aerial:0}`, `lib/fly/sky-diag.js`: the whole Enhanced aerial post pass leaves the ground pixels), `no-mist` (`?flags=-GROUND_MIST`), and CITY's `city-fade` / `city-premix` through `window.__flyCityDiag` — measured only when the tree publishes `__flyCityDiagApplied === true`, otherwise "pending merged tree". Metric: percentile Michelson luma contrast, RMS contrast, mean CIELAB chroma and mean luma in a crop around the projected Midtown point, plus a 50 km crop for SK-2. | `verify-ship-sky` SK-1 (a)–(d); table: below, when the run lands |
 | SK-3 | built, flag OFF (look flag) | `lib/fly/sun-model.js`: truncated Meeus ch. 47 (26 Σl/Σr + 14 Σb rows, A1–A3 terms), topocentric parallax, phase and illuminated fraction (Meeus ch. 48); `computeSun` records the place and instant behind each `az`, so `moonDirFromSun(az)` returns the real moon with REAL_MOON on and FlyScene, the cloud pass and cinema-environment inherit it unedited; `moonLight()` (D15 floor 0.5 of today's key, never above today's full moon, shadowless fill up to the floor when the moon is low or set, no key/disc under the horizon, exposure opens ≤ 0.5 stop); `moonState()` implemented (frozen shape plus additive `compassAzDeg`, `lightK`, `real`). `cinema-environment.js`: key × keyK, fill top-up, disc weight × visibility, exposure adapt (flag off: main's expressions). `night-sky.js`: the phase terminator on the composite's disc (sphere normal lit by the true sun, earthshine 0.06) and a corona that follows the lit fraction. | `verify-ship-sky` SK-3 (a)–(n): Meeus 47.a; 20 JPL Horizons dates (worst 0.020° position, 0.63% illumination); flag-off bit identity of `moonDirFromSun` and of cinema-environment over 820 states (sha256 vs main); the light law over a 241 × 21 grid; 403 deep-night states with the flag on |
-| SK-2, SK-4, SK-5, SK-6 | not started | | |
+| SK-5 | done | The lens flare (veiling glare, aperture starburst, five ghosts, `livSunVisible()` / `livLens()`, `uLivFlare*`, `FLARE_ON`) is deleted from `light-shafts.js`; the cloud pass's comments follow. `LIGHT_SHAFTS` is untouched and still off. The `LENS_FLARE` block, its `living-world.js` reader and its device-report entry stay for the lead's close (8.3). `verify-living-sky` (2a)'s LENS_FLARE marker now asserts the lens is gone (a file no stream lists; one line, unavoidable once the code is deleted). | `verify-ship-sky` SK-5 (a)–(d): default-frame program texts unchanged (TEXT (a), sha256 vs main); `?flags=LENS_FLARE` reaches no program; LIGHT_SHAFTS' source and blur programs are main's and its composite is main's minus exactly the lens text (sha256 of main's text with the lens cut out); `verify-living-sky` node rows green and its GPU compile/link rows green on SwiftShader |
+| SK-2, SK-4, SK-6 | not started | | |
 
 **Flags.** `AERIAL_CLARITY`, `REAL_MOON`, `SKY_LITE`: `enabled:false` (look
 flags; section 3.8 — the owner flips each after the 5080 motion bar).
 `REAL_MOON` tunables live in its block (`floorK`, `horizonBandDeg`,
 `minKeyElDeg`, `exposureAdapt`, `earthshine`, `terminatorSoft`).
 
-**Gates.** `node scripts/verify-ship-sky.mjs`: 20 passed, 0 failed (includes
+**Gates.** `node scripts/verify-ship-sky.mjs`: 24 passed, 0 failed (includes
 the default-flag program-text hashes vs main: cloud march / composite /
 filter, Classic and Enhanced; aerial Classic, Enhanced, merged pass and its
 defines). Existing: `verify-cinema-overhaul` 16/16, `verify-twilight` 6/6,
@@ -993,8 +994,9 @@ moon 70° up), each against the same URL without the flag.
 shape kept; additive `lightK` is the ground's moonlight relative to today's
 (1 with REAL_MOON off), the number a night exposure balance wants.
 
-**Files outside the listed ownership (new, SKY's own):** `lib/fly/sky-diag.js`,
-`scripts/ship-sky-veil.cjs`.
+**Files outside the listed ownership:** new and SKY's own — `lib/fly/sky-diag.js`,
+`scripts/ship-sky-veil.cjs`; edited minimally — `scripts/verify-living-sky.mjs`
+(one marker line, SK-5).
 <!-- SHIP PASS SKY report end -->
 
 ### CITY

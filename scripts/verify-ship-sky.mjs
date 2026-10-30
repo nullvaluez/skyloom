@@ -41,6 +41,8 @@ const pinName = (f) => `__fly${f.toLowerCase().split('_').map((w) => w[0].toUppe
 const LEGS = {
   default: {},
   'real-moon': { REAL_MOON: true },
+  shafts: { LIGHT_SHAFTS: true },
+  lens: { LIGHT_SHAFTS: true, LENS_FLARE: true },
 };
 
 async function buildLeg(name) {
@@ -83,7 +85,9 @@ async function buildLeg(name) {
     hashes,
     uniforms: Object.keys(pass.r25.uniforms).sort(),
     compositeHasPhase: texts.composite.includes('shipMoonPhase(ray)*.60*'),
-    compositeHasLens: /livLens\(|uLivLens/.test(texts.composite),
+    compositeHasLens: /livLens|livSunVisible|uLivFlare/.test(texts.composite),
+    compositeHasShafts: texts.composite.includes('livShaftLight(vUv,'),
+    uniformsHaveFlare: Object.keys(pass.r25.uniforms).some((k) => /Flare/.test(k)),
   };
 }
 
@@ -308,6 +312,30 @@ const DEG = Math.PI / 180;
   row('TEXT (b) default flags: no phase terminator, no REAL_MOON uniform', !def.compositeHasPhase && !def.uniforms.includes('uShipMoon'));
   row('SK-3 (n) REAL_MOON on: the composite draws the terminator and binds uShipMoon; every other program is the default one',
     moon.compositeHasPhase && moon.uniforms.includes('uShipMoon') && Object.keys(MAIN_TEXT).filter((k) => k !== 'composite').every((k) => moon.hashes[k] === def.hashes[k]));
+}
+
+// ---- SK-5: the lens flare is deleted (D10); LIGHT_SHAFTS untouched ----------
+{
+  const shafts = legOut('shafts');
+  const lens = legOut('lens');
+  const src = read('lib/fly/light-shafts.js') + read('lib/fly/immersive-cloud-pass.js');
+  // Frozen from main@940b751: the LIGHT_SHAFTS-on shaft programs, and main's
+  // LIGHT_SHAFTS-on composite with EXACTLY the lens text cut out (its two
+  // uniforms, livSunVisible() and livLens(), and the `+livLens(vUv)` term) —
+  // i.e. the shafts program is main's, minus the lens and nothing else.
+  const MAIN_SHAFTS = {
+    shaftSource: '991174c174c23c22e57fa27d38717c3b0299a7235ebcabe2300d866556ccaba0',
+    shaftBlur: '8d276508d096cd75c61d611abaf61afe282198ef8e0c0ea8e3fccc456cf0618c',
+    compositeMinusLens: '7473a5e9cad83c10a325a52e45f3f9a184c02849dd5bc2db25cb93505179d8b9',
+  };
+  row('SK-5 (a) the lens is gone from the code: no livLens / livSunVisible / uLivFlare / FLARE_ON in light-shafts.js or the cloud pass',
+    !/livLens|livSunVisible|uLivFlare|FLARE_ON|LENS_FLARE_ACTIVE|livingWorldOn\('LENS_FLARE'\)/.test(src));
+  row('SK-5 (b) ?flags=LENS_FLARE reaches no program: with LIGHT_SHAFTS + LENS_FLARE pinned on, every text equals LIGHT_SHAFTS alone, and no flare uniform exists',
+    Object.keys(shafts.hashes).every((k) => lens.hashes[k] === shafts.hashes[k]) && !lens.compositeHasLens && !lens.uniformsHaveFlare);
+  row('SK-5 (c) LIGHT_SHAFTS untouched: its source and blur programs are main\'s, and its composite is main\'s minus exactly the lens',
+    shafts.hashes.shaftSource === MAIN_SHAFTS.shaftSource && shafts.hashes.shaftBlur === MAIN_SHAFTS.shaftBlur && shafts.hashes.composite === MAIN_SHAFTS.compositeMinusLens && shafts.compositeHasShafts,
+    `composite ${shafts.hashes.composite.slice(0, 12)}`);
+  row('SK-5 (d) LIGHT_SHAFTS still ships off; the LENS_FLARE block stays for the lead\'s close (8.3)', C.LIGHT_SHAFTS.enabled === false && C.LENS_FLARE?.enabled === false);
 }
 
 console.log(`\nverify-ship-sky: ${passed} passed, ${failed} failed`);

@@ -122,7 +122,9 @@ const marks = {
     && !!on.filter?.includes('mix(.008,.04,smoothstep(15000.,30000.,fb))') && on.composite.includes('*mix(.008,.04,smoothstep(15000.,30000.,min('),
   CIRRUS: on.march.includes('livCirrus(ray,livTR,metricRay,rayCone,livSceneT,livFarL,livFarA);'),
   LIGHT_SHAFTS: on.composite.includes('livShaftLight(vUv,') && !!on.shafts && (!on.composite.includes('void pskyAerial(') || on.composite.includes('l=max(l,-S*uPskySunIllum);')),
-  LENS_FLARE: on.composite.includes('livLens(vUv)'),
+  // SHIP PASS SKY (SK-5, owner decision D10): the lens flare is deleted, so
+  // its pin must now reach no program (its block goes in the close, 8.3).
+  LENS_FLARE: !/livLens|livSunVisible|uLivFlare/.test(on.composite),
   NIGHT_SKY: on.composite.includes('light+=livMilkyWay(ray)*uCinemaOptics.y;') && on.composite.includes('livTwinkle(cell,ray.y)'),
 };
 check('(2a) flags on: every block is in its program', Object.values(marks).every(Boolean), JSON.stringify(marks));
