@@ -1099,6 +1099,33 @@ gate; it crashed on main with ERR_MODULE_NOT_FOUND since world-bend.js gained
 imports, fixed here with the shared resolve hook: 8/8 run, (1)/(3) need
 `R23_BASE_WORLDBEND`).
 
+**Flags (all three `enabled:false`, by design, 3.8).** CITY_RANGE, NIGHT_LITE
+and NIGHT_RHYTHM are look flags: built, node-gated (flag-off identity proven
+against `main`), smoke-tested on and off on the fixture, and left off for the
+owner's RTX 5080 motion bar (3.6) and iPhone glance; none claims to be on.
+When CITY_RANGE is flipped, three frozen browser premises move with it and
+must be re-read the same day: `verify-skyline` (B) "detail ring gone at
+5,000 m" (the range evicts at 5,200 m: probe at 5,400 m),
+`verify-sat-night` (E) "fade strictly inside (0,1) at 2,700 m" (the range
+dissolves at 4,500-5,000 m) and `verify-sat-buildings` (C-ii) is unaffected
+(6,000 m > 5,200 m).
+
+**Owner checks (run list section 9).**
+- 5080 step 2 (Midtown climb 6,000 -> 10,000 ft): `?flags=CITY_RANGE` vs
+  `?flags=-CITY_RANGE` (with SKY's `AERIAL_CLARITY`); the motion bar: a
+  descend/climb burst through 2,400 m (lite LOD) and 4,500-5,000 m (dissolve
+  into the mass) with no pop; Manhattan 8,000 ft draws against the FR-6 row.
+- 5080 step 6 (night at the current moon): `?flags=NIGHT_RHYTHM` at 500 m and
+  3 km at dusk and at 23:00-01:00 local: no ring where the road lights hand
+  off to NIGHT_LIGHTS (tune `NIGHT_RHYTHM.seam.gain` against the ring-edge
+  luma if one shows), lit windows by civil dusk, windows going dark one by one
+  late; still-camera diff for window crawl.
+- iPhone step 4 (night at 3 km) and step 10: `?flags=NIGHT_LITE` vs off at
+  night from 3 km and at cruise: city light to 60 km, no sparkle in a 60 s
+  still, the phone's draws (DiagnosticsPanel) within 250.
+- iPhone step 4 (city turn): `?flags=CITY_RANGE` (merged colour draws on the
+  phone) vs off: draws and turn hitch.
+
 **Gates.** `scripts/verify-ship-city.mjs` (node, starts the fixture itself): 45/45.
 `verify-play-city` 28/28, `verify-night-city-identity` PASS (8 rows). `ship-pass-gates`: 32 PASS, 2 KNOWN-RED, 0 FAIL, seam rule PASS.
 `FLY_TILE_FIXTURE=1 verify-worker-window` 4/4, `verify-true-areas` 7/7.
