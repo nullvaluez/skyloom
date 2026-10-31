@@ -158,8 +158,18 @@ ordinary city buildings and animated Hudson water. These are correctness
 checks, not frame-time certification. The five source gates also pass.
 
 Report: `.graphics-review/building-regression/scenery-startup-ship.json`, with
-matching screenshots. The deployment is not called fixed until the published
-URL serves this repair and its returning-flight check passes.
+matching screenshots.
+
+**Published and verified:** repair `306e5686` was pushed to main, Netlify deploy
+`6ae64bcaca03a1728fa85abf` completed, and the production URL switched from v1 to
+v3. The actual live device report identifies **306e568**. A fresh live flight
+and a cached reload + Continue both pass: returning buildings 15 ready chunks /
+25,743 columns, skyline 10 chunks, roads 16 chunks, water 699,069 cells, zero
+page errors, worker failures or shader errors, and no worker-bootstrap entries
+in the shell cache. Evidence:
+`.graphics-review/building-regression/live-scenery-306e5686.json` and
+`live-scenery-306e5686-returning.png`. Existing players should reload once to
+load the repaired page and run its startup guard; no manual storage wipe.
 
 ## 0. Context
 
