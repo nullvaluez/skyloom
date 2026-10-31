@@ -34,6 +34,18 @@ A flag's default flips to `true` in its own one-line commit after its run list p
 
 ### Flags
 
+2026-10-31 atmosphere follow-up: `TWILIGHT_BALANCE` fixes the clipped rusty
+sunset, the civil-twilight dark interval and city lights surviving their
+terrain's horizon fade. **Off pending owner certification**. Add it to the
+building preview: `?flags=BUILDING_REALISM,CITY_HORIZON,TWILIGHT_BALANCE&diag=1`.
+See [FLY_TWILIGHT_BALANCE.md](FLY_TWILIGHT_BALANCE.md) for the reproduction and A/B.
+
+2026-10-31 building pass: `BUILDING_REALISM` and `CITY_HORIZON` are implemented,
+**off pending owner certification**. Preview together with
+`?flags=BUILDING_REALISM,CITY_HORIZON&diag=1`. See
+[FLY_BUILDING_REALISM.md](FLY_BUILDING_REALISM.md) for material changes, distance
+budgets, verification and the desktop/iPhone run list.
+
 2026-10-30 addition: `OPERATOR_LIVERIES` is built on `main`, **off by default**.
 `?flags=OPERATOR_LIVERIES` previews callsign-matched airline and military paint.
 See [FLY_OPERATOR_LIVERIES.md](FLY_OPERATOR_LIVERIES.md) for coverage, verification

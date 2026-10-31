@@ -74,6 +74,7 @@ export function SatSkylineLayer({ runtime, flight }) {
   // the desired set just grows.
   useEffect(() => {
     engine.setMaxChunks((satelliteVisualsOn() ? satelliteVisualProfile(qualityTier).skylineChunks : SAT_SKYLINE.maxChunksByTier[qualityTier]) ?? 0);
+    engine.setHorizonTier(qualityTier);
     engine.setCityRange(cityRangeFor(qualityTier)); // SHIP PASS CITY (CT-2)
   }, [engine, qualityTier]);
 
