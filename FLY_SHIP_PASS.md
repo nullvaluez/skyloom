@@ -80,6 +80,40 @@ fragment texture limit, so a remaining affected session can distinguish failed
 requests, unfinished terrain placement and rendering. The existing flags and
 landmark exclusion areas are unchanged.
 
+### Returning-player city regression (2026-10-31)
+
+The owner's next report (`5211a14`) resolved the remaining attribution:
+zero shader link failures, but buildings and roads both had zero ready chunks
+and dozens of rejected requests. A fresh Edge visit loaded the city; reloading
+the same profile with `OFFLINE_SHELL` active reproduced the exact failure:
+zero buildings/roads, ten empty skyline groups, and Comlink errors reading
+`Cannot read properties of undefined (reading 'apply')`.
+
+The responsible release switch is `4cb7e8b4`, which enabled the service worker
+introduced in `b9e4822e`. Turbopack uses one `turbopack-worker-*.js` bootstrap
+for different worker APIs and selects their modules through URL `#params`.
+The shell cached that script as an ordinary immutable asset. Cache matching
+ignores fragments, so its first aircraft-worker response was reused for tile
+workers, which then exposed the aircraft API. Their `init` and `buildTile`
+calls failed before any city geometry or water masks could be produced.
+Main-thread landmark models continued rendering. Fresh automated sessions
+missed this because registration is skipped under `navigator.webdriver`
+unless the offline flag is explicitly pinned.
+
+Repair: exclude Turbopack worker bootstraps from both live shell caching and
+warm offers. Shell cache version v2 removes the affected v1 cache on activation.
+The requested landmark and livery flags remain enabled. Returning clients need
+a reload after the updated service worker activates to replace workers that
+already started with the wrong API.
+
+Verification: RELEASE **83/83**, including live-handler/warm-offer exclusions
+and migration preserving provider caches. `verify-worker-cache.cjs` covers the
+actual browser fragment collision and cache upgrade; `verify-returning-city.cjs`
+explicitly enables the service worker and checks real Manhattan buildings,
+roads, distant skyline, water masks and shader links before and after a
+controlled reload plus Continue. Reports are under
+`.graphics-review/building-regression/`.
+
 ## 0. Context
 
 The owner asked for a deep gap analysis across features, modes, lighting,

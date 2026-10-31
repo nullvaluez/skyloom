@@ -2,7 +2,8 @@
  *
  * Caches FIRST-PARTY STATIC ASSETS only, so a warm boot reads them from disk
  * and an offline launch still shows the title shell:
- *   - Next's content-hashed build output (/_next/static/…): cache first;
+ *   - Next's content-hashed build output (/_next/static/…): cache first,
+ *     except the fragment-configured Turbopack worker bootstrap;
  *   - the game's own static files (models, materials, HDRIs, textures, fonts,
  *     audio, runway and atlas data, icons, share and journey art):
  *     stale-while-revalidate;
@@ -14,7 +15,7 @@
  * OFFLINE_SHELL; with the flag off that module unregisters this worker and
  * deletes its caches (the kill switch).
  */
-const VERSION = 'v1';
+const VERSION = 'v2';
 const CACHE = `skyloom-shell-${VERSION}`;
 const SHELL = '/';
 const STATIC_PREFIXES = ['/models/', '/materials/', '/hdri/', '/textures/', '/fonts/', '/audio/', '/data/', '/atlas/', '/icons/', '/og/', '/adventures/', '/splash/'];
@@ -40,6 +41,12 @@ function shellCacheable(url, origin, mode, method) {
   const p = u.pathname;
   if (p.startsWith('/api/') || p === '/api') return null; // live data: never
   if (p === '/sw.js') return null;
+  // Turbopack shares this bootstrap across DIFFERENT worker entrypoints,
+  // selected by URL #params. Cache keys ignore fragments, but a cached
+  // Response retains its original URL. Reusing it boots subsequent workers
+  // with the FIRST worker's API (e.g. aircraft processing instead of tiles).
+  // Both live requests and warm offers must fetch this bootstrap directly.
+  if (/\/turbopack-worker-[^/]+\.js$/.test(p)) return null;
   if (p.startsWith('/_next/static/')) return 'immutable';
   if (STATIC_FILES.includes(p) || STATIC_PREFIXES.some((x) => p.startsWith(x))) return 'static';
   if (mode === 'navigate' && (p === '/' || p === '')) return 'shell';

@@ -195,7 +195,7 @@ function w0Arm() {
   try {
     const tar = execFileSync('git', ['-C', ROOT, 'archive', W0, 'lib', 'stores', 'scripts/_node-resolve.mjs', 'package.json'], { maxBuffer: 256 << 20 });
     execFileSync('tar', ['-x', '-C', dir], { input: tar });
-    symlinkSync(path.join(ROOT, 'node_modules'), path.join(dir, 'node_modules'), 'dir');
+    symlinkSync(path.join(ROOT, 'node_modules'), path.join(dir, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir');
     // The W0 tree has no RELEASE flags to pin, and its own arm script is this one.
     return { source: `live (git archive ${W0})`, fp: arm(dir, '') };
   } finally {
@@ -604,6 +604,9 @@ console.log('SHIP PASS RELEASE gate (verify-ship-release)\n');
     [`${O}/api/entitlements`, 'cors', 'GET', null],
     [`${O}/api/aircraft/abc123/photo`, 'cors', 'GET', null],
     [`${O}/sw.js`, 'same-origin', 'GET', null],
+    [`${O}/_next/static/chunks/turbopack-worker-shared.js#params=aircraft`, 'same-origin', 'GET', null],
+    [`${O}/_next/static/chunks/turbopack-worker-shared.js#params=tiles`, 'same-origin', 'GET', null],
+    [`${O}/_next/static/chunks/turbopack-worker-shared.js`, 'cors', 'GET', null],
     [`${O}/_next/static/chunks/app/page-0123abcd.js`, 'cors', 'GET', 'immutable'],
     [`${O}/_next/static/chunks/app/page-0123abcd.js`, 'cors', 'POST', null],
     [`${O}/models/player-vector-hero-v4.glb`, 'cors', 'GET', 'static'],
@@ -659,6 +662,8 @@ console.log('SHIP PASS RELEASE gate (verify-ship-release)\n');
   const live = [
     [`${O}/api/aircraft?lat=1`, false], [`${O}/api/weather`, false], ['https://server.arcgisonline.com/x/tile/1/2/3', false], ['https://tiles.openfreemap.org/planet/1/2/3.pbf', false],
     [`${O}/_next/static/chunks/main-abc.js`, true], [`${O}/models/x.glb`, true], [`${O}/`, true, 'navigate'], [`${O}/sw.js`, false],
+    [`${O}/_next/static/chunks/turbopack-worker-shared.js#params=aircraft`, false],
+    [`${O}/_next/static/chunks/turbopack-worker-shared.js#params=tiles`, false],
   ];
   const lbad = live.filter(([u, want, m]) => fetchEvent(u, m) !== want).map(([u, want]) => `${u} intercepted=${!want}`);
   lbad.push(...(fetchEvent(`${O}/models/x.glb`, 'cors', 'GET', { range: 'bytes=0-1' }) ? ['a ranged read was intercepted'] : []));
@@ -667,10 +672,19 @@ console.log('SHIP PASS RELEASE gate (verify-ship-release)\n');
   fetched.length = 0;
   stored.clear();
   let warmDone = null;
-  handlers.message({ data: { type: 'warm', urls: [`${O}/_next/static/chunks/app-1.js`, `${O}/api/aircraft?x=1`, 'https://evil.example/_next/static/x.js', `${O}/models/m.glb`, `${O}/somewhere`, `${O}/sw.js`, 42] }, waitUntil: (p) => (warmDone = p) });
+  handlers.message({ data: { type: 'warm', urls: [`${O}/_next/static/chunks/app-1.js`, `${O}/api/aircraft?x=1`, 'https://evil.example/_next/static/x.js', `${O}/models/m.glb`, `${O}/somewhere`, `${O}/sw.js`, `${O}/_next/static/chunks/turbopack-worker-shared.js#params=aircraft`, `${O}/_next/static/chunks/turbopack-worker-shared.js#params=tiles`, 42] }, waitUntil: (p) => (warmDone = p) });
   await warmDone;
   const warmWant = [`${O}/_next/static/chunks/app-1.js`, `${O}/models/m.glb`];
   gate('W7 the first visit warms the cache through the same allowlist (no /api, cross-origin or page URLs)', JSON.stringify(fetched) === JSON.stringify(warmWant) && [...stored.keys()].every((k) => warmWant.includes(k)), JSON.stringify(fetched));
+  // Upgrade the affected v1 cache without touching the provider tile cache.
+  const upgraded = [];
+  ctx2.caches.keys = async () => ['skyloom-shell-v1', CACHE, 'fly-tiles-v1'];
+  ctx2.caches.delete = async (key) => (upgraded.push(key), true);
+  let activation = null;
+  handlers.activate({ waitUntil: (promise) => (activation = promise) });
+  await activation;
+  gate('W14 upgrading the shell removes the affected v1 cache and preserves current/provider caches',
+    CACHE !== 'skyloom-shell-v1' && JSON.stringify(upgraded) === '["skyloom-shell-v1"]', JSON.stringify(upgraded));
   // The kill switch retires the worker first: an unregistered worker still
   // serves the pages it controls, and its caches.open() would re-create the
   // cache the page deletes (measured in the venue: verify-offline-shell 'kill').
