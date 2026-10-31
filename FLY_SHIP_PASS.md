@@ -66,6 +66,13 @@ its ordinary buildings and skyline use 8 and 7. The exact GPU lookup comparison
 passes 13,568 samples; LIGHT remains 67/67. Reports and screenshots are under
 `.graphics-review/building-regression/` (`manhattan-render` and `repair-edge`).
 
+Release `1dafd23a` was pushed to main and deployed to Netlify. The same five
+stages pass against the live site in Edge, with linked terrain and actual
+building/skyline draws, zero page/shader errors and no failed tile requests
+(`live-edge-after.json`). The live check waits for visible skyline draws:
+the first completed tile can be behind the camera or masked by the detailed
+ring, so an arbitrary eight-second dwell was not a valid readiness condition.
+
 The missing-building report is not independently attributed yet: clean desktop
 sessions do generate the city, including on the old release. Device reports
 now include the live building, skyline and road streamers' counts plus the

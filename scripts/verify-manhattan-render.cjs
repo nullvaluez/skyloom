@@ -70,7 +70,13 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
       await page.waitForFunction(value => window.__fly.cinemaProfile?.name === value && window.__fly.satBuildings?.stats.ready > 0 && window.__fly.satSkyline?.stats.ready > 0, preset, { timeout: 120000, polling: 1000 });
       await delay(5000);
       await page.evaluate(() => { window.__cityDraws.buildings.clear(); window.__cityDraws.skyline.clear(); window.__hookCityDraws(); });
-      await delay(3000);
+      // The first ready skyline tile can be behind the camera or entirely
+      // covered by the detailed ring. Keep observing newly finalized meshes
+      // until both rings actually draw; a fixed delay is not a settle signal.
+      await page.waitForFunction(() => {
+        window.__hookCityDraws();
+        return window.__cityDraws.buildings.size > 0 && window.__cityDraws.skyline.size > 0;
+      }, null, { timeout: 90000, polling: 1000 });
       const state = await page.evaluate(() => {
         const runtime = window.__fly, renderer = window.__flyComposer.renderer, gl = renderer.getContext();
         const ext = gl.getExtension('WEBGL_debug_renderer_info');
