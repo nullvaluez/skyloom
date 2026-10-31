@@ -8,6 +8,71 @@ and (as the pass runs) the record for a five-agent parallel pass, in the
 FLY_PLAY_PASS.md format. Each stream adds its report under "Stream reports"
 in its first commit and updates it on every landing.
 
+### Ultra terrain regression repair (2026-10-30)
+
+The owner reported terrain disappearing only at Ultra. Reproduced on the local
+RTX 5080 through ANGLE D3D11: the terrain fragment failed to link with
+`FRAGMENT shader texture image units count exceeds MAX_TEXTURE_IMAGE_UNITS(16)`.
+The actual count was **17**, not the 16 recorded below: the static census omitted
+Three r185's `dfgLUT`. The software smoke also omitted `TERRAIN_SHADOW` because
+its device policy refuses software renderers, so it never exercised the failing
+combination of that sampler and three cascades.
+
+Repair: `terrain-dfg.js` carries the upstream 16x16 RG16F lighting table in
+64 packed `uvec4` uniforms for terrain with `TERRAIN_SHADOW`, with the same
+clamped bilinear lookup. The terrain now uses **16 samplers** while retaining
+terrain shadows, all three cascades, reflections, relief, colour reference,
+LOD crossfade and night lighting. Flag-off shader text and keys stay unchanged.
+
+Verification on the RTX 5080: fresh production build; saved-Ultra boot and
+Ultra → High → Low → Ultra all link, with zero page or shader errors. The GPU
+lookup test preserves all 512 half-float values exactly and compares 13,568
+samples with the original texture (texel-centre error 0; worst interpolation
+error 0.0002443). LIGHT gate **67/67**, critical terrain prewarm **18/18**.
+Live Manhattan also passed in installed Chrome on the RTX 5080 at Ultra:
+164 visible terrain materials, a linked terrain program, three cascades and
+zero page/shader errors. The local capture and report are
+`.graphics-review/terrain-regression/manhattan-ultra-live.{png,json}`.
+This is a rendering-correctness check, not a frame-time or iPhone certificate.
+
+The regression test now forces the desktop LIGHT policy even in software CI,
+requires the terrain-shadow sampler and three Ultra cascades, checks shader
+console errors, and enforces a portable 16-unit ceiling even if the host exposes
+more. `verify-terrain-dfg.mjs` is part of `test:shaders`.
+
+### Production follow-up (2026-10-31)
+
+The repair above had remained uncommitted, so release `8d067a1` still carried
+the 17-sampler terrain program. Reproduced directly at
+`https://shadowads.netlify.app/` in Chrome and Edge on the RTX 5080 / ANGLE
+D3D11: Ultra terrain fails to link against the driver's 16-unit limit.
+The owner's Edge report names that release, Ultra with three cascades, one
+link failure, and a Manhattan arrival revealed by the time cap while terrain,
+surfaces, buildings and roads were still missing.
+
+The repair is now included in the release change. Verification uses a fresh
+**Turbopack production build**, matching Netlify, rather than only the local
+Webpack preview. The fixture gate now includes Medium. The new
+`scripts/verify-manhattan-render.cjs` launches through Free Flight and the
+Manhattan destination with real provider tiles, starts at saved Ultra, and
+checks Ultra / High / Medium / Low / Ultra. It inspects terrain shader links
+and texture counts, and requires actual ordinary-building and skyline draws
+with linked programs. It holds the governor and aircraft for repeatability;
+this is rendering correctness, not a performance certificate.
+
+Local results: all five real-provider stages pass in installed Chrome and Edge
+on the RTX 5080, with zero page/shader errors. Ultra terrain uses 16 samplers;
+its ordinary buildings and skyline use 8 and 7. The exact GPU lookup comparison
+passes 13,568 samples; LIGHT remains 67/67. Reports and screenshots are under
+`.graphics-review/building-regression/` (`manhattan-render` and `repair-edge`).
+
+The missing-building report is not independently attributed yet: clean desktop
+sessions do generate the city, including on the old release. Device reports
+now include the live building, skyline and road streamers' counts plus the
+fragment texture limit, so a remaining affected session can distinguish failed
+requests, unfinished terrain placement and rendering. The existing flags and
+landmark exclusion areas are unchanged.
+
 ## 0. Context
 
 The owner asked for a deep gap analysis across features, modes, lighting,

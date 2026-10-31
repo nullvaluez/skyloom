@@ -237,7 +237,7 @@ try {
     mkdirSync(path.join(SNAP, 'scripts'), { recursive: true });
     const tar = execFileSync('git', ['-C', ROOT, 'archive', '--format=tar', baseRef, 'lib', 'stores', 'scripts/_node-resolve.mjs'], { maxBuffer: 256 << 20 });
     execFileSync('tar', ['-x', '-C', SNAP], { input: tar });
-    symlinkSync(path.join(ROOT, 'node_modules'), path.join(SNAP, 'node_modules'), 'dir');
+    symlinkSync(path.join(ROOT, 'node_modules'), path.join(SNAP, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir');
   }
 
   const { register } = await import('node:module');
@@ -273,7 +273,7 @@ try {
   const hor = probe(ROOT, { ...W0_ON('TERRAIN_SHADOW'), __flyLightDeviceClass: 'phone' });
   const soft = probe(ROOT, { ...W0_ON('TERRAIN_SHADOW'), __flyLightDeviceClass: 'software' });
   check('(1a) desktop path is the depth map, touch is the horizon map, software is refused', map.mode === 'map' && hor.mode === 'horizon' && soft.mode === null, `${map.mode}/${hor.mode}/${soft.mode}`);
-  check('(1b) flag on: the key is the flag-off key plus one path token', map.earth.key.replace('|ts-map-v1', '') === cur.earth.key && hor.earth.key.replace('|ts-horizon-v1', '') === cur.earth.key
+  check('(1b) flag on: the key adds the shadow path and uniform DFG tokens', map.earth.key.replace('|ts-map-v1|dfg-uniform-v1', '') === cur.earth.key && hor.earth.key.replace('|ts-horizon-v1|dfg-uniform-v1', '') === cur.earth.key
     && count(map.earth.key, '|ts-map-v1') === 1 && count(hor.earth.key, '|ts-horizon-v1') === 1, map.earth.key.slice(-60));
   for (const [name, arm] of [['map', map], ['horizon', hor]]) {
     const t = arm.earth.text;
@@ -285,13 +285,16 @@ try {
       t.indexOf('earthTerrainLit=terrainShadowLit(') > t.indexOf('#include <lights_fragment_end>') && t.indexOf('water*=mix(1.,mix(.62,1.,earthTerrainLit),day);') < t.indexOf('float coastWeight='));
     check(`(1e) ${name}: shared receiver uniforms bound`, ['uTsMap', 'uTsMatrix', 'uTsParams', 'uTsLight'].every((u) => arm.earth.uniforms.includes(u)));
   }
-  // The flag-on text minus the patch is the flag-off text: nothing else moved.
+  // Outside the shadow terms, only the equivalent sampler-free DFG moves.
   {
     const t = await import('../lib/fly/terrain-shadow.js');
     const strip = (text, mode) => text.replace(t.terrainShadowGLSL(mode), '').replace(t.TS_LIGHT_TERM, '').replace(t.TS_WATER_TERM, '');
-    const offText = cur.earth.text;
+    const { applyTerrainDfg } = await import('../lib/fly/terrain-dfg.js');
+    const dfgOnly = { fragmentShader: cur.earth.text, uniforms: {} };
+    applyTerrainDfg(dfgOnly);
+    const offText = dfgOnly.fragmentShader;
     const a = strip(map.earth.text, 'map'), b = strip(hor.earth.text, 'horizon');
-    check('(1f) the patch is purely additive: stripped flag-on text equals flag-off text (both paths)', sha(a) === sha(offText) && sha(b) === sha(offText), `${sha(a)} ${sha(b)} vs ${sha(offText)}`);
+    check('(1f) stripping the shadows leaves only the sampler-free DFG replacement (both paths)', sha(a) === sha(offText) && sha(b) === sha(offText), `${sha(a)} ${sha(b)} vs ${sha(offText)}`);
   }
   {
     const d = map.depth;
@@ -407,10 +410,12 @@ try {
   // units, and SwiftShader may expose more, so a venue link proves nothing
   // here. The upper bound: every custom sampler the patched earth fragment
   // REFERENCES (a declared-only one is compiled out), plus three's map and
-  // envMap (satellite imagery, the Enhanced environment) and one shadow map
+  // envMap and Three r185's dfgLUT (unless moved into terrain uniforms), and
+  // one shadow map
   // per cascade at the class's largest profile (desktop Ultra, phone).
-  // TERRAIN_SHADOW adds one (uTsMap); another stream adding a sampler to the
-  // earth chain on the merged tree turns this row (and the shipped (S3)) red.
+  // TERRAIN_SHADOW adds uTsMap and moves dfgLUT into exact packed uniforms;
+  // another stream adding a sampler to the earth chain on the merged tree
+  // turns this row (and the shipped (S3)) red.
   const { CINEMA_PROFILES } = await import('../lib/fly/cinema-profile.js');
   const desktopCascades = Math.max(...['ultra', 'high', 'medium'].map((p) => CINEMA_PROFILES[p].cascades));
   const census = (text, cascades) => {
@@ -418,13 +423,14 @@ try {
     // three's own optional maps sit in #ifdef blocks the live tile never
     // defines (specularColorMap, sheenColorMap, ...), so only custom names count.
     const custom = [...new Set(names)].filter((n) => /^u[A-Z]/.test(n) && count(text, n) > 1);
-    return { custom, total: custom.length + 2 + cascades };
+    const dfg = text.includes('uniform highp uvec4 uEarthDfg[64]') ? 0 : 1;
+    return { custom, total: custom.length + 2 + dfg + cascades };
   };
   {
     const off = census(cur.earth.text, desktopCascades), on = census(map.earth.text, desktopCascades), ph = census(hor.earth.text, CINEMA_PROFILES.phone.cascades);
     check('(1p) earth fragment samplers stay within 16 units with the flag on (desktop Ultra cascades, phone)',
-      on.total <= 16 && ph.total <= 16 && on.total === off.total + 1 && on.custom.includes('uTsMap'),
-      `desktop off ${off.total} -> on ${on.total} (${on.custom.length} custom + map + envMap + ${desktopCascades} cascades), phone on ${ph.total}`);
+      on.total <= 16 && ph.total <= 16 && on.total === off.total && on.custom.includes('uTsMap'),
+      `desktop off ${off.total} -> on ${on.total} (${on.custom.length} custom + map + envMap + ${desktopCascades} cascades; DFG in uniforms), phone on ${ph.total}`);
   }
 
   // =========================================================================
@@ -610,7 +616,7 @@ try {
     const phone = probe(ROOT, { __flyLightDeviceClass: 'phone' });
     check('(S1) shipped default: TERRAIN_SHADOW, TRAFFIC_SHADOWS, AIRFRAME_SHADOW, SHADOW_REACH, PHOTO_HIRES and HANGAR_EXPOSURE ship on (owner, merge to main 2026-10-30)',
       LIGHT.every((f) => SHIPPED[f] === true && desk.flags[f] === true && phone.flags[f] === true), LIGHT.map((f) => `${f}=${SHIPPED[f]}`).join(' '));
-    check('(S2) shipped default earth: desktop the depth map, touch the horizon map, each exactly the pinned TERRAIN_SHADOW arm (key, fragment, vertex), so the W0 key plus one token and the W0 text plus the patch',
+    check('(S2) shipped default earth: desktop the depth map, touch the horizon map, each exactly the pinned TERRAIN_SHADOW arm including the uniform DFG (key, fragment, vertex)',
       desk.mode === 'map' && phone.mode === 'horizon'
         && desk.earth.key === map.earth.key && desk.earth.frag === map.earth.frag && desk.earth.vert === map.earth.vert
         && phone.earth.key === hor.earth.key && phone.earth.frag === hor.earth.frag && phone.earth.vert === hor.earth.vert,

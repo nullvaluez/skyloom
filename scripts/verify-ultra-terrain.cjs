@@ -10,7 +10,7 @@ const out='.graphics-review/beta',port=Number(process.env.PORT||3094),base=`http
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
 (async()=>{
  let server,browser,fixture,page;
- const report={at:new Date().toISOString(),venue:'Production fixture; governor held to exercise each requested profile',stages:[],errors:[]};
+ const report={at:new Date().toISOString(),venue:'Production fixture; governor held to exercise each requested profile',stages:[],errors:[],shaderErrors:[]};
  fs.mkdirSync(out,{recursive:true});
  try{
   if(!process.env.BETA_EXTERNAL_SERVER)server=spawn(process.execPath,['node_modules/next/dist/bin/next','start','-p',String(port)],{env:{...process.env,FLY_BUILD_DIR:'.next-explorer',NEXT_TELEMETRY_DISABLED:'1'},stdio:'ignore',windowsHide:true});
@@ -20,13 +20,17 @@ const delay=ms=>new Promise(r=>setTimeout(r,ms));
   fixture=await attachFixture(context);
   await context.addInitScript(pin=>{
    window.__flyTileFixture=pin;window.__flyGovPin='hold';
+   // Software CI otherwise refuses TERRAIN_SHADOW and silently omits the
+   // sampler that breaks real desktop Ultra. Exercise the desktop policy.
+   window.__flyLightDeviceClass='dgpu';
    localStorage.setItem('fly-quality-tier','ultra');localStorage.setItem('fly-visuals','enhanced');localStorage.setItem('fly-sound-on','0');
   },fixturePin(fixture.url));
   page=await context.newPage();page.on('pageerror',e=>report.errors.push(e.message));
+  page.on('console',m=>{if(m.type()==='error'&&/WebGLProgram|shader error|too many.*texture|MAX_TEXTURE_IMAGE_UNITS/i.test(m.text()))report.shaderErrors.push(m.text());});
   await page.goto(base+'/?graphicsReview=1',{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>window.__fly?.engine&&window.__flyComposer?.renderer,{},{timeout:90000,polling:1000});
   // Test both a saved-Ultra boot and returning to it after lower presets.
-  for(const preset of ['ultra','high','low','ultra']){
+  for(const preset of ['ultra','high','medium','low','ultra']){
    await page.evaluate(value=>window.__flyStore.getState().setQualityPreset(value),preset);
    // Interval polling, not rAF: on software GL a heavy Ultra frame can starve
    // rAF for longer than the old 30 s while the profile is already resolved
@@ -42,20 +46,23 @@ const delay=ms=>new Promise(r=>setTimeout(r,ms));
     const r=window.__fly,renderer=window.__flyComposer.renderer,gl=renderer.getContext();
     const types=[gl.SAMPLER_2D,gl.SAMPLER_2D_ARRAY,gl.SAMPLER_3D,gl.SAMPLER_CUBE,gl.SAMPLER_2D_SHADOW,gl.SAMPLER_CUBE_SHADOW];
     const programs=new Set();r.engine.forEachTileMaterial(m=>{const p=renderer.properties.get(m).currentProgram;if(m.userData.__r25Ground&&p)programs.add(p);});
-    return {profile:r.cinemaProfile.name,cascades:r.cinemaShadows.cascades,physicalSky:!!r.physSky,limit:gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS),
-     terrain:[...programs].map(p=>{const linked=gl.getProgramParameter(p.program,gl.LINK_STATUS);const samplers=linked?Array.from({length:gl.getProgramParameter(p.program,gl.ACTIVE_UNIFORMS)},(_,i)=>gl.getActiveUniform(p.program,i)).filter(u=>types.includes(u.type)).map(u=>({name:u.name,size:u.size})):[];return {linked,log:gl.getProgramInfoLog(p.program),samplers,count:samplers.reduce((n,u)=>n+u.size,0)};})};
+    const debug=gl.getExtension('WEBGL_debug_renderer_info');
+    return {profile:r.cinemaProfile.name,cascades:r.cinemaShadows.cascades,physicalSky:!!r.physSky,limit:gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS),gpu:debug?gl.getParameter(debug.UNMASKED_RENDERER_WEBGL):gl.getParameter(gl.RENDERER),
+     terrain:[...programs].map(p=>{const linked=gl.getProgramParameter(p.program,gl.LINK_STATUS);const uniforms=linked?Array.from({length:gl.getProgramParameter(p.program,gl.ACTIVE_UNIFORMS)},(_,i)=>gl.getActiveUniform(p.program,i)):[];const samplers=uniforms.filter(u=>types.includes(u.type)).map(u=>({name:u.name,size:u.size}));return {linked,log:gl.getProgramInfoLog(p.program),samplers,count:samplers.reduce((n,u)=>n+u.size,0),dfgUniforms:uniforms.find(u=>u.name==='uEarthDfg[0]')?.size??0};})};
    });
    report.stages.push(state);console.log(JSON.stringify(state));
    assert(state.physicalSky,'Physical atmosphere must be active');
    assert(state.terrain.length>0,'At least one real terrain program must be inspected');
-   assert(state.terrain.every(p=>p.linked&&p.count<=state.limit),'Every active terrain program must link within the GPU texture limit');
+   assert(state.terrain.every(p=>p.linked&&p.count<=Math.min(16,state.limit)),'Every active terrain program must link within the portable 16-texture limit, even when the test GPU exposes more');
    if(preset==='ultra'){
     assert.equal(state.cascades,3,'Ultra must retain all three cascades');
-    assert(state.terrain.some(p=>['uPskyView','uR25Relief','uR25Ref','uLodFadeMap','uNGMap'].every(name=>p.samplers.some(u=>u.name===name))&&p.samplers.some(u=>u.name==='directionalShadowMap[0]'&&u.size===3)),
-     'A linked Ultra terrain program must retain physical sky, relief, colour reference, crossfade, night lighting and three shadow maps');
+    assert(state.terrain.some(p=>['uPskyView','uR25Relief','uR25Ref','uLodFadeMap','uNGMap','uTsMap'].every(name=>p.samplers.some(u=>u.name===name))&&p.samplers.some(u=>u.name==='directionalShadowMap[0]'&&u.size===3)&&p.dfgUniforms===64),
+     'A linked Ultra terrain program must retain physical sky, relief, colour reference, crossfade, night lighting, terrain shadows, exact DFG data and three shadow maps');
    }
   }
-  assert.equal(report.errors.length,0,'No uncaught page errors');report.ok=true;
+  assert.equal(report.errors.length,0,'No uncaught page errors');
+  assert.equal(report.shaderErrors.length,0,'No shader errors, including transient prewarm programs');
+  await page.screenshot({path:out+'/ultra-terrain.png',timeout:60000});report.ok=true;
  }catch(e){report.ok=false;report.failure=e.stack;console.error(e.message);process.exitCode=1;}
  finally{await browser?.close();await fixture?.close();server?.kill();fs.writeFileSync(out+'/ultra-terrain.json',JSON.stringify(report,null,2));}
 })();
