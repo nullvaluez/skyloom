@@ -217,6 +217,14 @@ ANGLE D3D11 / RTX 5080, using real provider tiles and the production build.
 Evidence: `.graphics-review/reflection-flicker/coastal-scene.json` and `.png`,
   with the investigated view in `baseline.png` and `fixed.png`.
 
+**Published and verified:** `1d8cfbca` is the published Netlify production
+  deploy `6ae6516b6d595a056c8e1d22`. The same GPU scene check against
+  `https://shadowads.netlify.app` passes all five quality legs: 180/180 captures
+  on every enabled leg, target released on Low, zero duplicate faces, and zero
+  page/shader errors. Report and screenshot:
+  `.graphics-review/reflection-flicker/live-1d8cfbca.json` and
+  `live-1d8cfbca.png`. Existing players can reload normally.
+
 ## 0. Context
 
 The owner asked for a deep gap analysis across features, modes, lighting,
