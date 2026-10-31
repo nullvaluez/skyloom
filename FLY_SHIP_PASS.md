@@ -171,6 +171,52 @@ in the shell cache. Evidence:
 `live-scenery-306e5686-returning.png`. Existing players should reload once to
 load the repaired page and run its startup guard; no manual storage wipe.
 
+### Coastal reflection and overlapping facade repair (2026-10-31)
+
+The owner's next live report was rapid building-reflection flicker and facades
+that looked like competing textures. Reproduced in the Rio title view on Edge /
+ANGLE D3D11 / RTX 5080, using real provider tiles and the production build.
+
+**Causes and repairs:**
+
+- The rough-water reflection sampled five isolated bilinear texels across a
+  stretch up to 82 texture pixels. Thin buildings repeatedly fell into the
+  unsampled gaps. The capture now resolves subpixel edges with up to 4x MSAA
+  and builds a trilinear mip chain; the five water samples integrate overlapping
+  areas of the roughness footprint, including the animated distortion's pixel
+  footprint. Reflection memory accounting includes the mip chain and MSAA.
+  Low and phone profiles still allocate no reflection target.
+- Sea-level eligibility used the visually bent height. Distant sea could cross
+  the -5 m cutoff as the camera moved. It now uses geographic height before the
+  visual bend; elevated lakes remain excluded from the sea-plane reflection.
+- Rio had **538 detailed-building and 16 skyline triangles** occupying exactly
+  the same positions and bend anchors, with different inferred paint. The
+  worker now retains one deterministic owner of each duplicate surface, before
+  draping, normals and spatial partitioning. It preserves separate heights,
+  different bends, footprint coverage and the body/detail index boundary.
+  No worker protocol/schema change is required; provider caches hold raw tiles.
+
+**Measured:** the new GPU regression first reproduces the old kernel's gaps
+  (362 of 512 samples) and large brightness steps (184/255 for a quarter-texel
+  movement). The production filter reads **0 gaps and 2/255 maximum step**,
+  retaining 96% of the integrated test highlight. In the actual Rio scene,
+  duplicate faces read **554 → 0**, with **16,577 building columns retained**.
+  `verify-coastal-scene.cjs` observes 180 moving frames per preset through
+  Ultra → Medium → Low → High → Ultra: every reflection-enabled leg captures
+  all 180 frames, Low releases its target, every duplicate census reads zero,
+  and there are no page or shader errors. This is correctness evidence, not an
+  iPhone or frame-time certification.
+
+**Checks:** production Turbopack build, targeted ESLint, all five source gates,
+  `verify-reflection-stability` 3/3 (including the GPU reproduction),
+  `verify-city-water` 5/5, `verify-lounge-occlusion` 6/6 and
+  `verify-ship-release` 83/83. The older `verify-cinema-overhaul` still stops at
+  its unrelated phone-default assertion (expects High; current settings return
+  Medium), before its coastal tests; no settings or profile defaults changed.
+
+Evidence: `.graphics-review/reflection-flicker/coastal-scene.json` and `.png`,
+  with the investigated view in `baseline.png` and `fixed.png`.
+
 ## 0. Context
 
 The owner asked for a deep gap analysis across features, modes, lighting,
