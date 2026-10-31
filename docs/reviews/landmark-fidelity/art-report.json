@@ -1,0 +1,728 @@
+{
+  "cases": [
+    {
+      "name": "Empire State Building",
+      "level": "high",
+      "before": true,
+      "night": false,
+      "triangles": 3552,
+      "vertices": 7064,
+      "bounds": [
+        0.2618510127067566,
+        1,
+        0.14898419380187988
+      ]
+    },
+    {
+      "name": "Eiffel Tower",
+      "level": "high",
+      "before": true,
+      "night": false,
+      "triangles": 56012,
+      "vertices": 62673,
+      "bounds": [
+        0.3787878751754761,
+        1,
+        0.3787878751754761
+      ]
+    },
+    {
+      "name": "Taj Mahal",
+      "level": "high",
+      "before": true,
+      "night": false,
+      "triangles": 5890,
+      "vertices": 4089,
+      "bounds": [
+        1.354634165763855,
+        1,
+        1.5911058187484741
+      ]
+    },
+    {
+      "name": "Sydney Opera House",
+      "level": "high",
+      "before": true,
+      "night": false,
+      "triangles": 6217,
+      "vertices": 6626,
+      "bounds": [
+        2.7954516410827637,
+        1,
+        1.4584290981292725
+      ]
+    },
+    {
+      "name": "Big Ben",
+      "level": "high",
+      "before": true,
+      "night": false,
+      "triangles": 8754,
+      "vertices": 12314,
+      "bounds": [
+        0.22123079001903534,
+        1,
+        0.22123099863529205
+      ]
+    },
+    {
+      "name": "Space Needle",
+      "level": "high",
+      "before": true,
+      "night": false,
+      "triangles": 3160,
+      "vertices": 6268,
+      "bounds": [
+        0.28252020478248596,
+        1,
+        0.28252020478248596
+      ]
+    },
+    {
+      "name": "Gateway Arch",
+      "level": "high",
+      "before": true,
+      "night": false,
+      "triangles": 4656,
+      "vertices": 10933,
+      "bounds": [
+        0.06134147197008133,
+        1,
+        1.0572210550308228
+      ]
+    },
+    {
+      "name": "Colosseum",
+      "level": "high",
+      "before": true,
+      "night": false,
+      "triangles": 6835,
+      "vertices": 13893,
+      "bounds": [
+        5.01269006729126,
+        1,
+        5.477441310882568
+      ]
+    },
+    {
+      "name": "Willis Tower",
+      "level": "high",
+      "before": true,
+      "night": false,
+      "triangles": 3384,
+      "vertices": 6712,
+      "bounds": [
+        0.13159392774105072,
+        1,
+        0.13159392774105072
+      ]
+    },
+    {
+      "name": "Burj Khalifa",
+      "level": "high",
+      "before": true,
+      "night": false,
+      "triangles": 27732,
+      "vertices": 43284,
+      "bounds": [
+        0.11699282377958298,
+        1,
+        0.1304037868976593
+      ]
+    },
+    {
+      "name": "CN Tower",
+      "level": "high",
+      "before": true,
+      "night": false,
+      "triangles": 2424,
+      "vertices": 3700,
+      "bounds": [
+        0.08297012746334076,
+        1,
+        0.08285491168498993
+      ]
+    },
+    {
+      "name": "Empire State Building",
+      "level": "far",
+      "before": false,
+      "night": false,
+      "triangles": 376,
+      "vertices": 552,
+      "bounds": [
+        0.1410835236310959,
+        1,
+        0.272009015083313
+      ]
+    },
+    {
+      "name": "Eiffel Tower",
+      "level": "far",
+      "before": false,
+      "night": false,
+      "triangles": 2904,
+      "vertices": 5552,
+      "bounds": [
+        0.38269999623298645,
+        1,
+        0.38269999623298645
+      ]
+    },
+    {
+      "name": "Taj Mahal",
+      "level": "far",
+      "before": false,
+      "night": false,
+      "triangles": 6112,
+      "vertices": 5834,
+      "bounds": [
+        1.383561611175537,
+        1,
+        1.383561611175537
+      ]
+    },
+    {
+      "name": "Sydney Opera House",
+      "level": "far",
+      "before": false,
+      "night": false,
+      "triangles": 4385,
+      "vertices": 5088,
+      "bounds": [
+        2.7882094383239746,
+        1,
+        1.458429217338562
+      ]
+    },
+    {
+      "name": "Big Ben",
+      "level": "far",
+      "before": false,
+      "night": false,
+      "triangles": 4596,
+      "vertices": 2861,
+      "bounds": [
+        0.1614583283662796,
+        1,
+        0.1614583283662796
+      ]
+    },
+    {
+      "name": "Space Needle",
+      "level": "far",
+      "before": false,
+      "night": false,
+      "triangles": 1312,
+      "vertices": 1556,
+      "bounds": [
+        0.2347826063632965,
+        1,
+        0.2347826063632965
+      ]
+    },
+    {
+      "name": "Gateway Arch",
+      "level": "far",
+      "before": false,
+      "night": false,
+      "triangles": 240,
+      "vertices": 246,
+      "bounds": [
+        0.08447832614183426,
+        1,
+        0.9844197630882263
+      ]
+    },
+    {
+      "name": "Colosseum",
+      "level": "far",
+      "before": false,
+      "night": false,
+      "triangles": 8848,
+      "vertices": 16322,
+      "bounds": [
+        3.968592643737793,
+        1,
+        3.2916667461395264
+      ]
+    },
+    {
+      "name": "Willis Tower",
+      "level": "far",
+      "before": false,
+      "night": false,
+      "triangles": 472,
+      "vertices": 651,
+      "bounds": [
+        0.13130928575992584,
+        1,
+        0.13130928575992584
+      ]
+    },
+    {
+      "name": "Burj Khalifa",
+      "level": "far",
+      "before": false,
+      "night": false,
+      "triangles": 2448,
+      "vertices": 2844,
+      "bounds": [
+        0.12015818059444427,
+        1,
+        0.10966183990240097
+      ]
+    },
+    {
+      "name": "CN Tower",
+      "level": "far",
+      "before": false,
+      "night": false,
+      "triangles": 960,
+      "vertices": 976,
+      "bounds": [
+        0.0775427371263504,
+        1,
+        0.07861445099115372
+      ]
+    },
+    {
+      "name": "Empire State Building",
+      "level": "medium",
+      "before": false,
+      "night": false,
+      "triangles": 11302,
+      "vertices": 18788,
+      "bounds": [
+        0.14616252481937408,
+        1,
+        0.272009015083313
+      ]
+    },
+    {
+      "name": "Eiffel Tower",
+      "level": "medium",
+      "before": false,
+      "night": false,
+      "triangles": 9988,
+      "vertices": 19118,
+      "bounds": [
+        0.38269999623298645,
+        1,
+        0.38269999623298645
+      ]
+    },
+    {
+      "name": "Taj Mahal",
+      "level": "medium",
+      "before": false,
+      "night": false,
+      "triangles": 17884,
+      "vertices": 21362,
+      "bounds": [
+        1.383561611175537,
+        1,
+        1.383561611175537
+      ]
+    },
+    {
+      "name": "Sydney Opera House",
+      "level": "medium",
+      "before": false,
+      "night": false,
+      "triangles": 13729,
+      "vertices": 10527,
+      "bounds": [
+        2.7954516410827637,
+        1,
+        1.458429217338562
+      ]
+    },
+    {
+      "name": "Big Ben",
+      "level": "medium",
+      "before": false,
+      "night": false,
+      "triangles": 17220,
+      "vertices": 25517,
+      "bounds": [
+        0.1614583283662796,
+        1,
+        0.1614583283662796
+      ]
+    },
+    {
+      "name": "Space Needle",
+      "level": "medium",
+      "before": false,
+      "night": false,
+      "triangles": 5824,
+      "vertices": 7820,
+      "bounds": [
+        0.2347826063632965,
+        1,
+        0.2347826063632965
+      ]
+    },
+    {
+      "name": "Gateway Arch",
+      "level": "medium",
+      "before": false,
+      "night": false,
+      "triangles": 1788,
+      "vertices": 3006,
+      "bounds": [
+        0.08447832614183426,
+        1,
+        0.9844197630882263
+      ]
+    },
+    {
+      "name": "Colosseum",
+      "level": "medium",
+      "before": false,
+      "night": false,
+      "triangles": 19152,
+      "vertices": 30434,
+      "bounds": [
+        3.968592643737793,
+        1,
+        3.2916667461395264
+      ]
+    },
+    {
+      "name": "Willis Tower",
+      "level": "medium",
+      "before": false,
+      "night": false,
+      "triangles": 16452,
+      "vertices": 28307,
+      "bounds": [
+        0.13130930066108704,
+        1,
+        0.13130928575992584
+      ]
+    },
+    {
+      "name": "Burj Khalifa",
+      "level": "medium",
+      "before": false,
+      "night": false,
+      "triangles": 17496,
+      "vertices": 24738,
+      "bounds": [
+        0.12171278148889542,
+        1,
+        0.10966183990240097
+      ]
+    },
+    {
+      "name": "CN Tower",
+      "level": "medium",
+      "before": false,
+      "night": false,
+      "triangles": 7608,
+      "vertices": 5616,
+      "bounds": [
+        0.07837571948766708,
+        1,
+        0.07968416810035706
+      ]
+    },
+    {
+      "name": "Empire State Building",
+      "level": "high",
+      "before": false,
+      "night": false,
+      "triangles": 23634,
+      "vertices": 43452,
+      "bounds": [
+        0.14616252481937408,
+        1,
+        0.272009015083313
+      ]
+    },
+    {
+      "name": "Eiffel Tower",
+      "level": "high",
+      "before": false,
+      "night": false,
+      "triangles": 57287,
+      "vertices": 64456,
+      "bounds": [
+        0.3787878751754761,
+        1,
+        0.3787878751754761
+      ]
+    },
+    {
+      "name": "Taj Mahal",
+      "level": "high",
+      "before": false,
+      "night": false,
+      "triangles": 26300,
+      "vertices": 27122,
+      "bounds": [
+        1.383561611175537,
+        1,
+        1.383561611175537
+      ]
+    },
+    {
+      "name": "Sydney Opera House",
+      "level": "high",
+      "before": false,
+      "night": false,
+      "triangles": 54915,
+      "vertices": 33918,
+      "bounds": [
+        2.801379680633545,
+        1,
+        1.458429217338562
+      ]
+    },
+    {
+      "name": "Big Ben",
+      "level": "high",
+      "before": false,
+      "night": false,
+      "triangles": 28356,
+      "vertices": 38445,
+      "bounds": [
+        0.1614583283662796,
+        1,
+        0.1614583283662796
+      ]
+    },
+    {
+      "name": "Space Needle",
+      "level": "high",
+      "before": false,
+      "night": false,
+      "triangles": 7360,
+      "vertices": 8732,
+      "bounds": [
+        0.2347826063632965,
+        1,
+        0.2347826063632965
+      ]
+    },
+    {
+      "name": "Gateway Arch",
+      "level": "high",
+      "before": false,
+      "night": false,
+      "triangles": 4668,
+      "vertices": 8190,
+      "bounds": [
+        0.08447528630495071,
+        1,
+        0.9843843579292297
+      ]
+    },
+    {
+      "name": "Colosseum",
+      "level": "high",
+      "before": false,
+      "night": false,
+      "triangles": 56944,
+      "vertices": 89410,
+      "bounds": [
+        3.9583332538604736,
+        1,
+        3.2916667461395264
+      ]
+    },
+    {
+      "name": "Willis Tower",
+      "level": "high",
+      "before": false,
+      "night": false,
+      "triangles": 37620,
+      "vertices": 69073,
+      "bounds": [
+        0.13130930066108704,
+        1,
+        0.13130928575992584
+      ]
+    },
+    {
+      "name": "Burj Khalifa",
+      "level": "high",
+      "before": false,
+      "night": false,
+      "triangles": 47664,
+      "vertices": 60744,
+      "bounds": [
+        0.12171278148889542,
+        1,
+        0.10966183990240097
+      ]
+    },
+    {
+      "name": "CN Tower",
+      "level": "high",
+      "before": false,
+      "night": false,
+      "triangles": 9848,
+      "vertices": 6992,
+      "bounds": [
+        0.07837571948766708,
+        1,
+        0.07968416810035706
+      ]
+    },
+    {
+      "name": "Empire State Building",
+      "level": "high",
+      "before": false,
+      "night": true,
+      "triangles": 23634,
+      "vertices": 43452,
+      "bounds": [
+        0.14616252481937408,
+        1,
+        0.272009015083313
+      ]
+    },
+    {
+      "name": "Eiffel Tower",
+      "level": "high",
+      "before": false,
+      "night": true,
+      "triangles": 57287,
+      "vertices": 64456,
+      "bounds": [
+        0.3787878751754761,
+        1,
+        0.3787878751754761
+      ]
+    },
+    {
+      "name": "Taj Mahal",
+      "level": "high",
+      "before": false,
+      "night": true,
+      "triangles": 26300,
+      "vertices": 27122,
+      "bounds": [
+        1.383561611175537,
+        1,
+        1.383561611175537
+      ]
+    },
+    {
+      "name": "Sydney Opera House",
+      "level": "high",
+      "before": false,
+      "night": true,
+      "triangles": 54915,
+      "vertices": 33918,
+      "bounds": [
+        2.801379680633545,
+        1,
+        1.458429217338562
+      ]
+    },
+    {
+      "name": "Big Ben",
+      "level": "high",
+      "before": false,
+      "night": true,
+      "triangles": 28356,
+      "vertices": 38445,
+      "bounds": [
+        0.1614583283662796,
+        1,
+        0.1614583283662796
+      ]
+    },
+    {
+      "name": "Space Needle",
+      "level": "high",
+      "before": false,
+      "night": true,
+      "triangles": 7360,
+      "vertices": 8732,
+      "bounds": [
+        0.2347826063632965,
+        1,
+        0.2347826063632965
+      ]
+    },
+    {
+      "name": "Gateway Arch",
+      "level": "high",
+      "before": false,
+      "night": true,
+      "triangles": 4668,
+      "vertices": 8190,
+      "bounds": [
+        0.08447528630495071,
+        1,
+        0.9843843579292297
+      ]
+    },
+    {
+      "name": "Colosseum",
+      "level": "high",
+      "before": false,
+      "night": true,
+      "triangles": 56944,
+      "vertices": 89410,
+      "bounds": [
+        3.9583332538604736,
+        1,
+        3.2916667461395264
+      ]
+    },
+    {
+      "name": "Willis Tower",
+      "level": "high",
+      "before": false,
+      "night": true,
+      "triangles": 37620,
+      "vertices": 69073,
+      "bounds": [
+        0.13130930066108704,
+        1,
+        0.13130928575992584
+      ]
+    },
+    {
+      "name": "Burj Khalifa",
+      "level": "high",
+      "before": false,
+      "night": true,
+      "triangles": 47664,
+      "vertices": 60744,
+      "bounds": [
+        0.12171278148889542,
+        1,
+        0.10966183990240097
+      ]
+    },
+    {
+      "name": "CN Tower",
+      "level": "high",
+      "before": false,
+      "night": true,
+      "triangles": 9848,
+      "vertices": 6992,
+      "bounds": [
+        0.07837571948766708,
+        1,
+        0.07968416810035706
+      ]
+    }
+  ],
+  "errors": [],
+  "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "programs": [
+    {
+      "name": "",
+      "runnable": true
+    }
+  ],
+  "textures": 2
+}

@@ -1,0 +1,497 @@
+[
+  {
+    "poi": "Empire State Building",
+    "level": "far",
+    "file": "/models/landmark-empire-state-far-v2.glb",
+    "triangles": 376,
+    "bytes": 23952,
+    "sha256": "4c67d3f2488699cc022d0cea8bdb1673a5cdff03bdac8a1b5c9e253adf101a67",
+    "targetHeightM": 443,
+    "source": "Skyloom / MIT",
+    "sourceUrl": null,
+    "footprintM": [
+      120.5,
+      62.5
+    ]
+  },
+  {
+    "poi": "Empire State Building",
+    "level": "medium",
+    "file": "/models/landmark-empire-state-medium-v2.glb",
+    "triangles": 11302,
+    "bytes": 746032,
+    "sha256": "3ea587d20eaf2b8f1285b17461a8f1a31e1875c8a2d0defd5a3c4226eeedff43",
+    "targetHeightM": 443,
+    "source": "Skyloom / MIT",
+    "sourceUrl": null,
+    "footprintM": [
+      120.4999999983787,
+      64.7499999991288
+    ]
+  },
+  {
+    "poi": "Empire State Building",
+    "level": "high",
+    "file": "/models/landmark-empire-state-high-v2.glb",
+    "triangles": 23634,
+    "bytes": 1707936,
+    "sha256": "bf2687f1e0b9478c64e5f348e0a7feb690e862c2324afa7bb7e3bf2bb28c513d",
+    "targetHeightM": 443,
+    "source": "Skyloom / MIT",
+    "sourceUrl": null,
+    "footprintM": [
+      120.4999999983787,
+      64.7499999991288
+    ]
+  },
+  {
+    "poi": "Willis Tower",
+    "level": "far",
+    "file": "/models/landmark-willis-far-v2.glb",
+    "triangles": 472,
+    "bytes": 28076,
+    "sha256": "a7588cb46b1d27d2f8ddc2071870c294368a225f258fdd9483a60e12e7dc54d4",
+    "targetHeightM": 527,
+    "source": "Skyloom / MIT",
+    "sourceUrl": null,
+    "footprintM": [
+      69.19999694824219,
+      69.19999694824219
+    ]
+  },
+  {
+    "poi": "Willis Tower",
+    "level": "medium",
+    "file": "/models/landmark-willis-medium-v2.glb",
+    "triangles": 16452,
+    "bytes": 1119608,
+    "sha256": "266e5025a17b77a8520ecedc64ee76159944181e37c7b1bbe42ef1e20d369257",
+    "targetHeightM": 527,
+    "source": "Skyloom / MIT",
+    "sourceUrl": null,
+    "footprintM": [
+      69.20000457763672,
+      69.20000076293945
+    ]
+  },
+  {
+    "poi": "Willis Tower",
+    "level": "high",
+    "file": "/models/landmark-willis-high-v2.glb",
+    "triangles": 37620,
+    "bytes": 2939916,
+    "sha256": "6290828821dd4a844cd9b3353e0d66e75f55afbbdbc908bc32f7d2d45d0f6e8c",
+    "targetHeightM": 527,
+    "source": "Skyloom / MIT",
+    "sourceUrl": null,
+    "footprintM": [
+      69.20000457763672,
+      69.20000076293945
+    ]
+  },
+  {
+    "poi": "CN Tower",
+    "level": "far",
+    "file": "/models/landmark-cn-tower-far-v2.glb",
+    "triangles": 960,
+    "bytes": 42696,
+    "sha256": "479b565c8a7fdc8b12d8c722c00c4a69bcf4e47215800e55d227dfcf851707c2",
+    "targetHeightM": 553,
+    "source": "Skyloom / MIT",
+    "sourceUrl": null,
+    "footprintM": [
+      42.88113194299695,
+      43.4737895435987
+    ]
+  },
+  {
+    "poi": "CN Tower",
+    "level": "medium",
+    "file": "/models/landmark-cn-tower-medium-v2.glb",
+    "triangles": 7608,
+    "bytes": 249644,
+    "sha256": "a4d02abe9693be53b69f9903033bc0dfcdda9638c10be9e559a8158fdea88f50",
+    "targetHeightM": 553,
+    "source": "Skyloom / MIT",
+    "sourceUrl": null,
+    "footprintM": [
+      43.341773839236566,
+      44.065346504092325
+    ]
+  },
+  {
+    "poi": "CN Tower",
+    "level": "high",
+    "file": "/models/landmark-cn-tower-high-v2.glb",
+    "triangles": 9848,
+    "bytes": 312620,
+    "sha256": "8ea083084d823adb705f8b5aceab04e9ea50a188321a963c3dedbc47e05de122",
+    "targetHeightM": 553,
+    "source": "Skyloom / MIT",
+    "sourceUrl": null,
+    "footprintM": [
+      43.341773839236566,
+      44.065346504092325
+    ]
+  },
+  {
+    "poi": "Space Needle",
+    "level": "far",
+    "file": "/models/landmark-space-needle-far-v2.glb",
+    "triangles": 1312,
+    "bytes": 65704,
+    "sha256": "99a09b8df077970caf329d5d2deccbcda8e92d2b3f1f96874e893f9fcabc6fe6",
+    "targetHeightM": 184,
+    "source": "Skyloom / MIT",
+    "sourceUrl": null,
+    "footprintM": [
+      43.20000076293945,
+      43.20000076293945
+    ]
+  },
+  {
+    "poi": "Space Needle",
+    "level": "medium",
+    "file": "/models/landmark-space-needle-medium-v2.glb",
+    "triangles": 5824,
+    "bytes": 318292,
+    "sha256": "52c2f22a571dc6cef2d63c9c87fc3c8a309eb81dfe0267fa809a1b7de7ba6575",
+    "targetHeightM": 184,
+    "source": "Skyloom / MIT",
+    "sourceUrl": null,
+    "footprintM": [
+      43.20000076293945,
+      43.20000076293945
+    ]
+  },
+  {
+    "poi": "Space Needle",
+    "level": "high",
+    "file": "/models/landmark-space-needle-high-v2.glb",
+    "triangles": 7360,
+    "bytes": 360340,
+    "sha256": "309a8859d7a165c86f4dbc095ed659091f6873d655631985b1d274b9f893342c",
+    "targetHeightM": 184,
+    "source": "Skyloom / MIT",
+    "sourceUrl": null,
+    "footprintM": [
+      43.20000076293945,
+      43.20000076293945
+    ]
+  },
+  {
+    "poi": "Burj Khalifa",
+    "level": "far",
+    "file": "/models/landmark-burj-khalifa-far-v2.glb",
+    "triangles": 2448,
+    "bytes": 118896,
+    "sha256": "b8a5719724cdacceec955079d6faa278ecbcee7cc1f29de333d8a3ed12cd7d1d",
+    "targetHeightM": 828,
+    "source": "Skyloom / MIT",
+    "sourceUrl": null,
+    "footprintM": [
+      99.49097442626953,
+      90.80000305175781
+    ]
+  },
+  {
+    "poi": "Burj Khalifa",
+    "level": "medium",
+    "file": "/models/landmark-burj-khalifa-medium-v2.glb",
+    "triangles": 17496,
+    "bytes": 997384,
+    "sha256": "602f2c5adc8f9fe95c0b8703dc6a14080174d8ddb920676e08048d3ee0894096",
+    "targetHeightM": 828,
+    "source": "Skyloom / MIT",
+    "sourceUrl": null,
+    "footprintM": [
+      100.77818298339844,
+      90.80000305175781
+    ]
+  },
+  {
+    "poi": "Burj Khalifa",
+    "level": "high",
+    "file": "/models/landmark-burj-khalifa-high-v2.glb",
+    "triangles": 47664,
+    "bytes": 2474616,
+    "sha256": "007b455044aa0f17cba1a081df2529905cb0137783d9ecf3797108fec7a5510e",
+    "targetHeightM": 828,
+    "source": "Skyloom / MIT",
+    "sourceUrl": null,
+    "footprintM": [
+      100.77818298339844,
+      90.80000305175781
+    ]
+  },
+  {
+    "poi": "Taj Mahal",
+    "level": "far",
+    "file": "/models/landmark-taj-mahal-far-v2.glb",
+    "triangles": 6112,
+    "bytes": 248512,
+    "sha256": "40e5c101d946b3606a27a9318cf5f26983e548882900b9b1ba594a6368638523",
+    "targetHeightM": 73,
+    "source": "Skyloom / MIT",
+    "sourceUrl": null,
+    "footprintM": [
+      101,
+      101
+    ]
+  },
+  {
+    "poi": "Taj Mahal",
+    "level": "medium",
+    "file": "/models/landmark-taj-mahal-medium-v2.glb",
+    "triangles": 17884,
+    "bytes": 878164,
+    "sha256": "38ad908c82ec3f495c2143c52068e4e45d3404de27c3d1796bf551d74abb164d",
+    "targetHeightM": 73,
+    "source": "Skyloom / MIT",
+    "sourceUrl": null,
+    "footprintM": [
+      101,
+      101
+    ]
+  },
+  {
+    "poi": "Taj Mahal",
+    "level": "high",
+    "file": "/models/landmark-taj-mahal-high-v2.glb",
+    "triangles": 26300,
+    "bytes": 1136020,
+    "sha256": "c509cc27ee050d6f6ffb9bf1a2702cc107ff53bc2ba4324e1af27397971f2449",
+    "targetHeightM": 73,
+    "source": "Skyloom / MIT",
+    "sourceUrl": null,
+    "footprintM": [
+      101,
+      101
+    ]
+  },
+  {
+    "poi": "Big Ben",
+    "level": "far",
+    "file": "/models/landmark-big-ben-far-v2.glb",
+    "triangles": 4596,
+    "bytes": 132380,
+    "sha256": "26f718e01863463c95f27fca4b0a6864cef0b057f1cc621540dcbb01ff17752e",
+    "targetHeightM": 96,
+    "source": "Skyloom / MIT",
+    "sourceUrl": null,
+    "footprintM": [
+      15.5,
+      15.5
+    ]
+  },
+  {
+    "poi": "Big Ben",
+    "level": "medium",
+    "file": "/models/landmark-big-ben-medium-v2.glb",
+    "triangles": 17220,
+    "bytes": 1023760,
+    "sha256": "313e89c926a2f80a053338cb266f09a6aafeb1625fc440895aaf67a22c877312",
+    "targetHeightM": 96,
+    "source": "Skyloom / MIT",
+    "sourceUrl": null,
+    "footprintM": [
+      15.5,
+      15.5
+    ]
+  },
+  {
+    "poi": "Big Ben",
+    "level": "high",
+    "file": "/models/landmark-big-ben-high-v2.glb",
+    "triangles": 28356,
+    "bytes": 1555988,
+    "sha256": "a37d03684287dc57f6f7d43c9f830bfd09e0b61c77544b28cc0fdf50c6d2a0e6",
+    "targetHeightM": 96,
+    "source": "Skyloom / MIT",
+    "sourceUrl": null,
+    "footprintM": [
+      15.5,
+      15.5
+    ]
+  },
+  {
+    "poi": "Gateway Arch",
+    "level": "far",
+    "file": "/models/landmark-gateway-arch-far-v2.glb",
+    "triangles": 240,
+    "bytes": 12196,
+    "sha256": "2844bc72a67e6229ec54e9c7680c9b76782ff62095ebee4e1a8c4ecd9793bc03",
+    "targetHeightM": 192,
+    "source": "Skyloom / MIT",
+    "sourceUrl": null,
+    "footprintM": [
+      189.0085906982422,
+      16.219839096069336
+    ]
+  },
+  {
+    "poi": "Gateway Arch",
+    "level": "medium",
+    "file": "/models/landmark-gateway-arch-medium-v2.glb",
+    "triangles": 1788,
+    "bytes": 120768,
+    "sha256": "ccbec27fbaa1a78cc5bea509908071d846a5e784fd40534df2e500cc896f734f",
+    "targetHeightM": 192,
+    "source": "Skyloom / MIT",
+    "sourceUrl": null,
+    "footprintM": [
+      189.0085906982422,
+      16.219839096069336
+    ]
+  },
+  {
+    "poi": "Gateway Arch",
+    "level": "high",
+    "file": "/models/landmark-gateway-arch-high-v2.glb",
+    "triangles": 4668,
+    "bytes": 324676,
+    "sha256": "2e23ff8337dab663bde3d4474b8506d3af8ed203f8f6ce366feaf90fa54620c0",
+    "targetHeightM": 192,
+    "source": "Skyloom / MIT",
+    "sourceUrl": null,
+    "footprintM": [
+      189.00180053710938,
+      16.219255447387695
+    ]
+  },
+  {
+    "poi": "Sydney Opera House",
+    "level": "far",
+    "file": "/models/landmark-opera-house-far-v2.glb",
+    "triangles": 4385,
+    "bytes": 211440,
+    "sha256": "1482cc0eb9b2fe0f393133f95bd355b595a7331fbba9377dd9bdf032542cee5d",
+    "targetHeightM": 65,
+    "source": "Nick Reinhardt / CC BY 4.0; material treatment Skyloom / MIT",
+    "sourceUrl": "https://sketchfab.com/3d-models/sydney-opera-house-317b2d540f0a4f7e8d87dd3b0372712d",
+    "footprintM": [
+      181.23361076399914,
+      94.79789563134504
+    ]
+  },
+  {
+    "poi": "Sydney Opera House",
+    "level": "medium",
+    "file": "/models/landmark-opera-house-medium-v2.glb",
+    "triangles": 13729,
+    "bytes": 463320,
+    "sha256": "4d2d41abcdaccd3ac247064b5b266d37644325f0775a8db948cb01f9b7a327aa",
+    "targetHeightM": 65,
+    "source": "Nick Reinhardt / CC BY 4.0; material treatment Skyloom / MIT",
+    "sourceUrl": "https://sketchfab.com/3d-models/sydney-opera-house-317b2d540f0a4f7e8d87dd3b0372712d",
+    "footprintM": [
+      181.7043521998374,
+      94.79789563134504
+    ]
+  },
+  {
+    "poi": "Sydney Opera House",
+    "level": "high",
+    "file": "/models/landmark-opera-house-high-v2.glb",
+    "triangles": 54915,
+    "bytes": 1552520,
+    "sha256": "356663d55414506c7ed5697d20973f4fe6a07776f6c367d8d52662ee970ac95e",
+    "targetHeightM": 65,
+    "source": "Nick Reinhardt / CC BY 4.0; material treatment Skyloom / MIT",
+    "sourceUrl": "https://sketchfab.com/3d-models/sydney-opera-house-317b2d540f0a4f7e8d87dd3b0372712d",
+    "footprintM": [
+      182.0896843637487,
+      94.79789563134504
+    ]
+  },
+  {
+    "poi": "Colosseum",
+    "level": "far",
+    "file": "/models/landmark-colosseum-far-v2.glb",
+    "triangles": 8848,
+    "bytes": 642500,
+    "sha256": "8b0a0cd1caba0e36c5b0d78bd25abe2a5d4a4bf1c12d656f7359f5356ad9e6e8",
+    "targetHeightM": 48,
+    "source": "Skyloom / MIT",
+    "sourceUrl": null,
+    "footprintM": [
+      190.49244689941406,
+      158
+    ]
+  },
+  {
+    "poi": "Colosseum",
+    "level": "medium",
+    "file": "/models/landmark-colosseum-medium-v2.glb",
+    "triangles": 19152,
+    "bytes": 1212368,
+    "sha256": "29c48d0bc7a651ed8f377435ca75c1c6832ab7d295dcd509a2811b507f0e3313",
+    "targetHeightM": 48,
+    "source": "Skyloom / MIT",
+    "sourceUrl": null,
+    "footprintM": [
+      190.49244689941406,
+      158
+    ]
+  },
+  {
+    "poi": "Colosseum",
+    "level": "high",
+    "file": "/models/landmark-colosseum-high-v2.glb",
+    "triangles": 56944,
+    "bytes": 3903924,
+    "sha256": "6837ad5ec37b39abad6e0819c9ddb64858fb7ad9d4aeebe4050c220577bc60d3",
+    "targetHeightM": 48,
+    "source": "Skyloom / MIT",
+    "sourceUrl": null,
+    "footprintM": [
+      190,
+      158
+    ]
+  },
+  {
+    "poi": "Eiffel Tower",
+    "level": "far",
+    "file": "/models/landmark-eiffel-far-v2.glb",
+    "triangles": 2904,
+    "bytes": 219140,
+    "sha256": "fb218b011ae9f7b735d279a04d8b23d4800ed1292a3b0a07b54f798358863b6e",
+    "targetHeightM": 330,
+    "source": "Skyloom / MIT",
+    "sourceUrl": null,
+    "footprintM": [
+      126.29099296982591,
+      126.29099296982591
+    ]
+  },
+  {
+    "poi": "Eiffel Tower",
+    "level": "medium",
+    "file": "/models/landmark-eiffel-medium-v2.glb",
+    "triangles": 9988,
+    "bytes": 750028,
+    "sha256": "dbf01c53b1941b2ee35f2605044733c8b73953500a7c812611da88fff5e8bc11",
+    "targetHeightM": 330,
+    "source": "Skyloom / MIT",
+    "sourceUrl": null,
+    "footprintM": [
+      126.29099296982591,
+      126.29099296982591
+    ]
+  },
+  {
+    "poi": "Eiffel Tower",
+    "level": "high",
+    "file": "/models/landmark-eiffel-high-v2.glb",
+    "triangles": 57287,
+    "bytes": 2666052,
+    "sha256": "83c4a95b311d90df92d8f491f1d4b68ae7832676d430cc0f29216bd981ac7094",
+    "targetHeightM": 330,
+    "source": "Scott Marshall / CC BY 3.0; additions Skyloom / MIT",
+    "sourceUrl": "https://poly.pizza/m/aIpJchqtRTg",
+    "footprintM": [
+      125,
+      125
+    ]
+  }
+]

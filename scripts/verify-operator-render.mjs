@@ -69,8 +69,8 @@ function compile(material, physical = true) {
   return shader;
 }
 
-check('flag ships off and leaves neutral shaders, uniforms and geometry unchanged', () => {
-  assert.equal(FLAG.enabled, false, 'owner certification must precede a default flip');
+check('flag ships on; explicit off leaves neutral shaders, uniforms and geometry unchanged', () => {
+  assert.equal(FLAG.enabled, true, 'owner requested the enabled shipping default');
   enable(false);
   const off = createFleetShared({ texture: null });
   assert.equal(off.uFleetOperatorMarks, undefined);

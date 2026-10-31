@@ -15,7 +15,7 @@ async function main() {
     });
     compiler.run((error, stats) => { compiler.close(() => {}); error || stats.hasErrors() ? reject(error || Error(stats.toString({ all: false, errors: true }))) : resolve(); });
   });
-  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Skyloom operator livery review</title></head><body style="margin:0;background:#c4d3de"><script>window.__flyOperatorLiveriesOverride={enabled:new URLSearchParams(location.search).get('off')!=='1'};</script><script src="/bundle.js"></script></body></html>`;
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Skyloom operator livery review</title></head><body style="margin:0;background:#c4d3de"><script>window.__flyOperatorLiveriesOverride={enabled:new URLSearchParams(location.search).get('off')!=='1'};window.__flyCommercialPaintOverride={enabled:${process.env.FLY_COMMERCIAL_PAINT === '1'}};</script><script src="/bundle.js"></script></body></html>`;
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://localhost');
     if (url.pathname === '/favicon.ico') { res.writeHead(204); res.end(); return; }

@@ -1,0 +1,35 @@
+[
+  {
+    "poi": "Statue of Liberty",
+    "level": "far",
+    "file": "/models/monument-liberty-far-v2.glb",
+    "triangles": 4504,
+    "bytes": 167048,
+    "sha256": "92f031fc7e963de8969711fcce5dbe349bcf9a77cafa839af02f0967c9080e6a",
+    "source": "jerryfisher / CC BY 4.0; pedestal Skyloom / MIT",
+    "sourceHash": "e9c789977604980d410e30b95e02208ca6e46d053f44bc0f5c5030877eaa5fe8",
+    "simplificationError": 0.002527841366827488
+  },
+  {
+    "poi": "Statue of Liberty",
+    "level": "medium",
+    "file": "/models/monument-liberty-medium-v2.glb",
+    "triangles": 16988,
+    "bytes": 735120,
+    "sha256": "c3d422683872df671cdb22f7e0a953a10af5ddcdecd667789be336af906f4035",
+    "source": "jerryfisher / CC BY 4.0; pedestal Skyloom / MIT",
+    "sourceHash": "e9c789977604980d410e30b95e02208ca6e46d053f44bc0f5c5030877eaa5fe8",
+    "simplificationError": 0.0010356317507103086
+  },
+  {
+    "poi": "Statue of Liberty",
+    "level": "high",
+    "file": "/models/monument-liberty-high-v2.glb",
+    "triangles": 51992,
+    "bytes": 1785244,
+    "sha256": "5365aff435b51a37029dce3dab9d90a7815c88567bb289c2f6b07bf806397009",
+    "source": "jerryfisher / CC BY 4.0; pedestal Skyloom / MIT",
+    "sourceHash": "e9c789977604980d410e30b95e02208ca6e46d053f44bc0f5c5030877eaa5fe8",
+    "simplificationError": 0.0004228474572300911
+  }
+]

@@ -1,11 +1,12 @@
 # Live operator liveries
 
 2026-10-30. Built with a second agent for the operator catalogue, matching rules,
-and integration review. Lands on `main` behind `OPERATOR_LIVERIES`, **off by
-default** under the True Earth device-certification rule.
+and integration review. `OPERATOR_LIVERIES` is **on by default** at the owner's
+explicit request on 2026-10-31, together with commercial paint and the upgraded
+Liberty/landmark models. Physical iPhone certification remains outstanding.
 
-Preview with `/?flags=OPERATOR_LIVERIES`; use `/?flags=-OPERATOR_LIVERIES` for
-the previous paint. The device report records the effective flag.
+Open the app normally; use `/?flags=-OPERATOR_LIVERIES` for the previous paint.
+The device report records the effective flag.
 
 ## What the models looked like
 
@@ -102,12 +103,12 @@ JavaScript passes ESLint, and the Next.js **16.4.3** production build passes wit
 `FLY_BUILD_DIR=.next-liveries` and `next build --webpack`. The build retains the
 existing metadataBase warning when no deployment origin is configured locally.
 
-## Owner review before enabling by default
+## Remaining physical-device review
 
 On desktop and iPhone, open the preview flag and inspect a `DAL`, `SWA` and `UAL`
 contact in flight and through lounge binoculars, on both sides and at night.
 Check a military transport/fighter when one is available, then compare the
 flag-off page. Confirm readability, canopy/lights, LOD transitions and busy-airport
 smoothness. The automated desktop studio is complete; owner acceptance and a
-physical iPhone run remain open. Enable the constant in a separate commit after
-that review.
+physical iPhone run remain open. The owner explicitly authorized enabling and
+pushing the defaults before that run; the automated evidence is unchanged.

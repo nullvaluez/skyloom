@@ -67,6 +67,13 @@
 
 ## Map data & imagery
 
+- **Landmark fidelity architecture** — Skyloom, MIT: Empire State Building, Willis Tower, CN Tower, Space Needle, Burj Khalifa, Taj Mahal, Big Ben, Gateway Arch and Colosseum; original geometry, materials and three LODs. See `public/licenses/landmark-fidelity.md`.
+- **Eiffel Tower fidelity, high detail** — Scott Marshall, [Eiffel Tower](https://poly.pizza/m/aIpJchqtRTg), [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/). Added Skyloom railings, glazed pavilions and material/night masks. Far/medium architecture is Skyloom, MIT.
+- **Sydney Opera House fidelity** — Nick Reinhardt, [Sydney Opera House](https://sketchfab.com/3d-models/sydney-opera-house-317b2d540f0a4f7e8d87dd3b0372712d), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), via Icosa Gallery. Restored original detailed geometry, removed surrounding planes, simplified into three LODs, and replaced source textures with authored vertex materials and lighting. See `public/licenses/landmark-fidelity.md`.
+
+- **Statue of Liberty detail sculpture** — jerryfisher, [Statue Of Liberty Bronze Model](https://sketchfab.com/3d-models/statue-of-liberty-bronze-model-5b9aa58d51624f01b9009b52379bf18a), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Simplified into three LODs, recolored verdigris/gold, combined with a Skyloom-authored stone pedestal and Fort Wood. See `public/licenses/liberty-detail.md`.
+- **Commercial airline vector marks** — [Simple Icons 13.21.0](https://github.com/simple-icons/simple-icons/tree/13.21.0), CC0. Recolored and placed in authored livery artwork. Airline trademarks remain with their owners; no endorsement implied. See `public/licenses/commercial-liveries.md`.
+
 - © Esri, Maxar, Earthstar Geographics — https://www.esri.com/en-us/legal/terms/data-attributions
 - © ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium — https://esa-worldcover.org/en/data-access
 - © OpenStreetMap contributors — https://www.openstreetmap.org/copyright

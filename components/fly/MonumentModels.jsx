@@ -1,7 +1,7 @@
 'use client';
 import { useFlyStore } from '@/stores/fly-store';
 import { MonumentDetailCache, landmarkDistanceM, selectMonumentDetails } from '@/lib/fly/monument-detail';
-import { satelliteVisualsOn } from '@/lib/fly/satellite-visuals';
+import { satelliteVisualsOn, graphicsReviewOn } from '@/lib/fly/satellite-visuals';
 import { attachCinematicModelAttributes, createCinematicModelMaterial, updateCinematicModelNight } from '@/lib/fly/cinematic-models';
 
 
@@ -35,6 +35,7 @@ import { loadMonumentGeometries, loadMonumentDetail } from '@/lib/fly/monument-l
 import { setSuppressedMonuments, monumentSuppressionEpoch } from '@/lib/fly/monument-models';
 import { trueHorizontalK } from '@/lib/fly/true-scale';
 import { mercatorScale } from '@/lib/fly/coords';
+import { monumentPresence } from '@/lib/fly/liberty-detail';
 
 const _m = new Matrix4();
 const _q = new Quaternion();
@@ -359,7 +360,7 @@ export function MonumentModels({ flight, origin, engine, mapStyle, runtime }) {
     const placed = [];
     for (const k of keep) {
       const { poi } = k.s;
-      const s = Math.max(8, poi.hM || 0) * LANDMARKS_3D.scaleBoost;
+      const s = Math.max(8, poi.hM || 0) * LANDMARKS_3D.scaleBoost * monumentPresence(poi.name);
       const x = poi.wx - ax;
       const z = poi.wz - az;
       const g = k.geometry.clone();
@@ -421,7 +422,7 @@ export function MonumentModels({ flight, origin, engine, mapStyle, runtime }) {
     // instead of waiting out its own 2s cadence, so the two never double-draw).
     setSuppressedMonuments(placed.map((p) => p.name));
 
-    if (process.env.NODE_ENV !== 'production') {
+    if (process.env.NODE_ENV !== 'production' || graphicsReviewOn()) {
       window.__flyMonuments = {
         placed, // ABSOLUTE mercator x/z (see above), world-unit groundY/topY
         loaded: sites.map((s) => s.poi.name),

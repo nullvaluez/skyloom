@@ -1,0 +1,50 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { createHash } from 'node:crypto';
+import { register } from 'node:module';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+register('./_node-resolve.mjs',import.meta.url);
+const {COMMERCIAL_PRESETS}=await import('../lib/fly/commercial-liveries.mjs');
+const {MONUMENT_MANIFEST}=await import('../lib/fly/monument-models.js');
+const {resolveLibertyEntry,monumentPresence}=await import('../lib/fly/liberty-detail.js');
+const {monumentScale,letterLiftM}=await import('../lib/fly/landmarks-3d.js');
+const {applyLiveryPaint}=await import('../lib/fly/livery-paint.js');
+const {Group}=await import('three');
+const {COMMERCIAL_PAINT,LIBERTY_DETAIL,OPERATOR_LIVERIES}=await import('../lib/fly/fly-constants.js');
+for(const flag of [COMMERCIAL_PAINT,LIBERTY_DETAIL,OPERATOR_LIVERIES])assert.equal(flag.enabled,true,'owner requested the enabled shipping default');
+const assets=JSON.parse(fs.readFileSync('lib/fly/liberty-detail-assets.json'));
+assert.equal(COMMERCIAL_PRESETS.airliner.length,28);assert.equal(COMMERCIAL_PRESETS.cargo.length,6);assert.equal(COMMERCIAL_PRESETS.concorde.length,2);
+const entry=MONUMENT_MANIFEST.find(e=>e.poi==='Statue of Liberty'),poi={name:entry.poi,kind:'landmark',lm:'statue',hM:93};
+assert.equal(resolveLibertyEntry(entry).file,assets.find(a=>a.level==='far').file,'plain page load selects detailed Liberty');
+globalThis.window={__flyLibertyDetailOverride:{enabled:false},__flyCommercialPaintOverride:{enabled:false}};
+assert.equal(resolveLibertyEntry(entry),entry);assert.equal(monumentPresence(poi.name),1);
+const root=new Group();applyLiveryPaint(root,'airliner',COMMERCIAL_PRESETS.airliner[0]);assert.equal(root.userData.fleetPaint,undefined,'flag-off must leave the paint path untouched');
+const before=monumentScale(poi).sy;
+window.__flyLibertyDetailOverride.enabled=true;
+const resolved=resolveLibertyEntry(entry);
+assert.equal(resolved.file,assets.find(a=>a.level==='far').file);
+assert.equal(resolved.detail.high.file,assets.find(a=>a.level==='high').file);
+assert.equal(resolved.detail.medium.file,assets.find(a=>a.level==='medium').file);
+assert.equal(resolved.targetHeightM,93);assert.equal(monumentPresence('Eiffel Tower'),1);
+assert.ok(Math.abs(monumentScale(poi).sy-before*1.4)<1e-8);
+assert.ok(Math.abs(letterLiftM(poi)-monumentScale(poi).sy-30)<1e-8,'label clears enlarged statue and fallback');
+assert.equal(entry.file,'/models/monument-liberty.glb','preview must never mutate the worker manifest');
+console.log('PASS 36 commercial choices; flag-off fallback; shared placement/label scale; immutable worker manifest');
+for(const asset of assets){
+  const b=fs.readFileSync('public'+asset.file);assert.equal(b.length,asset.bytes);assert.equal(createHash('sha256').update(b).digest('hex'),asset.sha256);
+  const {scene}=await new GLTFLoader().parseAsync(b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength),'');
+  let meshes=0;
+  scene.traverse(o=>{if(!o.isMesh)return;meshes++;
+    const g=o.geometry;g.computeBoundingBox();
+    assert.ok(Math.abs(g.boundingBox.min.y)<1e-5);assert.ok(Math.abs(g.boundingBox.max.y-93)<1e-4);
+    assert.equal(g.index.count/3,asset.triangles);
+    for(const k of ['position','normal','color','_model_surface','_model_light']){
+      assert.equal(g.attributes[k].count,g.attributes.position.count);assert.ok(Array.from(g.attributes[k].array).every(Number.isFinite));
+    }
+    const max=asset.level==='high'?60000:asset.level==='medium'?20000:6000;
+    assert.ok(asset.triangles<=max);assert.ok(asset.bytes<(asset.level==='high'?4:2)*1024*1024);
+    assert.equal(o.material.map,null,'no runtime image dependency');
+    g.dispose();o.material.dispose();
+  });assert.equal(meshes,1);console.log(`PASS Liberty ${asset.level}: ${asset.triangles} triangles, ${asset.bytes} bytes, real height and PBR attributes`);
+}
+delete globalThis.window;

@@ -1,0 +1,75 @@
+{
+  "errors": [],
+  "runs": [
+    {
+      "phone": false,
+      "layout": {
+        "scrolls": true,
+        "overlap": false,
+        "minHeight": 76,
+        "panel": {
+          "x": 1232,
+          "y": 125,
+          "width": 328,
+          "height": 750,
+          "top": 125,
+          "right": 1560,
+          "bottom": 875,
+          "left": 1232
+        },
+        "scroll": {
+          "x": 1250,
+          "y": 260.59375,
+          "width": 292,
+          "height": 531.40625,
+          "top": 260.59375,
+          "right": 1542,
+          "bottom": 792,
+          "left": 1250
+        }
+      },
+      "painted": [
+        "commercial-united"
+      ],
+      "statue": {
+        "name": "Statue of Liberty",
+        "x": -8242596.036042545,
+        "z": -4966606.257307652,
+        "groundY": 22.768908490205902,
+        "topY": 198.53890849020593,
+        "heightM": 93,
+        "detail": "high",
+        "triangles": 51992
+      }
+    },
+    {
+      "phone": true,
+      "layout": {
+        "scrolls": true,
+        "overlap": false,
+        "minHeight": 72,
+        "panel": {
+          "x": 12,
+          "y": 357.765625,
+          "width": 366,
+          "height": 388.234375,
+          "top": 357.765625,
+          "right": 378,
+          "bottom": 746,
+          "left": 12
+        },
+        "scroll": {
+          "x": 24,
+          "y": 474.453125,
+          "width": 342,
+          "height": 201.546875,
+          "top": 474.453125,
+          "right": 366,
+          "bottom": 676,
+          "left": 24
+        }
+      }
+    }
+  ],
+  "status": "PASS"
+}

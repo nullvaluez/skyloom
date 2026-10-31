@@ -1,0 +1,271 @@
+{
+  "errors": [],
+  "runs": [
+    {
+      "phone": false,
+      "name": "Empire State Building",
+      "level": "high",
+      "placed": {
+        "name": "Empire State Building",
+        "x": -8236050.4499838995,
+        "z": -4975301.253789808,
+        "groundY": 15.926253401404818,
+        "topY": 613.9762534014048,
+        "heightM": 443,
+        "detail": "high",
+        "triangles": 23634
+      },
+      "stats": {
+        "remerges": 2,
+        "deferred": 8,
+        "placed": 2,
+        "priority": -1,
+        "bumpT": 9.5573,
+        "bumpEpoch": 1,
+        "detailCache": 1,
+        "detailDownloads": 0,
+        "detailed": 1,
+        "triangles": 28138,
+        "consumeT": 9.5573,
+        "lagSec": 0,
+        "releaseConsumes": 0,
+        "lateConsumes": 0,
+        "consumes": 1
+      },
+      "ready": false
+    },
+    {
+      "phone": false,
+      "name": "Eiffel Tower",
+      "level": "high",
+      "placed": {
+        "name": "Eiffel Tower",
+        "x": 255422.57162516625,
+        "z": -6250868.901479604,
+        "groundY": 33.78872974473191,
+        "topY": 479.288729744732,
+        "heightM": 330,
+        "detail": "high",
+        "triangles": 57287
+      },
+      "stats": {
+        "remerges": 5,
+        "deferred": 15,
+        "placed": 1,
+        "priority": -1,
+        "bumpT": 29.9451,
+        "bumpEpoch": 2,
+        "detailCache": 2,
+        "detailDownloads": 0,
+        "detailed": 1,
+        "triangles": 57287,
+        "consumeT": 17.3749,
+        "lagSec": 0,
+        "releaseConsumes": 0,
+        "lateConsumes": 0,
+        "consumes": 2
+      },
+      "ready": false
+    },
+    {
+      "phone": false,
+      "name": "Taj Mahal",
+      "level": "high",
+      "placed": {
+        "name": "Taj Mahal",
+        "x": 8687606.832437735,
+        "z": -3145365.264428791,
+        "groundY": 155.9575986092877,
+        "topY": 254.5075986092877,
+        "heightM": 73,
+        "detail": "high",
+        "triangles": 26300
+      },
+      "stats": {
+        "remerges": 8,
+        "deferred": 27,
+        "placed": 1,
+        "priority": -1,
+        "bumpT": 48.5764,
+        "bumpEpoch": 3,
+        "detailCache": 3,
+        "detailDownloads": 0,
+        "detailed": 1,
+        "triangles": 26300,
+        "consumeT": 36.428,
+        "lagSec": 0,
+        "releaseConsumes": 0,
+        "lateConsumes": 0,
+        "consumes": 3
+      },
+      "ready": false
+    },
+    {
+      "phone": false,
+      "name": "Sydney Opera House",
+      "level": "high",
+      "placed": {
+        "name": "Sydney Opera House",
+        "x": 16833210.196152102,
+        "z": 4009589.934222665,
+        "groundY": 3.443349746686402,
+        "topY": 91.19334974668641,
+        "heightM": 65,
+        "detail": "high",
+        "triangles": 54915
+      },
+      "stats": {
+        "remerges": 10,
+        "deferred": 33,
+        "placed": 1,
+        "priority": -1,
+        "bumpT": 60.3904,
+        "bumpEpoch": 4,
+        "detailCache": 4,
+        "detailDownloads": 0,
+        "detailed": 1,
+        "triangles": 54915,
+        "consumeT": 55.347,
+        "lagSec": 0,
+        "releaseConsumes": 0,
+        "lateConsumes": 0,
+        "consumes": 4
+      },
+      "ready": false
+    },
+    {
+      "phone": false,
+      "name": "Big Ben",
+      "level": "high",
+      "placed": {
+        "name": "Big Ben",
+        "x": -13870.408552841887,
+        "z": -6710344.259782705,
+        "groundY": 5.115340674492964,
+        "topY": 134.71534067449298,
+        "heightM": 96,
+        "detail": "high",
+        "triangles": 28356
+      },
+      "stats": {
+        "remerges": 13,
+        "deferred": 41,
+        "placed": 1,
+        "priority": -1,
+        "bumpT": 78.7318,
+        "bumpEpoch": 5,
+        "detailCache": 4,
+        "detailDownloads": 0,
+        "detailed": 1,
+        "triangles": 28356,
+        "consumeT": 66.59,
+        "lagSec": 0,
+        "releaseConsumes": 0,
+        "lateConsumes": 0,
+        "consumes": 5
+      },
+      "ready": false
+    },
+    {
+      "phone": false,
+      "name": "Space Needle",
+      "level": "high",
+      "placed": {
+        "name": "Space Needle",
+        "x": -13619861.774913466,
+        "z": -6043950.183918429,
+        "groundY": 41.54091262817383,
+        "topY": 289.9409126281738,
+        "heightM": 184,
+        "detail": "high",
+        "triangles": 7360
+      },
+      "stats": {
+        "remerges": 16,
+        "deferred": 50,
+        "placed": 1,
+        "priority": -1,
+        "bumpT": 97.5878,
+        "bumpEpoch": 6,
+        "detailCache": 4,
+        "detailDownloads": 0,
+        "detailed": 1,
+        "triangles": 7360,
+        "consumeT": 85.4019,
+        "lagSec": 0,
+        "releaseConsumes": 0,
+        "lateConsumes": 0,
+        "consumes": 6
+      },
+      "ready": false
+    },
+    {
+      "phone": false,
+      "name": "Gateway Arch",
+      "level": "high",
+      "placed": {
+        "name": "Gateway Arch",
+        "x": -10039326.013293218,
+        "z": -4668054.758376349,
+        "groundY": 136.08451005020825,
+        "topY": 395.28451005020827,
+        "heightM": 192,
+        "detail": "high",
+        "triangles": 4668
+      },
+      "stats": {
+        "remerges": 18,
+        "deferred": 58,
+        "placed": 1,
+        "priority": -1,
+        "bumpT": 109.3207,
+        "bumpEpoch": 7,
+        "detailCache": 4,
+        "detailDownloads": 0,
+        "detailed": 1,
+        "triangles": 4668,
+        "consumeT": 104.2081,
+        "lagSec": 0,
+        "releaseConsumes": 0,
+        "lateConsumes": 0,
+        "consumes": 7
+      },
+      "ready": false
+    },
+    {
+      "phone": false,
+      "name": "Colosseum",
+      "level": "high",
+      "placed": {
+        "name": "Colosseum",
+        "x": 1390625.3428877322,
+        "z": -5144546.100362264,
+        "groundY": 20.728976810544914,
+        "topY": 85.52897681054492,
+        "heightM": 48,
+        "detail": "high",
+        "triangles": 56944
+      },
+      "stats": {
+        "remerges": 21,
+        "deferred": 65,
+        "placed": 1,
+        "priority": -1,
+        "bumpT": 127.5132,
+        "bumpEpoch": 8,
+        "detailCache": 4,
+        "detailDownloads": 0,
+        "detailed": 1,
+        "triangles": 56944,
+        "consumeT": 115.5488,
+        "lagSec": 0,
+        "releaseConsumes": 0,
+        "lateConsumes": 0,
+        "consumes": 8
+      },
+      "ready": false
+    }
+  ],
+  "status": "FAIL",
+  "failure": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n\n16452 !== 37620\n\n    at C:\\Users\\bfecho\\skyloom-3\\scripts\\verify-landmark-fidelity-browser.cjs:31:73\n    at runNextTicks (node:internal/process/task_queues:64:5)\n    at process.processImmediate (node:internal/timers:472:9)"
+}

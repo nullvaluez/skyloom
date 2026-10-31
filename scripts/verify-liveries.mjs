@@ -16,19 +16,18 @@ const {createBackup,parseBackup,restoreBackup}=await import('../lib/fly/save-bac
 const {liveryMaterialRole}=await import('../lib/fly/livery-paint.js');
 const storage=()=>{const map=new Map();return {getItem:k=>map.get(k)??null,setItem:(k,v)=>map.set(k,String(v)),removeItem:k=>map.delete(k)};};
 
-test('each of the thirteen planes has three distinct original presets',()=>{
+test('each plane keeps its three originals and commercial additions have stable unique IDs',()=>{
   assert.deepEqual(Object.keys(PRESET_LIVERIES).sort(),PLAYER_AIRCRAFT.map(a=>a.id).sort());
   for(const [id,skins]of Object.entries(PRESET_LIVERIES)){
-    assert.equal(skins.length,3);assert.equal(new Set(skins.map(s=>s.id)).size,3);
-    assert.equal(new Set(skins.map(s=>`${s.hull}/${s.trim}/${s.accent}`)).size,3);
+    assert.equal(skins.filter(s=>!s.operator).length,3);assert.equal(new Set(skins.map(s=>s.id)).size,skins.length);
     for(const skin of skins){assert.ok(skin.name&&skin.description&&skin.marking&&skin.code);assert.match(skin.id,/^[a-z0-9-]+$/);for(const key of ['hull','trim','accent'])assert.match(skin[key],/^#[0-9a-f]{6}$/);assert.equal(presetLivery(id,skin.id),skin);}
   }
   assert.equal(presetLivery('__proto__','anything'),null);assert.equal(presetLivery('f35','pelagic'),null);
 });
 
-test('all 39 choices survive validation, journey updates and backup restore',()=>{
-  for(let index=0;index<3;index++){
-    const progress=emptyProgress();for(const [id,rows]of Object.entries(PRESET_LIVERIES))progress.liveries[id]=rows[index].id;
+test('every original and commercial choice survives validation, journey updates and backup restore',()=>{
+  for(let index=0;index<Math.max(...Object.values(PRESET_LIVERIES).map(s=>s.length));index++){
+    const progress=emptyProgress();for(const [id,rows]of Object.entries(PRESET_LIVERIES))progress.liveries[id]=rows[index%rows.length].id;
     const validated=validateProgress(progress);assert.deepEqual(validated.liveries,progress.liveries);
     const controller=new AdventureController(validated);controller.start(ADVENTURES[0].id,{aircraftId:'f35',conditions:'live'});controller.pause();
     assert.deepEqual(controller.progress.liveries,progress.liveries);
@@ -64,6 +63,8 @@ test('store saves per-plane picks, rejects forged choices and reports unavailabl
 });
 
 for(const aircraft of PLAYER_AIRCRAFT)for(const phone of [false,true])test(`${aircraft.id}/${phone?'mobile':'hero'}: paint owns its resources and follows real control geometry`,async()=>{
+  const priorWindow=globalThis.window;
+  globalThis.window={...priorWindow,__flyCommercialPaintOverride:{enabled:true}};
   const resolved=resolveAircraft(aircraft.id),entry=aircraftPresentation(resolved,phone,{mapStyle:'satellite',visuals:'enhanced'});
   const bytes=fs.readFileSync(new URL(`../public${entry.url}`,import.meta.url));
   const {scene}=await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),'');
@@ -96,4 +97,5 @@ for(const aircraft of PLAYER_AIRCRAFT)for(const phone of [false,true])test(`${ai
   if(LIVERIES[aircraft.id]){applyFleetLivery(clone,aircraft.id,true);assert.equal(clone.userData.fleetPaint.uniforms.uFleetPaintOn.value,0);}
   let disposed=0;for(const o of paintCoordinates.keys())o.geometry.addEventListener('dispose',()=>disposed++);
   disposeFleetGeometry(clone);assert.equal(disposed,paintCoordinates.size);
+  globalThis.window=priorWindow;
 });

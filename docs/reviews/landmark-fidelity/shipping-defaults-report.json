@@ -1,0 +1,82 @@
+{
+  "errors": [],
+  "runs": [
+    {
+      "phone": false,
+      "name": "Big Ben",
+      "level": "high",
+      "placed": {
+        "name": "Big Ben",
+        "x": -13870.408552841887,
+        "z": -6710344.259782705,
+        "groundY": 5.115340674492964,
+        "topY": 134.71534067449298,
+        "heightM": 96,
+        "detail": "high",
+        "triangles": 28356
+      },
+      "stats": {
+        "remerges": 2,
+        "deferred": 13,
+        "placed": 1,
+        "priority": -1,
+        "bumpT": 17.6069,
+        "bumpEpoch": 1,
+        "detailCache": 1,
+        "detailDownloads": 0,
+        "detailed": 1,
+        "triangles": 28356
+      },
+      "ready": false
+    },
+    {
+      "phone": false,
+      "name": "Big Ben",
+      "level": "low",
+      "triangles": 4596
+    },
+    {
+      "phone": true,
+      "name": "Big Ben",
+      "level": "medium",
+      "placed": {
+        "name": "Big Ben",
+        "x": -13870.408552841887,
+        "z": -6710344.259782705,
+        "groundY": 10.604850702281796,
+        "topY": 140.20485070228182,
+        "heightM": 96,
+        "detail": "medium",
+        "triangles": 17220
+      },
+      "stats": {
+        "remerges": 4,
+        "deferred": 5,
+        "placed": 1,
+        "priority": -1,
+        "bumpT": 30.1771,
+        "bumpEpoch": 1,
+        "detailCache": 1,
+        "detailDownloads": 0,
+        "detailed": 1,
+        "triangles": 17220
+      },
+      "ready": true
+    },
+    {
+      "phone": true,
+      "name": "Big Ben",
+      "level": "low",
+      "triangles": 4596
+    }
+  ],
+  "status": "PASS",
+  "shippedDefaults": true,
+  "smoke": true,
+  "pins": {
+    "governor": "hold",
+    "pose": "fixed",
+    "sun": "local noon"
+  },
+  "scope": "Placement, detail transitions, cache bounds, and desktop/phone layouts; not a performance or settled-terrain certification."
+}

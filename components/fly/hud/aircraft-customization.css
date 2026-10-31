@@ -6,6 +6,9 @@
 .aircraft-customization h3{font-size:18px;line-height:1.2;font-weight:550;letter-spacing:-.025em;margin:0}
 .aircraft-customization header p{font-size:12px;line-height:1.5;color:#9db4c5;margin:5px 0 0}
 .skin-choices{display:flex;flex-direction:column;gap:7px;min-height:0;overflow:auto;scrollbar-width:thin;scrollbar-color:#405368 transparent;padding:3px;margin:-3px}
+.skin-search{flex-shrink:0;width:100%;min-height:44px;margin:0 0 12px;padding:10px 12px;border:1px solid #587080;border-radius:8px;background:#142131;color:#e7f1f6;font:inherit;font-size:12px;caret-color:#b7eff2}
+.skin-search::placeholder{color:#a8c0cf}.skin-search:focus-visible{outline:2px solid #b7eff2;outline-offset:2px}
+.skin-empty{grid-column:1/-1;color:#a8c0cf;font-size:12px;line-height:1.5;padding:10px 2px}
 .skin-choices>button{display:grid;grid-template-columns:66px minmax(0,1fr) 17px;align-items:center;gap:11px;min-height:73px;width:100%;padding:10px;border:1px solid #344455;border-radius:10px;text-align:left;background:#142131;color:#e7f1f6;cursor:pointer}
 .skin-choices>button:hover:not(:disabled){border-color:#7398aa;background:#1b2c3e}
 .skin-choices>button[aria-checked=true]{border-color:#a7dfea;background:#213d4c}
@@ -37,3 +40,16 @@
 }
 .aircraft-customization .skin-done{background:#d3edf3;border-color:#d3edf3;color:#122331}
 .aircraft-customization .skin-done:hover{background:#e6f6f9;border-color:#e6f6f9}
+/* The hangar's generic button rule loads later. Own row height here so long
+   catalogues scroll rather than squeezing labels and swatches into 40px rows. */
+.aircraft-customization .skin-choices>button{flex-shrink:0;min-height:76px;height:auto}
+@media(max-width:700px) and (orientation:portrait){
+  .aircraft-customization[data-many=true]{max-height:min(46dvh,390px)}
+  .aircraft-customization[data-many=true] .skin-choices{display:flex}
+  .aircraft-customization[data-many=true] .skin-choices>button{grid-template-columns:44px minmax(0,1fr) 17px;align-items:center;min-height:72px}
+  .aircraft-customization[data-many=true] .skin-choices .skin-swatch{width:44px;height:34px}
+  .aircraft-customization[data-many=true] .skin-copy strong{font-size:12px}
+  .aircraft-customization[data-many=true] .skin-copy small{font-size:10px}
+  .aircraft-customization[data-many=true] .skin-choices>button>svg:last-child,
+  .aircraft-customization[data-many=true] .skin-choices>button>.skin-radio{position:static;width:15px;height:15px}
+}
