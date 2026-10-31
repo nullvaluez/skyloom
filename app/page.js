@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic';
 import { installUrlFlags } from '@/lib/fly/fly-pins';
 import { prepareSceneryWorkers } from '@/lib/fly/worker-cache-guard';
+import { LaunchScreen } from '@/components/LaunchScreen';
 
 // TRUE EARTH: `?flags=` must become pins before any Fly module reads one, and
 // this module evaluates before the lazily imported FlyMode tree.
@@ -10,7 +11,7 @@ if (typeof window !== 'undefined') installUrlFlags(window);
 
 // Round 9 (fly-only pivot): the game IS the app. FlyMode mounts directly —
 // no ui-store gate, no header/sidebar chrome. The dynamic() fallback is a
-// plain ink void: FlyMode's own BootScreen takes over the moment the three.js
+// lightweight status: FlyMode's own BootScreen takes over the moment the three.js
 // bundle lands (window.__flyBoot is the boot progress contract).
 const FlyMode = dynamic(
   async () => {
@@ -21,7 +22,7 @@ const FlyMode = dynamic(
   },
   {
     ssr: false,
-    loading: () => <div className="fixed inset-0 bg-[#04060f]" />,
+    loading: LaunchScreen,
   }
 );
 

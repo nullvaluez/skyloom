@@ -423,3 +423,15 @@ changes the measured elevation or pretends missing data succeeded. The local
 ring, zoom ceiling, longitude seam and cleared-focus cases are covered by
 `verify-living-earth.mjs`. The integration receipt explicitly adds this method
 and explains the two existing method edits. No historical allowance is changed.
+
+### Startup arrival scheduling — October 31, 2026
+
+`Tile._updateChildren` visits the nearest child first while `flyArrivalGround`
+is active. The fixed NW→SE depth-first walk otherwise spends limited loader
+slots on far branches before the required local terrain. Distances use the same
+wrapped absolute Mercator coordinates as the existing arrival request; no world
+matrix, source resolution, load budget or LOD threshold changes. Scene children
+stay in their original order, and normal traversal resumes when the focus clears.
+`verify-startup.mjs` exercises the real Tile traversal with one available slot;
+`verify-living-earth.mjs` retains the local-ring, zoom and longitude-seam checks.
+The integration receipt records this method and the two traversal call sites.

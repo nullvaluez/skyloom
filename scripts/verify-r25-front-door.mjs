@@ -788,7 +788,7 @@ try {
   const eb = rd('components/fly/FlyErrorBoundary.jsx');
   const layout = rd('app/layout.js');
   const manifest = rd('public/manifest.json');
-  const loading = rd('app/loading.js');
+  const loading = rd('app/loading.js') + rd('components/LaunchScreen.jsx');
   gate('(8a) FlyScene W0 call sites intact (titleCam needsSnap/active, spotAllowed, menuOpen gates)',
     /runtime\.titleCam\?\.needsSnap/.test(scene) &&
       // GATE TO GATE W0: the camera precedence moved into lib/fly/camera-mode.js; FlyScene calls cameraOwner().

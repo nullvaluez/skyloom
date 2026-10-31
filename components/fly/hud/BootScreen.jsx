@@ -229,6 +229,7 @@ export function BootScreen({ runtime }) {
 
       let phase;
       if (!store.spawn) phase = 'spawn';
+      else if (living && content.blocking.length && content.blocking.every(part => part === 'shaders' || part === 'fleet')) phase = content.parts.fleet ? 'shaders' : 'fleet';
       else if (!worldDone) phase = 'world';
       else if (!modelsP) phase = 'fleet';
       else if (shadersP < 1) phase = 'shaders';

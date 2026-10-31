@@ -14,6 +14,7 @@ const { Scene, PerspectiveCamera, DirectionalLight, HemisphereLight, Texture, Fo
 const { WebGLPrograms } = await import('three/src/renderers/webgl/WebGLPrograms.js');
 const { useFlyStore } = await import('../stores/fly-store.js');
 const { createMeasuredWorldWarmScene, warmMeasuredWorldProfiles, MEASURED_WORLD_VARIANTS } = await import('../lib/fly/measured-world-prewarm.js');
+const { cinemaProfile } = await import('../lib/fly/cinema-policy.js');
 const { reachableCinemaCascades } = await import('../lib/fly/cinema-profile-prewarm.js');
 const { worldReadiness, retryWorldContent } = await import('../lib/fly/world-readiness.js');
 useFlyStore.setState({ mapStyle: 'satellite', visuals: 'enhanced', qualityPreset: 'high', qualityTier: 'high' });
@@ -166,9 +167,9 @@ await check('production retry re-arms only the failed world batch and cannot dup
   const source = fs.readFileSync(new URL('../lib/fly/prewarm.js', import.meta.url), 'utf8');
   const stateStart = source.indexOf('const _state = {'), stateEnd = source.indexOf('\n};', stateStart) + 3;
   const retryStart = source.indexOf('let worldWarmPending = null;'), retryEnd = source.indexOf('\n/**', retryStart);
-  const { state, warm } = Function('warmMeasuredWorldProfiles', 'reachableCinemaCascades', 'useFlyStore', 'isMobileGraphicsClass',
+  const { state, warm } = Function('warmMeasuredWorldProfiles', 'reachableCinemaCascades', 'useFlyStore', 'isMobileGraphicsClass', 'cinemaProfile',
     source.slice(stateStart, stateEnd) + '\n' + source.slice(retryStart, retryEnd) + '\nreturn {state:_state,warm:warmMeasuredWorld};')(
-    warmMeasuredWorldProfiles, reachableCinemaCascades, useFlyStore, () => false);
+    warmMeasuredWorldProfiles, reachableCinemaCascades, useFlyStore, () => false, cinemaProfile);
   const gl = renderer(), compile = gl.compile.bind(gl);
   gl.compile = (...args) => { compile(...args); throw Error('retryable driver failure'); };
   await assert.rejects(warm(gl, camera, scene), /retryable/);
@@ -187,9 +188,9 @@ await check('completed context readiness invalidates immediately and the recover
   const source = fs.readFileSync(new URL('../lib/fly/prewarm.js', import.meta.url), 'utf8');
   const stateStart = source.indexOf('const _state = {'), stateEnd = source.indexOf('\n};', stateStart) + 3;
   const retryStart = source.indexOf('let worldWarmPending = null;'), retryEnd = source.indexOf('\n/**', retryStart);
-  const { state, warm } = Function('warmMeasuredWorldProfiles', 'reachableCinemaCascades', 'useFlyStore', 'isMobileGraphicsClass',
+  const { state, warm } = Function('warmMeasuredWorldProfiles', 'reachableCinemaCascades', 'useFlyStore', 'isMobileGraphicsClass', 'cinemaProfile',
     source.slice(stateStart, stateEnd) + '\n' + source.slice(retryStart, retryEnd) + '\nreturn {state:_state,warm:warmMeasuredWorld};')(
-    warmMeasuredWorldProfiles, reachableCinemaCascades, useFlyStore, () => false);
+    warmMeasuredWorldProfiles, reachableCinemaCascades, useFlyStore, () => false, cinemaProfile);
   const rigSource = fs.readFileSync(new URL('../components/fly/PrewarmRig.jsx', import.meta.url), 'utf8').replaceAll('\r\n', '\n');
   const start = rigSource.indexOf('    const store = useFlyStore.getState();\n    const worldProfiles');
   const end = rigSource.indexOf('    const gate = runtime?.terrainPrewarm;', start);
@@ -202,10 +203,10 @@ await check('completed context readiness invalidates immediately and the recover
   gl.domElement.dispatchEvent(new Event('webglcontextrestored'));
   assert.equal(worldReadiness(rt).parts.shaders, false);
   const originalEnv = scene.environment; scene.environment = null; rt.contextLost = false;
-  recover(rt, gl, scene, useFlyStore, () => true); assert.equal(gl.records.length, 57);
+  recover(rt, gl, scene, useFlyStore, () => true); assert.equal(gl.records.length, 19);
   scene.environment = originalEnv; gl.ready = false;
-  recover(rt, gl, scene, useFlyStore, () => true); assert.equal(gl.records.length, 114);
-  recover(rt, gl, scene, useFlyStore, () => true); assert.equal(gl.records.length, 114);
+  recover(rt, gl, scene, useFlyStore, () => true); assert.equal(gl.records.length, 38);
+  recover(rt, gl, scene, useFlyStore, () => true); assert.equal(gl.records.length, 38);
   assert.equal(worldReadiness(rt).parts.shaders, false);
   gl.ready = true;
   for (let i = 0; i < 30 && state.worldProfiles.status !== 'ready'; i++) await new Promise(resolve => setTimeout(resolve, 10));

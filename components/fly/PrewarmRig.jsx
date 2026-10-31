@@ -145,7 +145,7 @@ export function PrewarmRig({ runtime }) {
     const gate = runtime?.terrainPrewarm;
     if (!gate) return;
     if (runtime.prewarm) runtime.prewarm.criticalTerrain = gate.state;
-    if (!['waiting', 'compiling', 'failed'].includes(gate.state.status)) return;
+    if (!['waiting', 'compiling', 'failed', 'bypassed'].includes(gate.state.status)) return;
     const environment = scene.environment;
     const key = [environment?.id ?? 'none', environment?.mapping ?? '',
       runtime.cinemaShadows?.cascades ?? 'legacy', store.mapStyle, store.visuals, store.qualityTier,

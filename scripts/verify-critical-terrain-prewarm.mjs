@@ -127,8 +127,12 @@ await check('explicit reduced entry and time caps preserve their reasons even wh
     const gate = createCriticalTerrainGate(), m = new MeshStandardMaterial(), driver = deferred(); gate.hold(m);
     step(gate, () => driver.promise); gate.bypass(reason);
     assert.equal(m.visible, true); assert.equal((await gate.wait()).reason, reason);
-    driver.resolve(); await driver.promise; await Promise.resolve(); step(gate, () => assert.fail('terminal'));
-    assert.equal(gate.state.status, 'bypassed'); assert.equal(gate.state.readyAt, null); m.dispose();
+    assert.equal(criticalTerrainReady(gate.state), false, 'A cap is not proof of readiness');
+    driver.resolve(); await driver.promise; await Promise.resolve();
+    assert.equal(gate.state.status, 'bypassed', 'Completion must still wait for a matching frame');
+    step(gate, () => assert.fail('must not redispatch'), { covered: false });
+    assert.equal(gate.state.status, 'ready'); assert.equal(gate.state.bypassReason, reason);
+    assert.ok(gate.state.readyAt != null); assert.equal(criticalTerrainReady(gate.state), true); m.dispose();
   }
 });
 

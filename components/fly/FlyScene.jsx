@@ -2085,6 +2085,9 @@ export function FlyScene({ runtime }) {
     flight.heading = 0;
     flight.pitch = 0;
     flight.groundElev = 0;
+    // Initial placement needs the same bounded near-field fetch burst as a
+    // warp; previously only returning to a place got this fast path.
+    engine.notifyWarp?.(spawn.lon, spawn.lat, { cold: true });
     if (process.env.NODE_ENV === 'development') {
       // The worker projects traffic with a replicated mercator formula —
       // it must agree with three-tile's frame to sub-meter.

@@ -9,7 +9,7 @@
   "files": {
     "index.js": {
       "baselineSha256": "931e09ee8d594e709ec19f91be92ecb8fc28cd54054e352ac11d8275df86cb97",
-      "integratedSha256": "452775ca6fc01d49a6ec0a3b5badfc1c9c89eb74afeb7987f25dc8449606a855",
+      "integratedSha256": "94faa8bc484f2a829b65857579fc7be6fe487f8cbab81783eb463dba6e4da7e6",
       "changedFunctions": [
         {
           "name": "TerrainLercLoader.doLoad",
@@ -69,7 +69,12 @@
         {
           "name": "Tile._update",
           "change": "modified",
-          "reason": "Use one saturated-tree walker for both controls and schedule resident imagery recovery. Visit the explicitly requested local ground ring while the arrival camera is held."
+          "reason": "Use one saturated-tree walker for both controls and schedule resident imagery recovery. Visit the explicitly requested local ground ring while the arrival camera is held. During an active arrival, traverse children in distance order through _updateChildren so nearby required ground receives free loader slots first."
+        },
+        {
+          "name": "Tile._updateChildren",
+          "change": "added",
+          "reason": "Only while flyArrivalGround is active, visit Tile children by wrapped Mercator distance to the focus without mutating scene order; ordinary flight keeps its original traversal."
         },
         {
           "name": "Tile._updateModel",
@@ -279,6 +284,15 @@
       "integratedSha256": "452775ca6fc01d49a6ec0a3b5badfc1c9c89eb74afeb7987f25dc8449606a855",
       "summary": "Tile._updateModel: settle the epoch of an update that changed nothing, behind FLY_PATCH.settleNoop (off = verbatim). Explained in VENDOR.md R26-1.",
       "evidence": "node scripts/verify-load-guard.mjs (3) drives the real Tile.prototype._updateModel with the switch off and on; node scripts/verify-vendor-three-tile.mjs reports the changed-function inventory unchanged in membership."
+    },
+    {
+      "date": "2026-10-31",
+      "file": "index.js",
+      "patch": "startup-local-priority",
+      "previousIntegratedSha256": "452775ca6fc01d49a6ec0a3b5badfc1c9c89eb74afeb7987f25dc8449606a855",
+      "integratedSha256": "94faa8bc484f2a829b65857579fc7be6fe487f8cbab81783eb463dba6e4da7e6",
+      "summary": "Prioritize local terrain during existing bounded arrivals; no new tiles, geometry, LOD thresholds or steady-flight traversal.",
+      "evidence": "node scripts/verify-startup.mjs: a single available loader slot reaches the local quadrant first, scene child order is preserved, and cleared focus restores the original traversal. node scripts/verify-living-earth.mjs: arrival bounds and longitude wrapping."
     }
   ]
 }
