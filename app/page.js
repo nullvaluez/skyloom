@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { installUrlFlags } from '@/lib/fly/fly-pins';
+import { prepareSceneryWorkers } from '@/lib/fly/worker-cache-guard';
 
 // TRUE EARTH: `?flags=` must become pins before any Fly module reads one, and
 // this module evaluates before the lazily imported FlyMode tree.
@@ -12,7 +13,12 @@ if (typeof window !== 'undefined') installUrlFlags(window);
 // plain ink void: FlyMode's own BootScreen takes over the moment the three.js
 // bundle lands (window.__flyBoot is the boot progress contract).
 const FlyMode = dynamic(
-  () => import('@/components/fly/FlyMode').then((mod) => mod.FlyMode),
+  async () => {
+    // Retire a stale shell before it can give terrain workers the traffic API.
+    // The usual idle registration happens too late to protect this page load.
+    await prepareSceneryWorkers();
+    return import('@/components/fly/FlyMode').then((mod) => mod.FlyMode);
+  },
   {
     ssr: false,
     loading: () => <div className="fixed inset-0 bg-[#04060f]" />,

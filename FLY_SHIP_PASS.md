@@ -114,6 +114,53 @@ roads, distant skyline, water masks and shader links before and after a
 controlled reload plus Continue. Reports are under
 `.graphics-review/building-regression/`.
 
+### First-load scenery recovery and published-release check (2026-10-31)
+
+The next owner report was against the live website. The public Netlify deploy
+history and a fresh device report both identify **9b9139e** as the published
+release, although today's 1dafd23, 5211a14 and 479bd16 deploys completed. The
+live `/sw.js` was still **v1**. A completed deployment is not evidence that it
+is the published deployment. The older release retains both the worker-cache
+collision and the Ultra shader overflow described above.
+
+The real-provider reproduction on RTX 5080 / Edge loaded 25,402 building
+columns and 1,100,443 water-mask cells on the first visit, then **zero of
+both** on a cached return. Buildings, roads and skyline workers received the
+aircraft API. Updating a service worker after this happens cannot repair the
+dedicated workers that are already running.
+
+The page now checks the controlling shell **before importing FlyMode**. An
+older shell is retired (fetch interception disabled and shell caches cleared)
+and unregistered before any scenery workers start. The safe v3 shell answers
+a capability handshake, so subsequent visits keep their offline cache. Saves
+and provider caches are preserved. Idle registration explicitly checks for a
+script update and warms the activated replacement: register alone can revive
+the retired registration without fetching the new script on that same visit.
+This is a loading defect repair; no look flags or quality presets change.
+
+Verification: the browser cache regression has **17 passing assertions**,
+including red calibration against v1, recovery within the same document,
+removal of the old registration, safe-shell retention, and save/provider-cache
+preservation. RELEASE remains **83/83**; targeted ESLint and a fresh Turbopack
+production build pass. `verify-returning-city.cjs` now accepts
+`FLY_LEGACY_ORIGIN` to seed an actual old production build, switch the same
+browser profile to the repair, and verify two return visits. Its proxy keeps
+serving v1 until the startup guard retires it, so an early automatic update
+cannot hide the failing case. The test also waits for shell registration
+instead of confusing a pending idle callback with a failed registration.
+
+The final real-provider upgrade **passes on RTX 5080 / Edge**: the first
+upgraded visit generates 25,743 building columns and 699,069 water-mask cells;
+the following Continue generates 15,908 columns and 699,069 water-mask cells,
+with zero page errors, worker API failures or shader-link failures. The second
+return keeps the v3 shell without another retirement. The images show both
+ordinary city buildings and animated Hudson water. These are correctness
+checks, not frame-time certification. The five source gates also pass.
+
+Report: `.graphics-review/building-regression/scenery-startup-ship.json`, with
+matching screenshots. The deployment is not called fixed until the published
+URL serves this repair and its returning-flight check passes.
+
 ## 0. Context
 
 The owner asked for a deep gap analysis across features, modes, lighting,

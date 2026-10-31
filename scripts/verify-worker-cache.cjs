@@ -27,6 +27,7 @@ const ROOT = path.resolve(__dirname, '..');
 const OUT = path.join(ROOT, '.graphics-review/building-regression/worker-cache.json');
 const OLD = execFileSync('git', ['show', '5211a14:public/sw.js'], { cwd: ROOT, encoding: 'utf8' });
 const CURRENT = readFileSync(path.join(ROOT, 'public/sw.js'), 'utf8');
+const GUARD = readFileSync(path.join(ROOT, 'lib/fly/worker-cache-guard.js'), 'utf8');
 const BOOTSTRAP = '/_next/static/chunks/turbopack-worker-regression.js';
 const IMMUTABLE = '/_next/static/chunks/ordinary-regression.js';
 const OTHER_CACHE = 'fly-tiles-v1';
@@ -110,7 +111,10 @@ async function checkCurrentCache(page, name) {
 (async () => {
   server = http.createServer((request, response) => {
     const pathname = new URL(request.url, 'http://localhost').pathname;
-    if (pathname === '/sw.js') {
+    if (pathname === '/worker-cache-guard.js') {
+      response.writeHead(200, { 'content-type': 'application/javascript', 'cache-control': 'no-store' });
+      response.end(GUARD);
+    } else if (pathname === '/sw.js') {
       response.writeHead(200, { 'content-type': 'application/javascript', 'cache-control': 'no-store' });
       response.end(servedWorker);
     } else if (pathname === BOOTSTRAP) {
@@ -138,11 +142,35 @@ async function checkCurrentCache(page, name) {
   check('red calibration: v1 reuses the first worker API for later workers', broken.actual.every((worker) => worker.api === broken.requested[0]) && !correctApis(broken), broken);
   report.legs.legacy = { apis: broken, cache: await cacheState(legacyPage) };
 
+  // The deployed v2 repair required a SECOND reload after its update. Exercise
+  // the new page's actual startup guard while v1 is STILL the only available
+  // service worker. Clearing Cache API alone, or just unregistering, fails this.
+  const guardContext = await browser.newContext({ serviceWorkers: 'allow' });
+  const guardPage = await guardContext.newPage();
+  await controlled(guardPage, origin);
+  check('startup: precondition is a poisoned returning profile', !correctApis(await selectedApis(guardPage)));
+  await guardPage.evaluate(async (otherCache) => {
+    localStorage.setItem('fly-saved-flight-regression', 'keep my flight');
+    await (await caches.open(otherCache)).put('/unrelated-cache-sentinel', new Response('keep provider tiles'));
+  }, OTHER_CACHE);
+  const startup = await guardPage.evaluate(async () => (await import('/worker-cache-guard.js')).prepareSceneryWorkers());
+  check('startup: old shell is retired before scenery starts', startup === 'retired-legacy', startup);
+  check('startup: legacy registration is removed, so it cannot restart', await guardPage.evaluate(async () => (await navigator.serviceWorker.getRegistrations()).length) === 0);
+  const recovered = await selectedApis(guardPage);
+  check('startup: every API recovers in the SAME document, without another reload', correctApis(recovered), recovered);
+  const guardCache = await cacheState(guardPage);
+  check('startup: retired controller does not recreate its poisoned cache', !guardCache.names.includes('skyloom-shell-v1'));
+  check('startup: provider cache and saved flight survive', guardCache.sentinel === 'keep provider tiles' && await guardPage.evaluate(() => localStorage.getItem('fly-saved-flight-regression')) === 'keep my flight');
+  report.legs.startup = { result: startup, apis: recovered, cache: guardCache };
+  await guardContext.close();
+
   servedWorker = CURRENT;
   const freshContext = await browser.newContext({ serviceWorkers: 'allow' });
   const freshPage = await freshContext.newPage();
   freshPage.setDefaultTimeout(TIMEOUT);
   await controlled(freshPage, origin);
+  const safe = await freshPage.evaluate(async () => (await import('/worker-cache-guard.js')).prepareSceneryWorkers());
+  check('current: startup preserves the safe shell and its offline cache', safe === 'safe', safe);
   const fresh = await selectedApis(freshPage);
   check('current: each worker retains its requested API', correctApis(fresh), fresh);
   report.legs.current = { apis: fresh, cache: await checkCurrentCache(freshPage, 'current') };

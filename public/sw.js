@@ -15,7 +15,7 @@
  * OFFLINE_SHELL; with the flag off that module unregisters this worker and
  * deletes its caches (the kill switch).
  */
-const VERSION = 'v2';
+const VERSION = 'v3';
 const CACHE = `skyloom-shell-${VERSION}`;
 const SHELL = '/';
 const STATIC_PREFIXES = ['/models/', '/materials/', '/hdri/', '/textures/', '/fonts/', '/audio/', '/data/', '/atlas/', '/icons/', '/og/', '/adventures/', '/splash/'];
@@ -71,6 +71,10 @@ self.addEventListener('activate', (event) => {
 // and only what the cache does not hold yet.
 self.addEventListener('message', (event) => {
   const data = event.data;
+  if (data?.type === 'worker-cache-policy') {
+    event.ports?.[0]?.postMessage({ workerBootstrap: 'network-only' });
+    return;
+  }
   if (data && data.type === 'retire') {
     retired = true;
     event.waitUntil(
