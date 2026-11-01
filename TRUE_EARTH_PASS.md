@@ -8,8 +8,9 @@ follows unchanged under **Plan**.
 
 ## How to try a flag on a live build
 
-Every look-changing workstream ships `enabled:false` in `lib/fly/fly-constants.js`
-(TRUE EARTH section at the end). URL parameters switch things for one page load,
+New look-changing workstreams begin `enabled:false` in `lib/fly/fly-constants.js`
+(TRUE EARTH section at the end). The owner can authorize their release; the
+current enabled set is recorded below. URL parameters switch things for one page load,
 which also works on the iPhone where there is no console:
 
 | Parameter | Example | Effect |
@@ -19,9 +20,30 @@ which also works on the iPhone where there is no console:
 | `weather` | `?weather=overcast` · `?weather=baseline` | pin a weather state |
 | `diag` | `?diag=1` | diagnostics panel: live frame stats, 60 s benchmark, device report |
 
-A flag's default flips to `true` in its own one-line commit after its run list passes.
+A flag's default normally flips after its run list passes. An explicit owner
+release instruction is recorded separately from the measurements it authorizes.
 
 ## Status
+
+### 2026-11-01 — Premium Earth enabled by owner instruction
+
+[FLY_PREMIUM_EARTH.md](FLY_PREMIUM_EARTH.md) records the scanned-material,
+foliage, architecture and Manhattan/Yosemite implementation. After the corrected
+preview, the owner instructed **“Push to main and enable everything.”**
+`MATERIAL_SCANS`, `SCENERY_FORMS`, `SHOWCASE_EARTH`, `BUILDING_REALISM`,
+`CITY_HORIZON` and `TWILIGHT_BALANCE` now default **ON** in Enhanced Satellite.
+A plain URL activates them; `?flags=-NAME` disables one for a page load. The
+implementation retains Three.js/R3F and existing tier limits, with no paid asset
+or new paid service dependency.
+
+Owner-reported moving-window shimmer and horizontal cliff bands were then
+reproduced and corrected: filtered facade coverage/relief, eviction-tail skyline
+masking, and nonperiodic rock weathering with first-order gradients. The
+[surface correction record](FLY_SURFACE_STABILITY.md) includes
+GPU regression controls and the rebuilt Manhattan/Yosemite flight captures
+(zero runtime/shader errors). The release instruction does not certify the
+combined feature set's open High resource-budget gate or physical iPhone/Safari
+behavior. Those gaps remain documented in the implementation record.
 
 | Phase | State |
 |---|---|
@@ -36,12 +58,12 @@ A flag's default flips to `true` in its own one-line commit after its run list p
 
 2026-10-31 atmosphere follow-up: `TWILIGHT_BALANCE` fixes the clipped rusty
 sunset, the civil-twilight dark interval and city lights surviving their
-terrain's horizon fade. **Off pending owner certification**. Add it to the
-building preview: `?flags=BUILDING_REALISM,CITY_HORIZON,TWILIGHT_BALANCE&diag=1`.
+terrain's horizon fade. Initially off for review; **enabled by owner instruction
+on 2026-11-01**. Use `?flags=-TWILIGHT_BALANCE&diag=1` for the disabled arm.
 See [FLY_TWILIGHT_BALANCE.md](FLY_TWILIGHT_BALANCE.md) for the reproduction and A/B.
 
 2026-10-31 building pass: `BUILDING_REALISM` and `CITY_HORIZON` are implemented,
-**off pending owner certification**. Preview together with
+**enabled by owner instruction on 2026-11-01**. Force both on with
 `?flags=BUILDING_REALISM,CITY_HORIZON&diag=1`. See
 [FLY_BUILDING_REALISM.md](FLY_BUILDING_REALISM.md) for material changes, distance
 budgets, verification and the desktop/iPhone run list.

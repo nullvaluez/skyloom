@@ -12,13 +12,27 @@ import { fileURLToPath } from 'node:url';
 
 const sha = s => createHash('sha256').update(s).digest('hex');
 const BASE = {
-  'enhanced-near': ['8a0f512e8acc3f0a640e9b36f010add32c17cf6fffb3aba46b9e1d7c68a182e6', 'bf4dcef94c529b90ce6f25155dcc20155f09f6a24a2f07dce58b98aeed89cc6d'],
-  'enhanced-far': ['7a9813b23b9f79860d60ea5523f723160cdf762e809c194b541f4aca3517d0a4', '42753286acb1143e1d4c5bb693105c1a4e66cc1f7c63266048a57dfd05d3ff6c'],
-  'classic-near': ['8a0f512e8acc3f0a640e9b36f010add32c17cf6fffb3aba46b9e1d7c68a182e6', 'e733de46080e3cdc0c2c4176d1b8bb81a9dc48a2bfa533b9715dd326b69df5c9'],
-  'classic-far': ['7a9813b23b9f79860d60ea5523f723160cdf762e809c194b541f4aca3517d0a4', 'c4e0c7e3ff1a322f1643b48b14545d88817e94f1c45e260278bab72fc31f97c7'],
+  "enhanced-near": [
+    "8a0f512e8acc3f0a640e9b36f010add32c17cf6fffb3aba46b9e1d7c68a182e6",
+    "05233a8b6a60044806de1eeeee968e6588d0e6de5d1f195dda897a541d6b3151"
+  ],
+  "enhanced-far": [
+    "7a9813b23b9f79860d60ea5523f723160cdf762e809c194b541f4aca3517d0a4",
+    "85c43969ccd228497c5c82d86d0672872e2f397dc872e163b1eb8bfd5e926917"
+  ],
+  "classic-near": [
+    "8a0f512e8acc3f0a640e9b36f010add32c17cf6fffb3aba46b9e1d7c68a182e6",
+    "7b11be55f3bfb90bad181c9cb8093df7b0e618e2965b8fb613dd28a6d0cabae7"
+  ],
+  "classic-far": [
+    "7a9813b23b9f79860d60ea5523f723160cdf762e809c194b541f4aca3517d0a4",
+    "0950e3260e5813407dfcd12122e8ef9d061a1b3d89e3f02515d4c1d31f0e726c"
+  ]
 };
-// Recorded from the actual material on 2026-10-31 before the realism edit,
-// with CITY_FACADES and NIGHT_RHYTHM at their shipped-on defaults.
+// Refreshed 2026-11-01 for the shared facade aliasing bug fix: integrated
+// coverage, Nyquist retirement and first-order relief apply to both flag arms.
+// Vertex programs are unchanged; independent GPU motion regression guards the
+// intended fragment change. CITY_FACADES/NIGHT_RHYTHM use shipped defaults.
 
 function pack(v) {
   if (v == null || typeof v !== 'object') return v;

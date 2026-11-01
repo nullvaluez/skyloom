@@ -8,6 +8,7 @@ import crypto from 'node:crypto';
 const off = process.argv.includes('--off');
 globalThis.window = { location: { search: '' }, __flyCityHorizonOverride: { enabled: !off }, __flyBuildingRealismOverride: { enabled: false } };
 const workerURL = new URL('../lib/fly/toy-world/vector-tile.worker.js', import.meta.url).href;
+const baselineWorkerSource = execFileSync('git', ['show', 'HEAD:lib/fly/toy-world/vector-tile.worker.js'], { encoding: 'utf8', maxBuffer: 2e6 });
 registerHooks({
   resolve(spec, ctx, next) {
     if (spec === 'comlink') return { url: 'file:///city-horizon-comlink.mjs', shortCircuit: true };
@@ -20,7 +21,7 @@ registerHooks({
   },
   load(url, ctx, next) {
     if (url === 'file:///city-horizon-comlink.mjs') return { format: 'module', shortCircuit: true, source: 'export const expose=x=>{globalThis.__horizonWorker=x}; export const transfer=x=>x;' };
-    if (url === workerURL + '?baseline') return { format: 'module', shortCircuit: true, source: execFileSync('git', ['show', 'HEAD:lib/fly/toy-world/vector-tile.worker.js'], { encoding: 'utf8', maxBuffer: 2e6 }) };
+    if (url === workerURL + '?baseline') return { format: 'module', shortCircuit: true, source: baselineWorkerSource };
     return next(url, ctx);
   },
 });
@@ -116,14 +117,33 @@ globalThis.fetch = async (url) => {
 };
 await import(workerURL + '?baseline'); const baseline = globalThis.__horizonWorker;
 await import(workerURL); const worker = globalThis.__horizonWorker;
-const hash = (r) => crypto.createHash('sha256').update(JSON.stringify(r, (k, v) => k === 'tessMs' ? undefined : ArrayBuffer.isView(v) ? [...v] : v)).digest('hex');
+const protocolOf = (source) => {
+  const match = source.match(/const WORKER_PROTOCOL\s*=\s*(\d+)/);
+  assert.ok(match, 'Worker source declares its transport protocol');
+  return Number(match[1]);
+};
+const baselineProtocol = protocolOf(baselineWorkerSource);
+const currentProtocol = protocolOf(fs.readFileSync(new URL(workerURL), 'utf8'));
+const hash = (r) => {
+  // Protocol 24 adds explicit premium policy inputs. Compare transport
+  // identity separately from the unchanged flag-off geometry payload; retain
+  // every nested field, even if a future payload happens to name one "v".
+  const payload = { ...r };
+  delete payload.v;
+  delete payload.tessMs;
+  return crypto.createHash('sha256').update(JSON.stringify(payload, (k, v) => ArrayBuffer.isView(v) ? [...v] : v)).digest('hex');
+};
 const parityTiles = [[14, 4413, 6194], [14, 2817, 6402], [14, 8192, 8192]];
 for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) parityTiles.push([14, 4824 + dx, 6157 + dy]);
 for (const tile of parityTiles) {
   const opts = { visuals: true, cityRange: { denseMinH: 20, denseTallCount: 40 } };
-  assert.equal(hash(await worker.buildTile(...tile, 'sat-skyline', opts)), hash(await baseline.buildTile(...tile, 'sat-skyline', opts)));
+  const actual = await worker.buildTile(...tile, 'sat-skyline', opts);
+  const prior = await baseline.buildTile(...tile, 'sat-skyline', opts);
+  assert.equal(actual.v, currentProtocol, 'Current result carries the current source protocol');
+  assert.equal(prior.v, baselineProtocol, 'Baseline result carries its own source protocol');
+  assert.equal(hash(actual), hash(prior));
 }
-console.log('PASS flag-off real worker bundles byte-identical to HEAD on city/suburb/desert/synthetic tiles');
+console.log(`PASS flag-off real worker geometry matches HEAD; protocols ${baselineProtocol} -> ${currentProtocol} verified separately on city/suburb/desert/synthetic tiles`);
 for (const tier of ['high', 'medium', 'low']) {
   const options = H.cityHorizonRequest({ visuals: true }, H.cityHorizonFor(tier));
   const r = await worker.buildTile(14, 8192, 8192, 'sat-skyline', options);

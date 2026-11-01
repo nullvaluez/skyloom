@@ -1,0 +1,63 @@
+{
+  "schema": "skyloom-elevation-pack/1",
+  "id": "yosemite-v1",
+  "name": "Yosemite Valley",
+  "license": "Public domain",
+  "author": "U.S. Geological Survey",
+  "source": "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer",
+  "sourceSha256": "6a41c4b250571f8becf79ce3d9098d3d2d51a127bae37e3145a82e28149e4dcd",
+  "request": {
+    "f": "json",
+    "bbox": "-119.72,37.69,-119.48,37.8",
+    "bboxSR": "4326",
+    "imageSR": "3857",
+    "size": "2048,1187",
+    "format": "tiff",
+    "pixelType": "F32",
+    "noData": "-9999",
+    "interpolation": "RSP_BilinearInterpolation",
+    "renderingRule": "{\"rasterFunction\":\"None\"}"
+  },
+  "bounds": [
+    -13327170.221192565,
+    4535725.296459141,
+    -13300451.976558471,
+    4551210.91969189
+  ],
+  "crs": "EPSG:3857",
+  "heightUnit": "metres",
+  "verticalDatum": "USGS 3DEP orthometric elevations (NAVD88 in CONUS); feathered to the existing world at the pack boundary",
+  "pixelRegistration": "area; sample at pixel centres",
+  "quantizationM": 0.1,
+  "noData": 65535,
+  "edgeBlendM": 1200,
+  "variants": {
+    "512": {
+      "width": 512,
+      "height": 297,
+      "file": "height-512.u16",
+      "bytes": 304128,
+      "sha256": "565039da2f497174313668137a7507fa64ab02d07bd497ad0394f48044f06409",
+      "minM": 996.56,
+      "maxM": 3024.29
+    },
+    "1024": {
+      "width": 1024,
+      "height": 594,
+      "file": "height-1024.u16",
+      "bytes": 1216512,
+      "sha256": "99d1d8575fe035785f6b3b8eec3815ebd8599d44134ecf9c492e628565844159",
+      "minM": 996.4,
+      "maxM": 3024.29
+    },
+    "2048": {
+      "width": 2048,
+      "height": 1187,
+      "file": "height-2048.u16",
+      "bytes": 4861952,
+      "sha256": "b2c0cb81736143a88ac0579168943f4390c1e99b95a0335bce72391cd80941a9",
+      "minM": 996.34,
+      "maxM": 3024.98
+    }
+  }
+}

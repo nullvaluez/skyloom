@@ -4,19 +4,24 @@
 the coarse mapped city beyond the detailed ring. The owner's Manhattan capture
 at 40.7311° N, 73.9892° W, heading 006°, 1,780 ft is the primary review pose.
 
-Both True Earth flags ship **off pending owner certification**:
+**Release update, 2026-11-01:** the owner instructed “Push to main and enable
+everything.” Both True Earth flags now default **on**, together with the
+Premium Earth and twilight features. The validation below records the original
+comparison; the known resource cost and physical-iPhone checks remain open.
 
 - `BUILDING_REALISM`: architectural palettes, differentiated facade/glass
   response, filtered structural detail, neutral texture modulation and quieter
   daytime grading.
 - `CITY_HORIZON`: broader, bounded mapped city mass and a gradual outer fade.
 
-Preview both with `/?flags=BUILDING_REALISM,CITY_HORIZON&diag=1`. Negative names
-restore the prior paths: `/?flags=-BUILDING_REALISM,-CITY_HORIZON&diag=1`.
+Both run on a plain Enhanced Satellite URL. Negative names restore the prior
+paths for one page load: `/?flags=-BUILDING_REALISM,-CITY_HORIZON&diag=1`.
 These flags are recorded in device reports. No persistent preference changes.
 
 The follow-up [twilight correction](FLY_TWILIGHT_BALANCE.md) adds
-`TWILIGHT_BALANCE` to this preview for the owner's rusty-horizon report.
+`TWILIGHT_BALANCE` for the owner's rusty-horizon report; it also now defaults on.
+The later [surface stability correction](FLY_SURFACE_STABILITY.md) fixes moving
+window shimmer and the eviction-tail overlap between the two building rings.
 
 ## Diagnosis and changes
 
@@ -144,8 +149,9 @@ The larger city has a real cost: the owner-pose noon frame submits about 37%
 more triangles and 9% more draws. Those totals include the renderer's multiple
 passes; the skyline itself grows from 115,833 to 480,335 resident triangles.
 No performance ceiling was raised and no frame-rate certification is claimed.
-The opt-in High budget is a fidelity preview for hardware acceptance, while
-Medium and Low have their own smaller source budgets.
+The owner has enabled the High fidelity policy despite that open budget gate;
+Medium and Low retain their own smaller source budgets. Enabling it is not a
+new performance measurement.
 
 At the exact owner pose the High fade spans approximately 11.1–14.6 km true
 distance; the 24 km policy value is a requested search radius, not guaranteed
@@ -171,9 +177,11 @@ with no additional material defect identified in those views. Tall extrusions
 and repeated facade grids remain procedural; these screenshots do not establish
 photoreal reconstruction or motion stability.
 
-## Owner certification
+## Remaining owner checks
 
-1. Compare both preview URLs over Manhattan at noon and low sun. Concrete and
+Release was authorized on 2026-11-01; these checks remain useful evidence work.
+
+1. Compare the plain URL and the negative-flag URL over Manhattan at noon and low sun. Concrete and
    stone should remain distinct from brick; glass should reflect the environment
    without every building becoming a glossy blue mirror.
 2. Fly toward and away from Midtown, then turn through 360°. Coarse mapped mass

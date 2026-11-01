@@ -1,0 +1,10 @@
+[
+  {"layer":0,"surface":"asphalt","id":"aerial_asphalt_01","repeatM":16},
+  {"layer":1,"surface":"concrete","id":"concrete_floor_02","repeatM":4},
+  {"layer":2,"surface":"masonry","id":"brick_wall_001","repeatM":1.6},
+  {"layer":3,"surface":"roof","id":"grey_roof_01","repeatM":4},
+  {"layer":4,"surface":"forest floor","id":"forest_floor","repeatM":4},
+  {"layer":5,"surface":"rock","id":"rock_boulder_dry","repeatM":8},
+  {"layer":6,"surface":"sand","id":"aerial_sand","repeatM":16},
+  {"layer":7,"surface":"snow","id":"snow_02","repeatM":4}
+]

@@ -60,6 +60,11 @@ const FT = 0.3048;
 
 // camera: 'chase' (the game's own rig) | 'photo' (photo-mode orbit; yaw/pitch rad, dist m).
 const SCENES = [
+  { id: 'yosemite-owner-bands', detail: 'Owner banding report, valley at 4,660 ft heading northeast', lat: 37.7339, lon: -119.6071, altM: 4660 * FT, headingDeg: 52, hour: 15.5, weather: 'clear' },
+  { id: 'nyc-owner-shimmer', detail: 'Low Manhattan approach toward Empire State, 890 ft heading northeast', lat: 40.737, lon: -74.002, altM: 890 * FT, headingDeg: 50, hour: 12.5, weather: 'clear' },
+  { id: 'yosemite-showcase', detail: 'Yosemite Valley, El Capitan to Half Dome, low scenic flight', lat: 37.726, lon: -119.649, altM: 1500, headingDeg: 78, hour: 15.5, weather: 'clear' },
+  { id: 'yosemite-valley-noon', detail: 'Yosemite Valley west to east, 250 m above the valley floor', lat: 37.7234, lon: -119.683, altM: 1480, headingDeg: 72, hour: 12.5, weather: 'clear' },
+  { id: 'yosemite-granite-golden', detail: 'El Capitan south face from the valley, late afternoon', lat: 37.7215, lon: -119.646, altM: 1600, headingDeg: 35, hour: 16.5, weather: 'clear' },
   { id: 'nyc-user-noon', detail: 'Owner screenshot pose, Manhattan north, 1,780 ft, noon', lat: 40.7311, lon: -73.9892, altM: 1780 * FT, headingDeg: 6, hour: 12.5 },
   { id: 'nyc-user-golden', detail: 'Owner screenshot pose, Manhattan north, 1,780 ft, golden hour', lat: 40.7311, lon: -73.9892, altM: 1780 * FT, headingDeg: 6, hour: 18.85 },
   { id: 'nyc-1000-noon', detail: 'Manhattan from the Hudson, 1,000 ft, noon', lat: 40.742, lon: -74.022, altM: 1000 * FT, headingDeg: 105, hour: 12.5 },
@@ -95,7 +100,10 @@ function syntheticTraffic() {
 }
 
 const sourceFiles = ['lib/fly/fly-constants.js', 'lib/fly/architectural-realism.js', 'lib/fly/architectural-daylight.js', 'lib/fly/cinema-frame.js', 'lib/fly/city-horizon.js', 'lib/fly/city-facades.js', 'lib/fly/building-profiles.js', 'lib/fly/satellite-architecture-material.js', 'lib/fly/cinema-environment.js', 'lib/fly/hdr-grade.js', 'lib/fly/toy-world/sat-skyline-engine.js', 'lib/fly/toy-world/vector-tile.worker.js', 'lib/fly/toy-world/world-bend.js'];
+sourceFiles.push(...['premium-earth','cinema-material-assets','cinematic-materials','earth-surface-engine','earth-surface-material','living-forest','forest-atlas','natural-scenery-geometry','earth-scenery','showcase-policy','showcase-elevation','showcase-elevation-core','showcase-elevation.worker','tile-sources'].map(name=>`lib/fly/${name}.js`), 'lib/fly/showcase-regions.json', ...['materials/earth-scans-v1','materials/forest-atlas-v1','regions/yosemite-v1'].map(dir=>`public/${dir}/manifest.json`));
 const sourceHashes = () => Object.fromEntries(sourceFiles.map(file => [file, fs.existsSync(file) ? crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex') : null]));
+sourceFiles.push('lib/fly/scenery-support.js','lib/fly/toy-world/sat-veg-engine.js','components/fly/SatVegLayer.jsx');
+sourceFiles.push('lib/fly/facade-filtering.js','lib/fly/toy-world/sat-building-engine.js');
 const report = { label, url, viewport, quality, mobileEmulation: mobile, flags: args.flags || null, venue: 'Installed Chrome, D3D11, live tile providers; synthetic traffic and pinned weather/sun; no iPhone acceptance', capturedAt: new Date().toISOString(), source: sourceHashes(), captures: [], errors: [], console: [], requests: { failed: [], providers: {} } };
 const save = () => fs.writeFileSync(path.join(out, 'manifest.json'), JSON.stringify(report, null, 2));
 
@@ -129,6 +137,7 @@ async function newPage(browser) {
   }, { quality, mobile });
   await page.route('**/api/aircraft?**', (r) => r.fulfill({ json: syntheticTraffic() }));
   await page.route('**/api/weather**', (r) => r.fulfill({ json: { found: false } }));
+  if(args.assetFailure) await page.route(/\/(?:materials\/(?:earth-scans-v1|forest-atlas-v1)|regions\/yosemite-v1)\//, r=>r.abort('failed'));
   return page;
 }
 
@@ -184,7 +193,10 @@ async function telemetry(page) {
     const streamers = Object.fromEntries(['satBuildings', 'satSkyline', 'satRoads', 'satVeg'].map(k => [k, rt[k]?.stats ? { ...rt[k].stats } : null]));
     const stats = window.__flyStats || {};
     const details = Object.fromEntries(Object.entries(stats).filter(([key]) => /building|skyline|horizon|city|frame|draw|tri|memory|budget/i.test(key)));
+    let terrainUniforms=null;
+    scene.traverse(o=>{if(!terrainUniforms&&o.material){const q=gl?.properties.get(o.material)?.uniforms;if(q?.uShowcaseGranite)terrainUniforms={granite:q.uShowcaseGranite.value,masks:q.uShowcaseCliffs?.value?.map(v=>v.toArray()),scan:q.uMaterialScans?.value};}});
     return { quality: s.qualityTier, visuals: s.visuals, style: s.mapStyle, streamers, details,
+      premium:{surface:rt.earthSurface,forest:rt.livingForest?.stats??rt.livingForest,scenery:rt.earthScenery?.stats??rt.earthScenery,terrainUniforms},
       render: gl ? { ...gl.info.render, memory: { ...gl.info.memory }, programs: gl.info.programs?.length } : null,
       sun: rt.sun ? { sinEl: rt.sun.sinEl, frac: rt.sun.frac } : null,
       aglM: rt.flight.pos.y - rt.flight.groundElev, weather: rt.weather?.wx ? { cover: rt.weather.wx.cloudCoverPct ?? null, overcastT: rt.weather.wx.overcastT ?? null, visM: rt.weather.wx.visM ?? null } : null, cinemaFog: rt.cinemaEnvironment?.fog ?? null, cloudBase: rt.cinemaEnvironment?.cloudBase ?? null, cityFacades: window.__flyStats?.cityFacades ?? null,
@@ -264,15 +276,11 @@ async function enterPhoto(page, photo) {
  */
 async function motionBurst(page, scene) {
   const stepM = Number(args.stepM || 3);
-  const dir = await page.evaluate(async () => {
-    const pose = window.__capturePose, f = window.__fly.flight;
-    pose.hold = false;
-    const a = { x: f.pos.x, z: f.pos.z };
-    await new Promise((res) => setTimeout(res, 400));
-    const d = { x: f.pos.x - a.x, z: f.pos.z - a.z }, n = Math.hypot(d.x, d.z) || 1;
-    pose.x = f.pos.x; pose.z = f.pos.z; pose.hold = true;
-    return { x: d.x / n, z: d.z / n };
-  });
+  // Derive direction from the pinned pose. A timed free-flight warm-up gave
+  // each A/B arm a different starting point and invalidated pixel comparisons.
+  const heading=scene.headingDeg*Math.PI/180;
+  const k=1/Math.cos(scene.lat*Math.PI/180);
+  const dir={x:Math.sin(heading)*k,z:-Math.cos(heading)*k};
   await freezeClock(page);
   for (let i = 0; i < frames; i++) {
     await page.evaluate(({ dir, stepM }) => { const pose = window.__capturePose; pose.x += dir.x * stepM; pose.z += dir.z * stepM; }, { dir, stepM });
@@ -281,6 +289,22 @@ async function motionBurst(page, scene) {
   }
   await thawClock(page);
   report.captures.push({ scene: `${scene.id}-motion`, frames, stepM });
+}
+
+/** Real-clock travel through streaming boundaries, separate from stepped A/B. */
+async function flightBurst(page, scene) {
+  await page.evaluate(() => { window.__capturePose.hold=false; });
+  const seconds=Number(args.seconds||30),samples=[];
+  for(let i=0;i<seconds;i++) {
+    await page.waitForTimeout(1000);
+    samples.push(await page.evaluate(()=>{
+      const r=window.__fly,f=r.flight;
+      return {position:{x:f.pos.x,y:f.pos.y,z:f.pos.z},agl:f.agl,
+        near:r.satBuildings?.stats,far:r.satSkyline?.stats};
+    }));
+    if(i%5===0)await shoot(page,`${scene.id}-flight-${String(i).padStart(2,'0')}.png`);
+  }
+  report.captures.push({scene:`${scene.id}-flight`,seconds,samples});
 }
 
 /**
@@ -341,6 +365,7 @@ async function stillBurst(page, scene) {
         await thawClock(page);
         if (args.still && String(args.still).split(',').includes(scene.id)) await stillBurst(page, scene);
         if (args.motion && String(args.motion).split(',').includes(scene.id)) await motionBurst(page, scene);
+        if (args.flight && String(args.flight).split(',').includes(scene.id)) await flightBurst(page, scene);
         if (scene.camera === 'photo') { await page.keyboard.press('Escape'); await page.waitForTimeout(800); }
       } catch (e) {
         report.errors.push({ scene: scene.id, message: e.message.split('\n')[0] });

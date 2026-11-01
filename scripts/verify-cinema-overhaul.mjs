@@ -87,10 +87,15 @@ check('governor reduces effects before resolution or geographic tier',()=>{
 });
 const {resolveInitialSettings}=await import('../lib/fly/fly-settings.js');
 const {resolveInitialMapStyle}=await import('../lib/fly/map-style.js');
+const {DEVICE_TIERS_ACTIVE}=await import('../lib/fly/device-tiers.js');
 check('blocked browser storage resolves phone High with mobile effect budgets before allocation',()=>{
  window.matchMedia=()=>({matches:true});window.screen={width:390,height:844};window.ontouchstart=null;
  window.localStorage={getItem(){throw Error('blocked');}};
-  resolveInitialSettings();assert.equal(useFlyStore.getState().qualityPreset,'high');
+  // This checks the storage fallback, not the GPU classifier. Earlier desktop
+  // cases cache an unknown GPU as Medium; isolate that later-added policy.
+  const startTier=DEVICE_TIERS_ACTIVE.startTier;DEVICE_TIERS_ACTIVE.startTier=false;
+  try{resolveInitialSettings();assert.equal(useFlyStore.getState().qualityPreset,'high');}
+  finally{DEVICE_TIERS_ACTIVE.startTier=startTier;}
   useFlyStore.setState({mapStyle:'toy'});resolveInitialMapStyle();assert.equal(useFlyStore.getState().mapStyle,'satellite');
  assert.equal(resolveCinemaProfile({preset:'ultra',phone:true}).materialSize,256);
  window.matchMedia=()=>({matches:false});

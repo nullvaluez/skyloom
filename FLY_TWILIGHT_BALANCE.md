@@ -1,6 +1,9 @@
 # Twilight atmosphere correction
 
-2026-10-31. Implementation on `main`; preview flags remain off by default.
+2026-10-31 implementation. **Release update, 2026-11-01:** `TWILIGHT_BALANCE`
+now defaults on under the owner's “Push to main and enable everything”
+instruction. The original comparison evidence below is unchanged; this release
+authorization does not certify physical-iPhone behavior or performance.
 
 The owner's Hoboken screenshot showed a rusty orange horizon, a nearly black
 purple upper sky and a pale distant ground strip. The fixed-pose reproduction
@@ -37,12 +40,13 @@ emission closes this gap, but the first live A/B demonstrated that it does not
 fix the nearer carpet. The correction addresses both mechanisms; the
 source-only fade test alone is insufficient acceptance evidence.
 
-## Preview
+## Default and rollback
 
-`TWILIGHT_BALANCE` ships `enabled:false`, following the project's desktop and
-iPhone review rule. Preview with the building pass:
+`TWILIGHT_BALANCE` ships `enabled:true`, together with the building and Premium
+Earth features. A plain Enhanced Satellite URL uses the correction. Disable
+only this feature for one page load with:
 
-<http://localhost:3010/?flags=BUILDING_REALISM,CITY_HORIZON,TWILIGHT_BALANCE&diag=1>
+`/?flags=-TWILIGHT_BALANCE&diag=1`
 
 ## Implementation
 
@@ -125,9 +129,10 @@ by a settled capture with no further errors or source changes. Those initial
 errors are retained in `final-phone/manifest.json`. This checks the phone
 layout and shader policy on Chrome/RTX 5080, not iPhone Safari or its speed.
 
-For a same-time visual review, add
-`&sunUtc=2026-10-31T22:05:35Z&weather=baseline` to the preview URL and use the
-Hoboken pose above. Removing those parameters restores the live clock/weather.
+For a same-time visual review, use
+`/?diag=1&sunUtc=2026-10-31T22:05:35Z&weather=baseline` at the Hoboken pose above.
+Add `&flags=-TWILIGHT_BALANCE` for the disabled arm. Removing the time/weather
+parameters restores the live clock/weather.
 
 No extra render passes, draw calls, textures or atmosphere-table work are added.
 This is not an FPS or real-iPhone certification.

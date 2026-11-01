@@ -712,6 +712,8 @@ function placeCanopy(
         if (i > 0 && bucket(i) === bucket(i - 1)) continue;
         const lx = chunk.veg[i * 4];
         const lz = chunk.veg[i * 4 + 1];
+        // Re-evaluated with each drape revision, including the regional DEM.
+        if(!engine.canopySupported(chunk,lx,lz,1/Math.max(.1,Math.cos(flight.latDeg*Math.PI/180))))continue;
         const r0 = chunk.veg[i * 4 + 2] * S.radiusMul;
         const conifer = chunk.veg[i * 4 + 3] > 0.5;
         const wx = chunk.cx + lx;

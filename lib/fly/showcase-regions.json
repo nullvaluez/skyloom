@@ -1,0 +1,32 @@
+[
+  {
+    "id":"manhattan-v1","name":"Manhattan waterfront and skyline",
+    "bounds":[-74.05,40.68,-73.91,40.89],
+    "route":"Liberty – Battery – Midtown – Hudson",
+    "replaces":["inferred architectural roof treatment"],
+    "assets":{"landmarks":"existing LANDMARK_FIDELITY hero/mobile/coarse assets","surfaces":"/materials/earth-scans-v1/manifest.json"},
+    "placement":"Mapped building footprints, heights and courtyard holes remain authoritative. No additional tower layer.",
+    "architecture":"manhattan","forest":"deciduous",
+    "budget":{"additionalDraws":0,"additionalInstances":0},
+    "source":"OpenStreetMap via OpenFreeMap; existing Skyloom landmark assets",
+    "license":"ODbL-1.0 for mapped data; individual landmark licenses in FLY_ASSETS"
+  },
+  {
+    "id":"yosemite-v1","name":"Yosemite Valley",
+    "bounds":[-119.72,37.69,-119.48,37.8],
+    "route":"Valley View – El Capitan – Yosemite Falls – Half Dome",
+    "replaces":["terrain elevation inside feathered coverage","generic forest cluster geometry"],
+    "assets":{"elevation":"/regions/yosemite-v1/manifest.json","surfaces":"/materials/earth-scans-v1/manifest.json","foliage":"/materials/forest-atlas-v1/manifest.json"},
+    "placement":"Existing woodland and water evidence; no trees on mapped rock, roads, buildings or water.",
+    "architecture":"rural","forest":"conifer",
+    "mineralMasks":[
+      {"name":"El Capitan","lon":-119.637,"lat":37.731,"radiusXM":1150,"radiusZM":1050},
+      {"name":"Cathedral Rocks","lon":-119.631,"lat":37.716,"radiusXM":1100,"radiusZM":850},
+      {"name":"Half Dome","lon":-119.532,"lat":37.746,"radiusXM":1450,"radiusZM":1300},
+      {"name":"Royal Arches","lon":-119.563,"lat":37.751,"radiusXM":1500,"radiusZM":800}
+    ],
+    "budget":{"additionalDraws":0,"additionalInstances":0,"maxTerrainTrianglesPerTile":4096,"maxPhoneTerrainTrianglesPerTile":2048},
+    "source":"U.S. Geological Survey 3DEP; OpenStreetMap classification",
+    "license":"Public domain elevation; ODbL-1.0 for mapped data"
+  }
+]

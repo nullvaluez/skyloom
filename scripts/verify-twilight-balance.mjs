@@ -55,7 +55,7 @@ const run = (name) => JSON.parse(execFileSync(process.execPath, [fileURLToPath(i
   cwd: fileURLToPath(new URL('..', import.meta.url)), encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
 }).trim().split('\n').pop());
 const off = run('off'), on = run('on');
-check('module pin resolves both arms, shipped default remains off', !off.active && on.active && TWILIGHT_BALANCE.enabled === false);
+check('module pin resolves both arms; owner-approved default is on', !off.active && on.active && TWILIGHT_BALANCE.enabled === true);
 
 let flagOff = true, endpoints = true, phase = true, written = true;
 const phaseKeys = ['night', 'day', 'moonW', 'golden', 'keyGain', 'sun', 'keyDir', 'keyColor', 'fill', 'fillColor', 'environment', 'exposure'];

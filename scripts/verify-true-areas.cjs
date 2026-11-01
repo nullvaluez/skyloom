@@ -193,8 +193,8 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol * Math.max(1, Math.abs(b));
     const sk = read('lib/fly/toy-world/sat-skyline-engine.js');
     const ta = read('lib/fly/true-areas.js');
     const ok =
-      bld.split("{ visuals: this.visuals, ...trueAreasRequest() }").length - 1 === 2 &&
-      sk.split("{ visuals: this.visuals, ...trueAreasRequest() }").length - 1 === 1 &&
+      (bld.match(/visuals:\s*this\.visuals,[^}]*\.\.\.trueAreasRequest\(\)/g)??[]).length === 2 &&
+      (sk.match(/visuals:\s*this\.visuals,[^}]*\.\.\.trueAreasRequest\(\)/g)??[]).length === 2 &&
       /return trueAreasOn\(\) \? \{ trueAreas: true \} : null;/.test(ta);
     check('(7) the building and skyline engines add { trueAreas: true } only when the flag is on', ok);
   }

@@ -73,9 +73,9 @@ const cloudyDay=resolveSatelliteAtmosphere({sinEl:0.7},{overcastT:1});
 assert.ok(cloudyDay.environment>day.environment,'Immersive overcast shifts light into diffuse environment fill');
 assert.ok(cloudyDay.background<day.background,'Overcast still darkens the visible background');
 for(const f of ['sat-building','sat-skyline','sat-road','sat-veg','sat-clutter','toy-world']) {
-  assert.match(fs.readFileSync(new URL('../lib/fly/toy-world/'+f+'-engine.js',import.meta.url),'utf8'), /EXPECTED_WORKER_PROTOCOL = 23/);
+  assert.match(fs.readFileSync(new URL('../lib/fly/toy-world/'+f+'-engine.js',import.meta.url),'utf8'), /EXPECTED_WORKER_PROTOCOL = 24/);
 }
-assert.match(fs.readFileSync(new URL('../lib/fly/toy-world/vector-tile.worker.js',import.meta.url),'utf8'), /WORKER_PROTOCOL = 23/);
+assert.match(fs.readFileSync(new URL('../lib/fly/toy-world/vector-tile.worker.js',import.meta.url),'utf8'), /WORKER_PROTOCOL = 24/);
 // Exercise the real near/far handover uniforms through a quality step and a rebase.
 const {createSatelliteArchitectureMaterial,setSatelliteArchitectureCoverage} = await import('../lib/fly/satellite-architecture-material.js');
 for(const distant of [false,true]) {
@@ -89,19 +89,20 @@ for(const distant of [false,true]) {
   assert.match(shader.fragmentShader,/mix\(vec3\(0\.32\), diffuseColor\.rgb, 0\.35\)/,'Glazing reads the existing material variant albedo');
   assert.doesNotMatch(shader.fragmentShader,/vec3\(0\.40,0\.54,0\.61\)/,'Universal cyan glazing is retired');
   // Texture-array sampling must not reuse the previous program cache entry.
-  assert.match(material.customProgramCacheKey(),/cinematic-architecture-v11-cinema-art-/);
+  assert.match(material.customProgramCacheKey(),/cinematic-architecture-v12-filtered-/);
   material.dispose();
 }
 const far = createSatelliteArchitectureMaterial({distant:true});
-const chunks = new Map(Array.from({length:16},(_,i)=>[i,{state:'ready',tile:{z:14},mesh:{visible:true,position:{x:i*2500,z:0}}}]));
-const buildings = {object:{visible:true},chunks};
+const {SatBuildingEngine} = await import('../lib/fly/toy-world/sat-building-engine.js');
+const chunks = new Map(Array.from({length:16},(_,i)=>[i,{state:'ready',tile:{z:14},mesh:{visible:true,userData:{},position:{x:i*2500,z:0}}}]));
+const buildings = {object:{visible:true},chunks,_dying:[],forEachArchitectureCoverage:SatBuildingEngine.prototype.forEachArchitectureCoverage};
 const u = far.userData.architecture.uniforms;
 setSatelliteArchitectureCoverage(far,buildings,{x:0,z:0},1);
 assert.equal(u.uArchitectureTileCount.value,16);
 const left = u.uArchitectureTiles.value[0].x;
 for(let i=5;i<16;i++)chunks.delete(i);
 setSatelliteArchitectureCoverage(far,buildings,{x:1200,z:700},0.4);
-assert.equal(u.uArchitectureTileCount.value,5,'Evicted detailed tiles expose the distant representation');
+assert.equal(u.uArchitectureTileCount.value,5,'Fully removed detailed tiles expose the distant representation');
 assert.equal(u.uArchitectureTiles.value[0].x,left-1200,'Coverage follows the floating origin');
 assert.equal(u.uArchitectureNearFade.value,0.4,'Coverage follows the detailed altitude/birth fade');
 buildings.object.visible=false;

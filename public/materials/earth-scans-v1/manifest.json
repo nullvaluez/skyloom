@@ -1,0 +1,367 @@
+{
+  "schema": "skyloom-surface-arrays/1",
+  "version": 1,
+  "license": "CC0-1.0",
+  "licenseUrl": "https://polyhaven.com/license",
+  "channels": {
+    "color": "sRGB albedo RGB, linear roughness A",
+    "detail": "linear OpenGL normal XY, height B, ambient occlusion A"
+  },
+  "encoding": "KTX2 UASTC, full mip chain; transcodes to ASTC / BC7 / ETC2 at load",
+  "layers": [
+    {
+      "layer": 0,
+      "surface": "asphalt",
+      "id": "aerial_asphalt_01",
+      "repeatM": 16,
+      "name": "Aerial Asphalt 01",
+      "author": "Rob Tuytel",
+      "url": "https://polyhaven.com/a/aerial_asphalt_01",
+      "maps": {
+        "color": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/aerial_asphalt_01/aerial_asphalt_01_diff_1k.png",
+          "md5": "423f88cd96c687ac0e26f27d195e0bc9",
+          "bytes": 2337475
+        },
+        "normal": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/aerial_asphalt_01/aerial_asphalt_01_nor_gl_1k.png",
+          "md5": "797a0f591574d51a059011e022ab472f",
+          "bytes": 1671509
+        },
+        "rough": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/aerial_asphalt_01/aerial_asphalt_01_rough_1k.png",
+          "md5": "89c02a20c3a462014a80620cd2d5be66",
+          "bytes": 525889
+        },
+        "height": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/aerial_asphalt_01/aerial_asphalt_01_disp_1k.png",
+          "md5": "1560b8b1f1afcd4e2596fbfb7ebfc695",
+          "bytes": 1930160
+        },
+        "ao": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/aerial_asphalt_01/aerial_asphalt_01_ao_1k.png",
+          "md5": "6d57ebb12199bb52ca88e73f6c2d5872",
+          "bytes": 640881
+        }
+      }
+    },
+    {
+      "layer": 1,
+      "surface": "concrete",
+      "id": "concrete_floor_02",
+      "repeatM": 4,
+      "name": "Concrete Floor 02",
+      "author": "Rob Tuytel",
+      "url": "https://polyhaven.com/a/concrete_floor_02",
+      "maps": {
+        "color": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/concrete_floor_02/concrete_floor_02_diff_1k.png",
+          "md5": "e6b278dadc06f7550fc34eedd80a40ab",
+          "bytes": 2502798
+        },
+        "normal": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/concrete_floor_02/concrete_floor_02_nor_gl_1k.png",
+          "md5": "fe71a8ff06acc83aadfdd694a42acfd6",
+          "bytes": 6297394
+        },
+        "rough": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/concrete_floor_02/concrete_floor_02_rough_1k.png",
+          "md5": "1828b2884b6dc899704410f74b35b2be",
+          "bytes": 1866235
+        },
+        "height": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/concrete_floor_02/concrete_floor_02_disp_1k.png",
+          "md5": "491b25742fff11f5279da37f1e767917",
+          "bytes": 1752250
+        },
+        "ao": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/concrete_floor_02/concrete_floor_02_ao_1k.png",
+          "md5": "d2aa87af6dfd755381d66a0ec21ad628",
+          "bytes": 702605
+        }
+      }
+    },
+    {
+      "layer": 2,
+      "surface": "masonry",
+      "id": "brick_wall_001",
+      "repeatM": 1.6,
+      "name": "Brick Wall 001",
+      "author": "Rob Tuytel, Dimitrios Savva",
+      "url": "https://polyhaven.com/a/brick_wall_001",
+      "maps": {
+        "color": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/brick_wall_001/brick_wall_001_diffuse_1k.png",
+          "md5": "0fb8052e42bd6bc7141b28c481437a8b",
+          "bytes": 1782607
+        },
+        "normal": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/brick_wall_001/brick_wall_001_nor_gl_1k.png",
+          "md5": "99200c9dd07ae8bc85f5a027deea4b78",
+          "bytes": 2562545
+        },
+        "rough": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/brick_wall_001/brick_wall_001_rough_1k.png",
+          "md5": "29388613a9bd406979e5d82ba58e7dec",
+          "bytes": 412987
+        },
+        "height": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/brick_wall_001/brick_wall_001_displacement_1k.png",
+          "md5": "2b5d461ef87420993fe52ff13753dcb1",
+          "bytes": 1874946
+        },
+        "ao": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/brick_wall_001/brick_wall_001_ao_1k.png",
+          "md5": "a7194fda48f7fc52a5f3c915b6ec40bb",
+          "bytes": 470899
+        }
+      }
+    },
+    {
+      "layer": 3,
+      "surface": "roof",
+      "id": "grey_roof_01",
+      "repeatM": 4,
+      "name": "Grey Roof 01",
+      "author": "Rob Tuytel",
+      "url": "https://polyhaven.com/a/grey_roof_01",
+      "maps": {
+        "color": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/grey_roof_01/grey_roof_01_diff_1k.png",
+          "md5": "922999c4e66e4a3368549c5bccdb004a",
+          "bytes": 5975955
+        },
+        "normal": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/grey_roof_01/grey_roof_01_nor_gl_1k.png",
+          "md5": "8ae0e5848a46306cba062bd36a3aa955",
+          "bytes": 5263260
+        },
+        "rough": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/grey_roof_01/grey_roof_01_rough_1k.png",
+          "md5": "7362bc3d2941f0bca738f87729bc2b03",
+          "bytes": 2090568
+        },
+        "height": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/grey_roof_01/grey_roof_01_disp_1k.png",
+          "md5": "d6ba76da06a771fbc8d8246b53bc3851",
+          "bytes": 2035210
+        },
+        "ao": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/grey_roof_01/grey_roof_01_ao_1k.png",
+          "md5": "6f5087af4c202c34c9900cb9b9b5f9f9",
+          "bytes": 1992688
+        }
+      }
+    },
+    {
+      "layer": 4,
+      "surface": "forest floor",
+      "id": "forest_floor",
+      "repeatM": 4,
+      "name": "Forest Floor",
+      "author": "eye-candy.xyz",
+      "url": "https://polyhaven.com/a/forest_floor",
+      "maps": {
+        "color": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/forest_floor/forest_floor_diff_1k.png",
+          "md5": "2022eac44976b3c4842309819d76d94f",
+          "bytes": 6062807
+        },
+        "normal": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/forest_floor/forest_floor_nor_gl_1k.png",
+          "md5": "be619d4bba96b04132f29338f9b14ea2",
+          "bytes": 6034422
+        },
+        "rough": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/forest_floor/forest_floor_rough_1k.png",
+          "md5": "80e32a18aa0b93805faaca7f2a7a8bb5",
+          "bytes": 2558171
+        },
+        "height": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/forest_floor/forest_floor_disp_1k.png",
+          "md5": "70a4ea1c07579ecaa95774652090ac44",
+          "bytes": 2500130
+        },
+        "ao": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/forest_floor/forest_floor_ao_1k.png",
+          "md5": "1a1c8586de9ec2139a7f4612fcb9a49b",
+          "bytes": 2577519
+        }
+      }
+    },
+    {
+      "layer": 5,
+      "surface": "rock",
+      "id": "rock_boulder_dry",
+      "repeatM": 8,
+      "name": "Rock Boulder Dry",
+      "author": "Dimitrios Savva, Rico Cilliers",
+      "url": "https://polyhaven.com/a/rock_boulder_dry",
+      "maps": {
+        "color": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/rock_boulder_dry/rock_boulder_dry_diff_1k.png",
+          "md5": "3903508680ae823cd0d3c843fccfdf5a",
+          "bytes": 5690647
+        },
+        "normal": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/rock_boulder_dry/rock_boulder_dry_nor_gl_1k.png",
+          "md5": "90a2f0d635e2216aa6ce4ac927459c7f",
+          "bytes": 5462248
+        },
+        "rough": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/rock_boulder_dry/rock_boulder_dry_rough_1k.png",
+          "md5": "4b293c21fd24f194a7f512b1f05c363c",
+          "bytes": 2520145
+        },
+        "height": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/rock_boulder_dry/rock_boulder_dry_disp_1k.png",
+          "md5": "5427f87d47ccc84b9060bc935b90d0ca",
+          "bytes": 2140946
+        },
+        "ao": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/rock_boulder_dry/rock_boulder_dry_ao_1k.png",
+          "md5": "b5dc46ece4362a3b6721e5293e3aeda6",
+          "bytes": 1795337
+        }
+      }
+    },
+    {
+      "layer": 6,
+      "surface": "sand",
+      "id": "aerial_sand",
+      "repeatM": 16,
+      "name": "Aerial Sand",
+      "author": "Rob Tuytel",
+      "url": "https://polyhaven.com/a/aerial_sand",
+      "maps": {
+        "color": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/aerial_sand/aerial_sand_diff_1k.png",
+          "md5": "55cd6f4a96adf90d74c9308230d03019",
+          "bytes": 6176901
+        },
+        "normal": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/aerial_sand/aerial_sand_nor_gl_1k.png",
+          "md5": "11814cfaf17acaff463edd4b8aed9781",
+          "bytes": 6093377
+        },
+        "rough": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/aerial_sand/aerial_sand_rough_1k.png",
+          "md5": "804fe445b3df3b0d5967599393315c4e",
+          "bytes": 2018770
+        },
+        "height": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/aerial_sand/aerial_sand_disp_1k.png",
+          "md5": "a7393dc1df6164a28e6e405e970b9b24",
+          "bytes": 2040000
+        },
+        "ao": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/aerial_sand/aerial_sand_ao_1k.png",
+          "md5": "0f504b7a794dc445091ffb43f93970cf",
+          "bytes": 2320593
+        }
+      }
+    },
+    {
+      "layer": 7,
+      "surface": "snow",
+      "id": "snow_02",
+      "repeatM": 4,
+      "name": "Snow 02",
+      "author": "Rob Tuytel",
+      "url": "https://polyhaven.com/a/snow_02",
+      "maps": {
+        "color": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/snow_02/snow_02_diff_1k.png",
+          "md5": "7fd13580f5e8e4c7b7ca7eb02b5e0c1b",
+          "bytes": 1304640
+        },
+        "normal": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/snow_02/snow_02_nor_gl_1k.png",
+          "md5": "57d7f4e2501db746c862c6efee9fb38f",
+          "bytes": 2118417
+        },
+        "rough": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/snow_02/snow_02_rough_1k.png",
+          "md5": "bf38d1229a80dcfb44669b43ba1a8d81",
+          "bytes": 407196
+        },
+        "height": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/snow_02/snow_02_disp_1k.png",
+          "md5": "ac190f15723eb0850917e8812b7a6808",
+          "bytes": 1889438
+        },
+        "ao": {
+          "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/snow_02/snow_02_ao_1k.png",
+          "md5": "de69407f5db75e2c4b1c90340b3bea84",
+          "bytes": 620285
+        }
+      }
+    }
+  ],
+  "variants": {
+    "128": {
+      "size": 128,
+      "layers": 8,
+      "files": {
+        "color": {
+          "file": "color-128.ktx2",
+          "bytes": 156721,
+          "sha256": "cb55f1e4a5a5fd31609cdc0cef3ff42da321f750cc0d9ea3e86b49509ed681af"
+        },
+        "detail": {
+          "file": "detail-128.ktx2",
+          "bytes": 164369,
+          "sha256": "456d9e2c1f6751b92c1806d6ddb53d70fe70dfa23ca56e55ee45012b5d2a51d2"
+        }
+      }
+    },
+    "256": {
+      "size": 256,
+      "layers": 8,
+      "files": {
+        "color": {
+          "file": "color-256.ktx2",
+          "bytes": 616503,
+          "sha256": "a4585a3fb8e1168609f26692308788df6cd324ded91c8c6f401ff78b3c7570fc"
+        },
+        "detail": {
+          "file": "detail-256.ktx2",
+          "bytes": 659470,
+          "sha256": "96ef47346a20626efa2af189421a2bc9374d28a32e9a7bc5033c6cc55172b4aa"
+        }
+      }
+    },
+    "512": {
+      "size": 512,
+      "layers": 8,
+      "files": {
+        "color": {
+          "file": "color-512.ktx2",
+          "bytes": 2384497,
+          "sha256": "db2272e5889cdf8d23987d754533589306ae34db90f5fd912649ce5a8799982a"
+        },
+        "detail": {
+          "file": "detail-512.ktx2",
+          "bytes": 2604358,
+          "sha256": "de76fd7ae800bc8c1418bee1a576daecff32056920bc7f7a95fc75a0b371ced1"
+        }
+      }
+    },
+    "1024": {
+      "size": 1024,
+      "layers": 8,
+      "files": {
+        "color": {
+          "file": "color-1024.ktx2",
+          "bytes": 9197657,
+          "sha256": "b3d5925c0cf586649b2c649d33e64650638388e0284e52b754a12e3d5a1357f5"
+        },
+        "detail": {
+          "file": "detail-1024.ktx2",
+          "bytes": 10288555,
+          "sha256": "8307ea5db2a3ed10722ee43ce39cf14d07201429c414875a30de757ea76aa547"
+        }
+      }
+    }
+  }
+}
