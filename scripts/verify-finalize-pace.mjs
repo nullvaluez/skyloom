@@ -131,6 +131,32 @@ fp.resetFinalizePace();
 fp.noteFinalizeFrame(0.0167);
 gate('6 …and a fresh frame restores it', fp.mayFinalize(1) === true);
 
+// Real engines each arrive with done=0. The old test above used done=1 for
+// the second engine, which accidentally hid the per-producer free-first bug.
+fp.resetFinalizePace();
+fp.noteFinalizeFrame(.0167);
+const firstProducer = fp.mayFinalize(0, 'buildings');
+spin(4);
+gate('24 a different producer cannot spend another free first chunk',
+  firstProducer && !fp.mayFinalize(0, 'skyline') && !fp.mayFinalize(0, 'roads'));
+fp.resetFinalizePace();
+globalThis.__fpCfg = { enabled: true, budgetMs: 0, longFrameMs: 24, spikeK: 2, maxRefuseFrames: 3 };
+const owners=['buildings','skyline','roads','veg','toy'];
+const counts=Object.fromEntries(owners.map(k=>[k,0]));
+let peak=0;
+for(let frame=0;frame<25;frame++){
+  fp.noteFinalizeFrame(.0167);let n=0;
+  for(const owner of owners)if(fp.mayFinalize(0,owner)){counts[owner]++;n++;}
+  peak=Math.max(peak,n);
+}
+gate('25 all five producers progress fairly even with no spare frame time',
+  peak===1&&Object.values(counts).every(n=>n>=4),JSON.stringify(counts));
+fp.resetFinalizePace();
+fp.noteFinalizeFrame(.0167);fp.mayFinalize(0,'old');fp.mayFinalize(0,'cancelled');
+fp.noteFinalizeFrame(.0167);fp.mayFinalize(0,'current');
+fp.noteFinalizeFrame(.0167);
+gate('26 a cancelled producer releases its place by the second frame',fp.mayFinalize(0,'current'));
+
 // ------------------- 12-16. THE SHIPPED DEFECT: rule 1 tested a LEVEL
 // As shipped, rule 1 was `lastDtMs <= longFrameMs` against a fixed 24 ms. Any
 // machine steadily below ~41 fps has EVERY frame "long", so the first finalize
@@ -254,7 +280,7 @@ const engines = {
 const missing = [];
 for (const [name, rel] of Object.entries(engines)) {
   const txt = readText(path.join(root, rel));
-  if (!/if \(!mayFinalize\(done\)\) break;/.test(txt)) missing.push(name);
+  if (!/if \(!mayFinalize\(done, '[a-z-]+'\)\) break;/.test(txt)) missing.push(name);
 }
 gate('7 every chunk engine calls the shared brake in its finalize loop',
   missing.length === 0, missing.join(', '));

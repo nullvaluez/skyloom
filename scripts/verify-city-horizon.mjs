@@ -131,6 +131,14 @@ const hash = (r) => {
   const payload = { ...r };
   delete payload.v;
   delete payload.tessMs;
+  // Surface repair now supplies worker normals and repair telemetry. Those
+  // additive fields have independent geometry tests; keep comparing EVERY
+  // pre-existing geometry/attribute field against the pre-horizon payload.
+  if (payload.satSkyline) {
+    payload.satSkyline = { ...payload.satSkyline };
+    delete payload.satSkyline.normal;
+    delete payload.satSkyline.wallRepair;
+  }
   return crypto.createHash('sha256').update(JSON.stringify(payload, (k, v) => ArrayBuffer.isView(v) ? [...v] : v)).digest('hex');
 };
 const parityTiles = [[14, 4413, 6194], [14, 2817, 6402], [14, 8192, 8192]];

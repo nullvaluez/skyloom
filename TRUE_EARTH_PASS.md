@@ -25,6 +25,14 @@ release instruction is recorded separately from the measurements it authorizes.
 
 ## Status
 
+### 2026-11-01 — Building surface and streaming follow-up
+
+[Building stutter](FLY_BUILDING_STUTTER.md) records overlapping wall/trim
+ownership repair, fair shared chunk admission, and worker-built normals.
+`DISTANCE_SOFTEN` adds a bounded distant-city detail preview, **off by default**;
+use `?flags=DISTANCE_SOFTEN&diag=1`. Device appearance acceptance and sustained
+performance gains are not implied by the regression checks.
+
 ### 2026-11-01 — Premium Earth enabled by owner instruction
 
 [FLY_PREMIUM_EARTH.md](FLY_PREMIUM_EARTH.md) records the scanned-material,
