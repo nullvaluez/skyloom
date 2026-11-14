@@ -10,6 +10,7 @@ import { compactDepthShadowTarget } from '@/lib/fly/compact-shadow-target';
 import { toSceneDir } from '@/lib/fly/true-scale';
 import { mobileEnhancedOn, mobileShadowRange, resolveMobileEnhanced, stepMobileShadowRange } from '@/lib/fly/mobile-enhanced';
 import { useFlyStore } from '@/stores/fly-store';
+import { lookShadowRangeM } from '@/lib/fly/look-shadow';
 
 export function CinemaShadowRig({runtime,sunRef}){
   const rig=useRef(null),legacyShadow=useRef(false),mobileRange=useRef(null);
@@ -38,7 +39,9 @@ export function CinemaShadowRig({runtime,sunRef}){
     if(sunRef.current){sunRef.current.castShadow=false;sunRef.current.intensity=r?0:e.sun;}
     if(!r){applyShadowCasterRequests(false);runtime.cinemaShadows={cascades:0};delete runtime.adoptCinematicWarmScene;return;}
     const state=useFlyStore.getState();
-    let rangeM=profile.shadowRangeM;
+    // LOOK PASS B (SHADOW): desktop High/Ultra reach further; every other
+    // profile (and the flag off) keeps its own range.
+    let rangeM=lookShadowRangeM(profile);
     // SHIP PASS LIGHT (SHADOW_REACH, LT-5): Medium desktops reuse the phone
     // rule with their own tunables; flag off, `reach` is exactly the old
     // mobileEnhancedOn() branch.

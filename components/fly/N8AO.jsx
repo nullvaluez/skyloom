@@ -94,6 +94,7 @@ import { N8AOPostPass, DepthType } from 'n8ao';
 import { DEPTH_PASS } from '@/lib/fly/fly-constants';
 import { cinemaOn } from '@/lib/fly/cinema-policy';
 import { cinemaAoDenoise } from '@/lib/fly/cinema-ao';
+import { lookShadowAoConfig } from '@/lib/fly/look-shadow';
 import { withDirectComposite } from '@/lib/fly/n8ao-direct';
 
 // The exact source line DepthDownSample.js writes its chosen sample with. The
@@ -250,6 +251,9 @@ class FlyN8AOPass extends N8AOPostPass {
  * downsample patch — which needs the material the halfRes setter just made.
  */
 export function createN8AOPass({ gl, scene, camera, cfg = DEPTH_PASS.n8ao, size }) {
+  // LOOK PASS B (SHADOW): city-scale radius and gain (lib/fly/look-shadow.js);
+  // flag off, `cfg` is returned as it came.
+  cfg = lookShadowAoConfig(cfg);
   const reversed = detectReversedDepth(gl);
   const proxy = new PerspectiveCamera(camera.fov, camera.aspect, camera.near, camera.far);
   proxy.name = 'n8ao-proxy-camera';
