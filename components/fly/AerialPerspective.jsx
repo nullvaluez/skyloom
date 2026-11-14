@@ -86,6 +86,8 @@ import { PHYS_SKY_TEXT_ACTIVE } from '@/lib/fly/cinema-sky';
 // LIVING WORLD (GROUND): night lights and valley mist on the ground pixel,
 // before the air in front of it (lib/fly/living-ground.js).
 import { LIVING_GROUND_ACTIVE, LIVING_GROUND_UNIFORMS, livingGroundAerial, updateLivingGround } from '@/lib/fly/living-ground';
+// LOOK PASS A (ATMOS): the hazy boundary layer (lib/fly/look-atmos.js).
+import { LOOK_ATMOS_ON, LOOK_ATMOS_UNIFORMS, lookAtmosAerialShader } from '@/lib/fly/look-atmos';
 
 /**
  * Module-scope frame state. One satellite scene exists at a time, so a plain
@@ -586,6 +588,9 @@ const enhancedFragmentShaderLiving = livingGroundAerial(enhancedFragmentShaderTS
  */
 const enhancedFragmentShaderClarity = aerialClarityShader(enhancedFragmentShaderLiving);
 
+/** LOOK PASS A (ATMOS): the boundary layer, an anchored edit on the final text; flag off = unchanged. */
+const enhancedFragmentShaderLook = lookAtmosAerialShader(enhancedFragmentShaderClarity);
+
 /**
  * R24 D: which pass ships. Read ONCE at construction, from a module const, so
  * production and the PREWARM twin (which builds through this same constructor)
@@ -602,7 +607,7 @@ export class AerialPerspectiveEffect extends Effect {
   constructor(opts = {}) {
     const law = LAW();
     const r25 = !law && opts?.r25 === true;
-    super('AerialPerspectiveEffect', law ? lawFragmentShader : r25 ? enhancedFragmentShaderClarity : fragmentShader, {
+    super('AerialPerspectiveEffect', law ? lawFragmentShader : r25 ? enhancedFragmentShaderLook : fragmentShader, {
       // This is what makes the composer allocate + bind its depth texture.
       attributes: EffectAttribute.DEPTH,
       uniforms: new Map(law ? [
@@ -661,6 +666,7 @@ export class AerialPerspectiveEffect extends Effect {
     if(r25)for(const[name,holder]of Object.entries(CINEMA_UNIFORMS))this.uniforms.set(name,holder);
     if(r25&&LIVING_GROUND_ACTIVE)for(const[name,holder]of Object.entries(LIVING_GROUND_UNIFORMS))this.uniforms.set(name,holder);
     if(r25&&AERIAL_CLARITY_ON)for(const[name,holder]of Object.entries(AERIAL_CLARITY_UNIFORMS))this.uniforms.set(name,holder);
+    if(r25&&LOOK_ATMOS_ON&&enhancedFragmentShaderLook!==enhancedFragmentShaderClarity)for(const[name,holder]of Object.entries(LOOK_ATMOS_UNIFORMS))this.uniforms.set(name,holder);
     // Resolved from the live renderer on the first update() — see the shader.
     this._reversed = null;
   }

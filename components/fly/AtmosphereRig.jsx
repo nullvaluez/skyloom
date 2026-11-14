@@ -11,6 +11,8 @@ import { registerCinemaResources } from '@/lib/fly/cinema-resources';
 import { useFlyStore } from '@/stores/fly-store';
 // SHIP PASS SKY (SK-4): SKY_LITE's aerial reach switch, from the device policy.
 import { skyLiteAerialSwitch } from '@/lib/fly/sky-lite';
+// LOOK PASS A (ATMOS): the boundary layer's per-frame light (desktop High/Ultra only).
+import { updateLookAtmos } from '@/lib/fly/look-atmos';
 
 /**
  * TRUE EARTH Phase 2 (PHYS_SKY): the atmosphere tables, rendered between the
@@ -61,6 +63,7 @@ export function AtmosphereRig({ runtime }) {
     // which High and every flag-off session keep).
     PSKY_UNIFORMS.uPskyAp.value.set(luts.aerialState.maxKm, luts.aerialState.h, skyLiteAerialSwitch(qt), 0);
     runtime.physSky = { ...luts.stats, eyeKm: h, aerialKm: tier.aerialKm };
+    updateLookAtmos(runtime.cinemaEnvironment, !isMobileGraphicsClass() && qt !== 'low' && qt !== 'medium');
   }, -20);
   return null;
 }
