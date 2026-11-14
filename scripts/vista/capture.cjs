@@ -43,8 +43,8 @@ function solar(lon, hour, day = Date.UTC(2026, 6, 18)) {
 const POSES = [
   { id: 'alps-noon', title: 'Alps at midday', lat: 47.215, lon: 11.33, altM: 2900, headingDeg: 160, hour: 11.5, weather: 'scattered' },
   { id: 'valley-morning', title: 'Yosemite Valley, early light', lat: 37.705, lon: -119.70, altM: 2700, headingDeg: 75, hour: 8.2, weather: 'baseline' },
-  { id: 'city-day', title: 'Manhattan from the Hudson, afternoon', lat: 40.70, lon: -74.035, altM: 520, headingDeg: 35, hour: 15.6, weather: 'few' },
   { id: 'city-close', title: 'Low over Midtown, mid-morning', lat: 40.7415, lon: -73.9960, altM: 330, headingDeg: 28, hour: 10.4, weather: 'few' },
+  { id: 'city-day', title: 'Manhattan from the Hudson, afternoon', lat: 40.70, lon: -74.035, altM: 520, headingDeg: 35, hour: 15.6, weather: 'few' },
   { id: 'city-golden', title: 'Manhattan, golden hour', lat: 40.70, lon: -74.035, altM: 650, headingDeg: 35, hour: 19.2, weather: 'few' },
   { id: 'city-night', title: 'Manhattan at night', lat: 40.70, lon: -74.035, altM: 650, headingDeg: 35, hour: 23.0, weather: 'baseline' },
   { id: 'suburb-day', title: 'Ohio suburb, afternoon', lat: 40.1585, lon: -83.0752, altM: 620, headingDeg: 20, hour: 16.2, weather: 'scattered' },
@@ -159,6 +159,7 @@ async function waitTerrain(page, pose, t0, timeout) {
       camera.updateProjectionMatrix();
     });
     report.flagsApplied = await page.evaluate(() => window.__flyUrlFlags ?? null);
+    let prev = null;
     for (const pose of list) {
       current = pose;
       const t0 = Date.now();
@@ -169,7 +170,17 @@ async function waitTerrain(page, pose, t0, timeout) {
         // A warp is refused while a menu is still closing (it returns false), and
         // the first pose after boot used to be captured wherever the title had
         // parked the aircraft. Place, then PROVE the aircraft is at the pose.
-        let placed = false;
+        // A pose at the previous pose's spot (another sun hour or altitude)
+        // keeps the streamed world: only the eye height and the sun change.
+        const sameSpot = !!prev && prev.lat === pose.lat && prev.lon === pose.lon && prev.headingDeg === pose.headingDeg;
+        let placed = sameSpot && await page.evaluate((sc) => {
+          const r = window.__fly, f = r.flight;
+          if (!window.__capturePose) return false;
+          const y = r.engine.geoToWorld(sc.lon, sc.lat, sc.altM).y;
+          window.__capturePose.y = y; f.pos.y = y; f.agl = y - f.groundElev;
+          r.chaseCam?.snap?.();
+          return true;
+        }, pose);
         for (let attempt = 0; attempt < 12 && !placed; attempt++) {
           placed = await page.evaluate((sc) => {
             const r = window.__fly, s = window.__flyStore.getState();
@@ -198,7 +209,18 @@ async function waitTerrain(page, pose, t0, timeout) {
         }
         if (!placed) throw new Error(`pose ${pose.id}: the warp was refused (a menu is open or the flight is grounded)`);
         const ready = {};
-        if (args.quick) {
+        if (sameSpot && placed) {
+          // Lighting, exposure and the sky blend converge per FRAME, so count frames.
+          await page.waitForTimeout(2000);
+          ready.frames = await page.evaluate((n) => new Promise((done) => {
+            let k = 0; const t0 = performance.now();
+            const tick = () => { if (++k >= n || performance.now() - t0 > 150000) done(k); else requestAnimationFrame(tick); };
+            requestAnimationFrame(tick);
+          }), Number(args.sameSpotFrames || 45));
+          ready.terrain = await waitTerrain(page, pose, t0, 90000);
+          ready.streamers = await page.waitForFunction(captureStreamersSettled, undefined, { timeout: 90000, polling: 1000 }).then(() => true, () => false);
+          ready.sameSpot = true;
+        } else if (args.quick) {
           await page.waitForFunction(() => !window.__fly.worldLoading, undefined, { timeout: 240000, polling: 1000 }).catch(() => {});
           await page.waitForTimeout(Number(args.quick) || 20000);
           ready.quick = true;
@@ -256,7 +278,9 @@ async function waitTerrain(page, pose, t0, timeout) {
           delete window.__captureClock;
         });
         if (photo) { await page.keyboard.press('Escape'); await page.waitForTimeout(800); }
+        prev = pose;
       } catch (e) {
+        prev = null;
         report.errors.push({ pose: pose.id, message: e.message.split('\n')[0] });
         console.log(`FAILED ${pose.id}: ${e.message.split('\n')[0]}`);
       }
