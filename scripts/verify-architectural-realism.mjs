@@ -47,7 +47,9 @@ function pack(v) {
 const arm = process.argv.find(x => x.startsWith('--arm='))?.slice(6);
 if (arm) {
   register('./_node-resolve.mjs', import.meta.url);
-  globalThis.window = { location: { search: '' }, __flyBuildingRealismOverride: { enabled: arm !== 'off' }, __flyCityHorizonOverride: { enabled: false } };
+  globalThis.window = { location: { search: '' }, __flyBuildingRealismOverride: { enabled: arm !== 'off' }, __flyCityHorizonOverride: { enabled: false },
+    // LOOK PASS C: this gate measures the realism layer alone; the 'look' arm adds LOOK_FACADE.
+    __flyLookFacadeOverride: { enabled: arm === 'look' } };
   if (arm === 'independent') window.__flyCityFacadesOverride = { enabled: false };
   const { ShaderLib, ShaderChunk, UniformsUtils } = await import('three');
   const originalChunks = { ...ShaderChunk };
@@ -76,7 +78,17 @@ const runArm = name => {
   assert.equal(r.status, 0, r.stderr);
   return JSON.parse(r.stdout);
 };
-const off = runArm('off'), on = runArm('on'), independent = runArm('independent');
+const off = runArm('off'), on = runArm('on'), independent = runArm('independent'), look = runArm('look');
+check('LOOK_FACADE on: both rings assemble its day and night edits under their own key', () => {
+  for (const [name, p] of Object.entries(look)) {
+    assert.equal(p.key.replace('|look-facade-v1', ''), on[name].key, name);
+    assert.ok(p.key.includes('|look-facade-v1'), name);
+    assert.ok(p.fs.includes('float lfE1='), `${name} night`);
+    // The day edit needs the realism albedo; Classic programs keep it but cityDay is 0 there.
+    assert.ok(p.fs.includes('float lfDay='), `${name} day`);
+    assert.ok(p.fs.indexOf('float lfDay=') < p.fs.indexOf('#include <lights_physical_fragment>'));
+  }
+});
 check('flag off keeps both look/ring shader programs and keys unchanged', () => {
   for (const [name, p] of Object.entries(off)) {
     assert.deepEqual([sha(p.vs), sha(p.fs)], BASE[name], name);
