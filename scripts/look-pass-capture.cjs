@@ -3,13 +3,15 @@
  *
  *   node scripts/look-pass-capture.cjs --label=baseline
  *   Options: --url=http://localhost:3000  --poses=nyc-street,yosemite  --times=noon,golden,dusk,night
- *            --flags=-LOOK_ATMOS,-LOOK_GRADE  --quality=ultra  --settle=7000  --slots=2
+ *            --shots=nyc-street__noon,powell__golden   exact pose__time pairs (instead of the cross product)
+ *            --flags=-LOOK_ATMOS,-LOOK_GRADE  --quality=ultra  --settle=7000  --slots=3
  *            --width=1600 --height=900  --out=<absolute dir>  --list
  *            --burst   after each still, 7 frames while the pose creeps forward 1.5 units a frame;
  *                      reports the share of pixels whose luma jumps > 30 between frames (shimmer proxy)
  *
  * Output: <main checkout>/.graphics-review/look-pass/<label>/<pose>__<time>.png + manifest.json.
- * A two-slot lock under .graphics-review/look-pass/.locks keeps concurrent agents from
+ * A re-run into an existing label replaces the shots it captures and keeps the rest of the manifest.
+ * A three-slot lock under .graphics-review/look-pass/.locks keeps concurrent agents from
  * oversubscribing the GPU; a run waits for a slot instead of failing.
  */
 const { chromium } = require('playwright');
@@ -48,8 +50,11 @@ const url = args.url || 'http://localhost:3000';
 const flags = typeof args.flags === 'string' ? args.flags : '';
 const quality = args.quality || 'ultra';
 const date = args.date || '2026-09-22';
-const poseNames = (typeof args.poses === 'string' ? args.poses.split(',') : Object.keys(POSES)).filter(n => POSES[n]);
-const timeNames = (typeof args.times === 'string' ? args.times.split(',') : Object.keys(TIMES)).filter(n => n in TIMES);
+const shotPairs = typeof args.shots === 'string' ? args.shots.split(',').map(s => s.trim().split('__')).filter(([p, t]) => POSES[p] && t in TIMES) : null;
+const poseNames = shotPairs ? [...new Set(shotPairs.map(([p]) => p))] : (typeof args.poses === 'string' ? args.poses.split(',') : Object.keys(POSES)).filter(n => POSES[n]);
+const allTimes = (typeof args.times === 'string' ? args.times.split(',') : Object.keys(TIMES)).filter(n => n in TIMES);
+const timesFor = pose => shotPairs ? shotPairs.filter(([p]) => p === pose).map(([, t]) => t) : allTimes;
+const timeNames = timesFor(poseNames[0]);
 const viewport = { width: Number(args.width || 1600), height: Number(args.height || 900) };
 
 let home;
@@ -60,14 +65,16 @@ const out = path.resolve(typeof args.out === 'string' ? args.out : path.join(roo
 fs.mkdirSync(out, { recursive: true });
 
 const report = { label, url, flags, quality, date, viewport, venue: 'Installed Chrome / D3D11 / live world; fixed pose, real solar ephemeris, running clock', captures: [], errors: [], warnings: [] };
+try { report.captures = JSON.parse(fs.readFileSync(path.join(out, 'manifest.json'), 'utf8')).captures || []; } catch {}
 const save = () => fs.writeFileSync(path.join(out, 'manifest.json'), JSON.stringify(report, null, 2));
+let captured = 0;
 
 // ---- GPU slot lock -------------------------------------------------------
 const lockDir = path.join(root, '.locks');
 fs.mkdirSync(lockDir, { recursive: true });
 let heldSlot = null;
 async function acquireSlot() {
-  const slots = Number(args.slots || 2), staleMs = 25 * 60 * 1000, t0 = Date.now();
+  const slots = Number(args.slots || 3), staleMs = 25 * 60 * 1000, t0 = Date.now();
   for (;;) {
     for (let i = 0; i < slots; i++) {
       const p = path.join(lockDir, `slot-${i}`);
@@ -199,11 +206,11 @@ async function waitWorld(page, timeout) {
         const r = window.__fly; window.__lookHold = null; window.__flySunOverride = sun;
         r.warpToGeo(p.lat, p.lon, { altM: p.altM, headingRad: p.headingDeg * Math.PI / 180, name: null }); r.autopilot?.disengage?.();
         const f = r.flight; window.__lookHold = { x: f.pos.x, y: f.pos.y, z: f.pos.z, heading: p.headingDeg * Math.PI / 180 }; r.chaseCam?.snap?.();
-      }, { p: pose, sun: solve(pose, timeNames[0]) });
+      }, { p: pose, sun: solve(pose, timesFor(poseName)[0]) });
       await page.waitForTimeout(4000);
       const world = await waitWorld(page, Number(args.worldTimeout || 150000));
       console.log(`POSE ${label} ${poseName} settled=${world.settled} ${world.ms}ms`);
-      for (const time of timeNames) {
+      for (const time of timesFor(poseName)) {
         current = `${poseName}__${time}`;
         const utc = solve(pose, time), want = elevationAt(pose, utc);
         await page.evaluate(v => { window.__flySunOverride = v; }, utc);
@@ -219,6 +226,7 @@ async function waitWorld(page, timeout) {
             fps: window.__flyStats?.fps ?? null, urlFlags: window.__flyUrlFlags ?? null };
         });
         const burst = args.burst ? await burstMetric(page).catch(e => ({ error: e.message })) : null;
+        report.captures = report.captures.filter(c => c.file !== file); captured++;
         report.captures.push({ pose: poseName, time, file, utc, burst, iso: new Date(utc).toISOString(), worldSettled: world.settled, telemetry, metrics: await imageMetrics(path.join(out, file)) }); save();
         console.log(`CAPTURE ${label} ${file} el=${telemetry.sunElevation.toFixed(2)} calls=${telemetry.render?.calls} tris=${telemetry.render?.triangles}${burst ? ` sparkle=${burst.sparklePct ?? burst.error}%` : ''}`);
       }
@@ -229,7 +237,7 @@ async function waitWorld(page, timeout) {
     console.error(e.message);
   } finally {
     save(); await browser.close(); releaseSlot();
-    console.log(`DONE ${label}: ${report.captures.length} captures, ${report.errors.length} errors -> ${out}`);
+    console.log(`DONE ${label}: ${captured} captures, ${report.errors.length} errors -> ${out}`);
     if (report.errors.length) process.exitCode = 1;
   }
 })().catch(e => { report.errors.push({ kind: 'fatal', message: e.message }); save(); releaseSlot(); console.error(e); process.exitCode = 1; });
