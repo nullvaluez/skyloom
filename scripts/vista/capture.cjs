@@ -7,7 +7,7 @@
  * poses and writes one PNG per pose plus manifest.json. No menus, no HUD.
  *
  *   node scripts/vista/capture.cjs --url=http://localhost:3101 --out=<dir> --poses=alps-noon,city-day
- *   options: --size=960x540   --quality=high|ultra   --flags=NAME,-NAME
+ *   options: --size=1280x720  --quality=high|ultra   --flags=NAME,-NAME
  *            --terrainMs=200000  --settle=6000  --quick=ms (no terrain wait: sky / grade work)
  *            --pose='{"id":"x","lat":..,"lon":..,"altM":..,"headingDeg":..,"hour":..,"weather":"few"}'
  *            --photo='{"yaw":2.3,"pitch":0.1,"dist":26}' (applies to every pose in the run)
@@ -29,7 +29,7 @@ const args = Object.fromEntries(process.argv.slice(2).map((s) => {
 }));
 const url = String(args.url || process.env.FLY_URL || 'http://localhost:3000').replace(/\/$/, '');
 const out = path.resolve(args.out || '.graphics-review/vista/capture');
-const [W, H] = String(args.size || '960x540').split('x').map(Number);
+const [W, H] = String(args.size || '1280x720').split('x').map(Number);
 const viewport = { width: W, height: H };
 const quality = args.quality || 'high';
 const settleMs = Number(args.settle || 6000);
@@ -46,10 +46,10 @@ const POSES = [
   { id: 'city-day', title: 'Manhattan from the Hudson, afternoon', lat: 40.70, lon: -74.035, altM: 520, headingDeg: 35, hour: 15.6, weather: 'few' },
   { id: 'city-close', title: 'Low over Midtown, mid-morning', lat: 40.7415, lon: -73.9960, altM: 330, headingDeg: 28, hour: 10.4, weather: 'few' },
   { id: 'city-golden', title: 'Manhattan, golden hour', lat: 40.70, lon: -74.035, altM: 650, headingDeg: 35, hour: 19.2, weather: 'few' },
+  { id: 'city-night', title: 'Manhattan at night', lat: 40.70, lon: -74.035, altM: 650, headingDeg: 35, hour: 23.0, weather: 'baseline' },
   { id: 'suburb-day', title: 'Ohio suburb, afternoon', lat: 40.1585, lon: -83.0752, altM: 620, headingDeg: 20, hour: 16.2, weather: 'scattered' },
   { id: 'coast-day', title: 'Honolulu coast, afternoon', lat: 21.255, lon: -157.86, altM: 450, headingDeg: 100, hour: 16.4, weather: 'few' },
   { id: 'cruise-high', title: 'Cruise at 10.7 km, Rockies', lat: 39.62, lon: -105.25, altM: 10700, headingDeg: 265, hour: 14.5, weather: 'few' },
-  { id: 'city-night', title: 'Manhattan at night', lat: 40.70, lon: -74.035, altM: 650, headingDeg: 35, hour: 23.0, weather: 'baseline' },
 ];
 
 const custom = args.pose ? [JSON.parse(args.pose)] : [];
@@ -166,25 +166,37 @@ async function waitTerrain(page, pose, t0, timeout) {
       try {
         await page.evaluate(({ sun, weather }) => { window.__flySunOverride = sun; window.__flyWeatherOverride = weather; },
           { sun: solar(pose.lon, pose.hour), weather: pose.weather ?? 'baseline' });
-        await page.evaluate((sc) => {
-          const r = window.__fly, s = window.__flyStore.getState();
-          r.operations.profile = null;
-          r.operations.phase = 'airborne';
-          if (s.photoMode && s.setPhotoMode) s.setPhotoMode(false);
-          s.setPhase('flying');
-          r.warpToGeo(sc.lat, sc.lon, { altM: sc.altM, headingRad: (sc.headingDeg * Math.PI) / 180, name: null });
-          r.autopilot?.disengage?.();
-          const f = r.flight;
-          window.__capturePose = { y: f.pos.y, heading: (sc.headingDeg * Math.PI) / 180 };
-          window.__captureStep ??= f.step.bind(f);
-          f.step = (dt, cmd) => {
-            window.__captureStep(dt, { ...cmd, turn: 0, pitch: 0, boost: false });
-            f.pos.y = window.__capturePose.y;
-            f.heading = window.__capturePose.heading; f.pitch = 0.02; f.bank = 0;
-            f.agl = f.pos.y - f.groundElev;
-          };
-          r.chaseCam?.snap?.();
-        }, pose);
+        // A warp is refused while a menu is still closing (it returns false), and
+        // the first pose after boot used to be captured wherever the title had
+        // parked the aircraft. Place, then PROVE the aircraft is at the pose.
+        let placed = false;
+        for (let attempt = 0; attempt < 12 && !placed; attempt++) {
+          placed = await page.evaluate((sc) => {
+            const r = window.__fly, s = window.__flyStore.getState();
+            r.operations.profile = null;
+            r.operations.phase = 'airborne';
+            if (s.hangarOpen && s.setHangarOpen) s.setHangarOpen(false);
+            if (s.photoMode && s.setPhotoMode) s.setPhotoMode(false);
+            s.setPhase('flying');
+            const ok = r.warpToGeo(sc.lat, sc.lon, { altM: sc.altM, headingRad: (sc.headingDeg * Math.PI) / 180, name: null });
+            const g = r.geo;
+            if (ok === false || !g || Math.abs(g.y - sc.lat) > 0.02 || Math.abs(g.x - sc.lon) > 0.02) return false;
+            r.autopilot?.disengage?.();
+            const f = r.flight;
+            window.__capturePose = { y: f.pos.y, heading: (sc.headingDeg * Math.PI) / 180 };
+            window.__captureStep ??= f.step.bind(f);
+            f.step = (dt, cmd) => {
+              window.__captureStep(dt, { ...cmd, turn: 0, pitch: 0, boost: false });
+              f.pos.y = window.__capturePose.y;
+              f.heading = window.__capturePose.heading; f.pitch = 0.02; f.bank = 0;
+              f.agl = f.pos.y - f.groundElev;
+            };
+            r.chaseCam?.snap?.();
+            return true;
+          }, pose);
+          if (!placed) await page.waitForTimeout(2500);
+        }
+        if (!placed) throw new Error(`pose ${pose.id}: the warp was refused (a menu is open or the flight is grounded)`);
         const ready = {};
         if (args.quick) {
           await page.waitForFunction(() => !window.__fly.worldLoading, undefined, { timeout: 240000, polling: 1000 }).catch(() => {});
@@ -227,6 +239,7 @@ async function waitTerrain(page, pose, t0, timeout) {
           const rt = window.__fly, s = window.__flyStore.getState();
           return { quality: s.qualityTier, visuals: s.visuals, style: s.mapStyle,
             sun: rt.sun ? { sinEl: rt.sun.sinEl, frac: rt.sun.frac } : null, aglM: rt.flight.pos.y - rt.flight.groundElev,
+            geo: rt.geo ? { lat: +rt.geo.y.toFixed(4), lon: +rt.geo.x.toFixed(4), altM: Math.round(rt.geo.z) } : null,
             terrainSharp: rt.terraStats?.sharp ?? null, flags: window.__flyUrlFlags ?? null, build: window.__flyBuild ?? null,
             content: Object.fromEntries(['satBuildings', 'satRoads', 'satSkyline', 'satVeg'].map((k) => [k, rt[k]?.stats ? { ...rt[k].stats } : null])) };
         });
