@@ -34,7 +34,7 @@ const SRC = `uniform float uX;\nvoid mainImage(const in vec4 inputColor,const in
 check('(1a) flag off: the aerial text is the input, byte for byte', LA.lookAtmosAerialShader(SRC, false) === SRC);
 const on = LA.lookAtmosAerialShader(SRC, true);
 const count = (s, t) => s.split(t).length - 1;
-check('(2a) flag on: the layer call lands once, before the world fade', count(on, 'lit=lookAtmos(lit,metricRay,trueY);') === 1 && on.indexOf('lookAtmos(lit,') < on.indexOf(AT));
+check('(2a) flag on: the layer call lands once, before the world fade', count(on, 'lit=lookAtmos(lit,metricRay,trueY,haze,dXZ);') === 1 && on.indexOf('lookAtmos(lit,') < on.indexOf(AT));
 check('(2b) flag on: declarations once, before mainImage', count(on, 'vec3 lookAtmos(') === 1 && on.indexOf('vec3 lookAtmos(') < on.indexOf('void mainImage('));
 check('(2c) a text without the physical anchor is returned unchanged', LA.lookAtmosAerialShader('void mainImage(){}', true) === 'void mainImage(){}');
 let threw = false;
@@ -59,8 +59,20 @@ if (LA.LOOK_ATMOS_ON) {
 
 const ap = fs.readFileSync(new URL('../components/fly/AerialPerspective.jsx', import.meta.url), 'utf8');
 check('(4a) wiring: the layer text only in the Enhanced branch, the clarity text its fallback',
-  ap.includes('r25 && LOOK_TEXT_ON ? enhancedFragmentShaderLook : r25 ? enhancedFragmentShaderClarity : fragmentShader')
+  ap.includes('look ? enhancedFragmentShaderLook : r25 ? enhancedFragmentShaderClarity : fragmentShader')
+  && ap.includes('const look = r25 && LOOK_TEXT_ON && !isMobileGraphicsClass();')
   && ap.includes('const enhancedFragmentShaderLook = lookAtmosAerialShader(enhancedFragmentShaderClarity);'));
+check('(4b) wiring: the layer uniforms bind only with the layer text', ap.includes('if(look&&LOOK_ATMOS_ON)for(const[name,holder]of Object.entries(LOOK_ATMOS_UNIFORMS))'));
+
+// (5) the ground mist shape: flag off or off-device = GROUND_MIST's own law.
+LA.updateLookAtmos(env, false);
+check('(5a) outside desktop High/Ultra the mist shape is the old law (1, 0)', LA.LOOK_MIST_SHAPE.value.x === 1 && LA.LOOK_MIST_SHAPE.value.y === 0);
+LA.updateLookAtmos({ day: 0, golden: 0, overcast: 0 }, true);
+check('(5b) at night the mist shape is the old law (1, 0)', LA.LOOK_MIST_SHAPE.value.x === 1 && LA.LOOK_MIST_SHAPE.value.y === 0);
+const GM = await import('../lib/fly/ground-mist.js');
+check('(5c) the mist text carries the shape only with the flag on',
+  LA.LOOK_ATMOS_ON ? GM.GROUND_MIST_GLSL.includes('uniform vec2 uGMLook;') && 'uGMLook' in GM.GROUND_MIST_UNIFORMS
+    : !GM.GROUND_MIST_GLSL.includes('uGMLook') && !('uGMLook' in GM.GROUND_MIST_UNIFORMS));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -43,6 +43,7 @@ export function AtmosphereRig({ runtime }) {
       luts.dispose();
       ref.current = null;
       delete runtime.physSky;
+      updateLookAtmos(null, false);
     };
   }, [gl, runtime]);
 
