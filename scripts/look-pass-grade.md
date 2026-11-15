@@ -83,13 +83,90 @@ cleaner, bluer and cooler in shade, not transformed. The noon city is still
 grey-white; its materials are stream C's, and a warm daylight key was not
 re-added because of the owner's brown-city rejection.
 
+## Round 2 (after review: critic revise 3.2, auditor pass)
+
+The critic's verdict: golden hour and dusk strong (Yosemite 4.5), noon a
+minor grade shift (powell, harbor 2, cruise 2.5); golden water still cobalt
+with no gold; a teal band in the harbour's golden sky; cream-blown golden
+cloud tops; a monochrome blue-grey noon city. The auditor's non-blocking
+notes: the 0/1 weight snaps on a governor tier step; two pre-existing reds
+missing from this ledger.
+
+What changed in r2 (WIP `4ee7fef7` from the interrupted instance, then
+`9ecb3a02` and the sparkle pull-back):
+
+1. **Noon colour** (display grade, `day` share only, warm/brown never pushed):
+   hue-selective chroma on blues (`noonBlue` 0.55) and greens (`noonGreen`
+   0.50), a green hue spread for crop variety (`greenSpread`), a deeper
+   saturated sky (`skyDeep` 0.10), extra midtone S at noon (`contrastNoon`
+   0.10) around a raised pivot (`pivotNoon` 0.48, so hazy mid ground holds
+   instead of lifting toward milk), and a warm-neutral push on sunlit,
+   unsaturated stone and concrete (`noonWarm` 0.07). The toe lift is mostly
+   withheld at noon (an open toe read as a milky lower frame from cruise).
+   The chroma lift is gamut-limited: an earlier pass clipped the cruise
+   zenith's red channel to 0 (hue shift to royal blue); the lift now stops
+   before any channel leaves the gamut and fades on already-saturated colour.
+2. **Gold far water at low sun** (`coastal-water.js`): far grazing water takes
+   the horizon's brightness with the key's hue (fully gold toward the sun,
+   peach away from it) instead of the cinema sky's cool horizon term; near
+   water reflects more of the (chroma-lifted) sky. Program key
+   `|look-grade-water-v4`.
+3. **Low-sun guards**: firmer shoulder at low sun (`shoulderGolden`) and the
+   warm-guard lift stops on the brightest tops, so gold cloud tops keep
+   shading; `tealGuard` turns bright unsaturated green-led sky pixels toward
+   lavender-peach.
+4. **Weight ramp**: `lookGradeWeight()` eases over 0.5 s on a tier change
+   (first frame snaps, so boots and stills are never mid-ramp).
+
+### grade-r2 measured (frame mean luma, saturation, burst sparkle %)
+
+Final r2 tree (`contrastNoon` 0.10, toe keyed on day; see the sparkle note).
+
+| shot | luma base -> r1 -> r2 | sat base -> r2 | sparkle base -> r2 (ratio) |
+|---|---|---|---|
+| powell golden | 64 -> 94 -> 93 | .41 -> .45 | .289 -> .273 (0.94) |
+| nyc-harbor golden | 67 -> 99 -> 102 (lower RGB 14,20,23 -> 20,42,68) | .36 -> .46 | .406 -> .386 (0.95) |
+| yosemite golden | 67 -> 97 -> 94 | .34 -> .46 | .077 -> .085 (1.10) |
+| nyc-street dusk | 36 -> 58 -> 57 | .52 -> .52 | 1.37 -> 1.583 (1.16) |
+| powell noon | 113 -> 124 -> 116 | .32 -> .46 | .831 -> .675 (0.81) |
+| nyc-harbor noon | 111 -> 121 -> 113 | .30 -> .47 | .594 -> .632 (1.06) |
+| nyc-cruise noon | 125 -> 137 -> 131 (upper 80 -> 70) | .30 -> .42 | .116 -> .162 (1.40, noise: .109 on the previous r2 run) |
+| nyc-street noon | 113 -> 123 -> 115 | .26 -> .41 | 1.999 -> 2.296 (1.15) |
+| nyc-harbor night | 43 -> 43 -> 44 | .55 -> .55 | .414 -> .242 (0.58) |
+
+Compare: `compare/baseline__vs__grade-r2/sheet.jpg`, mean absDiff 21.9, 86.1 %
+of pixels changed (r1: 21.2 / 85.7 %). Noon now differs by absDiff 15 to 20
+per shot (the baseline-a floor is about 4 to 5) at nearly the same mean luma:
+the noon change is contrast and colour, not exposure. Noon saturation is up
+0.14 to 0.17 on every noon shot.
+
+Sparkle: the metric counts pixels whose luma jumps by more than 30 between
+creeping frames, so any added contrast raises it at a fixed threshold, and
+two runs of the same code differ a lot (clouds animate, nyc-street never
+reports settled). A flag-off control captured on this server mid-round
+(`grade-off2`) read yosemite golden .040 and nyc-street noon 1.246. The first
+r2 tree (`contrastNoon` 0.18, full toe at low sun) read yosemite .137 / .224
+and nyc-street noon 2.448 / 3.271 in two runs: a real rise, not noise. The
+toe is now keyed on daylight (not low sun) and the noon S is 0.10, which
+brought both inside 1.25x of baseline (1.10, 1.15). nyc-cruise noon (.116 ->
+.162) is a tiny number on a frame of animated clouds; the same pose read .109
+on the first r2 run with more contrast, so it is read as noise, but it is the
+one ratio over 1.25 in the final set.
+
+Weakest in r2: `nyc-cruise__noon`. The sky is deeper and the ground less
+milky, but the white haze slab (stream A) still dominates, the zenith now
+reads dark navy, and its sparkle ratio is the one over 1.25. Also weak:
+`powell__golden`'s lake, which stays a blue slab (see rejected).
+
 ## Dials (`LOOK_GRADE` in fly-constants.js)
 
 Masters: `exposure`, `fill`, `grade`, `water`, `warmth` (each 0 removes its
 family, 1 = as tuned). Detail: `exposureNoon/Golden/Dusk`, `fillGolden`,
 `envGolden`, `fillColor`, `groundBounce`, `keyWarmGolden`, `keyGoldGreen`,
 `keyGainGolden`, `toeLift`, `contrast`, `pivot`, `shoulder`, `vibrance`,
-`warmGuard`, `shadeCool`, `keyWarm`, `waterSheen`, `waterPath`.
+`warmGuard`, `shadeCool`, `keyWarm`, `waterSheen`, `waterPath`; r2 adds
+`contrastNoon`, `pivotNoon`, `noonBlue`, `noonGreen`, `greenSpread`, `skyDeep`,
+`noonWarm`, `shoulderGolden`, `tealGuard`.
 
 ## Tried and rejected
 
@@ -101,6 +178,21 @@ family, 1 = as tuned). Detail: `exposureNoon/Golden/Dusk`, `fillGolden`,
   clouds salmon-pink. Pulled to x1.75 with a 0.66 green floor: gold, not pink.
 - Contrast/vibrance at full night (the checkpoint's 0.35 floor) darkened the
   night sentinel 43 -> 36 and lower third 16 -> 8. Gated off below twilight.
+- r2: `contrastNoon` 0.30 around pivot 0.52 halved the cruise zenith's
+  luminance (upper third 80 -> 62, a near-black navy) and darkened harbour
+  water; pulled to 0.18 / 0.48.
+- r2: `contrastNoon` 0.18 and a full toe lift at low sun roughly doubled
+  the burst sparkle at yosemite golden and nyc-street noon against a flag-off
+  control; pulled to 0.10 and a daylight-keyed toe.
+- r2: an ungated noon chroma x1.55 clipped the cruise zenith's red to 0
+  (pixels 1,54,125): replaced by the gamut-limited lift.
+- r2: far water sampling the cinema sky at its own reflection angle
+  (`.025 + .5*eye.y`) stayed cobalt, because the gold band in the frame is
+  only 2 to 3 degrees tall and the cinema sky's horizon term is cool. The key
+  colour carries the gold instead.
+- r2, not solved: the Powell golden lake is near water seen steeply (it
+  reflects the deep-blue upper sky); it is lighter and bluer than r1 but has
+  no gold, and the sun is out of frame so no sun path can show.
 - Not attempted this round: open-land colour variation and deeper vegetation
   in the terrain shader (`earth-surface-material.js`, `living-ground.js`).
   Vegetation is only richer through the display vibrance.
@@ -118,17 +210,29 @@ family, 1 = as tuned). Detail: `exposureNoon/Golden/Dusk`, `fillGolden`,
   verify-cinema-art (assertion), verify-ship-sky (47/2), verify-r25-flagoff
   (4a, a pre-existing constants diff far above the LOOK blocks) and
   verify-r25-ground (7d vendor, 8 vendor-three-tile) fail identically on the
-  baseline tree: pre-existing, not moved by this stream.
+  baseline tree: pre-existing, not moved by this stream. So do
+  verify-sea-seams (identical PASS/FAIL list) and verify-ship-light 0a/0b
+  (red with LOOK_GRADE forced off too; the auditor's finding).
+- r2 re-run: verify-look-grade 18/18 (new: the noon chroma gamut guard is in
+  the shader text), verify-true-earth-flags 8/8, eslint clean on every changed
+  file; architectural-daylight, cinematic-earth, city-water, cinema-overhaul,
+  cruise-color, painterly-flight 18/18, true-scale 14, twilight 6,
+  twilight-balance 13, phys-sky 12, reflection-stability 3/3, water-field,
+  terrain-weathering exit 0; sea-seams, cinema-art, ship-light exit 1 as on
+  the base tree.
 
 ## Cost
 
 No new pass, target, texture or draw. The grade runs inside the existing
 HDRGrade effect (one uniform vec4); the water adds one uniform and a few ALU
 ops per water pixel; the CPU side is a handful of scalar ops per frame. New
-shader text: the earth-surface program key gains `|look-grade-water-v2` when
-`SEA_STATE` and the flag are on.
+shader text: the earth-surface program key gains `|look-grade-water-v4` (r2) when
+`SEA_STATE` and the flag are on. The flag-on shader text also compiles on
+Medium, phone and Low behind a uniform branch that is 0 there (identical
+pixels, a skipped branch, slightly larger programs). grade-r2 draw calls
+match baseline within streaming noise (192 to 367 per shot).
 
 ## Outside edits
 
-- `lib/fly/cinema-frame.js`: one import and one call,
+- `lib/fly/cinema-frame.js` (r1, unchanged in r2): one import and one call,
   `applyLookGradeEnvironment(e)`, after `applyPhysicalSky` (shared with A).
