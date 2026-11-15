@@ -43,6 +43,8 @@ import { CITY_FACADES_ON, updateCityFacades, cityFacadesState, setCityFacadesSky
 import { cityRangeFor } from '@/lib/fly/city-range';
 // SHIP PASS CITY (CT-5): NIGHT_RHYTHM's occupancy / twilight uniform.
 import { NIGHT_RHYTHM_ON, updateNightRhythm } from '@/lib/fly/night-rhythm';
+// LOOK PASS C (LOOK_FACADE): its terms run on desktop High/Ultra only.
+import { LOOK_FACADE_ON, setLookFacadeTier } from '@/lib/fly/look-facade';
 
 const TIERS = ['low', 'medium', 'high']; // mirrors FlyCanvas's quality ladder
 const atLeastTier = (tier, min) => TIERS.indexOf(tier) >= TIERS.indexOf(min);
@@ -117,6 +119,7 @@ export function SatBuildingLayer({ runtime, flight }) {
     engine.setArchitectureDetail(satelliteVisualProfile(qualityTier).normalMaps);
     engine.setCityRange(cityRangeFor(qualityTier));
     if (CITY_FACADES_ON) setCityFacadesSky(satelliteVisualProfile(qualityTier).normalMaps); // PLAY PASS CITY
+    if (LOOK_FACADE_ON) setLookFacadeTier(qualityTier); // LOOK PASS C
   }, [engine, qualityTier]);
   // Round 19 — the two SAT_SHADOWS mesh flags for THIS layer's meshes (the
   // plan's per-layer rule; B DEEPFIELD owns the light rig and FlyScene's
