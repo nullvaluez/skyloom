@@ -80,6 +80,7 @@ const LEGS = {
 async function buildLeg(name) {
   globalThis.window = { location: { search: '', href: 'http://localhost/' } };
   for (const [f, on] of Object.entries(LEGS[name] ?? {})) globalThis.window[pinName(f)] = { enabled: on };
+  globalThis.window.__flyLookLayersOverride = { enabled: false }; // LOOK PASS D: these texts are the Ship Pass's; LOOK_LAYERS is certified by its own captures
   if (typeof globalThis.OffscreenCanvas === 'undefined') {
     const inert = new Proxy(function () {}, { get: (t, k) => (k === Symbol.toPrimitive ? () => 0 : inert), apply: () => inert, construct: () => inert });
     globalThis.OffscreenCanvas = class { constructor(w, h) { this.width = w; this.height = h; } getContext() { return inert; } };
