@@ -112,7 +112,118 @@ a roof patch grid, and one dot-product lobe on glass. One new program key
 segment (`|look-facade-v1`) per architecture program (near and far rings), on
 the same prewarm path as the shipped material.
 
+## Round 2 (`facade-r2`, review response)
+
+Built in two sittings again: a WIP checkpoint (`87b8b54b`, owner pause) and
+the finishing commit `7927c42a`. Program key is now `|look-facade-v2`.
+
+### What changed
+
+1. **Tier branches** (WIP). Every block sits behind `if(uLookFacade>.5)`, the
+   palette picks with a ternary, and the ribbon edit keeps the shipped
+   expression in its `else`, so Medium/Low run only shipped expressions.
+   `uLookFacade` starts at 0. `setLookFacadeTier` now also requires
+   `!isMobileGraphicsClass()`, so a touch device that picks High keeps the
+   pre-pass look (auditor note; rule 5 says desktop).
+2. **Dusk is a dim dusk city, not a night city** (WIP, then tuned). A
+   twilight lift (`twilight`, sun -12 to +4 degrees, weight
+   `uLookFacadeTwilight`): a cool sky rim on roofs and upper walls and a warm
+   horizon lift on faces toward the sun's azimuth. Frame luma went from -9.1
+   (r1) to about -1.2 against baseline; the lower band is no longer crushed.
+3. **Dusk shimmer** (`7927c42a`). The audit run read 1.894 (1.38x). Night at
+   the same HEAD was 0.86x with the same lit-room picks, darkBlocks and
+   farActivity, so those were not the source; the only dusk-only term is the
+   twilight lift. Fixes: every light-stage term (twilight, sun side, glint)
+   uses `nonPerturbedNormal` (the face normal), not `geometryNormal`, which
+   carried the per-pane relief slope and varied inside window cells; the lift
+   fades to 0.25 past 1.2-4.5 km (`twilight.far`); the sky rim is 0.7x.
+   WIP probe before the last pull-back: 1.768 (1.29x).
+4. **Day at distance** (WIP + `7927c42a`). Value, hue and dark-glass now apply
+   to the whole averaged face once cells are subpixel (`farKeep`), and past
+   1.8-5 km the same per-building picks are pushed further (`day.far`: value
+   0.62-1.32, +60% chroma, dark-glass towers 0.6x more), so a 5 km skyline
+   keeps dark towers, pale stone and brick. Per-building vertical gradient
+   (`day.gradient`): 0.8 at the street to 1 at 45 m, a 1.12 sky lift on tall
+   towers above 90-240 m.
+5. **Day hue families** (WIP). Warm brick, limestone, sandstone, cool grey,
+   green-grey and a terracotta accent per building (`day.hues`), chroma
+   0.3 -> 0.55, two green-tinted glazings, a 40% dark curtain-glass share of
+   tall families with a weaker mirror (`darkTower`), sun side vs shade side on
+   walls (`sunSide`, eased with distance).
+6. **Golden: the city catches light** (`7927c42a`, tuned in `ea75d347` and the
+   last code commit). Glint gain 3 with a soft knee (1.2, so the Jersey City glass no
+   longer clips), a broad warm halo beside glinting glass (gain 0.4, glass
+   only), and a warm-gold edge on sun-facing stone at low sun
+   (`glint.stoneEdge`, gain 0.12, a quarter past 1.5-5 km). Below about 25
+   degrees of sun the sun-side/shade split eases out: low sun already splits
+   faces hard, and doubling it was the golden shimmer source. Kept small
+   because GRADE already warms the golden key.
+
+### Dials (block `LOOK_FACADE`)
+
+`night.strength`, `day.strength`, `day.far.value`, `twilight.strength`,
+`glint.gain`, `glint.stoneEdge.gain`.
+
+### Tried and rejected
+
+- Stone edge gain 0.35: golden burst 1.251 (1.45x). Gain 0.16, knee 1.2 and
+  the shade cut eased at low sun: 1.198 (1.39x). Final (halo glass-only,
+  sun-side boost eased at low sun, stone edge 0.12): 0.973 (1.13x).
+- Twilight sky rim 0.10/0.15/0.30 at full strength to the horizon: dusk
+  1.768 (1.29x); x0.7 and a far fade.
+- try/catch around `applyLookFacade` (auditor suggestion): not done. The
+  realism gate pins "a broken or repeated anchor fails loudly", and every
+  anchor exists in all four programs (GPU compile passes); a silent fallback
+  would hide a broken look on ship day.
+
+### Gates (at `7927c42a`)
+
+`verify-architectural-realism` 12/12 (GPU arm, RTX 5080: compile, flag-off
+byte identity, uLookFacade 0 = pre-pass pixels day and night, Classic
+unchanged), `verify-true-earth-flags` 8/8, `verify-building-handoff` 4/4,
+`verify-facade-filtering` pass (168 cases), `verify-building-surfaces` 6/6,
+`verify-distance-soften` pass, `verify-world-art` 3/3, eslint clean.
+`verify-play-city` / `verify-ship-city` reds are pre-existing (auditor:
+same five play-city checks fail on `c0f11f36` without this stream).
+
+### Cost
+
+ALU only; no new draws, passes or textures. Three uniforms
+(`uLookFacade`, `uLookFacadeTwilight`, `uLookFacadeSun`), two writes a frame.
+Medium/Low compile a larger program (branches skipped at run time); their
+compile time is not measured.
+
+### Round 2 capture (`facade-r2`, burst, vs `baseline`; golden re-taken at the final code)
+
+| shot | changed | luma | shimmer base -> r2 (ratio) |
+|---|---|---|---|
+| nyc-street noon | 27.4% | -5.83 (-5%, rule 7 holds) | 1.999 -> 1.387 (0.69) |
+| nyc-street golden | 24.3% | +0.21 | 0.862 -> 0.973 (1.13) |
+| nyc-street dusk | 36.6% | -1.77 (r1 -9.11) | 1.37 -> 1.575 (1.15) |
+| nyc-street night | 30.6% | -10.07 | 2.223 -> 1.885 (0.85) |
+| nyc-harbor noon | 13.4% (r1 10%, floor 10.4%) | -1.0 | 0.594 -> 0.411 (0.69) |
+| nyc-harbor night | 15.9% | -3.03 | 0.414 -> 0.216 (0.52) |
+| powell golden (sentinel) | 17.4% | +0.18 | 0.289 -> 0.111 |
+| nyc-cruise noon (sentinel) | 4.2% | -0.23 | 0.116 -> 0.121 |
+
+Dusk read 1.576 and 1.575 on two runs (the last golden-only change does not
+touch dusk: the sun is below the horizon). nyc-street never settles in 150 s,
+so its burst carries streaming noise: a same-session flag-off golden
+(`facade-off2`) read 0.412 against the stored baseline's 0.862, so against
+that run the final golden is 2.4x. The gate as written (baseline) passes;
+golden shimmer is the number to watch on the owner's motion check.
+
+### Shared-folder note
+
+The auditor's accidental `--help` capture rewrote
+`.graphics-review/look-pass/baseline/manifest.json` (errors array) and added
+`baseline/failure.png`. Not repaired here (outside this worktree); captures
+and compare numbers are unaffected.
+
 ## Files outside the stream's list
 
-None. `components/fly/SatBuildingLayer.jsx` (owned) gained one import and one
-call, `setLookFacadeTier(qualityTier)`, next to the existing `setCityFacadesSky`.
+None. `components/fly/SatBuildingLayer.jsx` (owned) gained one import and two
+one-line calls, `setLookFacadeTier(qualityTier)` and
+`updateLookFacade(runtime.sun)`. `city-facades.js` (owned) gained one exported
+line. `verify-architectural-realism.mjs` gained the look arms (shipped hashes
+and flag-off arms unchanged).
