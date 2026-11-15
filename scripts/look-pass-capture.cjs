@@ -13,6 +13,10 @@
  * A re-run into an existing label replaces the shots it captures and keeps the rest of the manifest.
  * A three-slot lock under .graphics-review/look-pass/.locks keeps concurrent agents from
  * oversubscribing the GPU; a run waits for a slot instead of failing.
+ * A shot is retried in a fresh page (up to three attempts) when the page reloads, the canvas
+ * remounts, the WebGL context is lost or the frame comes out blank. Editing a source file while
+ * a capture runs causes exactly that (hot reload), so wait for DONE before editing.
+ * The reference labels baseline and baseline-a are read-only without --rebaseline.
  */
 const { chromium } = require('playwright');
 const fs = require('node:fs');
@@ -54,7 +58,6 @@ const shotPairs = typeof args.shots === 'string' ? args.shots.split(',').map(s =
 const poseNames = shotPairs ? [...new Set(shotPairs.map(([p]) => p))] : (typeof args.poses === 'string' ? args.poses.split(',') : Object.keys(POSES)).filter(n => POSES[n]);
 const allTimes = (typeof args.times === 'string' ? args.times.split(',') : Object.keys(TIMES)).filter(n => n in TIMES);
 const timesFor = pose => shotPairs ? shotPairs.filter(([p]) => p === pose).map(([, t]) => t) : allTimes;
-const timeNames = timesFor(poseNames[0]);
 const viewport = { width: Number(args.width || 1600), height: Number(args.height || 900) };
 
 let home;
@@ -62,6 +65,10 @@ try { home = path.resolve(execSync('git rev-parse --path-format=absolute --git-c
 catch { home = path.resolve(__dirname, '..'); }
 const root = path.join(home, '.graphics-review', 'look-pass');
 const out = path.resolve(typeof args.out === 'string' ? args.out : path.join(root, label));
+if (/^baseline(-a)?$/.test(label) && !args.rebaseline && fs.existsSync(path.join(out, 'manifest.json'))) {
+  console.error(`Refusing to write into the reference label "${label}". Pass --label=<stream>-wip and --url=http://localhost:<your port>.`);
+  process.exit(2);
+}
 fs.mkdirSync(out, { recursive: true });
 
 const report = { label, url, flags, quality, date, viewport, venue: 'Installed Chrome / D3D11 / live world; fixed pose, real solar ephemeris, running clock', captures: [], errors: [], warnings: [] };
@@ -89,7 +96,7 @@ const releaseSlot = () => { if (heldSlot) { try { fs.rmSync(heldSlot, { recursiv
 process.on('exit', releaseSlot);
 process.on('SIGINT', () => { releaseSlot(); process.exit(130); });
 
-// ---- image metrics -------------------------------------------------------
+// ---- image metrics (file path or PNG buffer) ------------------------------
 async function imageMetrics(file) {
   const { data, info } = await sharp(file).removeAlpha().raw().toBuffer({ resolveWithObject: true });
   const band = (y0, y1) => {
@@ -160,16 +167,19 @@ async function waitWorld(page, timeout) {
     for (let i = 0; i < 50; i++) { const mid = (lo + hi) / 2; if (elevationAt(pose, mid) > TIMES[time]) lo = mid; else hi = mid; }
     return Math.round((lo + hi) / 2);
   };
+  const shots = poseNames.flatMap(p => timesFor(p).map(t => ({ pose: p, time: t, key: `${p}__${t}` })));
+  const BLANK_STD = 2.5, MAX_TRIES = 3, sleep = ms => new Promise(r => setTimeout(r, ms));
 
   const waited = await acquireSlot();
   console.log(`SLOT ${label} ${path.basename(heldSlot)} after ${waited}ms`);
   const browser = await chromium.launch({ channel: process.env.PLAYWRIGHT_CHANNEL || 'chrome', headless: true, args: ['--use-angle=d3d11', '--ignore-gpu-blocklist', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'] });
-  let page, current = 'boot';
-  try {
-    page = await browser.newPage({ viewport, deviceScaleFactor: 1 });
-    page.on('pageerror', e => { report.errors.push({ scene: current, kind: 'pageerror', message: e.message }); save(); });
-    page.on('console', m => { const t = m.text(); if (m.type() === 'error' && /shader|WebGL|GLSL|ReferenceError|TypeError/i.test(t)) { report.errors.push({ scene: current, kind: 'console', message: t.slice(0, 2500) }); save(); } else if (m.type() === 'error' && report.warnings.length < 60) report.warnings.push({ scene: current, message: t.slice(0, 600) }); });
-    await page.addInitScript(({ quality, sun }) => {
+  let page = null, current = 'boot';
+
+  async function boot(first) {
+    const p = await browser.newPage({ viewport, deviceScaleFactor: 1 });
+    p.on('pageerror', e => { report.errors.push({ scene: current, kind: 'pageerror', message: e.message }); save(); });
+    p.on('console', m => { const t = m.text(); if (m.type() === 'error' && /shader|WebGL|GLSL|ReferenceError|TypeError/i.test(t)) { report.errors.push({ scene: current, kind: 'console', message: t.slice(0, 2500) }); save(); } else if (m.type() === 'error' && report.warnings.length < 60) report.warnings.push({ scene: current, message: t.slice(0, 600) }); });
+    await p.addInitScript(({ quality, sun }) => {
       window.__flyGovPin = 'hold'; window.__flyVisualsOverride = 'enhanced'; window.__flyTitleBypass = true; window.__flyBoostInfinite = true;
       window.__flySunOverride = sun; window.__flyWeatherOverride = 'baseline';
       try {
@@ -177,15 +187,15 @@ async function waitWorld(page, timeout) {
         localStorage.setItem('fly-sound-on', '0'); localStorage.setItem('fly-visuals', 'enhanced');
         localStorage.setItem('fly-explorer-preferences-v1', JSON.stringify({ version: 1, settings: { tutorial: 'done' } }));
       } catch {}
-    }, { quality, sun: solve(POSES[poseNames[0]], timeNames[0]) });
-    await page.route('**/api/aircraft?**', r => r.fulfill({ json: { ac: [], now: Date.now(), total: 0, source: 'look pass' } }));
-    await page.route('**/api/weather**', r => r.fulfill({ json: { found: false } }));
-    await page.goto(`${url}/?graphicsReview=1${flags ? `&flags=${encodeURIComponent(flags)}` : ''}`, { waitUntil: 'domcontentloaded', timeout: 240000 });
-    await page.waitForFunction(() => !!window.__fly?.operations && !!window.__flyStore, undefined, { timeout: 240000 });
-    report.gpu = await page.evaluate(() => { const g = document.createElement('canvas').getContext('webgl2'), e = g.getExtension('WEBGL_debug_renderer_info'); return g.getParameter(e.UNMASKED_RENDERER_WEBGL); });
+    }, { quality, sun: solve(POSES[first.pose], first.time) });
+    await p.route('**/api/aircraft?**', r => r.fulfill({ json: { ac: [], now: Date.now(), total: 0, source: 'look pass' } }));
+    await p.route('**/api/weather**', r => r.fulfill({ json: { found: false } }));
+    await p.goto(`${url}/?graphicsReview=1${flags ? `&flags=${encodeURIComponent(flags)}` : ''}`, { waitUntil: 'domcontentloaded', timeout: 240000 });
+    await p.waitForFunction(() => !!window.__fly?.operations && !!window.__flyStore, undefined, { timeout: 240000 });
+    report.gpu = await p.evaluate(() => { const g = document.createElement('canvas').getContext('webgl2'), e = g.getExtension('WEBGL_debug_renderer_info'); return g.getParameter(e.UNMASKED_RENDERER_WEBGL); });
     if (/swiftshader|llvmpipe|software|basic render/i.test(report.gpu || '')) throw Error(`Software renderer: ${report.gpu}`);
     console.log(`BOOT ${label} ${report.gpu}`);
-    await page.evaluate(() => {
+    await p.evaluate(() => {
       const r = window.__fly, s = window.__flyStore.getState();
       r.operations.phase = 'airborne'; r.operations.profile = null; r.operations.warp(r.flight); s.setHangarOpen(false); s.setPhase('flying');
       const f = r.flight, step = f.step.bind(f);
@@ -197,39 +207,92 @@ async function waitWorld(page, timeout) {
       let scene = r.engine.object; while (scene.parent) scene = scene.parent;
       scene.__r3f.root.getState().gl.domElement.setAttribute('data-look-canvas', '');
       Object.defineProperty(r.camera, 'fov', { configurable: true, get: () => 60, set: () => {} }); r.camera.updateProjectionMatrix();
+      window.__lookSession = { flight: f, step: f.step };
     });
+    return p;
+  }
 
-    for (const poseName of poseNames) {
-      const pose = POSES[poseName];
-      current = poseName;
-      await page.evaluate(({ p, sun }) => {
-        const r = window.__fly; window.__lookHold = null; window.__flySunOverride = sun;
-        r.warpToGeo(p.lat, p.lon, { altM: p.altM, headingRad: p.headingDeg * Math.PI / 180, name: null }); r.autopilot?.disengage?.();
-        const f = r.flight; window.__lookHold = { x: f.pos.x, y: f.pos.y, z: f.pos.z, heading: p.headingDeg * Math.PI / 180 }; r.chaseCam?.snap?.();
-      }, { p: pose, sun: solve(pose, timesFor(poseName)[0]) });
-      await page.waitForTimeout(4000);
-      const world = await waitWorld(page, Number(args.worldTimeout || 150000));
-      console.log(`POSE ${label} ${poseName} settled=${world.settled} ${world.ms}ms`);
-      for (const time of timesFor(poseName)) {
-        current = `${poseName}__${time}`;
-        const utc = solve(pose, time), want = elevationAt(pose, utc);
-        await page.evaluate(v => { window.__flySunOverride = v; }, utc);
-        await page.waitForFunction(el => Math.abs(Math.asin(window.__fly.sun.sinEl) * 180 / Math.PI - el) < 0.05, want, { timeout: 15000, polling: 250 }).catch(() => report.warnings.push({ scene: current, message: 'sun did not converge' }));
-        await page.waitForTimeout(Number(args.settle || 7000));
-        const file = `${current}.png`;
-        await page.screenshot({ path: path.join(out, file), timeout: 60000, style: HIDE });
-        const telemetry = await page.evaluate(() => {
-          const r = window.__fly, s = window.__flyStore.getState(); let scene = r.engine.object; while (scene.parent) scene = scene.parent;
-          const gl = scene.__r3f?.root?.getState()?.gl;
-          return { sunElevation: Math.asin(r.sun?.sinEl) * 180 / Math.PI, quality: s.qualityTier, visuals: s.visuals, aglM: r.flight.pos.y - r.flight.groundElev,
-            render: gl ? { calls: gl.info.render.calls, triangles: gl.info.render.triangles, programs: gl.info.programs.length, textures: gl.info.memory.textures } : null,
-            fps: window.__flyStats?.fps ?? null, urlFlags: window.__flyUrlFlags ?? null };
-        });
-        const burst = args.burst ? await burstMetric(page).catch(e => ({ error: e.message })) : null;
-        report.captures = report.captures.filter(c => c.file !== file); captured++;
-        report.captures.push({ pose: poseName, time, file, utc, burst, iso: new Date(utc).toISOString(), worldSettled: world.settled, telemetry, metrics: await imageMetrics(path.join(out, file)) }); save();
-        console.log(`CAPTURE ${label} ${file} el=${telemetry.sunElevation.toFixed(2)} calls=${telemetry.render?.calls} tris=${telemetry.render?.triangles}${burst ? ` sparkle=${burst.sparklePct ?? burst.error}%` : ''}`);
+  // '' while the page this session set up is still the page on screen; otherwise the reason it is not.
+  const alive = p => p.evaluate(() => {
+    const k = window.__lookSession, r = window.__fly;
+    if (!k || !r) return 'the page reloaded';
+    if (r.flight !== k.flight || r.flight.step !== k.step) return 'the flight runtime was replaced';
+    let scene = r.engine.object; while (scene.parent) scene = scene.parent;
+    const gl = scene.__r3f?.root?.getState()?.gl, c = gl?.domElement;
+    if (!c || !c.isConnected || !c.hasAttribute('data-look-canvas')) return 'the canvas remounted';
+    if (gl.getContext().isContextLost()) return 'the WebGL context was lost';
+    return '';
+  }).catch(e => 'the page went away: ' + String(e.message).split('\n')[0]);
+
+  async function warp(p, shot) {
+    const pose = POSES[shot.pose];
+    await p.evaluate(({ p, sun }) => {
+      const r = window.__fly; window.__lookHold = null; window.__flySunOverride = sun;
+      r.warpToGeo(p.lat, p.lon, { altM: p.altM, headingRad: p.headingDeg * Math.PI / 180, name: null }); r.autopilot?.disengage?.();
+      const f = r.flight; window.__lookHold = { x: f.pos.x, y: f.pos.y, z: f.pos.z, heading: p.headingDeg * Math.PI / 180 }; r.chaseCam?.snap?.();
+    }, { p: pose, sun: solve(pose, shot.time) });
+    await p.waitForTimeout(4000);
+    const world = await waitWorld(p, Number(args.worldTimeout || 150000));
+    console.log(`POSE ${label} ${shot.pose} settled=${world.settled} ${world.ms}ms`);
+    return world;
+  }
+
+  // Returns '' when the shot is recorded, or the reason it has to be retried in a fresh page.
+  async function shoot(p, shot, world, attempt) {
+    const pose = POSES[shot.pose], final = attempt >= MAX_TRIES, file = `${shot.key}.png`;
+    const utc = solve(pose, shot.time), want = elevationAt(pose, utc);
+    await p.evaluate(v => { window.__flySunOverride = v; }, utc);
+    await p.waitForFunction(el => Math.abs(Math.asin(window.__fly.sun.sinEl) * 180 / Math.PI - el) < 0.05, want, { timeout: 15000, polling: 250 }).catch(() => report.warnings.push({ scene: current, message: 'sun did not converge' }));
+    await p.waitForTimeout(Number(args.settle || 7000));
+    if (args['test-reload'] && attempt === 1) await p.reload({ waitUntil: 'domcontentloaded' });
+    let why = await alive(p), png = null, metrics = null;
+    if (!why) {
+      png = await p.screenshot({ timeout: 60000, style: HIDE });
+      metrics = await imageMetrics(png);
+      why = metrics.frame.lumaStd < BLANK_STD ? 'the frame is blank' : await alive(p);
+    }
+    if (why && !final) return why;
+    if (!png) { png = await p.screenshot({ timeout: 60000, style: HIDE }); metrics = await imageMetrics(png); }
+    fs.writeFileSync(path.join(out, file), png);
+    const telemetry = await p.evaluate(() => {
+      const r = window.__fly, s = window.__flyStore.getState(); let scene = r.engine.object; while (scene.parent) scene = scene.parent;
+      const gl = scene.__r3f?.root?.getState()?.gl;
+      return { sunElevation: Math.asin(r.sun?.sinEl) * 180 / Math.PI, quality: s.qualityTier, visuals: s.visuals, aglM: r.flight.pos.y - r.flight.groundElev,
+        render: gl ? { calls: gl.info.render.calls, triangles: gl.info.render.triangles, programs: gl.info.programs.length, textures: gl.info.memory.textures } : null,
+        fps: window.__flyStats?.fps ?? null, urlFlags: window.__flyUrlFlags ?? null };
+    });
+    const burst = args.burst && !why ? await burstMetric(p).catch(e => ({ error: e.message })) : null;
+    if (burst && !final) { const after = await alive(p); if (after) return `${after} during the motion burst`; }
+    report.captures = report.captures.filter(c => c.file !== file); captured++;
+    const entry = { pose: shot.pose, time: shot.time, file, utc, burst, iso: new Date(utc).toISOString(), worldSettled: world.settled, attempts: attempt, telemetry, metrics };
+    if (why) { entry.blank = why; report.errors.push({ scene: shot.key, kind: 'bad-frame', message: `${why} on all ${MAX_TRIES} attempts; this frame is not usable evidence` }); }
+    report.captures.push(entry); save();
+    if (why) console.log(`BAD FRAME ${label} ${file}: ${why} on all ${MAX_TRIES} attempts. Not usable as evidence: read the errors array in manifest.json, fix the cause and capture it again.`);
+    else console.log(`CAPTURE ${label} ${file} el=${telemetry.sunElevation.toFixed(2)} calls=${telemetry.render?.calls} tris=${telemetry.render?.triangles}${burst ? ` sparkle=${burst.sparklePct ?? burst.error}%` : ''}`);
+    return '';
+  }
+
+  try {
+    const tries = new Map(); let lastPose = null, world = null, restarts = 0;
+    for (let i = 0; i < shots.length;) {
+      const shot = shots[i], attempt = (tries.get(shot.key) || 0) + 1; tries.set(shot.key, attempt);
+      let why;
+      try {
+        if (!page) { current = 'boot'; page = await boot(shot); lastPose = null; }
+        if (lastPose !== shot.pose) { current = shot.pose; world = await warp(page, shot); lastPose = shot.pose; }
+        current = shot.key;
+        why = await shoot(page, shot, world, attempt);
+      } catch (e) {
+        if (attempt >= MAX_TRIES) throw e;
+        why = 'error: ' + String(e.message).split('\n')[0];
       }
+      if (!why) { i++; continue; }
+      console.log(`RETRY ${label} ${shot.key}: ${why} (attempt ${attempt} of ${MAX_TRIES}). If a source file was edited while this capture ran, the hot reload is the cause: wait for DONE before editing.`);
+      report.warnings.push({ scene: shot.key, message: `retry ${attempt}: ${why}` }); save();
+      if (page) await page.close().catch(() => {});
+      page = null;
+      if (++restarts > 10) throw Error('More than 10 page restarts in one capture run');
+      await sleep(6000);
     }
   } catch (e) {
     report.errors.push({ scene: current, kind: 'fatal', message: e.message });
