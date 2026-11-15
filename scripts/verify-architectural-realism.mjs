@@ -81,16 +81,24 @@ const runArm = name => {
 const off = runArm('off'), on = runArm('on'), independent = runArm('independent'), look = runArm('look');
 check('LOOK_FACADE on: both rings assemble its day and night edits under their own key', () => {
   for (const [name, p] of Object.entries(look)) {
-    assert.equal(p.key.replace('|look-facade-v1', ''), on[name].key, name);
-    assert.ok(p.key.includes('|look-facade-v1'), name);
+    assert.equal(p.key.replace('|look-facade-v2', ''), on[name].key, name);
+    assert.ok(p.key.includes('|look-facade-v2'), name);
     assert.ok(p.fs.includes('float lfE1='), `${name} night`);
     // The day edit needs the realism albedo; Classic programs keep it but cityDay is 0 there.
     assert.ok(p.fs.includes('float lfDay='), `${name} day`);
     assert.ok(p.fs.indexOf('float lfDay=') < p.fs.indexOf('#include <lights_physical_fragment>'));
     // Floor ribbons replace the both-axis retire; the glint follows the sky reflection.
-    assert.ok(p.fs.includes('float lfMinX=') && !p.fs.includes('paneMask = mix(paneMask, opening.x * opening.y * isWall, minify);'), `${name} ribbons`);
-    assert.ok(p.fs.indexOf('LOOK_FACADE: low-sun glint') > p.fs.indexOf('reflectedLight.indirectSpecular*=1.+(mix(uCityReflect,'), `${name} glint`);
-    assert.ok(p.uniforms.uLookFacade, `${name} tier uniform`);
+    // Rule 5: Medium/Low (uLookFacade 0) run only the shipped expression, in the else branch.
+    assert.ok(p.fs.includes('float lfMinX=') && p.fs.split('paneMask = mix(paneMask, opening.x * opening.y * isWall, minify);').length === 2
+      && p.fs.includes('}else paneMask = mix(paneMask, opening.x * opening.y * isWall, minify);'), `${name} ribbons`);
+    for (const block of ['LOOK_FACADE: sparse lit rooms', 'LOOK_FACADE: one value and hue', 'LOOK_FACADE: sun side / shade side']) {
+      const at = p.fs.indexOf(block);
+      const next = p.fs.slice(at).split('\n')[1];
+      assert.ok(at >= 0 && next.startsWith('if(') && next.endsWith('uLookFacade>.5){'), `${name} ${block} sits behind the tier branch`);
+    }
+    assert.ok(p.fs.indexOf('low-sun glint') > p.fs.indexOf('reflectedLight.indirectSpecular*=1.+((uLookFacade>.5?'), `${name} glint`);
+    assert.ok(p.fs.includes('float lfHalo=') && p.fs.includes('uLookFacadeTwilight>.001'), `${name} halo and twilight`);
+    assert.equal(p.uniforms.uLookFacade, 0, `${name} tier uniform defaults to 0 (Medium/Low)`);
   }
 });
 check('flag off keeps both look/ring shader programs and keys unchanged', () => {
