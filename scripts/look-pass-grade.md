@@ -158,6 +158,84 @@ milky, but the white haze slab (stream A) still dominates, the zenith now
 reads dark navy, and its sparkle ratio is the one over 1.25. Also weak:
 `powell__golden`'s lake, which stays a blue slab (see rejected).
 
+## Round 2 revision (after review of `dd8d5102`: critic ship 3.9/4.2, auditor pass)
+
+No must-fix and no blocking item. The resumed instance found no WIP after
+`dd8d5102` (the `4ee7fef7` checkpoint the task named sits below round 1 and is
+already folded into it), so every item below is new work on top of `dd8d5102`.
+Captures re-taken under the same label, `grade-r2`.
+
+What changed (all behind the flag and the live weight; new dials in brackets):
+
+1. **Golden water, near field** (`coastal-water.js`): the near-water sky add
+   is chroma-lifted x1.15 instead of x1.7 (the x1.7 was the cobalt tarp); the
+   wave slopes that face the sun take a gold sheen off the horizon brightness
+   in the key's hue, squared on the slope so it is texture, not a veil, and
+   stronger on the sun's side of the frame (`waterNearSheen`); the near body
+   gives up 16 % of its chroma toward a warm grey. The lavender "away from the
+   sun" tint is now a faint peach.
+2. **Noon lake** (`coastal-water.js`, uLookWater.z, `waterNoon`): steep water
+   by day reflects 0.075 more of the sky it sees, so its luma rises and the
+   waves (which steer the reflected ray) carry structure.
+3. **Cruise zenith** (`zenithLift` 0.15): dark, saturated blue below luma
+   about .4 gets value back and a little chroma out (toward a mid blue).
+4. **Noon whites** (`cloudWhite` 0.85): bright unsaturated pixels at noon go
+   to a pale blue-white at their own luma, and the `noonWarm` push now stops
+   below them (its top band moved .80-.95 -> .66-.84). Clouds and the cruise
+   haze slab are white or blue-white, stone and concrete keep the warm key.
+   This only takes back the cream this stream added to stream A's slab; the
+   slab's own tint and density are A's.
+5. **Dusk walls** (`duskCool` 0.40): at civil twilight warm-lit pixels give
+   up 40 % of their chroma toward a faintly blue grey (full night and golden
+   hour untouched). Kept modest: stream C's night windows take the rest.
+6. **Auditor, non-blocking, taken**: the flag-on GLSL (display grade and sea)
+   is now compiled only off the mobile graphics class
+   (`LOOK_GRADE_COMPILED = LOOK_GRADE_ON && !isMobileGraphicsClass()`), so
+   phones and tablets keep today's programs, not only today's pixels. Desktop
+   Medium keeps the uniform branch (its tier moves at runtime). Program key
+   `|look-grade-water-v4` -> `-v5`.
+7. **Auditor, not taken**: caching `cinemaProfile()` per tier (FlyScene already
+   resolves it each frame; the saving is one small object) and zeroing the
+   water uniform in `cinema-frame.js`'s cinema-off branch (Classic/Neon are not
+   player-facing, and it would be a second edit in a file this stream does not
+   own).
+
+WIP evidence (`grade-wip`, region probes, display RGB / luma):
+
+| region | round 1 | round 2 |
+|---|---|---|
+| powell noon lake (800-1150, 760-880) | 17,39,67 / 36.3 | 18,46,78 / 42.1 (+16 %) |
+| powell golden lake | 10,21,45 / 20.8 | 17,25,43 / 24.6 |
+| harbour golden near water (0-600, 700-900) | 2,24,54 / 21.8 | 13,27,49 / 25.9 |
+| cruise noon zenith (top 200 rows) | 13,65,125 / 57.8 | 16,70,133 / 63.0 (+9 %) |
+
+### grade-r2 (revision) measured, `73cac3d5`
+
+Frame luma = baseline + compare delta; sparkle = burst, baseline -> r2.
+
+| shot | luma base -> r2 | sat delta | sparkle (ratio) |
+|---|---|---|---|
+| powell golden | 64 -> 93 | +.03 | .289 -> .267 (0.92) |
+| nyc-harbor golden | 67 -> 103 | +.03 | .406 -> .399 (0.98) |
+| yosemite golden | 67 -> 95 | +.12 | .077 -> .077 (1.00) |
+| nyc-street dusk | 36 -> 58 | -.02 | 1.370 -> 1.543 (1.13) |
+| powell noon | 113 -> 116 | +.14 | .831 -> .628 (0.76) |
+| nyc-harbor noon | 111 -> 113 | +.16 | .594 -> .628 (1.06) |
+| nyc-cruise noon | 125 -> 131 | +.11 | .116 -> .119 (1.03) |
+| nyc-street noon | 113 -> 114 | +.14 | 1.999 -> 2.215 (1.11) |
+| nyc-harbor night | 43 -> 45 | 0 | .414 -> .250 (0.60) |
+
+Every burst ratio is now inside 1.25x (cruise noon was the one over, 1.40).
+Mean absDiff 21.8, 86 % of pixels changed. Region probes on the final set:
+cruise haze slab (rows 330-420) 137,162,179 at baseline, cream in round 1,
+129,170,198 now (blue-white); cruise zenith 63.0 (round 1 57.8, baseline
+68.1); Powell noon lake 42.2 (round 1 36.3, baseline 45.5); harbour golden near
+water 13,27,49 (round 1 2,24,54).
+
+Rejected on the way: a broad sheen with a 0.25 floor plus a 30 % chroma pull
+turned the harbour's near water slate grey-brown (the critic's strongest frame
+lost its depth); replaced by the slope-squared sheen and a 16 % pull.
+
 ## Dials (`LOOK_GRADE` in fly-constants.js)
 
 Masters: `exposure`, `fill`, `grade`, `water`, `warmth` (each 0 removes its
@@ -166,7 +244,8 @@ family, 1 = as tuned). Detail: `exposureNoon/Golden/Dusk`, `fillGolden`,
 `keyGainGolden`, `toeLift`, `contrast`, `pivot`, `shoulder`, `vibrance`,
 `warmGuard`, `shadeCool`, `keyWarm`, `waterSheen`, `waterPath`; r2 adds
 `contrastNoon`, `pivotNoon`, `noonBlue`, `noonGreen`, `greenSpread`, `skyDeep`,
-`noonWarm`, `shoulderGolden`, `tealGuard`.
+`noonWarm`, `shoulderGolden`, `tealGuard`; the r2 revision adds `zenithLift`,
+`cloudWhite`, `duskCool`, `waterNearSheen`, `waterNoon`.
 
 ## Tried and rejected
 
@@ -220,6 +299,16 @@ family, 1 = as tuned). Detail: `exposureNoon/Golden/Dusk`, `fillGolden`,
   twilight-balance 13, phys-sky 12, reflection-stability 3/3, water-field,
   terrain-weathering exit 0; sea-seams, cinema-art, ship-light exit 1 as on
   the base tree.
+- r2 revision: verify-look-grade 20/20 (new: the cloud-white, zenith-lift and
+  dusk-cool terms are weight-gated; weight 0 zeroes all four water lanes),
+  verify-true-earth-flags 8/8, eslint clean on every changed file;
+  city-water, water-field, reflection-stability, cinematic-earth,
+  cinema-overhaul, cruise-color, twilight, twilight-balance,
+  architectural-daylight exit 0; verify-sea-seams exit 1 with the base tree's
+  FAIL list (1a, 1b, 1c, 2a, 2c).
+- Not run here: a flying burst on the 5080 at nyc-street noon and nyc-cruise
+  noon (the critic's request). The harness burst is a slow creep; the
+  owner's motion check is the real read.
 
 ## Cost
 
