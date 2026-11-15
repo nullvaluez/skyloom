@@ -28,6 +28,9 @@ ok(LOOK_WATER_UNIFORM.value.x === 0 && LOOK_WATER_UNIFORM.value.y === 0, 'weight
 // 2. Flag off: the display grade text carries no LOOK term.
 ok(!hdrGradeGLSL(true, false).includes('uLook') && !hdrGradeGLSL(false, false).includes('uLook'), 'flag-off display grade text has no uLook');
 ok(hdrGradeGLSL(true, true).includes('lookGrade('), 'flag-on display grade text carries lookGrade()');
+// r2: the noon chroma lift is gamut-limited (a saturated cruise zenith once
+// clipped its red channel to 0 and shifted hue).
+ok(hdrGradeGLSL(true, true).includes('.97*yy/max(-dn,1e-4)'), 'noon chroma lift carries the gamut guard');
 
 // 3. The law, weight 1.
 const stops = (el, w = {}) => { const e = at(el, w), s0 = e.exposureStops; applyLookGradeEnvironment(e, 1); return { d: e.exposureStops - s0, e }; };
