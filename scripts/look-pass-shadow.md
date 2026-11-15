@@ -1,4 +1,4 @@
-# Look Pass B SHADOW: ledger (round 1)
+# Look Pass B SHADOW: ledger (rounds 1 and 2)
 
 Flag `LOOK_SHADOW` (on). Tunables: the `LOOK_SHADOW` block at the end of
 `lib/fly/fly-constants.js`, read only through `lib/fly/look-shadow.js`.
@@ -115,3 +115,115 @@ triangles in the far cascade; read the owner's 5080 frame time).
   the only change and they are hard to see at half size.
 - Cloud shadows depend on where the baseline weather puts clouds; with sparse
   cumulus most frames get one or two shadows, not a dappled landscape.
+
+---
+
+# Round 2 (label `shadow-r2`)
+
+## Review items
+
+Blocking (code auditor), all fixed:
+
+1. **Cloud shadow applied on every tier (rule 5).** Fixed. The patched
+   composite keeps the original `clamp(shade*.32,0.,.23)` line as the `else`
+   of one uniform branch on `uLookCloudShape.x`, a gate uniform shared by
+   every patched composite. It starts at 0 and `CinemaShadowRig` writes it
+   every frame from the live profile (`lookShadowCloudGate`): 1 on desktop
+   High/Ultra (and their governor rungs) with cascades, 0 on Medium, phone,
+   Low, with no cascades, with Classic or when the cinema rig retires. At 0
+   the air fades act on the raw density exactly as before, so Medium/phone
+   pixels are the original expression; the only added cost there is one
+   uniform compare per ground pixel. Gate `verify-look-shadow` (5d) to (5f).
+2. **Merge conflict with look/layers in `verify-ship-sky.mjs`.** Fixed: the
+   `LOOK_SHADOW` pin moved below the OffscreenCanvas block. `git merge-tree`
+   of this file against `look/layers` is now clean (checked with a temporary
+   index).
+3. **Triangle cost not justified.** See Cost below.
+
+Non-blocking: the AO tuned config is cached per (base, look) and no longer
+allocated every frame. The `cloudShadow` master dial now reaches baseline at
+0 (it scales the gate, which mixes from the original line to the tuned one),
+and above 1 it scales strength.
+
+Critic:
+
+- **Cloud shadows soft, larger, edge broken (done).** The caster is now a
+  five-tap disc average (`softM` 420 m) held to at least 80 % of the core
+  density, so each shadow grows a feathered penumbra past its cloud. Two
+  octaves of the cloud noise at `noiseM` 900 m modulate the density (x0.55 to
+  x1.45), which breaks straight or stamped edges. Darkness capped at 60 %
+  (was 70 %, the harbour read near-black) and the cool bias raised 0.12 ->
+  0.22 so the shadow reads blue-grey, not navy or green-black.
+- **Golden-hour cloud shadows (done).** `lowSun` 0.35 -> 1: with soft edges a
+  low sun's long shadow no longer reads as a sheet, so golden hour keeps full
+  strength.
+- **Houses float (done, a real defect).** `SatParcelHomes` casts only when the
+  legacy sun light casts, and `CinemaShadowRig` always turns that light off,
+  so in Enhanced no parcel house ever cast a shadow. On High/Ultra with this
+  pass's cascades they now cast (`lookShadowHomesCast`). The live probe at
+  `powell__golden` confirms `sat-parcel-homes` in the caster set, along with
+  the tree canopy (`Mesh:trees`) and the forest tiles, which already cast.
+- **City warm sun-side lift: declined.** The colour of lit walls and of the
+  fill inside a shadow is stream E's (FLY_LOOK_PASS.md, B SHADOW bullet 5),
+  and GRADE r1 already adds a warm key and cool fill. Doing it here would
+  double the same move.
+- **Golden-hour sun shadows that bite: partly.** The cascades already reach
+  8 km at golden hour and trees, forest and now houses cast into them; what
+  keeps them faint is the ratio of direct sun to sky fill at 7 degrees, which
+  is exposure and fill (stream E). Darkening the ambient term inside the
+  shadow would mean new CSM shader text in every lit material (a recompile of
+  the whole world and a new prewarm key) and was not attempted this round.
+- **AO further out: not changed.** The critic also called the near field
+  heavy; a larger radius makes both worse together. Left at 130 m / 6.5.
+
+## Cost
+
+Measured by the auditor on a flag-off / flag-on pair, twice each:
+`nyc-harbor__noon` 2.04 M -> 2.37 M triangles (+15.9 %, calls 340 -> 349),
+`nyc-harbor__night` 2.16 M -> 2.52 M (+16.7 %, calls 344 -> 346). The cause is
+the 8 km cascade reach: the far cascade now draws the shadow casters of a
+much larger area. It is over rule 8's 15 % line and is kept because it is the
+reach the plan asks for (canyons and grounded objects past 3 km). No new
+pass, target or texture. For the owner's RTX 5080 read: if the harbour frame
+time rises noticeably, `LOOK_SHADOW.reach` 0.75 brings Ultra to 6 km. The
+r1 harbour-night draw-call spike (375 -> 538) did not reproduce (rerun 346):
+streaming noise. Round 2 adds, on High/Ultra only: four extra cloud-density
+taps and two noise taps per ground pixel in the existing cloud composite
+(ALU and 3D-texture reads, no draw), and the parcel-house instances in the
+shadow pass (one instanced draw per cascade where homes exist).
+
+## Edits outside my files (round 2)
+
+- `components/fly/SatParcelHomes.jsx`: one import and one call,
+  `lookShadowHomesCast(runtime)`, added to the existing cast condition.
+- `scripts/verify-ship-sky.mjs`: the round 1 pin moved below the
+  OffscreenCanvas block (same four lines).
+- `lib/fly/immersive-cloud-pass.js`: unchanged since round 1.
+
+## Measured (shadow-r2 vs baseline)
+
+| shot | frame luma | lower third | sparkle (base -> r2) | triangles |
+|---|---|---|---|---|
+| nyc-street noon | 112.6 -> 98.4 | 91.0 -> 59.0 | 1.999 -> 0.937 | 3.18 M -> 3.64 M (unsettled) |
+| nyc-street golden | 62.9 -> 61.1 | 31.3 -> 27.8 | 0.862 -> 0.354 | 3.28 M -> 3.78 M (unsettled) |
+| nyc-harbor noon | 110.9 -> 107.4 | 62.8 -> 61.9 | 0.594 -> 0.427 | 2.03 M -> 2.38 M |
+| powell noon | 113.2 -> 110.9 | 81.0 -> 80.3 | 0.831 -> 0.436 | 0.82 M -> 0.92 M |
+| powell golden | 64.0 -> 63.9 | 21.9 -> 22.0 | 0.289 -> 0.115 | 0.96 M -> 1.05 M |
+| yosemite golden | 66.9 -> 65.1 | 38.8 -> 38.8 | 0.077 -> 0.054 | 0.66 M -> 0.66 M |
+| nyc-cruise noon | 124.7 -> 123.6 | 133.8 -> 130.6 | 0.116 -> 0.086 | flat |
+| nyc-harbor night | 42.6 -> 41.8 | 15.7 -> 14.4 | 0.414 -> 0.247 | 2.14 M -> 2.53 M |
+
+`nyc-harbor__noon` middle band -9.8 luma (the soft harbour shadow). The
+nyc-street pair did not settle (`settled=false`; calls 365 -> 514 is
+streaming), and its frame luma reads -12.6 %, just over rule 7's 12 % (r1 read
+-10.8 % with the same AO). If the merged frame needs it back, `occlusion` 0.85
+is the dial. Capture errors: none.
+
+## Still weak after round 2
+
+- Golden hour. `powell__golden` and `yosemite__golden` still barely move at
+  half size: the cloud shadows there are soft and present but small, and the
+  sun cascades are faint because the direct-to-fill ratio at 7 degrees is low.
+  The next real lever is an ambient term inside the cascade shadow (new CSM
+  shader text and a prewarm key), which belongs with stream E's fill colour.
+- Cloud shadow count still follows the baseline weather's sparse cumulus.
