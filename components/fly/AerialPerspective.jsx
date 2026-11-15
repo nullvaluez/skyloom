@@ -590,6 +590,7 @@ const enhancedFragmentShaderClarity = aerialClarityShader(enhancedFragmentShader
 
 /** LOOK PASS A (ATMOS): the boundary layer, an anchored edit on the final text; flag off = unchanged. */
 const enhancedFragmentShaderLook = lookAtmosAerialShader(enhancedFragmentShaderClarity);
+const LOOK_TEXT_ON = enhancedFragmentShaderLook !== enhancedFragmentShaderClarity;
 
 /**
  * R24 D: which pass ships. Read ONCE at construction, from a module const, so
@@ -607,7 +608,7 @@ export class AerialPerspectiveEffect extends Effect {
   constructor(opts = {}) {
     const law = LAW();
     const r25 = !law && opts?.r25 === true;
-    super('AerialPerspectiveEffect', law ? lawFragmentShader : r25 ? enhancedFragmentShaderLook : fragmentShader, {
+    super('AerialPerspectiveEffect', law ? lawFragmentShader : r25 && LOOK_TEXT_ON ? enhancedFragmentShaderLook : r25 ? enhancedFragmentShaderClarity : fragmentShader, {
       // This is what makes the composer allocate + bind its depth texture.
       attributes: EffectAttribute.DEPTH,
       uniforms: new Map(law ? [
@@ -666,7 +667,7 @@ export class AerialPerspectiveEffect extends Effect {
     if(r25)for(const[name,holder]of Object.entries(CINEMA_UNIFORMS))this.uniforms.set(name,holder);
     if(r25&&LIVING_GROUND_ACTIVE)for(const[name,holder]of Object.entries(LIVING_GROUND_UNIFORMS))this.uniforms.set(name,holder);
     if(r25&&AERIAL_CLARITY_ON)for(const[name,holder]of Object.entries(AERIAL_CLARITY_UNIFORMS))this.uniforms.set(name,holder);
-    if(r25&&LOOK_ATMOS_ON&&enhancedFragmentShaderLook!==enhancedFragmentShaderClarity)for(const[name,holder]of Object.entries(LOOK_ATMOS_UNIFORMS))this.uniforms.set(name,holder);
+    if(r25&&LOOK_ATMOS_ON&&LOOK_TEXT_ON)for(const[name,holder]of Object.entries(LOOK_ATMOS_UNIFORMS))this.uniforms.set(name,holder);
     // Resolved from the live renderer on the first update() — see the shader.
     this._reversed = null;
   }
