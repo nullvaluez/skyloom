@@ -10,9 +10,11 @@ import { compactDepthShadowTarget } from '@/lib/fly/compact-shadow-target';
 import { toSceneDir } from '@/lib/fly/true-scale';
 import { mobileEnhancedOn, mobileShadowRange, resolveMobileEnhanced, stepMobileShadowRange } from '@/lib/fly/mobile-enhanced';
 import { useFlyStore } from '@/stores/fly-store';
+import { lookShadowAoSun, lookShadowCloudGate, lookShadowRangeM } from '@/lib/fly/look-shadow';
+import { DEPTH_PASS } from '@/lib/fly/fly-constants';
 
 export function CinemaShadowRig({runtime,sunRef}){
-  const rig=useRef(null),legacyShadow=useRef(false),mobileRange=useRef(null);
+  const rig=useRef(null),legacyShadow=useRef(false),mobileRange=useRef(null),lookAo=useRef({});
   useEffect(()=>{
     const sun=sunRef.current,castShadow=sun?.castShadow;
     legacyShadow.current=!!castShadow;
@@ -24,6 +26,7 @@ export function CinemaShadowRig({runtime,sunRef}){
     // Retire its lights immediately: otherwise outgoing terrain compiles the
     // Classic samplers PLUS cinematic cascades and exceeds WebGL's 16 units.
     if(!e||!cinemaOn()){
+      lookShadowCloudGate(null);
       rig.current?.dispose();rig.current=null;delete runtime.cinemaShadows;delete runtime.adoptCinematicWarmScene;
       if(sunRef.current)sunRef.current.castShadow=legacyShadow.current;
       return;
@@ -36,9 +39,13 @@ export function CinemaShadowRig({runtime,sunRef}){
     const r=rig.current;
     r?.setMapSize(profile.shadowSize);
     if(sunRef.current){sunRef.current.castShadow=false;sunRef.current.intensity=r?0:e.sun;}
+    // LOOK PASS B (SHADOW): the cloud-shadow gate follows the live profile (0 off High/Ultra).
+    const lookCloud=lookShadowCloudGate(r?profile:null);
     if(!r){applyShadowCasterRequests(false);runtime.cinemaShadows={cascades:0};delete runtime.adoptCinematicWarmScene;return;}
     const state=useFlyStore.getState();
-    let rangeM=profile.shadowRangeM;
+    // LOOK PASS B (SHADOW): desktop High/Ultra reach further; every other
+    // profile (and the flag off) keeps its own range.
+    let rangeM=lookShadowRangeM(profile);
     // SHIP PASS LIGHT (SHADOW_REACH, LT-5): Medium desktops reuse the phone
     // rule with their own tunables; flag off, `reach` is exactly the old
     // mobileEnhancedOn() branch.
@@ -96,8 +103,10 @@ export function CinemaShadowRig({runtime,sunRef}){
     const requestedCasters=applyShadowCasterRequests(true);
     camera.updateMatrixWorld();r.update();
     runtime.shadowRadiusM=rangeM;
+    // LOOK PASS B (SHADOW): city-scale AO by day, today's AO at low sun.
+    lookShadowAoSun(runtime.aoPass?.configuration,runtime.sun?.sinEl,DEPTH_PASS.n8ao,lookAo.current);
     Object.assign(runtime.cinemaShadows??={}, {cascades:r.cascades,size:profile.shadowSize,rangeM,baseRangeM:profile.shadowRangeM,materials:r.owned.size,bytes:r.cascades*profile.shadowSize**2*5,scanObjects:r.scanObjects,scanMs:r.scanMs,
-      airframeBreakM:r.airframeBreakM,reach:reach?(mobileReach?'mobile':'medium'):null,requestedCasters});
+      airframeBreakM:r.airframeBreakM,reach:reach?(mobileReach?'mobile':'medium'):null,requestedCasters,lookCasters:lookCloud>0||lookShadowRangeM(profile)>profile.shadowRangeM});
   },-.9);
   return null;
 }

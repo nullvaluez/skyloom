@@ -84,6 +84,10 @@ async function buildLeg(name) {
     const inert = new Proxy(function () {}, { get: (t, k) => (k === Symbol.toPrimitive ? () => 0 : inert), apply: () => inert, construct: () => inert });
     globalThis.OffscreenCanvas = class { constructor(w, h) { this.width = w; this.height = h; } getContext() { return inert; } };
   }
+  // LOOK PASS B (SHADOW): its cloud-shadow edit lands in the cloud composite.
+  // This gate certifies the Ship Pass SKY programs, so every leg runs with it
+  // off (FLY_LOOK_PASS.md rule 8); scripts/verify-look-shadow.mjs covers it on.
+  globalThis.window.__flyLookShadowOverride = { enabled: false };
   register('./_node-resolve.mjs', import.meta.url);
   register('./_alias-loader.mjs', import.meta.url);
   register('./_r25-c-jsx-loader.mjs', import.meta.url);

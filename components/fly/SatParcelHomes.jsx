@@ -38,6 +38,7 @@ import { createCinematicHomeMaterial, createCinematicHomeDepthMaterial } from '@
 import { nearGroundOn } from '@/lib/fly/near-ground';
 import { parcelGapDecision, parcelGapSourceReady, parcelGapSupported } from '@/lib/fly/parcel-gap';
 import { parcelRoadDistance, parcelRoadScan, stepParcelRoadScan } from '@/lib/fly/parcel-roads';
+import { lookShadowHomesCast } from '@/lib/fly/look-shadow';
 
 const _dummy = new Object3D();
 const _col = new Color();
@@ -372,7 +373,7 @@ export function SatParcelHomes({ engine, runtime, flight, tier }) {
     // visible pool's current matrices/count already include every support
     // correction and motion/birth envelope, so its depth cannot drift away.
     const cast = cinematic && nearGroundOn('shading') && useFlyStore.getState().mapStyle === 'satellite'
-      && runtime.sunLight?.castShadow === true && mesh.visible && mesh.count > 0;
+      && (runtime.sunLight?.castShadow === true || lookShadowHomesCast(runtime)) && mesh.visible && mesh.count > 0; // LOOK PASS B (SHADOW)
     if (mesh.castShadow !== cast) mesh.castShadow = cast;
     st.shadowCasters = cast ? mesh.count : 0;
     st.shadowTriangles = cast ? mesh.count * geometry.index.count / 3 : 0;
