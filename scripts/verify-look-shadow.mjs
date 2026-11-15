@@ -91,12 +91,27 @@ const OFF = { ...LOOK_SHADOW, enabled: false };
   p.ensureR25();
   const f = p.r25.composite.fragmentShader;
   const on = LS.LOOK_SHADOW_ON;
-  const count = f.split('LOOK PASS B (SHADOW)').length - 1;
+  const count = f.split('LOOK PASS B (SHADOW): readable').length - 1;
   if (on) {
-    check('(5) Enhanced composite: cloud shadow patched once, uniform bound to the material',
+    check('(5) Enhanced composite: cloud shadow patched once, uniforms bound to the material',
       count === 1 && p.r25.lookShadow?.ok === true && p.r25.composite.uniforms.uLookCloudShadow === p.r25.lookShadow.uniform
-      && !f.includes('clamp(shade*.32,0.,.23)') && f.includes('uniform vec4 uLookCloudShadow;'),
+      && p.r25.composite.uniforms.uLookCloudShape === LS.lookShadowCloudShape
+      && f.includes('uniform vec4 uLookCloudShadow, uLookCloudShape;'),
       `count ${count}, ok ${p.r25.lookShadow?.ok}`);
+    // Rule 5: off desktop High/Ultra the gate is 0 and the ORIGINAL line runs
+    // on the original value (the air fades act on the raw density there).
+    check('(5d) gate 0 keeps the original darkening line as the fallback branch',
+      f.includes('} else scene*=1.-clamp(shade*.32,0.,.23)*day*cloudMix;') && f.includes('if(uLookCloudShape.x>0.){'));
+    const gate = (name, cascades) => LS.lookShadowCloudGate(name ? { name, cascades } : null);
+    const gHi = [gate('ultra', 3), gate('ultra-balanced', 3), gate('high', 2)];
+    const gLo = [gate('medium', 2), gate('phone', 1), gate('low', 0), gate('ultra', 0), gate(null)];
+    check('(5e) gate: High/Ultra (and rungs) 1; Medium, phone, Low, no cascades, no rig 0',
+      gHi.every(g => g === Math.min(1, ON.cloudShadow)) && gLo.every(g => g === 0) && LS.lookShadowCloudShape.value.x === 0,
+      `hi ${gHi} lo ${gLo}`);
+    check('(5f) gate 0 with the flag off', LS.lookShadowCloudGate({ name: 'ultra', cascades: 3 }, { ...ON, enabled: false }) === 0);
+    check('(5g) homes cast only with this pass cascades', LS.lookShadowHomesCast({ cinemaShadows: { lookCasters: true } }) === true
+      && LS.lookShadowHomesCast({ cinemaShadows: { cascades: 0 } }) === false
+      && LS.lookShadowHomesCast({ cinemaShadows: { lookCasters: true } }, { ...ON, enabled: false }) === false);
     const u = p.r25.lookShadow.uniform.value;
     check('(5b) uniform carries the dials', Math.abs(u.x - Math.min(0.9, ON.cloud.darkMax * ON.cloudShadow)) < 1e-6 && u.y === ON.cloud.opticalK);
     check('(5c) a second call does not patch again', LS.lookShadowCloudComposite(p.r25) === false && p.r25.composite.fragmentShader === f);
