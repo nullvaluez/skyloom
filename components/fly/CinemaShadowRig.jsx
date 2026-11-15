@@ -10,10 +10,11 @@ import { compactDepthShadowTarget } from '@/lib/fly/compact-shadow-target';
 import { toSceneDir } from '@/lib/fly/true-scale';
 import { mobileEnhancedOn, mobileShadowRange, resolveMobileEnhanced, stepMobileShadowRange } from '@/lib/fly/mobile-enhanced';
 import { useFlyStore } from '@/stores/fly-store';
-import { lookShadowRangeM } from '@/lib/fly/look-shadow';
+import { lookShadowAoSun, lookShadowRangeM } from '@/lib/fly/look-shadow';
+import { DEPTH_PASS } from '@/lib/fly/fly-constants';
 
 export function CinemaShadowRig({runtime,sunRef}){
-  const rig=useRef(null),legacyShadow=useRef(false),mobileRange=useRef(null);
+  const rig=useRef(null),legacyShadow=useRef(false),mobileRange=useRef(null),lookAo=useRef({});
   useEffect(()=>{
     const sun=sunRef.current,castShadow=sun?.castShadow;
     legacyShadow.current=!!castShadow;
@@ -99,6 +100,8 @@ export function CinemaShadowRig({runtime,sunRef}){
     const requestedCasters=applyShadowCasterRequests(true);
     camera.updateMatrixWorld();r.update();
     runtime.shadowRadiusM=rangeM;
+    // LOOK PASS B (SHADOW): city-scale AO by day, today's AO at low sun.
+    lookShadowAoSun(runtime.aoPass?.configuration,runtime.sun?.sinEl,DEPTH_PASS.n8ao,lookAo.current);
     Object.assign(runtime.cinemaShadows??={}, {cascades:r.cascades,size:profile.shadowSize,rangeM,baseRangeM:profile.shadowRangeM,materials:r.owned.size,bytes:r.cascades*profile.shadowSize**2*5,scanObjects:r.scanObjects,scanMs:r.scanMs,
       airframeBreakM:r.airframeBreakM,reach:reach?(mobileReach?'mobile':'medium'):null,requestedCasters});
   },-.9);
