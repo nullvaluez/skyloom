@@ -31,6 +31,11 @@ ok(hdrGradeGLSL(true, true).includes('lookGrade('), 'flag-on display grade text 
 // r2: the noon chroma lift is gamut-limited (a saturated cruise zenith once
 // clipped its red channel to 0 and shifted hue).
 ok(hdrGradeGLSL(true, true).includes('.97*yy/max(-dn,1e-4)'), 'noon chroma lift carries the gamut guard');
+// r3 (review round 2): noon whites stay white, the zenith gets value back,
+// dusk walls give up chroma; all gated on the live weight.
+{ const t = hdrGradeGLSL(true, true);
+  ok(t.includes('float white=g*noon') && t.includes('float zl=') && t.includes('float tw=g*uLook.w'), 'cloud-white, zenith-lift and dusk-cool terms are weight-gated'); }
+ok(LOOK_WATER_UNIFORM.value.z === 0 && LOOK_WATER_UNIFORM.value.w === 0, 'weight 0 zeroes the daylight water lift and near sheen');
 
 // 3. The law, weight 1.
 const stops = (el, w = {}) => { const e = at(el, w), s0 = e.exposureStops; applyLookGradeEnvironment(e, 1); return { d: e.exposureStops - s0, e }; };
