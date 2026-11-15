@@ -47,7 +47,9 @@ function pack(v) {
 const arm = process.argv.find(x => x.startsWith('--arm='))?.slice(6);
 if (arm) {
   register('./_node-resolve.mjs', import.meta.url);
-  globalThis.window = { location: { search: '' }, __flyBuildingRealismOverride: { enabled: arm !== 'off' }, __flyCityHorizonOverride: { enabled: false } };
+  globalThis.window = { location: { search: '' }, __flyBuildingRealismOverride: { enabled: arm !== 'off' }, __flyCityHorizonOverride: { enabled: false },
+    // LOOK PASS C: this gate measures the realism layer alone; the 'look' arm adds LOOK_FACADE.
+    __flyLookFacadeOverride: { enabled: arm === 'look' } };
   if (arm === 'independent') window.__flyCityFacadesOverride = { enabled: false };
   const { ShaderLib, ShaderChunk, UniformsUtils } = await import('three');
   const originalChunks = { ...ShaderChunk };
@@ -76,7 +78,29 @@ const runArm = name => {
   assert.equal(r.status, 0, r.stderr);
   return JSON.parse(r.stdout);
 };
-const off = runArm('off'), on = runArm('on'), independent = runArm('independent');
+const off = runArm('off'), on = runArm('on'), independent = runArm('independent'), look = runArm('look');
+check('LOOK_FACADE on: both rings assemble its day and night edits under their own key', () => {
+  for (const [name, p] of Object.entries(look)) {
+    assert.equal(p.key.replace('|look-facade-v2', ''), on[name].key, name);
+    assert.ok(p.key.includes('|look-facade-v2'), name);
+    assert.ok(p.fs.includes('float lfE1='), `${name} night`);
+    // The day edit needs the realism albedo; Classic programs keep it but cityDay is 0 there.
+    assert.ok(p.fs.includes('float lfDay='), `${name} day`);
+    assert.ok(p.fs.indexOf('float lfDay=') < p.fs.indexOf('#include <lights_physical_fragment>'));
+    // Floor ribbons replace the both-axis retire; the glint follows the sky reflection.
+    // Rule 5: Medium/Low (uLookFacade 0) run only the shipped expression, in the else branch.
+    assert.ok(p.fs.includes('float lfMinX=') && p.fs.split('paneMask = mix(paneMask, opening.x * opening.y * isWall, minify);').length === 2
+      && p.fs.includes('}else paneMask = mix(paneMask, opening.x * opening.y * isWall, minify);'), `${name} ribbons`);
+    for (const block of ['LOOK_FACADE: sparse lit rooms', 'LOOK_FACADE: one value and hue', 'LOOK_FACADE: sun side / shade side']) {
+      const at = p.fs.indexOf(block);
+      const next = p.fs.slice(at).split('\n')[1];
+      assert.ok(at >= 0 && next.startsWith('if(') && next.endsWith('uLookFacade>.5){'), `${name} ${block} sits behind the tier branch`);
+    }
+    assert.ok(p.fs.indexOf('low-sun glint') > p.fs.indexOf('reflectedLight.indirectSpecular*=1.+((uLookFacade>.5?'), `${name} glint`);
+    assert.ok(p.fs.includes('float lfHalo=') && p.fs.includes('uLookFacadeTwilight>.001'), `${name} halo and twilight`);
+    assert.equal(p.uniforms.uLookFacade, 0, `${name} tier uniform defaults to 0 (Medium/Low)`);
+  }
+});
 check('flag off keeps both look/ring shader programs and keys unchanged', () => {
   for (const [name, p] of Object.entries(off)) {
     assert.deepEqual([sha(p.vs), sha(p.fs)], BASE[name], name);
@@ -147,7 +171,7 @@ if (!process.argv.includes('--node-only')) {
       return route.fulfill({ contentType: 'text/html', body: '<!doctype html><script type="importmap">{"imports":{"three":"/three.module.js"}}</script>' });
     });
     await page.goto('http://architecture.test/');
-    const result = await page.evaluate(async ({ off, on }) => {
+    const result = await page.evaluate(async ({ off, on, look, look0 }) => {
       const T = await import('three');
       const unpack = v => {
         if (v == null || typeof v !== 'object') return v;
@@ -165,7 +189,7 @@ if (!process.argv.includes('--node-only')) {
       const environment = new T.Scene(); environment.background = new T.Color('#a6b5c1');
       const pmrem = new T.PMREMGenerator(renderer), env = pmrem.fromScene(environment).texture;
       const output = {};
-      for (const [arm, programs] of Object.entries({ off, on })) for (const [name, p] of Object.entries(programs)) {
+      for (const [arm, programs] of Object.entries({ off, on, look, look0 })) for (const [name, p] of Object.entries(programs)) {
         // TRUE_SCALE patches three's shared chunks when the actual app modules
         // load. Carry those real chunks into this isolated renderer as well.
         Object.assign(T.ShaderChunk, p.chunks);
@@ -176,6 +200,8 @@ if (!process.argv.includes('--node-only')) {
         const uniforms = Object.fromEntries(Object.entries(p.uniforms).map(([k, v]) => [k, { value: unpack(v) }]));
         // Keep the fixture visible; runtime optical values are tested elsewhere.
         for (const [k, v] of Object.entries({ uCinema: name.startsWith('enhanced') ? 1 : 0, uCinemaArt: 1, uCinematicMaterials: 0, uArchitectureLighting: 1, uBendK: 0, uSatBldgFade: 1, uSkyFade: 1, uArchitectureNearFade: 0 })) if (uniforms[k]) uniforms[k].value = v;
+        // LOOK PASS C: look0 is the LOOK_FACADE program on a Medium/Low tier (uLookFacade 0).
+        if (uniforms.uLookFacade) uniforms.uLookFacade.value = arm === 'look0' ? 0 : 1;
         const material = new T.MeshStandardMaterial({ vertexColors: true, side: T.DoubleSide, roughness: 0.82, metalness: 0.02, envMapIntensity: 0.5 });
         material.onBeforeCompile = s => { s.vertexShader = p.vs; s.fragmentShader = p.fs; Object.assign(s.uniforms, uniforms); };
         material.customProgramCacheKey = () => `${arm}-${name}`;
@@ -212,12 +238,22 @@ if (!process.argv.includes('--node-only')) {
       const gpu = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
       renderer.dispose(); pmrem.dispose(); env.dispose();
       return { output, gpu };
-    }, { off, on });
-    check(`near/far × Enhanced/Classic × off/on compile and link (${result.gpu})`, () => {
+    }, { off, on, look, look0: look });
+    check(`near/far × Enhanced/Classic × off/on/LOOK_FACADE compile and link (${result.gpu})`, () => {
       for (const [name, r] of Object.entries(result.output)) assert.ok(r.compiled && !r.errors.length, `${name}: ${r.errors.join('\n')}`);
     });
     check('full-night pixels remain identical in every material path', () => {
       for (const name of Object.keys(on)) assert.deepEqual(result.output[`on-${name}`].samples[1], result.output[`off-${name}`].samples[1], name);
+    });
+    check('LOOK_FACADE program at uLookFacade 0 (Medium/Low) renders the pre-pass pixels, day and night', () => {
+      for (const name of Object.keys(on)) for (const night of [0, 1]) assert.deepEqual(result.output[`look0-${name}`].samples[night], result.output[`on-${name}`].samples[night], `${name} night=${night}`);
+    });
+    check('LOOK_FACADE changes Enhanced pixels at uLookFacade 1 and leaves Classic alone', () => {
+      for (const name of Object.keys(on)) for (const night of [0, 1]) {
+        const a = result.output[`look-${name}`].samples[night], b = result.output[`on-${name}`].samples[night];
+        if (name.startsWith('classic')) assert.deepEqual(a, b, `${name} night=${night}`);
+        else if (night === 0) assert.ok(a.some((v, i) => v !== b[i]), name);
+      }
     });
     check('Classic pixels stay identical; Enhanced daytime actually changes', () => {
       for (const name of Object.keys(on)) {
