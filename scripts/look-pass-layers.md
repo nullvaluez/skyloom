@@ -43,6 +43,13 @@ phone and Low get the identity uniforms.
    density is low, so coverage holds and silhouettes break into lobes. The fine
    octave fades to its mean by footprint and is not fetched past it.
 
+4. **Round-1 close (third instance, 2026-11-15).** Kept the paused instance's
+   work as it stood after a fresh capture showed it compiling and reading at
+   every hero pose. One edit: the bank's base was a ruled line a few pixels
+   above the horizon; it now thins over the lowest 14% of the tower and takes
+   up to +0.3 more air mix in its lowest third, so the bases sink into the
+   horizon haze.
+
 ## Dials (`LOOK_LAYERS`)
 
 `volume`, `bank`, `high` (0 = that layer exactly as before, shader text
@@ -62,6 +69,32 @@ airMix), `highCfg` (coverFloor, coverCap, opacity, fibre, slantCap, fadeM).
 - Bank from cruise: tombstone cards; it now stands down above the bank tops.
 - LIGHT_SHAFTS: not attempted this round (the plan allows it only with clean
   stills and burst; no time to certify). It stays off.
+
+## Round 1 capture (`layers-r1`, RTX 5080, 2026-11-15)
+
+`compare/baseline__vs__layers-r1`: mean absDiff 10.9, 28% of pixels changed.
+
+| shot | changed | mean luma delta | shimmer base -> r1 |
+|---|---|---|---|
+| nyc-cruise noon | 26.7% | +2.44 | 0.116% -> 0.110% |
+| nyc-cruise golden | 21.9% | +1.97 | 0.114% -> 0.081% |
+| powell noon | 28.2% | +0.67 | 0.831% -> 0.512% |
+| powell golden | 22.0% | +1.07 | 0.289% -> 0.104% |
+| rio noon | 42.5% | -11.34 | 0.575% -> 0.361% |
+| nyc-harbor golden | 16.2% | +0.53 | 0.406% -> 0.213% |
+| nyc-harbor night | 20.5% | -2.55 | 0.414% -> 0.224% |
+| nyc-street noon | 27.6% | +1.49 | 1.999% -> 1.243% |
+| alps noon | 46.7% | -22.17 | 0.234% -> 0.153% |
+
+Every shimmer number is at or below baseline. Rio's luma drop is 8.9% of its
+127.4 mean (inside rule 7's 12%): partly the big near cumulus moving (cloud
+phase), partly this flag's darker cloud bodies. Alps did not settle
+(sun 35.9 deg against the baseline's 23.2): the baseline's frame-filling near
+cloud is not in that capture, so its delta is the pose, not this flag.
+
+Incident: the first r1 run went black from alps onward because a comment-only
+edit to `fly-constants.js` hot-reloaded the page mid-capture; the five shots
+were recaptured with no edits in flight. Do not edit while a capture runs.
 
 ## Gates
 
