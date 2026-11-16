@@ -343,3 +343,84 @@ none.
 - Cloud shadows at low altitude in Powell: unchanged this round (the critic
   asked for double contrast); the composite still follows the sparse
   baseline cumulus.
+
+## Round 4 (close-out, on the balanced tree 5919deea)
+
+### Shimmer: my share, one session, LOOK_SHADOW off vs on (--burst)
+
+Labels `shadow-r4-off` (`--flags=-LOOK_SHADOW`) and `shadow-r4-on`, captured
+back to back on :3312, same poses, same clock window.
+
+| shot | sun | off | on | my share | rule |
+|---|---|---|---|---|---|
+| nyc-street golden | 7.0 | 1.251 | 1.533 | x1.23 | inside 1.25 |
+| nyc-street dusk | -3.0 | 1.558 | 1.555 | x1.00 | inside |
+| powell-sun golden | 7.0 | 0.276 | 0.334 | x1.21 | inside (and ~0.3) |
+| powell-sun dusk | -3.0 | 0.126 | 0.133 | x1.06 | both under 0.3 |
+
+No shot is over 1.25x from this stream, so no dial moved: the long Powell
+shadows and the low-sun fill (`lowSunShadow` 1, key .5) stay as they are. The
+orchestrator's whole-pass numbers (powell-sun golden 0.42 vs 0.29, dusk 0.32
+vs 0.06) are the five streams together; with LOOK_SHADOW off in the balanced
+tree they read 0.276 / 0.126, so the rest of the rise belongs to the other
+flags (dusk is below the low-sun window, `upFromDeg` -1, so my fill term is
+off there by construction). nyc-street golden at x1.23 is the one with no
+margin: `lowSunShadow` 0.7 is the first step down if the owner sees it move.
+
+### yosemite golden stair-stepped cliff edge: the terrain map texel, filtered
+
+Not the far cascade: terrain never casts into the cinema cascades (they hold
+buildings, trees, aircraft), so a ridge's shadow on the cliff comes only from
+the terrain shadow map. On desktop High/Ultra that map is 2048 texels over
+2 x 40 km (device policy `TERRAIN_SHADOW.mapSize`/`rangeM`), i.e. a texel
+~39 m across the light and ~9 m along it at a 7 deg sun: the teeth are those
+39 m texels on the caster ridge's silhouette. r4 widens the five-footprint
+PCF ring from ~1.26 to ~2.5 texels under a low sun
+(`mix(2, 1, smoothstep(.12, .35, light.y))`, so above ~20 deg it is r3's
+ring), program key `-ls3` -> `-ls4`. The stepped lower edge on the cliff
+face now reads as a soft diagonal (shadow-wip vs merged-2 crop). A slight
+wave along the edge remains; removing it entirely needs a finer map (4096 or
+a 20 km half-width on High/Ultra, device-policy, not mine: ~4x the map
+memory/fill, or less reach for valley shadows), not a wider filter.
+
+### Cost dial: LOOK_SHADOW.reach (the only one)
+
+`reach` multiplies `rangeM` {ultra 8000, high 5000}, never below the
+profile's own (Ultra 3000 / High 1800), desktop High/Ultra only, eased back
+to the profile's range between 2,000 and 4,500 m AGL (`highAgl`).
+
+| reach | Ultra cascade range | High | cost (low-altitude city/harbour/Rio) |
+|---|---|---|---|
+| 1 (ships) | 8 km | 5 km | +13 to +27 % triangles vs baseline (nyc-harbor noon 2.04 M -> 2.37 M, +16 %; calls +9); cruise 0 (eased off) |
+| 0.75 | 6 km | 3.75 km | about half the added far-cascade casters (estimate, not captured) |
+| 0.375 | 3 km (= base) | 1.875 km (~base) | 0 added: today's reach; long golden shadows past 3 km gone |
+
+The added cost is the far cascade drawing every caster between 3 and 8 km;
+it is triangles in the shadow pass, not pixels. Read on the owner's 5080
+frame time; if it costs, 0.75 is the first step.
+
+### Gates (r4)
+
+`verify-look-shadow` 19/19, `verify-true-earth-flags` 8/8,
+`verify-cinema-overhaul`, `verify-cinema-profile-prewarm` 7/7,
+`verify-graphics-repair`, `verify-lounge-prewarm`, `verify-true-scale` 14/14
+pass; eslint clean on both changed files.
+`verify-ship-light` 64/67 (run under PowerShell: git-bash's tar cannot read
+its C:\ temp path): (0a)/(0b) compare the flags-off terrain text to the old
+base 940b751 and differ by other streams' terrain tokens
+(`painterly-v3-r5-terrain-world-art1`); (1b) expects the bare `|ts-map-v1`
+token and has been red since r3 added the look suffix (`-ls3`, now `-ls4`):
+the gate needs to accept `-ls\d` when LOOK_SHADOW is on. Not edited (not my
+file). `verify-ship-sky` 47/49: two aerial / cinema-environment hashes
+against main, not my files.
+
+### shadow-r4 vs merged-2 (what this step changed)
+
+Mean absDiff 4.35. Luma moves within +-0.7 everywhere except yosemite golden
+-1.1 (the cliff penumbra, the intended change). nyc-harbor noon absDiff 10.7
+is cloud drift on the running clock (luma +0.16, contrast +0.06; at a 40 deg
+sun the terrain ring is r3's by construction). Sparkle: nyc-street noon 1.495
+-> 1.465, golden 1.503 -> 1.507, dusk 1.563 -> 1.560, powell golden 0.198 ->
+0.167, powell noon 0.466 -> 0.383, yosemite golden 0.098 -> 0.102, harbor
+noon 0.436 -> 0.446: run-to-run. Triangles unchanged (nyc-harbor noon 2.37 M,
+nyc-street golden 4.12 M). Capture errors: none.
