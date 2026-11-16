@@ -59,7 +59,34 @@ the roof half of the authority has to land with M1, or M1 shows nothing.
   (`worldLookShader()`), program key `|world-look-v1-...`: flag off, the
   program text and key are today's.
 
-**M2 structures.** (see below)
+**M2 structures.** `relateStructures(items, tileCtx)` in
+`sat-buildings/structures.js`, a port of FableFlight `relate()`
+(`src/buildings.rs` 1388-1541, MIT): each footprint is a 10 x 10 grid of
+inside points, shares by point-in-polygon, neighbours by a sort-and-sweep on
+bounding boxes. Kept: twins (>= 85 % both ways, same base) become one (the
+mapped, then the taller one stays); a mapped part >= 85 % inside a bigger mapped
+volume spanning its heights is not drawn; union-find structures of parts that
+overlap (>= 30 % of the smaller, area ratio >= 0.1, touching in height), rooted
+at the biggest footprint on the ground, classified by the structure's TOP
+(FableFlight `Rel.top`) so a tower on a podium reads as the tower. Not ported:
+merging stacked slabs and trimming a lower slab (they change heights, stream
+A's). Added: an outline covered >= 90 % by two or more of its own mapped parts
+and no taller than them is not drawn; mapped parts that share an edge, a tag
+colour and a height band (>= 20 m, within 1.6 x) are one structure (the
+Shard's wedges are side by side in OpenFreeMap, not overlapping, so the
+overlap rule alone never joins them).
+- One look per structure: `colourOf` re-derives the `style` object (family,
+  variant, seed, palette) from the root under the shared look id before any
+  colour is read; the caller writes that same object into the vertices, so the
+  shader's family and seed follow. Drape anchors and collision columns stay per
+  part (no polygon moves, every kept item keeps its own id).
+- Look id: `item.sid` when stream A sets it, else a cross-tile-stable id.
+  OpenFreeMap merges same-property buildings into one multipolygon feature, so
+  the feature id is not per building; a building cut by a seam is identified by
+  the whole span it touches on the seam (world Mercator, 4 m quantum; the clip
+  can lay several segments along one seam in either order, so the span, not the
+  first segment). A building on no seam keeps `item.id`. The far ring
+  (`colourOf(..., 'far')`) applies the seam id too.
 
 **M3 walls and authority.** (see below)
 
@@ -92,6 +119,31 @@ Worker build time added per tile (same probe, in-process node, median of 3,
 machine loaded by four other streams, so noisy): Midtown +63 ms, Brooklyn +70,
 Paris +196, London +264, Tokyo +35, Phoenix +71 (on 0.8 to 2.8 s node builds).
 The live per-tile number and the arrival off against on are in "Arrival".
+
+### M2 part piles and seam twins
+
+`node scripts/wp-look-structures.mjs` (`.graphics-review/world-pass/look/structures.json`).
+Pile = a structure of 2+ parts rendering in more than one look (style family or
+palette wall differs), or a footprint drawn although the relation hides it.
+
+| tile | structures (parts) | hidden twins / inside / outline | piles today | piles with M2 |
+|---|---|---|---|---|
+| London Bridge 14/8188/5448 | 28 (94) | 0 / 1 / 0 | 29 | 0 |
+| Midtown 14/4824/6157 | 182 (619) | 5 / 14 / 17 | 210 | 0 |
+| Paris 14/8299/5636 | 43 (90) | 0 / 24 / 0 | 64 | 0 |
+| Tokyo 14/14552/6451 | 32 (94) | 2 / 2 / 2 | 36 | 0 |
+
+The Shard: 5 parts (252 to 310 m, all tagged `#8db2b9`), 5 different looks
+today, 1 with M2 (family 4, glass). Seam twins, Midtown and its east neighbour
+(14/4824 and 14/4825/6157): 27 buildings cut by the seam, the look id matches
+on 27 / 27; their looks split on 13 / 27 today and 2 / 27 with M2 (the two
+halves have different clipped areas and the classifier reads area).
+
+Seen in the browser (`.graphics-review/world-pass/look/m2a/crop-shard-offon.png`,
+london noon, Ultra): with M2 alone the Shard still renders in three materials,
+because by day CITY_FACADES picks cladding per 64-unit world cell from each
+part's own anchor. The worker side is right; the pixels follow only with M3's
+wall authority.
 
 ## Shared-file edits
 
