@@ -6,6 +6,7 @@ import { Vector3 } from 'three';
 import { useFlyStore } from '@/stores/fly-store';
 import { toSceneDir } from '@/lib/fly/true-scale';
 import { lightBlock } from '@/lib/fly/ship-light';
+import { lookShadowTerrainSoftGate } from '@/lib/fly/look-shadow';
 import {
   HorizonShadowMap,
   TERRAIN_SHADOW_UNIFORMS,
@@ -103,6 +104,8 @@ export function TerrainShadowRig({ runtime, engine }) {
     const dt = Math.min(0.1, Math.max(0, delta));
     s.strength += (target - s.strength) * Math.min(1, dt / fade);
     if (target === 0 && s.strength < 0.002) s.strength = 0;
+    // LOOK PASS B (SHADOW): the soft ring follows the shared tier test (rule 5).
+    lookShadowTerrainSoftGate();
     if (s.map && s.strength > 0) s.map.bind(TERRAIN_SHADOW_UNIFORMS, _anchor, s.strength, block);
     else TERRAIN_SHADOW_UNIFORMS.uTsParams.value.x = 0;
     runtime.terrainShadow = {

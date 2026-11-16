@@ -5,7 +5,8 @@
  * graphics class, goes through the shared predicate AND through each stream's
  * own gate function, and all six answers must agree:
  *   ATMOS   updateLookAtmos(env, profile)  -> uLookAtmosA.w
- *   SHADOW  lookShadowLightDepth(profile)  -> non-null; lookShadowCloudGate(profile) > 0
+ *   SHADOW  lookShadowLightDepth(profile)  -> non-null; lookShadowCloudGate(profile) > 0;
+ *           lookShadowTerrainSoftGate(profile) -> 1 (the terrain uTsSoft ring)
  *   FACADE  setLookFacadeProfile(profile)  -> uLookFacade
  *   LAYERS  lookLayersProfile(name)
  *   GRADE   lookGradeWeight(profile)
@@ -40,6 +41,7 @@ function streams(profile) {
     atmos: LA.LOOK_ATMOS_UNIFORMS.uLookAtmosA.value.w === 1,
     shadow: LS.lookShadowLightDepth(profile) !== null,
     shadowCloud: LS.lookShadowCloudGate(profile) > 0,
+    shadowTerrain: LS.lookShadowTerrainSoftGate(profile ?? null) === 1,
     facade: LF.LOOK_FACADE_UNIFORMS.uLookFacade.value === 1,
     layers: LL.lookLayersProfile(profile?.name),
     grade: LG.lookGradeWeight(profile) === 1,
@@ -47,6 +49,7 @@ function streams(profile) {
 }
 const flagOn = {
   atmos: LA.LOOK_ATMOS_ON, shadow: LS.LOOK_SHADOW_CFG.enabled === true, shadowCloud: LS.LOOK_SHADOW_CFG.enabled === true && cloudDial > 0,
+  shadowTerrain: LS.lookShadowTerrainSoft(),
   facade: LF.LOOK_FACADE_ON, layers: LL.LOOK_LAYERS_ON, grade: LG.LOOK_GRADE_ON,
 };
 console.log('flags:', Object.entries(flagOn).map(([k, v]) => `${k}=${v ? 'on' : 'off'}`).join(' '));
