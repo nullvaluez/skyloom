@@ -43,6 +43,12 @@ const POSES = {
   'alps': { lat: 46.5935, lon: 7.9091, altM: 3150, headingDeg: 185, note: 'snow, ridgeline layering' },
   // Featured: bay, mountains and city in one frame.
   'rio': { lat: -22.94, lon: -43.14, altM: 1100, headingDeg: 260, note: 'coast, hills, city depth' },
+  // Toward the low sun. Of the seven poses above only rio faces the golden-hour sun, and that is
+  // where haze, grade and cloud light stack hardest. Use these with golden and dusk.
+  'nyc-skyline-sun': { lat: 40.7080, lon: -73.9650, altM: 420, headingDeg: 268, note: 'Manhattan skyline against the low sun, river in front' },
+  'powell-sun': { lat: 40.1990, lon: -83.0811, altM: 630, headingDeg: 268, note: 'flat suburb into the low sun' },
+  'yosemite-sun': { lat: 37.72, lon: -119.66, altM: 2850, headingDeg: 268, note: 'granite valley into the low sun' },
+  'nyc-cruise-sun': { lat: 40.62, lon: -74.08, altM: 7000, headingDeg: 268, note: 'cruise altitude into the low sun' },
 };
 // Target true solar elevation in degrees on the afternoon branch; 'noon' is solar noon + 2 h.
 const TIMES = { noon: null, golden: 7, dusk: -3, night: -20 };

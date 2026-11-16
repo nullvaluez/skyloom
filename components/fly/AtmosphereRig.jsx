@@ -13,6 +13,7 @@ import { useFlyStore } from '@/stores/fly-store';
 import { skyLiteAerialSwitch } from '@/lib/fly/sky-lite';
 // LOOK PASS A (ATMOS): the boundary layer's per-frame light (desktop High/Ultra only).
 import { updateLookAtmos } from '@/lib/fly/look-atmos';
+import { cinemaProfile } from '@/lib/fly/cinema-policy';
 
 /**
  * TRUE EARTH Phase 2 (PHYS_SKY): the atmosphere tables, rendered between the
@@ -64,7 +65,7 @@ export function AtmosphereRig({ runtime }) {
     // which High and every flag-off session keep).
     PSKY_UNIFORMS.uPskyAp.value.set(luts.aerialState.maxKm, luts.aerialState.h, skyLiteAerialSwitch(qt), 0);
     runtime.physSky = { ...luts.stats, eyeKm: h, aerialKm: tier.aerialKm };
-    updateLookAtmos(runtime.cinemaEnvironment, !isMobileGraphicsClass() && qt !== 'low' && qt !== 'medium');
+    updateLookAtmos(runtime.cinemaEnvironment, cinemaProfile()); // LOOK PASS: the shared tier test (lib/fly/look-tier.js)
   }, -20);
   return null;
 }

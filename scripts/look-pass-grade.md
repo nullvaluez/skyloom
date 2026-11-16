@@ -236,6 +236,104 @@ Rejected on the way: a broad sheen with a 0.25 floor plus a 30 % chroma pull
 turned the harbour's near water slate grey-brown (the critic's strongest frame
 lost its depth); replaced by the slope-squared sheen and a 16 % pull.
 
+## Round 3 (balancing inside the merged frame, `2755f844` + sun poses)
+
+The owner's item first: golden hour toward a low sun (Rio, and any pose facing
+it) was a cream frame. On sun-merged-1 the toward-the-sun shots sat +55 to +84
+frame luma over sun-off, the water was flat gold and the sun path was lost.
+Three causes on my side: the +0.72 stop golden lift stacked with ATMOS glow and
+the cirrus; the near-water gold sheen and a broad pow-6 sun-path lobe washed all
+water facing the sun gold; and the lift did not care where the camera looked.
+
+- Golden lift cut 0.72 -> 0.22 stop (down-sun golden now +26..+31 over
+  baseline at powell and the harbour).
+- Metering (`meterSun` 0.95, `meterDusk` 0.6): exposure comes off as the view
+  turns into a low sun (horizontal facing, smooth 0.05..0.9), eased over about
+  0.9 s like an eye; a new camera snaps. `cinema-frame.js` now passes
+  `runtime.camera` to my existing call (same line). Noon is never metered.
+- Water: the broad lobe is now a narrow pow-16 x .05 under the pow-30 path,
+  the graze sheen floor .11 -> .05, `waterSheen` 0.8 -> 0.4, `waterNearSheen`
+  1.0 -> 0.35. The path is again the brightest thing on the water
+  (program key `look-grade-water-v6`).
+- Noon (critic: lower third -47, saturation +0.24): `toeNoon` 0.75 (was a fixed
+  0.4), `toeGuard` 0.9 (the S below the pivot spares the darkest tones at noon),
+  `contrastNoon` 0.10 -> 0.03, `fillNoon` 0.25, `shadeCoolNoon` 0.35 (navy ->
+  neutral-cool), `vibranceNoon` 0.65, `noonBlue` 0.55 -> 0.42, `noonGreen`
+  0.50 -> 0.40, `zenithDesat` 0.15.
+- Night: `exposureNight` 0.30 stop, `toeNight` 0.70 (was 0.35).
+- Dusk: `exposureDusk` 0.80 -> 0.66 (dusk stays under golden), `fillDusk` 0.70
+  (was 0.35), `toeDusk` 0.8 (a low, narrow toe, y*(1-y)^10, on the ground only).
+
+### grade-r3 measured (frame mean luma delta; burst sparkle %)
+
+Toward the sun, against sun-off (the old look) / against sun-merged-1:
+
+| shot | vs sun-off | vs sun-merged-1 | p95 | sparkle off -> r3 |
+|---|---|---|---|---|
+| rio__golden | +33.9 | -50.0 | 208 | 0.151 -> 0.144 |
+| nyc-skyline-sun__golden | +10.9 | -51.0 | 212 | 0.867 -> 1.555 |
+| powell-sun__golden | +1.8 | -53.6 | 194 | 0.287 -> 0.290 |
+| yosemite-sun__golden | +21.2 | -40.5 | 205 | 0.149 -> 0.088 |
+| nyc-cruise-sun__golden | +8.7 | -53.9 | 200 | 0.102 -> 0.073 |
+| rio__dusk | +22.8 | -16.3 | 116 | 0.059 -> 0.066 |
+
+Hero shots against baseline (merged-1 in brackets): powell__golden +26.4
+(+43.8), nyc-harbor__golden +30.7 (+49.8), yosemite__golden +45.3 (+61.5),
+rio__golden +17.1 (+66.9), nyc-street__noon -9.3 (-14.5; lower third -36.5,
+was -47.5; p05 -31, was -41; saturation +0.14, was +0.24), nyc-harbor__night
++3.9 (-4.6), nyc-street__dusk +29.7, powell__noon +5.9, nyc-cruise__noon +16.0.
+WIP: alps__dusk lower third 14.5 -> 20.5 with the sky flat (72.9 -> 71.0);
+alps__night 35.4 -> 41.7 (baseline 43.9); powell__night 36.3 (baseline 32.9).
+
+Shimmer: nyc-street__dusk 1.37 -> 1.91 against baseline (1.39x; merged-1 was
+2.24, FACADE's item) and nyc-skyline-sun__golden 0.867 -> 1.555 against sun-off
+(1.79x): the sea glitter restored on darker water. Both are over the 1.25x line.
+The skyline one is mine: `waterPath` is its dial.
+
+## Round 4 (close-out on `5919deea`: shimmer only, exposure and golden lift unmoved)
+
+Two shimmer items, both measured as LOOK_GRADE on against `--flags=-LOOK_GRADE`
+in the same session (burst.sparklePct; the line is 1.25x).
+
+1. Toward the sun (`coastal-water.js`). The r3 sun path followed each pixel's
+   wave normal through a pow-30 lobe, so it broke into per-pixel points that
+   aliased in motion. It now reads the flat sea's mirror ray: a band narrow in
+   azimuth (pow 500 at the horizon easing to pow 70 on steep near water, as the
+   wave slopes allow), running from the horizon down to about 24 deg below the
+   sun's own elevation, brightest at the graze. The physical glitter from
+   SEA_STATE (in both arms) still carries the sparkle. The near-water gold sheen's
+   per-pixel slope term fades out with footprint (pixelM 0.06..0.30) and leaves an
+   even sheen. Program key `look-grade-water-v6` -> `-v7`.
+   nyc-skyline-sun__golden 0.942 off / 0.997 on (1.06x, was 1.79x);
+   rio__golden 0.139 / 0.129 (both under 0.3). The path is still the brightest
+   thing on the water, as a smooth gold column (grade-wip).
+2. Manhattan (`hdr-grade.js`, new dial `contrastLow`). The midtone S is scaled by
+   `mix(1, contrastLow, max(lowSun, twilight))`, so below about 15 deg of sun
+   and at civil dusk only a share of it is applied. 0.40 read nyc-street__golden 1.065 /
+   1.408 (1.32x) and dusk 1.166 / 1.475 (1.27x); 0.10 reads golden 1.061 /
+   1.316 (1.24x) and dusk 1.177 / 1.420 (1.21x) (grade-wip-off2 / grade-wip2).
+   The rest of the remaining rise is the golden exposure lift, toe and vibrance,
+   which this step was told not to move. The frame keeps its warm key and cool
+   fill. The noon S is unchanged.
+
+## Round 5 (final audit on `5919deea`; no code change, r4 already carries the fix)
+
+The audit's shimmer item read the tree before r4. Re-measured on `5473b06f`
+(server :3315, settled, same session, burst.sparklePct, `--flags=-LOOK_GRADE`
+off arm; labels grade-r5 / grade-r5-off, grade-r5-off2):
+nyc-street__golden 1.068 / 1.322 (1.24x, audit head 1.518), nyc-street__dusk
+1.170 / 1.427 (1.22x, audit 1.569), nyc-skyline-sun__golden 1.006 / 1.036
+(1.03x, audit 1.815: the r4 sun-path band). Off arm repeat 1.072 / 1.173 / 1.012.
+FACADE x GRADE pair on this head (`-LOOK_FACADE` vs `-LOOK_FACADE,-LOOK_GRADE`,
+grade-r5-nof / -nofg): golden 0.621 / 0.467, dusk 1.101 / 1.008, so GRADE's part
+under FACADE-off fell from the audit's 1.68x to 1.33x golden and 1.09x dusk. The
+remaining all-on vs all-off rise at the street (1.32 against the audit's 0.389)
+sits in FACADE (no GRADE still 1.07) and SHADOW at golden, not in GRADE.
+Tried: `toeLow` 0.5 (toe share at low sun): golden 1.313, dusk 1.432, no
+movement, reverted. `contrastLow` 0.10 already takes 90 % of the S off at low
+sun, so the auditor's (1 - a*z) scaling is in place and stronger. Gates:
+verify-look-grade 23/23, verify-true-earth-flags 8/8, eslint clean.
+
 ## Dials (`LOOK_GRADE` in fly-constants.js)
 
 Masters: `exposure`, `fill`, `grade`, `water`, `warmth` (each 0 removes its
@@ -245,7 +343,9 @@ family, 1 = as tuned). Detail: `exposureNoon/Golden/Dusk`, `fillGolden`,
 `warmGuard`, `shadeCool`, `keyWarm`, `waterSheen`, `waterPath`; r2 adds
 `contrastNoon`, `pivotNoon`, `noonBlue`, `noonGreen`, `greenSpread`, `skyDeep`,
 `noonWarm`, `shoulderGolden`, `tealGuard`; the r2 revision adds `zenithLift`,
-`cloudWhite`, `duskCool`, `waterNearSheen`, `waterNoon`.
+`cloudWhite`, `duskCool`, `waterNearSheen`, `waterNoon`. Round 3 adds `exposureNight`,
+`meterSun`, `meterDusk`, `fillDusk`, `fillNoon`, `toeNight`, `toeDusk`, `toeNoon`,
+`toeGuard`, `shadeCoolNoon`, `vibranceNoon`, `zenithDesat`. Round 4 adds `contrastLow`.
 
 ## Tried and rejected
 
@@ -310,6 +410,14 @@ family, 1 = as tuned). Detail: `exposureNoon/Golden/Dusk`, `fillGolden`,
   noon (the critic's request). The harness burst is a slow creep; the
   owner's motion check is the real read.
 
+- r3: verify-look-grade 23/23 (new: golden 0.1..0.4 stop down-sun, night
+  floor 0.1..0.4, into-the-sun meters down by more than 0.5 stop, dusk meters
+  down, noon unmetered), verify-true-earth-flags 8/8, eslint clean on every
+  changed file; city-water, water-field, reflection-stability,
+  cinematic-earth, cinema-overhaul, cruise-color, twilight, twilight-balance,
+  architectural-daylight exit 0; verify-sea-seams exit 1 with the base tree's
+  FAIL list (1a, 1b, 1c, 2a, 2c).
+
 ## Cost
 
 No new pass, target, texture or draw. The grade runs inside the existing
@@ -325,3 +433,6 @@ match baseline within streaming noise (192 to 367 per shot).
 
 - `lib/fly/cinema-frame.js` (r1, unchanged in r2): one import and one call,
   `applyLookGradeEnvironment(e)`, after `applyPhysicalSky` (shared with A).
+- r3: the same `lib/fly/cinema-frame.js` line now reads
+  `applyLookGradeEnvironment(e,undefined,runtime.camera)` (the metering needs
+  the view direction). `earth-surface-material.js` key: `look-grade-water-v6`.

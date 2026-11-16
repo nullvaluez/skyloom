@@ -59,9 +59,11 @@ const OFF = { ...LOOK_SHADOW, enabled: false };
 // (3) AO config
 {
   const base = DEPTH_PASS.n8ao;
-  const t = LS.lookShadowAoConfig(base, ON), z = LS.lookShadowAoConfig(base, { ...ON, occlusion: 0 });
+  // r3 ships `occlusion` 0.6 -> 0.1 in the combined frame; the tuned block is the dial at 1.
+  const ON1 = { ...ON, occlusion: 1 };
+  const t = LS.lookShadowAoConfig(base, ON1), z = LS.lookShadowAoConfig(base, { ...ON, occlusion: 0 });
   check('(3) AO config: tuned radius/intensity at occlusion 1, caller\'s own at 0',
-    t.aoRadius === ON.ao.radiusM && t.intensity === ON.ao.intensity && t.aoSamples === base.aoSamples && z === base,
+    t.aoRadius === ON1.ao.radiusM && t.intensity === ON1.ao.intensity && t.aoSamples === base.aoSamples && z === base,
     `radius ${base.aoRadius}->${t.aoRadius}, intensity ${base.intensity}->${t.intensity}`);
 }
 
@@ -119,6 +121,46 @@ const OFF = { ...LOOK_SHADOW, enabled: false };
     check('(5) flag off: Enhanced composite is not patched', count === 0 && f.includes('clamp(shade*.32,0.,.23)'));
   }
 }
+
+
+// (6) r3 low-sun fill: only a low sun in clear air, flag off untouched, key gain follows
+{
+  const sinDeg = (d) => Math.sin(d * Math.PI / 180);
+  const env = (el, overcast = 0) => ({ sunDir: [0, sinDeg(el), Math.cos(el * Math.PI / 180)], fill: 0.3, environment: 0.8, overcast });
+  const noon = env(40), gold = env(7), dusk = env(-3), grey = env(7, 1), off = env(7);
+  const U = CINEMA_PROFILES.ultra;
+  LS.applyLookShadowLowSun(noon, ON, U); LS.applyLookShadowLowSun(dusk, ON, U); LS.applyLookShadowLowSun(grey, ON, U);
+  LS.applyLookShadowLowSun(off, OFF, U);
+  const w = LS.applyLookShadowLowSun(gold, ON, U), kg = LS.lookShadowKeyGain(ON);
+  check('(6a) noon, dusk, overcast and flag off keep the fill and IBL', noon.fill === 0.3 && noon.environment === 0.8 && dusk.fill === 0.3
+    && grey.fill === 0.3 && off.fill === 0.3 && off.environment === 0.8 && LS.lookShadowKeyGain(OFF) === 1);
+  check('(6b) a 7 deg sun cuts fill and IBL and raises the cascade key', w > 0.99 && gold.fill < 0.3 && gold.environment < 0.8 && kg > 1,
+    `w ${w.toFixed(2)} fill ${gold.fill.toFixed(3)} env ${gold.environment.toFixed(3)} key x${kg.toFixed(2)}`);
+  // (6c) r5: desktop High/Ultra only. Medium, phone and Low (and their rungs) keep today's pixels.
+  const lower = Object.values(CINEMA_PROFILES).filter((p) => !/^(ultra|high)/.test(p.name));
+  const upper = Object.values(CINEMA_PROFILES).filter((p) => /^(ultra|high)/.test(p.name));
+  const bad = lower.filter((p) => { const g = env(7); const wl = LS.applyLookShadowLowSun(g, ON, p);
+    return wl !== 0 || g.fill !== 0.3 || g.environment !== 0.8 || LS.lookShadowKeyGain(ON) !== 1; }).map((p) => p.name);
+  const missed = upper.filter((p) => !(LS.applyLookShadowLowSun(env(7), ON, p) > 0.99)).map((p) => p.name);
+  check('(6c) Medium, phone and Low: weight 0, fill and IBL untouched, key gain 1; High/Ultra rungs apply',
+    lower.length >= 3 && bad.length === 0 && missed.length === 0,
+    `lower ${lower.map((p) => p.name).join(',')}${bad.length ? ` BAD ${bad}` : ''}${missed.length ? ` MISSED ${missed}` : ''}`);
+}
+
+// (7) r3 reach eases back with height above ground
+{
+  const u = CINEMA_PROFILES.ultra;
+  const low = LS.lookShadowRangeM(u, ON, 600), high = LS.lookShadowRangeM(u, ON, 7000), nan = LS.lookShadowRangeM(u, ON, NaN);
+  const lights = [{ shadow: { camera: { far: 26000, updateProjectionMatrix() {} } } }];
+  const r = { lights }; LS.lookShadowLightDepthAt(r, u, 7000, ON);
+  const farHigh = lights[0].shadow.camera.far; LS.lookShadowLightDepthAt(r, u, 600, ON);
+  check('(7) full reach low, the profile own reach and light depth at cruise', low === ON.rangeM.ultra && nan === ON.rangeM.ultra
+    && high === u.shadowRangeM && farHigh === 14000 && lights[0].shadow.camera.far === ON.lightFarM && LS.lookShadowRangeM(u, OFF, 600) === u.shadowRangeM,
+    `600 m ${low}, 7000 m ${high}, far ${farHigh}`);
+}
+
+// (8) r3 terrain shadow soft edge: flag on only
+check('(8) terrain shadow soft edge with the flag on only', LS.lookShadowTerrainSoft(ON) === true && LS.lookShadowTerrainSoft(OFF) === false);
 
 console.log(`\nverify-look-shadow: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

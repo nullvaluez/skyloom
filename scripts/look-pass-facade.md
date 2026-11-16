@@ -227,3 +227,186 @@ one-line calls, `setLookFacadeTier(qualityTier)` and
 `updateLookFacade(runtime.sun)`. `city-facades.js` (owned) gained one exported
 line. `verify-architectural-realism.mjs` gained the look arms (shipped hashes
 and flag-off arms unchanged).
+
+## Round 3 (`facade-r3`, balancing inside the combined frame)
+
+Program key `|look-facade-v3`. Base: look/integration `2755f844` (all five
+streams merged).
+
+### Same-session shimmer A/B (the stored nyc-street baseline does not settle)
+
+Burst, one session, `--flags=-LOOK_FACADE` vs on:
+
+| shot | facade off | r2 code (merged-1) | r3 code |
+|---|---|---|---|
+| nyc-street golden | 0.746 | 1.467 (1.97x) | 1.305 (1.75x) |
+| nyc-street dusk | 1.513 | 2.221 (1.47x) | 1.806 (1.19x) |
+| nyc-skyline-sun dusk | 0.759 / 0.766 | 1.16 (1.53x) | 0.902 (1.18x) |
+| nyc-skyline-sun golden | 0.729 | - | 0.846 (1.16x) |
+
+### What changed
+
+1. **Patterns retire before they alias** (critic must). Window rows retired at
+   0.28-0.62 cells/px, i.e. floor lines 1.6-3.5 px apart, and the night L2
+   level at up to 0.85 cells/px: sub-Nyquist patterns under motion. Now rows
+   0.18-0.42 (`day.ribbons.rowMinify`), storey band and roof patches 0.15-0.4
+   (`day.nyquist`), night L1 0.2-0.45 and L2 0.25-0.5. On top, the pane,
+   floor, band and roof-patch patterns fade to their means over 600-2500 m
+   whatever the footprint (`day.fade`), and single lit windows retire to the
+   lit-room level over the same range (`night.retire`).
+2. **Golden glint eased**: gain 3 -> 2.2, lobe 20 -> 28 degrees, a fade to 0.3
+   past 800-3000 m (`glint.far`). Measured alone: 1.394 -> 1.381, so glint
+   was not the golden source; kept as the softer setting.
+3. **Low-sun knee on lit walls** (orchestrator should): albedo luma above
+   0.30 rolls off toward 0.48 on sun-lit walls at sin el 0-0.34, so pale
+   limestone stays cream under GRADE's golden lift (`day.lowSunKnee`). At low
+   sun the per-building value spread eases 0.6 and the 3-8 km push is off
+   (`day.lowSunEase`; alone 1.414 -> 1.394).
+4. **Harbor night skyline** (critic should): far activity falloff 0.55 -> 0.85
+   and window emission x1.3 past 3-5 km (`night.farLift`).
+5. **Powell dusk** (critic should): the white-blue warehouse roof was the
+   twilight sky rim, not glint (the glint is off below the horizon); flat roofs
+   now take 0.45 of the rim (`twilight.roof`). Houses (families 0/6) keep the
+   shipped window glow and skip the dark-block cut (`night.houses`), so the
+   subdivision reads as before.
+6. **Noon near field** (orchestrator must): street-level gradient 0.8 -> 0.9,
+   shade faces 0.62 -> 0.74, roofs 0.74-1.0 -> 0.84-1.04. Lower third +1.5
+   luma against merged-1: the -46 crush is SHADOW and GRADE, not this stream.
+
+### Capture (`facade-r3`, burst)
+
+| shot | vs merged-1 luma / lower | sparkle baseline -> r3 (ratio) |
+|---|---|---|
+| nyc-street noon | +0.19 / +1.47 | 1.999 -> 1.303 (0.65) |
+| nyc-street golden | +0.12 / +1.17 | 0.862 -> 1.305 (1.51) |
+| nyc-street dusk | -1.19 / -3.1 | 1.37 -> 1.806 (1.32) |
+| nyc-street night | +0.64 / +1.2 | 2.223 -> 1.669 (0.75) |
+| nyc-harbor noon | -0.11 | 0.594 -> 0.478 (0.80) |
+| nyc-harbor night | +0.66 / +1.57 | 0.414 -> 0.200 (0.48) |
+| powell golden | +4.15 (cloud/clock drift; no city in frame) | 0.289 -> 0.264 (0.91) |
+| nyc-cruise noon | +1.12 | 0.116 -> 0.113 (0.97) |
+
+Against the stored baseline nyc-street golden (1.51x) and dusk (1.32x) still
+exceed 1.25x. That baseline does not settle and the other four streams share
+the frame; against the same-session facade-off run dusk is 1.19x (passes) and
+golden 1.75x (does not).
+
+Toward the sun (`facade-r3-sun` vs `facade-r3-sun-off`): nyc-skyline-sun
+golden luma +0.08, contrast +0.04, so this stream adds nothing to the
+overcooked low-sun look.
+
+### Open
+
+nyc-street golden: this stream still nearly doubles the sparkle at the same
+session. Ruled out by measurement: glint, value spread, the 3-8 km push.
+Suspect next: the darker, more frequent glazing in the palette (`day.palette`
+cuts and glass colours), whose pane grid against the lit cladding is the
+highest-contrast pattern in the near field at low sun. Not tried this round.
+
+### Gates
+
+`verify-architectural-realism` 12/12 (GPU arm on the 5080; key assertions moved
+to v3 and the r3 terms added), `verify-true-earth-flags` 8/8,
+`verify-facade-filtering` pass (168 cases), `verify-building-handoff` 4/4,
+`verify-building-surfaces` 6/6, `verify-distance-soften` pass,
+`verify-world-art` 3/3, eslint clean.
+
+## Round 4 (close-out: golden/dusk shimmer, own gate)
+
+Program key `|look-facade-v4`. Base: look/integration `5919deea` (round 3 of
+all five streams merged; the `merged-2` frame).
+
+### The golden shimmer cause: the glint on the pane grid
+
+Same-session bisect at nyc-street golden. Burst sparkle; each term was turned off
+through a temporary `?lfoff=` hook (removed before commit):
+
+| arm | sparkle |
+|---|---|
+| LOOK_FACADE off | 0.735 |
+| LOOK_FACADE on (r3 code) | 1.524 |
+| round 1: palette (glazing pattern) off | 1.517 |
+| round 1: ribbons + storey band + roof patches off | 1.527 |
+| round 1: per-building value/hue/far push + gradient off | 1.545 |
+| round 1: stone edge + glint + halo + knee off | **0.619** |
+| round 2: knee off | 1.524 |
+| round 2: stone edge off | 1.518 |
+| round 2: glint + halo off | **0.633** |
+
+So it was the low-sun glint and nothing else. The lobe was weighted by
+`realGlassMask`, i.e. `max(cityGlassMask, paneMask)`: the bright mirror lobe sat
+on the pane and mullion masks, a grid of bright cells 1-3 px apart at that
+range. Round 3 only measured a lower glint gain (1.394 -> 1.381), never the
+glint removed, so the sum read as "not glint". The palette glazing that round 3
+named as the suspect is clean.
+
+### What changed
+
+1. **Glint on whole faces** (`glint.faceMask` 0.85): the lobe and its halo
+   weight `cityCurtain*isWall*cityDay*0.85` (curtain-wall faces times their
+   frame mean), never the pane/mullion pattern. This took golden from 2.07x to 1.37x.
+2. **Glint gain 2.2 -> 1.7, far fade 800-3000 m / keep 0.3 -> 400-1800 m / keep 0.15**:
+   the remaining edge contrast of the glinting faces at range. Golden 1.17x.
+3. **Dusk** (safe route; the glint is off below the horizon): single lit windows
+   retire to the lit-room level over a range shrunk by 0.6 at full twilight
+   weight (`night.retire.twilight`; full night is unchanged), and the twilight sky/horizon lift fades
+   with distance from 700-2800 m (was 1200-4500 m). Dusk 1.29x -> 1.09x.
+
+Kept as they were: the building-to-building tone and hue variety, the lit faces
+(sun side, stone edge, knee) and the night windows. Noon and night run no
+changed term (the glint is 0 above sin el 0.6 and the twilight weight is 0 at
+night).
+
+### Same-session shimmer (`facade-r4` vs `facade-r4-off2`, captured together)
+
+| shot | facade off | r4 on | ratio | (r3 code, same day) |
+|---|---|---|---|---|
+| nyc-street golden | 0.753 | 0.884 | **1.17x** | 1.524 / 0.735 = 2.07x |
+| nyc-street dusk | 1.210 | 1.317 | **1.09x** | 1.561 / 1.216 = 1.28x |
+| nyc-skyline-sun golden | 1.625 | 1.622 | **1.00x** | - |
+
+The face-mask-only intermediate (`facade-r4-pre` vs `facade-r4-off`): golden
+1.010 / 0.738 = 1.37x, dusk 1.563 / 1.210 = 1.29x, skyline-sun 1.660 / 1.601.
+Note: in-session the facade-off skyline-sun golden reads 1.60, not the 0.87 of
+the stored `sun-off`; the remaining excess there belongs to the other streams
+(water, grade), not to this one.
+
+### Capture (`facade-r4` vs `merged-2`)
+
+| shot | absDiff | luma | sparkle merged-2 -> r4 |
+|---|---|---|---|
+| nyc-street noon | 4.44 | -0.14 | 1.495 -> 1.454 |
+| nyc-street golden | 5.20 | -3.12 | 1.503 -> 0.884 |
+| nyc-street dusk | 3.20 | -1.56 | 1.563 -> 1.317 |
+| nyc-street night | 1.27 | +0.04 | 1.767 -> 1.767 |
+| nyc-harbor noon | 10.04 | +0.05 | 0.436 -> 0.435 |
+| nyc-harbor night | 4.59 | -0.31 | 0.212 -> 0.224 |
+| nyc-skyline-sun golden (vs sun-merged-2) | 9.07 | -0.95 | 1.825 -> 1.622 |
+
+The harbor noon absDiff is run-to-run, not this step: noon runs no changed
+term, and `facade-r4-pre` -> `facade-r4` at that shot is 2.96. The worktree's
+noon harbor runs differ from the stored `merged-2` one by about 10-13 in every
+run since round 3 (one central tower picks dark glass in the worktree runs);
+streaming order, not code. Golden loses a little of the gold on the curtain
+towers (luma -3): the glint now lights whole faces softly, not a pane grid.
+
+### Gate
+
+New `scripts/verify-look-facade.mjs` (55 checks, node only): flag off has no
+look-facade key, text or uniform in any of the four programs; flag on is the off key with
+`|look-facade-v4` added once, and its fragment text is exactly the off text with
+`applyLookFacade` run over it (vertex text and chunks untouched); every block
+opens on a `uLookFacade` branch; each of the eight anchors is found exactly once
+and a missing, drifted or repeated anchor throws; `uLookFacade` is 1 only at
+desktop High (Ultra runs the High scene tier), 0 on Medium, Low, an unknown tier
+and a touch device on High.
+
+### Gates
+
+`verify-look-facade` 55/55, `verify-architectural-realism` 12/12 (GPU arm on the
+5080; key string moved to v4), `verify-true-earth-flags` 8/8,
+`verify-building-handoff` 4/4, `verify-distance-soften` pass, `verify-world-art`
+3/3, eslint clean. `verify-play-city` (23/28) and `verify-ship-city` (46/49)
+fail on frozen flag-off shader hashes; neither pins any LOOK flag and both read
+the same on `5919deea` before this step's edits (pre-existing; not this
+stream's files).
