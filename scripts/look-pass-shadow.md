@@ -424,3 +424,48 @@ sun the terrain ring is r3's by construction). Sparkle: nyc-street noon 1.495
 0.167, powell noon 0.466 -> 0.383, yosemite golden 0.098 -> 0.102, harbor
 noon 0.436 -> 0.446: run-to-run. Triangles unchanged (nyc-harbor noon 2.37 M,
 nyc-street golden 4.12 M). Capture errors: none.
+
+## Round 5 (review fixes on the balanced tree; reviews read 5919deea)
+
+### Blocker: low-sun fill/IBL/key was not gated by profile (Medium leak)
+
+Not addressed by r4 (71c8c9b2 only touched the terrain PCF ring). Fixed:
+`applyLookShadowLowSun` now multiplies its weight by a profile gate that is 1
+only on desktop High/Ultra (and rungs, `lookProfileKey`, cascades > 0) and 0 on
+Medium, phone and Low; on gate 0 it leaves fill and environment untouched and
+resets the cascade key gain to 1. The live gate (cinemaProfile()) eases over
+~0.5 s like `lookGradeWeight`, first call snaps; an explicit profile argument
+(the node gate) answers at once. New gate `verify-look-shadow (6c)`: every
+Medium/phone/Low profile gives weight 0, fill 0.3 / env 0.8 untouched, key
+gain 1; every High/Ultra rung applies. Medium powell__golden, one session,
+`--quality=medium`: all flags on vs all off absDiff 0.80, changed 0.7 %, luma
+-0.15 (auditor: 2.57-3.14, 7.7-9.8 %, +0.8-0.97); LOOK_SHADOW-off vs all-off
+reads the same 0.81 / 0.7 %, so that is this session's floor
+(`shadow-r5-med`, `shadow-r5-med-off`, `shadow-r5-med-noshadow`).
+
+### Shimmer: my share re-measured, one session, LOOK_SHADOW off vs on (--burst)
+
+The first r5 read with key 0.5 found powell-sun golden over the rule:
+0.413 / 0.310 (x1.33) and again 0.434 / 0.299 (x1.45) (r4's 1.21 did not
+hold). Attribution by dial: `lowSunShadow` 0 gave powell 0.298 / street 1.231
+(= the off arm), so all of it is the low-sun term, not the reach. `lowSun.key`
+0.5 -> 0.2 (fill and IBL cuts kept, so the shadow still reads; lit faces a
+touch less hot): powell 0.322, street 1.352. Final, `shadow-r5` vs
+`shadow-r5-off`:
+
+| shot | off | on | my share |
+|---|---|---|---|
+| nyc-street golden | 1.255 | 1.347 | x1.07 |
+| nyc-street dusk | 1.557 | 1.563 | x1.00 |
+| nyc-skyline-sun golden | 1.744 | 1.842 | x1.06 |
+| powell-sun golden | 0.285 | 0.298 | both under 0.3 |
+
+The rest of the street / skyline-sun shimmer is FACADE x GRADE (auditor's
+pair test); not mine to move. vs merged-2: nyc-street golden absDiff 2.18,
+luma -1.27, sparkle 1.503 -> 1.347; dusk 0.83 (floor). vs sun-merged-2:
+skyline-sun golden 5.81 (cloud drift, luma -1.17), powell-sun golden 3.81,
+luma -1.67, sparkle 0.415 -> 0.298; sun path and glow kept.
+
+Gates: verify-look-shadow 20/20, verify-true-earth-flags 8/8,
+verify-cinema-overhaul, verify-cinema-profile-prewarm 7/7,
+verify-graphics-repair, verify-true-scale 14/14; eslint clean.
