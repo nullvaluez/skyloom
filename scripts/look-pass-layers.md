@@ -83,6 +83,32 @@ phone and Low get the identity uniforms.
      do no extra fetch. `look-layers.js` defaults now equal the block. Dead
      `uLookBank2.w` / `uLookHigh.w` values are 0.
 
+6. **Round 3 (2026-11-16, balancing inside the merged frame, base 2755f844).**
+   - **Bank OFF** (`bank: 0`, shader text removed). In merged-1 it read as a
+     fence of bells and arches by day and a castle wall at night in about 24 of
+     28 shots, after three rounds of shaping. The orchestrator's rule: a missing
+     bank is acceptable, a pasted-on one is not. The code stays for a later
+     attempt (set `bank: 1` in the block to see it).
+   - **Toward a low sun** (owner's Rio item, first job): the high layer no
+     longer thickens at low sun. `highCfg.lowSun` is now the opacity a low sun
+     removes (0: removing r2's x2.6 depth and x1.96 opacity is already a ~70%
+     cut), `lowSunCover` 0.4 the cover it removes (the patch field then decides
+     which places keep any, so skies vary by place), `sunClear` 0.6 the extra
+     thinning within ~40 deg of the sun (and 55% less fibre sun light there), a
+     warm tint (1, .86, .7) instead of the x2.4 warm gain. Cloud bodies: within
+     ~40 deg of a low sun the forward-scatter lobe is cut 40% and the silver
+     rim 80%, so tops round the sun stay warm and translucent.
+   - **Dusk cirrus** (`duskDim` 0.4): with the sun below ~+3 deg the fibres'
+     sun light drops 40%, goes rose-grey, and the layer is 50% thinner. It now
+     sits under the horizon glow at rio__dusk.
+   - **Streaks** half as long (12 volumes per period, was 6): less radial fan.
+   - **Bases**: `baseDark` 0.5 -> 0.67; the floor shading greys and cools to a
+     blue-grey; the ground bounce tint in the cloud ambient (green-brown over
+     the Alps, the noon "dirt") is 80% greyed and cooled.
+   - **Night floor**: the bulk-above occlusion never takes the ambient below
+     0.65 x the night weight (yosemite__night's black hole). The night weight
+     now rides the volume dial too (it rode only the bank).
+
 ## Dials (`LOOK_LAYERS`)
 
 `volume`, `bank`, `high` (0 = that layer exactly as before, shader text
@@ -164,8 +190,37 @@ out of frame: the two baseline runs alone differ by absDiff 13.6 and luma 7.4 on
 this shot. Rio's -10.3 (8.1% of 127) is the same effect plus the darker bodies,
 inside rule 7.
 
+## Round 3 capture (`layers-r3`, RTX 5080, 2026-11-16, 15 shots, burst)
+
+Frame / upper-third mean luma deltas (merged-1 -> r3 for the standard set,
+sun-merged-1 -> r3 for the toward-the-sun set):
+
+| shot | frame | upper | shimmer (vs baseline / sun-off) |
+|---|---|---|---|
+| rio golden | -9.5 | -27.1 | 0.408 -> 0.137 |
+| rio dusk | -11.1 | -33.5 (p95 -44) | 0.059 -> 0.091 |
+| nyc-cruise-sun golden | -13.0 | -32.7 | 0.102 -> 0.053 |
+| powell-sun golden | -8.8 | -27.4 | 0.287 -> 0.342 (1.19x) |
+| yosemite-sun golden | -10.8 | -26.1 | 0.149 -> 0.287 (both < 0.3) |
+| nyc-skyline-sun golden | -5.1 | -12.9 | 0.867 -> 0.976 (1.13x) |
+| nyc-cruise golden | -12.1 | -30.6 | 0.114 -> 0.107 |
+| powell golden | -2.1 | -20.4 | 0.289 -> 0.220 |
+| nyc-harbor golden | -2.4 | -9.6 | 0.406 -> 0.248 |
+| alps / rio / nyc-cruise / powell noon | -3.8 / -0.3 / -2.0 / -1.3 | small | all below baseline |
+| nyc-street noon | +1.0 | +1.5 | 1.999 -> 1.408 |
+| nyc-harbor night | +2.2 | +1.6 | 0.414 -> 0.229 |
+
+No shot exceeds 1.25x its baseline sparkle. Toward the sun the frame is still
++47 to +74 luma over sun-off at golden (rio +74): this stream removed 9-13 of
+it (26-33 in the upper third); the rest is the mid-field haze and exposure
+(atmos and grade items), not cloud layers.
+
 ## Gates
 
+- Round 3: `verify-true-earth-flags` 8/8, `verify-cloud-calm` 6/6,
+  `verify-phys-sky` 12/12, `verify-true-scale` 14/14, `verify-hdr-guard` 4/4;
+  `verify-living-sky` 20/1 (1c), `verify-ship-sky` 47/2 (SK-3 l, TEXT a),
+  `verify-r25-sky` 47/2 (4h, 4i): the same known rows. eslint clean.
 - `verify-true-earth-flags` 8/8, `verify-cloud-calm` 6/6, `verify-phys-sky`
   12/12, `verify-true-scale` 14/14, `verify-hdr-guard` 4/4.
 - `verify-living-sky` 20/1, `verify-ship-sky` 47/2, `verify-r25-sky` 47/2: the
