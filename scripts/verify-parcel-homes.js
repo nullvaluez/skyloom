@@ -134,10 +134,9 @@ const pinScene = ([lat, lon, altM, heading, pitch]) => {
 
   // --- (I) SOURCE: the revert is ONE flag, by construction -------------------
   const root = path.join(__dirname, '..');
-  const worker = fs.readFileSync(
-    path.join(root, 'lib/fly/toy-world/vector-tile.worker.js'),
-    'utf8'
-  );
+  // World Pass W0: the satellite builders live in lib/fly/toy-world/worker/**,
+  // so the worker's SOURCE is the worker file plus those modules.
+  const worker = require('./world-pass-worker-source.cjs').readWorkerSource(root);
   const vegLayer = fs.readFileSync(path.join(root, 'components/fly/SatVegLayer.jsx'), 'utf8');
   const homes = fs.readFileSync(path.join(root, 'components/fly/SatParcelHomes.jsx'), 'utf8');
   gate(

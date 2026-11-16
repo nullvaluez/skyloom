@@ -37,6 +37,7 @@
  * Run: node scripts/verify-night-city-identity.mjs
  */
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -221,7 +222,8 @@ gate(
  * engine writes it only under its own arm — while the worker never mentions it. */
 {
   const engine = readFileSync(path.join(ROOT, 'lib/fly/toy-world/sat-road-engine.js'), 'utf8');
-  const worker = readFileSync(path.join(ROOT, 'lib/fly/toy-world/vector-tile.worker.js'), 'utf8');
+  // World Pass W0: the worker's source is the worker file plus lib/fly/toy-world/worker/**.
+  const worker = createRequire(import.meta.url)('./world-pass-worker-source.cjs').readWorkerSource(ROOT);
   gate(
     '(10) aRoadSide — declared by the armed program, built by the engine under its arm, ABSENT from the worker',
     /attribute float aRoadSide/.test(cur.roadOn.v) &&

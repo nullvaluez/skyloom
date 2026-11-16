@@ -390,7 +390,9 @@ async function warpHold(page, lat, lon, altM) {
   // Round 20 (C2). The exclusion's flag-off byte identity is a SOURCE property —
   // MONUMENT_MODELS.enabled is baked at build time and cannot be flipped from
   // inside the browser, exactly like B3 above.
-  const workerSrc = read('lib/fly/toy-world/vector-tile.worker.js');
+  // World Pass W0: the satellite builders live in lib/fly/toy-world/worker/**,
+  // so the worker's SOURCE is the worker file plus those modules.
+  const workerSrc = require('./world-pass-worker-source.cjs').readWorkerSource(ROOT);
   gate(
     'B5 the worker exclusion is gated on MONUMENT_MODELS.enabled (flag-off = byte-identical)',
     /function marqueeExclusionTile\([^)]*\)\s*\{\s*\n\s*if \(!MONUMENT_MODELS\.enabled \|\| MONUMENT_EXCLUSIONS\.length === 0\) return null;/.test(

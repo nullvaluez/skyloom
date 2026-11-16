@@ -141,10 +141,9 @@ const TRI_MAX = 2.0e6; // 0.2 M headroom under the 2.2 M gate
   };
 
   // --- (0) source gates: the revert is ONE flag, by construction ------------
-  const workerSrc = fs.readFileSync(
-    path.join(__dirname, '../lib/fly/toy-world/vector-tile.worker.js'),
-    'utf8'
-  );
+  // World Pass W0: the satellite builders live in lib/fly/toy-world/worker/**,
+  // so the worker's SOURCE is the worker file plus those modules.
+  const workerSrc = require('./world-pass-worker-source.cjs').readWorkerSource();
   const constSrc = fs.readFileSync(path.join(__dirname, '../lib/fly/fly-constants.js'), 'utf8');
   const enabledOf = (name) => {
     const m = new RegExp(`export const ${name} = \\{\\s*[\\r\\n]+\\s*enabled:\\s*(true|false)`).exec(

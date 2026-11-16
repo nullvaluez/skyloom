@@ -14,7 +14,11 @@ registerHooks({
 const {buildAirfieldTile}=await import('../lib/fly/airfield/airfield-tile.js');
 const {mergeAirfieldTiles,loadAirfieldFeatures,peekAirfieldFeatures,clearAirfieldCache}=await import('../lib/fly/airfield/airfield-data.js');
 const {renderedBuildingBound}=await import('../lib/fly/airfield/rendered-building-bound.js');
-const {buildSatBuildings}=await import('../lib/fly/toy-world/vector-tile.worker.js');
+const {buildSatBuildings:buildSatFromCtx}=await import('../lib/fly/toy-world/vector-tile.worker.js');
+const {createTileCtx}=await import('../lib/fly/toy-world/worker/tile-ctx.js');
+// World Pass W0: the builder takes ONE per-build context (worker/tile-ctx.js)
+// made from the same frame the worker builds; this adapter keeps the old call.
+const buildSatBuildings=(vt,frame)=>buildSatFromCtx(createTileCtx(vt,frame,{z:tile.z,x:tile.x,y:tile.y,detail:'sat-buildings',options:{},v:0,diag:false,clutterOnly:false}));
 const {airfieldRaster,assessPierRearOpening}=await import('../lib/fly/lounge-seat.js');
 const {registerAirport}=await import('../lib/fly/operations-airports.js');
 let count=0;const check=(name,fn)=>{fn();count++;console.log('PASS '+name);};
