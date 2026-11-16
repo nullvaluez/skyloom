@@ -10,7 +10,7 @@ import { compactDepthShadowTarget } from '@/lib/fly/compact-shadow-target';
 import { toSceneDir } from '@/lib/fly/true-scale';
 import { mobileEnhancedOn, mobileShadowRange, resolveMobileEnhanced, stepMobileShadowRange } from '@/lib/fly/mobile-enhanced';
 import { useFlyStore } from '@/stores/fly-store';
-import { lookShadowAoSun, lookShadowCloudGate, lookShadowRangeM } from '@/lib/fly/look-shadow';
+import { lookShadowAglWeight, lookShadowAoSun, lookShadowCloudGate, lookShadowKeyGain, lookShadowLightDepthAt, lookShadowRangeM } from '@/lib/fly/look-shadow';
 import { DEPTH_PASS } from '@/lib/fly/fly-constants';
 
 export function CinemaShadowRig({runtime,sunRef}){
@@ -45,7 +45,11 @@ export function CinemaShadowRig({runtime,sunRef}){
     const state=useFlyStore.getState();
     // LOOK PASS B (SHADOW): desktop High/Ultra reach further; every other
     // profile (and the flag off) keeps its own range.
-    let rangeM=lookShadowRangeM(profile);
+    // r3: eased back to the profile's own reach above ~2-4.5 km AGL.
+    const lookK=runtime.cinemaGeography?.worldUnitsPerMetre??1,lookGround=runtime.cinemaGeography?.groundVisualM;
+    const lookAgl=Number.isFinite(lookGround)?(camera.position.y-lookGround)/lookK:NaN;
+    let rangeM=lookShadowRangeM(profile,undefined,lookAgl);
+    lookShadowLightDepthAt(r,profile,lookAgl);
     // SHIP PASS LIGHT (SHADOW_REACH, LT-5): Medium desktops reuse the phone
     // rule with their own tunables; flag off, `reach` is exactly the old
     // mobileEnhancedOn() branch.
@@ -70,7 +74,8 @@ export function CinemaShadowRig({runtime,sunRef}){
     // key direction is S⁻¹·keyDir (identity at k0 = 1). A parallel projection
     // along it in scene space is exactly the true projection after S.
     toSceneDir(r.lightDirection.fromArray(e.keyDir),r.lightDirection).negate();
-    for(const light of r.lights){light.intensity=e.sun;light.color.fromArray(e.keyColor);compactDepthShadowTarget(light.shadow,gl.shadowMap.type);}
+    const lookKey=lookShadowKeyGain(); // LOOK PASS B r3: 1 except under a low sun
+    for(const light of r.lights){light.intensity=e.sun*lookKey;light.color.fromArray(e.keyColor);compactDepthShadowTarget(light.shadow,gl.shadowMap.type);}
     // Register new streamed materials before their first color draw. A dispose
     // listener drops evicted materials, so the registry never pins the world.
     // TRUE EARTH: this walks the WHOLE scene every frame. Before replacing it
@@ -106,7 +111,7 @@ export function CinemaShadowRig({runtime,sunRef}){
     // LOOK PASS B (SHADOW): city-scale AO by day, today's AO at low sun.
     lookShadowAoSun(runtime.aoPass?.configuration,runtime.sun?.sinEl,DEPTH_PASS.n8ao,lookAo.current);
     Object.assign(runtime.cinemaShadows??={}, {cascades:r.cascades,size:profile.shadowSize,rangeM,baseRangeM:profile.shadowRangeM,materials:r.owned.size,bytes:r.cascades*profile.shadowSize**2*5,scanObjects:r.scanObjects,scanMs:r.scanMs,
-      airframeBreakM:r.airframeBreakM,reach:reach?(mobileReach?'mobile':'medium'):null,requestedCasters,lookCasters:lookCloud>0||lookShadowRangeM(profile)>profile.shadowRangeM});
+      airframeBreakM:r.airframeBreakM,reach:reach?(mobileReach?'mobile':'medium'):null,requestedCasters,lookCasters:lookShadowAglWeight(lookAgl)>0&&(lookCloud>0||lookShadowRangeM(profile)>profile.shadowRangeM)});
   },-.9);
   return null;
 }

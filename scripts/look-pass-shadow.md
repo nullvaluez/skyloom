@@ -227,3 +227,119 @@ is the dial. Capture errors: none.
   The next real lever is an ambient term inside the cascade shadow (new CSM
   shader text and a prewarm key), which belongs with stream E's fill colour.
 - Cloud shadow count still follows the baseline weather's sparse cumulus.
+
+---
+
+# Round 3 (label `shadow-r3`): balancing inside the combined frame
+
+Base: look/integration 2755f844 (all five streams merged). Compared against
+`merged-1` (what this round changed) and `baseline` (the whole pass).
+
+## Items
+
+- **[must] Golden-hour cast shadows bite (powell__golden, nyc-street__golden):
+  done, with a shimmer cost (below).** Cause, measured: at a 7 deg sun the
+  sky fill and IBL make up most of the light on flat ground, and GRADE lifts
+  both at low sun (fill x1.9, IBL x1.45). A tree shadow at `powell__golden`
+  was 18 % darker than the lit grass beside it in `merged-1`. Fix:
+  `applyLookShadowLowSun` (one call from `lib/fly/cinema-frame.js`, after the
+  grade) scales the hemisphere fill by `1 - 0.6 w` and the IBL by
+  `1 - 0.45 w`, w = 1 from -1..2.5 deg up to 9 deg of sun, 0 by 17 deg, clear
+  air only (overcast untouched). The cascade lights (direct term on lit
+  materials only, `lookShadowKeyGain` in CinemaShadowRig) rise by `1 + 0.5 w`
+  so lit ground holds; the shared key `e.sun` that clouds, water, mist and
+  the air read is NOT touched, so this adds nothing to the toward-the-sun
+  glare. No new shader text, no prewarm key, no per-material term. With the
+  stronger first try (fill .65 / env .5 / key .9) long tree and levee shadows
+  read across the open land at powell__golden, tree shadow 25.6 vs lit 32.5
+  (sample boxes include some shade; visually clearly darker and cool).
+  The cascades carry the length: 8 km reach, shadows already scale with
+  1/tan(elevation) because they are real cast shadows, not a contact term.
+- **[must] nyc-street__noon near field: done for my share; the residue is not
+  mine.** `occlusion` 1 -> 0.1 (AO radius 130 -> 35 m). merged-1 lower third
+  vs baseline -47.5; at occlusion 0.6 it was -41, at 0.2 -33, at 0.1 -32/-35
+  (run to run). The last 0.1 step moves nothing, so the remaining ~-33 lower
+  third and ~-35 frame p05 come from GRADE's noon contrast and blue fill and
+  FACADE's wall value, not occlusion. Block separation survives through the
+  cascade shadows. Target (-25 / -15) not met by this stream alone.
+- **[should] Cost at cruise: found and fixed, it was mine.** nyc-cruise__golden
+  flag off 170 calls, on 312 (merged-1 308). The cause was the parcel houses
+  casting into the cascades from 7 km up (`lookShadowHomesCast`). Now houses
+  cast only below ~4.5 km AGL, and the cascade reach and light depth ease back
+  to the profile's own between 2,000 and 4,500 m AGL (`highAgl`, refit in
+  250 m / 500 m steps). nyc-cruise__golden on: 170 calls (= flag off). Cloud
+  shadows at cruise are the composite and stay. Harbour triangles (+16 %) are
+  the 8 km low-altitude reach and are unchanged; `reach` 0.75 is the dial.
+- **[should] yosemite__golden stair-stepped terrain shadow edge: partly.** The
+  desktop terrain shadow receiver now takes five bilinear PCF footprints on a
+  rotated grid (radius ~1.3 texels) instead of one (new shader text, program
+  key `|ts-depth-v1-ls3`, flag on only; the touch `horizon` path unchanged).
+  The edge is softer but the teeth remain: they are wider than the filter, so
+  either the terrain map texel on that cliff is several screen texels or the
+  teeth come from the far CSM cascade. Not resolved this round.
+- **Toward-the-sun check (nyc-skyline-sun__golden): my part does not add.**
+  vs sun-merged-1: frame -0.2 luma, p95 228 (under 240). The fill/IBL cut
+  slightly darkens the shaded faces facing the camera; the key is untouched.
+
+## Shimmer (the open cost)
+
+nyc-street__golden burst: baseline 0.862, merged-1 1.512 (FACADE's
+regression), this round 1.98-2.14 with the low-sun fill on and 1.61 with
+`lowSunShadow` 0 (probe). The stronger golden-hour shadow contrast makes
+the existing facade/edge aliasing ~30 % more visible. The other golden shots
+stay inside the rule (powell 0.305 vs 0.289; yosemite both under 0.3). Kept
+on because cast shadows at golden hour are this round's headline item;
+`lowSunShadow` 0 is the one-number way back if the facade fix does not bring
+it down.
+
+## Dials added
+
+`lowSunShadow` (master, 0 = grade's fill untouched), `lowSun`
+{fill, env, key, fullDeg, fromDeg, upFromDeg, upFullDeg}, `highAgl`
+{fromM, toM}, `terrainSoft`. `occlusion` ships 0.1.
+
+## Edits outside my files (round 3)
+
+- `lib/fly/cinema-frame.js` (GRADE's): one import and one call,
+  `applyLookShadowLowSun(e)`, after `applyLookGradeEnvironment(e)` (allowed
+  by the round brief).
+- `lib/fly/terrain-shadow.js` is mine (contract list); the program key change
+  is inside it.
+
+## Gates
+
+`verify-look-shadow` 19/19 (check 3 now asserts the tuned block at the dial's
+1; new checks 6 low-sun fill, 7 AGL reach, 8 terrain soft flag gating);
+`verify-true-earth-flags` 8/8; `verify-n8ao-direct` pass; `verify-look-grade`
+20/20; eslint clean on every changed file.
+
+## Final shadow-r3 (fill .6 / env .45 / key .5, occlusion .1, wide terrain PCF)
+
+The milestone was re-captured on the shipped dials after the key gain was
+eased from .9 to .5 (shimmer). Long tree and levee shadows at powell__golden
+are weaker than with .9 but still read.
+
+| shot | frame vs merged-1 | lower vs merged-1 | frame vs baseline | lower vs baseline | sparkle base -> merged-1 -> r3 |
+|---|---|---|---|---|---|
+| nyc-street noon | +5.1 | +13.1 | -9.4 | -34.5 | 1.999 -> 1.296 -> 1.739 |
+| nyc-street golden | -1.8 | -4.3 | +46.2 | +16.1 | 0.862 -> 1.512 -> 1.964 (over 1.25x) |
+| nyc-harbor noon | +0.2 | +0.5 | +0.8 | -5.3 | 0.594 -> 0.461 -> 0.513 |
+| powell noon | +0.3 | +1.7 | +3.7 | -0.5 | 0.831 -> 0.452 -> 0.445 |
+| powell golden | +4.0 | +8.5 | +47.7 | +25.9 | 0.289 -> 0.162 -> 0.292 |
+| yosemite golden | -0.8 | -3.1 | +60.7 | +46.0 | 0.077 -> 0.093 -> 0.129 (both < 0.3) |
+| nyc-cruise noon | +2.4 | +2.0 | +14.9 | +22.3 | 0.116 -> 0.153 -> 0.117 |
+| nyc-harbor night | 0.0 | +0.2 | -4.6 | -0.1 | 0.414 -> 0.244 -> 0.247 |
+
+Calls: nyc-cruise noon and golden 170 (merged-1 golden 308). Capture errors:
+none.
+
+## Still weak after round 3
+
+- nyc-street__golden shimmer (1.96 vs 0.862 baseline): FACADE's 1.51 plus
+  this round's golden contrast. Weakest shot.
+- nyc-street__noon lower third still -34 vs baseline with occlusion near
+  today's; the rest belongs to GRADE / FACADE.
+- Yosemite cliff shadow teeth softened, not gone.
+- Cloud shadows at low altitude in Powell: unchanged this round (the critic
+  asked for double contrast); the composite still follows the sparse
+  baseline cumulus.
