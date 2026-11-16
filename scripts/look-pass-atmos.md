@@ -363,3 +363,59 @@ more ground detail shows.
 - The horizon slab top in powell/nyc-street/nyc-harbor golden sits on the
   LAYERS bank base; until that bank changes the edge stays visible.
 - nyc-cruise__noon slab: not touched this round.
+
+## Round 4 (close-out, base 5919deea)
+
+### Toward-the-sun falloff (should, first): done
+
+The r3 weight was a smoothstep in cosine from 40 deg (0) to about 25 deg
+(full): a 15 deg ramp, so a wide frame showed a pale veil just outside it
+(rio sea side, the left mid ground of yosemite-sun) and in flight the ramp
+would sweep across the frame on a turn. It is now a smoothstep in ANGLE,
+full inside `sun.coneFullDeg` 12 and 0 at `sun.coneDeg` 80 (new uniform
+`uLookAtmosI.xy`; `uLookAtmosG.y` is kept but no longer read). The slope is
+about 2.5% of the weight per degree at most: no edge at any heading. At 25
+deg the weight is 0.91 (was 1), at 40 deg 0.59 (was 0), at 60 deg 0.21.
+
+Frame luma (whole / middle band) against sun-merged-2 (atmos-r4):
+
+| shot | delta | middle |
+|---|---|---|
+| rio__golden | -2.3 | -0.5 |
+| nyc-skyline-sun__golden | -0.4 | -1.2 |
+| powell-sun__golden | -4.8 | -3.2 |
+| yosemite-sun__golden | -1.3 | -7.6 |
+| nyc-cruise-sun__golden | -1.6 | -0.3 |
+
+All within the 10-luma bound. The veil outside the old cone is gone in
+rio (left coast reads through) and yosemite-sun (left ridge field even).
+
+Shimmer, same session, burst (atmos-r4-off = `-LOOK_ATMOS` / atmos-r4):
+rio 0.212 / 0.197, powell-sun 0.598 / 0.349, yosemite-sun 0.167 / 0.166,
+nyc-skyline-sun 1.984 / 1.831: the flag lowers it everywhere.
+
+### nyc-cruise__noon slab (should): not changed, out of this stream's pixels
+
+Tried a blend of the layer's colour toward the sky row 0.04 rad above the
+horizon over the last 0.08 rad below it (weight 0.5, day only, eye-height
+ramped): the slab's rows moved 0 to 2 luma (column profile, atmos-wip7 vs
+merged-2). The slab and its top are not terrain seen through this layer:
+the aerial pass skips sky pixels, and at 7,000 m the grey-white band is the
+sky below the horizon / LAYERS' horizon bank composited over the far field.
+The code was taken back out (no inert uniforms ship). Softening it belongs
+to the sky (below-horizon row) or LAYERS' bank.
+
+### Standard shots (atmos-r4 against merged-2)
+
+powell__golden -1.5 (middle -2.5), yosemite__golden +0.1, nyc-street__golden
+-0.2, nyc-cruise__noon +0.8, powell__noon +0.1. powell__golden moves a little
+because its far field on the warm side now keeps some sun weight; noon is
+untouched by construction (the weight is golden-hour only). The absDiff of
+5-8 on powell and rio is the clouds' run-to-run motion (luma flat). Haze was
+not reduced anywhere else; the depth in powell/nyc-street/yosemite golden
+holds.
+
+### Gates (round 4)
+
+`verify-look-atmos` 15/0, `verify-true-earth-flags` 8/0, eslint clean on
+both files.
