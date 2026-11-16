@@ -290,6 +290,32 @@ Shimmer: nyc-street__dusk 1.37 -> 1.91 against baseline (1.39x; merged-1 was
 (1.79x): the sea glitter restored on darker water. Both are over the 1.25x line.
 The skyline one is mine: `waterPath` is its dial.
 
+## Round 4 (close-out on `5919deea`: shimmer only, exposure and golden lift unmoved)
+
+Two shimmer items, both measured as LOOK_GRADE on against `--flags=-LOOK_GRADE`
+in the same session (burst.sparklePct; the line is 1.25x).
+
+1. Toward the sun (`coastal-water.js`). The r3 sun path followed each pixel's
+   wave normal through a pow-30 lobe, so it broke into per-pixel points that
+   aliased in motion. It now reads the flat sea's mirror ray: a band narrow in
+   azimuth (pow 500 at the horizon easing to pow 70 on steep near water, as the
+   wave slopes allow), running from the horizon down to about 24 deg below the
+   sun's own elevation, brightest at the graze. The physical glitter from
+   SEA_STATE (in both arms) still carries the sparkle. The near-water gold sheen's
+   per-pixel slope term fades out with footprint (pixelM 0.06..0.30) and leaves an
+   even sheen. Program key `look-grade-water-v6` -> `-v7`.
+   nyc-skyline-sun__golden 0.942 off / 0.997 on (1.06x, was 1.79x);
+   rio__golden 0.139 / 0.129 (both under 0.3). The path is still the brightest
+   thing on the water, as a smooth gold column (grade-wip).
+2. Manhattan (`hdr-grade.js`, new dial `contrastLow`). The midtone S is scaled by
+   `mix(1, contrastLow, max(lowSun, twilight))`, so below about 15 deg of sun
+   and at civil dusk only a share of it is applied. 0.40 read nyc-street__golden 1.065 /
+   1.408 (1.32x) and dusk 1.166 / 1.475 (1.27x); 0.10 reads golden 1.061 /
+   1.316 (1.24x) and dusk 1.177 / 1.420 (1.21x) (grade-wip-off2 / grade-wip2).
+   The rest of the remaining rise is the golden exposure lift, toe and vibrance,
+   which this step was told not to move. The frame keeps its warm key and cool
+   fill. The noon S is unchanged.
+
 ## Dials (`LOOK_GRADE` in fly-constants.js)
 
 Masters: `exposure`, `fill`, `grade`, `water`, `warmth` (each 0 removes its
@@ -301,7 +327,7 @@ family, 1 = as tuned). Detail: `exposureNoon/Golden/Dusk`, `fillGolden`,
 `noonWarm`, `shoulderGolden`, `tealGuard`; the r2 revision adds `zenithLift`,
 `cloudWhite`, `duskCool`, `waterNearSheen`, `waterNoon`. Round 3 adds `exposureNight`,
 `meterSun`, `meterDusk`, `fillDusk`, `fillNoon`, `toeNight`, `toeDusk`, `toeNoon`,
-`toeGuard`, `shadeCoolNoon`, `vibranceNoon`, `zenithDesat`.
+`toeGuard`, `shadeCoolNoon`, `vibranceNoon`, `zenithDesat`. Round 4 adds `contrastLow`.
 
 ## Tried and rejected
 
