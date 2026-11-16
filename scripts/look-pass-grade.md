@@ -316,6 +316,24 @@ in the same session (burst.sparklePct; the line is 1.25x).
    which this step was told not to move. The frame keeps its warm key and cool
    fill. The noon S is unchanged.
 
+## Round 5 (final audit on `5919deea`; no code change, r4 already carries the fix)
+
+The audit's shimmer item read the tree before r4. Re-measured on `5473b06f`
+(server :3315, settled, same session, burst.sparklePct, `--flags=-LOOK_GRADE`
+off arm; labels grade-r5 / grade-r5-off, grade-r5-off2):
+nyc-street__golden 1.068 / 1.322 (1.24x, audit head 1.518), nyc-street__dusk
+1.170 / 1.427 (1.22x, audit 1.569), nyc-skyline-sun__golden 1.006 / 1.036
+(1.03x, audit 1.815: the r4 sun-path band). Off arm repeat 1.072 / 1.173 / 1.012.
+FACADE x GRADE pair on this head (`-LOOK_FACADE` vs `-LOOK_FACADE,-LOOK_GRADE`,
+grade-r5-nof / -nofg): golden 0.621 / 0.467, dusk 1.101 / 1.008, so GRADE's part
+under FACADE-off fell from the audit's 1.68x to 1.33x golden and 1.09x dusk. The
+remaining all-on vs all-off rise at the street (1.32 against the audit's 0.389)
+sits in FACADE (no GRADE still 1.07) and SHADOW at golden, not in GRADE.
+Tried: `toeLow` 0.5 (toe share at low sun): golden 1.313, dusk 1.432, no
+movement, reverted. `contrastLow` 0.10 already takes 90 % of the S off at low
+sun, so the auditor's (1 - a*z) scaling is in place and stronger. Gates:
+verify-look-grade 23/23, verify-true-earth-flags 8/8, eslint clean.
+
 ## Dials (`LOOK_GRADE` in fly-constants.js)
 
 Masters: `exposure`, `fill`, `grade`, `water`, `warmth` (each 0 removes its
