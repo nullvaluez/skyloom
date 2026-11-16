@@ -260,6 +260,9 @@ for (const [name, [lat, lon]] of Object.entries(PLACES)) {
     times.on.push(performance.now() - t);
     ctxOn = b;
   }
+  // One more build with the stage counters on: the look's wall and structure counts.
+  const vtD = new VectorTile(new PbfReader(new Uint8Array(mvt.body)));
+  const outD = buildSatBuildings(createTileCtx(vtD, { ...frameOf(z, x, y), lookPhoto: photo }, { z, x, y, detail: 'sat-buildings', options: { ...opts, worldPass: req }, v: 25, diag: true }));
   const E = ctxOn.extent;
   const archCtx = architectureContext(ctxOn.vt, ctxOn);
   const roofs = ctxOn.look.prep.roofs;
@@ -300,6 +303,8 @@ for (const [name, [lat, lon]] of Object.entries(PLACES)) {
     deltaE: { beforeShader: stat(d.beforeShader), beforeWorker: stat(d.beforeWorker), after: stat(d.after), beforeShaderUnder30m: stat(d.beforeShaderLow), afterUnder30m: stat(d.afterLow) },
     buildMs: { off: +med(times.off).toFixed(1), on: +med(times.on).toFixed(1), added: +(med(times.on) - med(times.off)).toFixed(1) },
     emptyOn: outOn.empty === true,
+    walls: outD.wpStages?.look?.walls ?? null,
+    structures: outD.wpStages?.lookStructures ?? null,
   };
   console.log(name, JSON.stringify(result[name]));
 }

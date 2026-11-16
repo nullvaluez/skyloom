@@ -62,6 +62,12 @@ for (const distant of [false, true]) {
   check(`(2) on ${name}: key`, /\|world-look-v\d+-rw?/.test(p.key), p.key);
 }
 check('(2) look-facade roof value steps aside', /lfDay\*lfRoof\*0\.\)/.test(on[false].frag));
+for (const distant of [false, true]) {
+  const p = on[distant], name = distant ? 'far' : 'near';
+  check(`(2) on ${name}: wall glass mode decoded before any pass`, count(p.frag, 'float wlMode=wlBase.r>7.5?2.:wlBase.r>3.5?1.:0.;') === 1 && p.frag.indexOf('diffuseColor.rgb=wlBase;') < p.frag.indexOf('cityDay='));
+  check(`(2) on ${name}: wall albedo from the worker, the tag decides curtain glass`, count(p.frag, 'cityWall=wlBase;') === 1 && count(p.frag, 'cityCurtain=wlMode>1.5?0.:wlMode>.5?1.:cityCurtain;') === 1);
+  check(`(2) on ${name}: look-facade wall identity terms step aside, dark glass on curtain only`, /lfDay\*lfFace\*0\.\)/.test(p.frag) && /lfDarkT\*cityCurtain\)/.test(p.frag));
+}
 // (4) latched: flip the pin, the material keeps the latched answer
 window.__flyWorldLookOverride = { enabled: false };
 check('(4) latched for the page load', program(false).key === on[false].key);
