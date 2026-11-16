@@ -42,7 +42,7 @@ if (arm) {
 }
 
 register('./_node-resolve.mjs', import.meta.url);
-const { applyLookFacade, LOOK_FACADE_KEY, LOOK_FACADE_UNIFORMS, LOOK_FACADE_CFG, setLookFacadeTier } = await import('../lib/fly/look-facade.js');
+const { applyLookFacade, LOOK_FACADE_KEY, LOOK_FACADE_UNIFORMS, LOOK_FACADE_CFG, setLookFacadeProfile } = await import('../lib/fly/look-facade.js');
 const { NIGHT_RHYTHM_KEY } = await import('../lib/fly/night-rhythm.js');
 
 let pass = 0, fail = 0;
@@ -100,19 +100,20 @@ for (const a of ANCHORS) {
   ok(!!repeated && /LOOK_FACADE/.test(repeated), `repeated anchor throws: ${a.trim().slice(0, 48)}`, repeated || 'no throw');
 }
 
-// 4. Tier rule: High only, desktop only (Ultra runs the High scene tier).
+// 4. Tier rule: the live cinema profile through the shared tier test (lib/fly/look-tier.js):
+// desktop High/Ultra profiles and their governor rungs only (scripts/verify-look-tier.mjs covers every name).
 const u = LOOK_FACADE_UNIFORMS.uLookFacade;
-for (const [tier, want] of [['high', 1], ['medium', 0], ['low', 0], ['ultra', 0], [undefined, 0]]) {
-  setLookFacadeTier(tier);
-  ok(u.value === want, `desktop tier ${tier}: uLookFacade ${want}`);
+for (const [profile, want] of [['high', 1], ['high-balanced', 1], ['ultra', 1], ['ultra-balanced', 1], ['medium', 0], ['low', 0], ['phone', 0], [undefined, 0]]) {
+  setLookFacadeProfile(profile === undefined ? undefined : { name: profile });
+  ok(u.value === want, `desktop profile ${profile}: uLookFacade ${want}`);
 }
 globalThis.window = { matchMedia: () => ({ matches: true }), ontouchstart: null, screen: { width: 390, height: 844 }, innerWidth: 390, innerHeight: 844 };
-setLookFacadeTier('high');
-ok(u.value === 0, 'touch device on High: uLookFacade 0 (rule 5 is desktop only)');
+setLookFacadeProfile({ name: 'high' });
+ok(u.value === 0, 'touch device on a High profile: uLookFacade 0 (rule 5 is desktop only)');
 delete globalThis.window;
-setLookFacadeTier('high');
+setLookFacadeProfile({ name: 'high' });
 ok(u.value === 1, 'back on desktop High: uLookFacade 1');
-setLookFacadeTier('medium');
+setLookFacadeProfile({ name: 'medium' });
 
 console.log(`\nverify-look-facade: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

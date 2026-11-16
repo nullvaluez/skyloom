@@ -221,6 +221,27 @@ Owns: the grade and tone section of `components/fly/Effects.jsx`,
     on `main` already. Clouds and water animate, so two runs of the same code
     differ; read `compare/baseline-a__vs__baseline/compare.json` for the floor.
 
+## Tier test
+
+Rule 5 has one implementation: `lookTierAllowed(profile, mobile)` in
+`lib/fly/look-tier.js`. It is true only for the cinema profiles `ultra`,
+`ultra-balanced`, `high` and `high-balanced`, and never on the mobile graphics
+class (`isMobileGraphicsClass()`). Every stream must ask it, with the ACTIVE
+cinema profile (`cinemaProfile()`), never the store's `qualityTier`: the frame
+governor steps the profile's effect rungs (and Battery saver floors them) while
+the store tier stays `high`, so a store-tier test left ATMOS and FACADE on at the
+rungs that resolve to `medium` or `low` while SHADOW, LAYERS and GRADE were off.
+
+Where each stream asks: GRADE `lookGradeWeight()`, SHADOW `lookProfileKey()`,
+LAYERS `lookLayersProfile()`, ATMOS `updateLookAtmos(env, cinemaProfile())`
+from AtmosphereRig, FACADE `setLookFacadeProfile(cinemaProfile())` once a frame
+from SatBuildingLayer. Every answer drives a uniform or a CPU weight; the
+flag-on shader text stays keyed on the flag and the static device class, so a
+governor rung step recompiles nothing. `node scripts/verify-look-tier.mjs`
+feeds every profile name, on desktop and on the mobile class, through the
+predicate and through each stream's gate and asserts they agree. A new stream,
+or a new gate in an old one, uses this predicate and adds itself to that gate.
+
 ## Capture
 
 ```text

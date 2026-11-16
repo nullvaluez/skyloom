@@ -273,7 +273,9 @@ try {
   const hor = probe(ROOT, { ...W0_ON('TERRAIN_SHADOW'), __flyLightDeviceClass: 'phone' });
   const soft = probe(ROOT, { ...W0_ON('TERRAIN_SHADOW'), __flyLightDeviceClass: 'software' });
   check('(1a) desktop path is the depth map, touch is the horizon map, software is refused', map.mode === 'map' && hor.mode === 'horizon' && soft.mode === null, `${map.mode}/${hor.mode}/${soft.mode}`);
-  check('(1b) flag on: the key adds the shadow path and uniform DFG tokens', map.earth.key.replace('|ts-map-v1|dfg-uniform-v1', '') === cur.earth.key && hor.earth.key.replace('|ts-horizon-v1|dfg-uniform-v1', '') === cur.earth.key
+  // LOOK PASS B (SHADOW): its soft desktop receiver extends the depth-map token to
+  // `|ts-map-v1-ls<digit>` (terrainShadowKey; the horizon path never carries it).
+  check('(1b) flag on: the key adds the shadow path and uniform DFG tokens', map.earth.key.replace(/\|ts-map-v1(?:-ls\d)?\|dfg-uniform-v1/, '') === cur.earth.key && hor.earth.key.replace('|ts-horizon-v1|dfg-uniform-v1', '') === cur.earth.key
     && count(map.earth.key, '|ts-map-v1') === 1 && count(hor.earth.key, '|ts-horizon-v1') === 1, map.earth.key.slice(-60));
   for (const [name, arm] of [['map', map], ['horizon', hor]]) {
     const t = arm.earth.text;
