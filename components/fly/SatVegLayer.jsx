@@ -47,6 +47,8 @@ import { SatParcelHomes } from './SatParcelHomes';
 import { SatTintLayer } from './SatTintLayer';
 import { stylizedEarthOn } from '@/lib/fly/stylized-earth';
 import { trueHorizontalK } from '@/lib/fly/true-scale';
+import { worldPassOn } from '@/lib/fly/world-pass'; // WORLD PASS E (GROUND)
+import { WpCanopyLayer } from './WpCanopyLayer';
 
 // --- Round 24 — C MOTION's spec, B's call sites -----------------------------
 // settle.js through a NAMESPACE import: `groundElevVis`/`motionSubOn` are C's
@@ -180,6 +182,10 @@ export function SatVegLayer({ runtime, flight }) {
       ? SAT_GROUND_LIFE.poolHigh
       : basePool;
   const maxChunks = SAT_VEG.maxChunksByTier[poolTier] ?? 0;
+  // WORLD PASS E (GROUND), M1: latched once. On, WpCanopyLayer is the one tree
+  // placer and the legacy canopy pool below is never mounted (LivingForest
+  // stands down in the same session). Off: this file's legacy path, unchanged.
+  const wpTrees = useMemo(() => worldPassOn('ground', 'trees'), []);
   // maxChunks × perChunkCap ≤ pool BY CONSTRUCTION: the pool can therefore
   // never bind, which makes a pool cut (a hard radius that pops as the player
   // moves) impossible rather than merely unlikely.
@@ -431,7 +437,8 @@ export function SatVegLayer({ runtime, flight }) {
 
   return (
     <>
-      {pool > 0 && (
+      {wpTrees && <WpCanopyLayer engine={engine} runtime={runtime} flight={flight} tier={tier} />}
+      {pool > 0 && !wpTrees && (
         <instancedMesh
           ref={(m) => {
             meshRef.current = m;
