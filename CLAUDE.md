@@ -7,6 +7,23 @@
 >   Enhanced Satellite is the default on every device
 >   (`VISUALS.defaultProfile:'enhanced'`), and `R25_SKY` / `R25_GROUND` ship
 >   `enabled:true`.
+> - **Look Pass (2026-11-14 to 16, owner-requested, MERGED and pushed to `main`
+>   with all five flags ON):** [FLY_LOOK_PASS.md](FLY_LOOK_PASS.md) is the plan
+>   and the record. A visual pass on the Enhanced look for desktop High and
+>   Ultra: air and distance haze (`LOOK_ATMOS`), long sun shadows, city
+>   occlusion and cloud shadows (`LOOK_SHADOW`), building materials and night
+>   windows (`LOOK_FACADE`), cirrus and cloud shading (`LOOK_LAYERS`; its
+>   horizon cloud bank ships off), and the grade, golden hour and water sun path
+>   (`LOOK_GRADE`). Each is read only through `lib/fly/look-<stream>.js`, and
+>   all five gate on ONE predicate, `lookTierAllowed` in `lib/fly/look-tier.js`
+>   (Medium, phone and Low keep the previous pixels); a new look term must use
+>   it. `?flags=-LOOK_NAME` restores the previous look per stream for one page
+>   load. Gates: `scripts/verify-look-*.mjs` (not yet in `verify:beta`).
+>   Capture and compare tools: `scripts/look-pass-capture.cjs` and
+>   `look-pass-compare.cjs`; when judging golden hour, include the poses that
+>   face the low sun (`*-sun`). The owner's motion check on the RTX 5080 is
+>   open; the record's run list starts with building shimmer over Manhattan at
+>   golden hour.
 > - **Ship Pass (2026-10-30, MERGED to `main` with EVERY flag ON at the owner's
 >   request — FLY_SHIP_PASS.md 8.5 is the merge record):** the five streams were
 >   stopped mid-verification and their committed heads merged; all 21 flags

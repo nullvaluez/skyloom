@@ -268,3 +268,176 @@ creeps forward); it must stay within 1.25x of the baseline value for that shot.
 
 Each stream keeps `scripts/look-pass-<stream>.md`: what was wrong (measured),
 what changed, what was tried and rejected, the dials, gates run, cost notes.
+
+## Record (closed 2026-11-16)
+
+Shipped on `main` with all five flags on, desktop High and Ultra only.
+`?flags=-LOOK_ATMOS,-LOOK_SHADOW,-LOOK_FACADE,-LOOK_LAYERS,-LOOK_GRADE`
+restores the previous look for one page load; any one flag can be turned off
+by itself the same way.
+
+### How it was run
+
+Five Opus implementers, one per stream, each in its own worktree and dev
+server, with two Sonnet reviewers (an art critic who judged frames only and a
+code auditor) and the orchestrator merging and capturing. Every claim was
+judged on frames from the owner's RTX 5080.
+
+| Step | What happened |
+|---|---|
+| Rounds 1 and 2 | Each stream built and revised alone, reviewed alone. Merged as `6fa88478`. |
+| First merged review | 81% of pixels changed against baseline; art critic "revise" (impact 3.5, taste 3.4). The streams stacked: golden hour 44 to 67 luma over baseline, a cream white-out toward the sun, the horizon cloud bank read as drawn arches, the Manhattan noon foreground 47 below baseline. |
+| Round 3, balancing | Each owner worked on top of the merged tree with the review's items. |
+| Close-out and must-fixes | Shimmer, cloud bases, the Medium leak. Final art review of that frame: taste 4.2, one must-fix (brown noon cloud bases), fixed. |
+| One tier test | `lib/fly/look-tier.js` replaced five different High/Ultra tests. Audit: pass. |
+| Sign-off | Art critic: ship (impact 4.3, taste 4.0, no blockers). Code auditor: one blocker, the soft terrain shadow filter running on Medium, fixed afterwards (see "Lower tiers"). |
+
+### What a player sees
+
+- Air: distance softens into sky-coloured haze from about 3 km, golden hour
+  has a glowing far field, valleys hold mist in the evening.
+- Shadows: street canyons are shaded at noon, clouds shadow the ground, and
+  trees, houses and terrain throw long shadows at golden hour.
+- Buildings: varied wall tones and glass by day, floor lines, lit faces
+  against shaded ones at low sun, dark walls with discrete lit windows at
+  dusk and night.
+- Sky: cirrus at noon, a light high layer at golden hour away from the sun,
+  shaded cloud bases in cool grey.
+- Grade: deeper noon sky and richer land and water, a warm key and cool fill
+  at golden hour, a blue hour at dusk, a sun path on water.
+
+### Measured on the final frame
+
+Labels `merged-3` (28 shots) and `sun-merged-3` (10 toward-the-sun shots),
+tree `e8388154`, no render errors.
+
+- Golden hour, standard poses: frame luma 16 to 31 over baseline (it was 44
+  to 67 in the first merge).
+- Toward the low sun at golden hour, against the old look (`sun-off`): Rio 0,
+  cruise -7, skyline -9, Powell -6, Yosemite -4 (they were +55 to +84 and
+  washed out). The sign-off art review read all five as richer than the old
+  look, not darker. This was the owner's direct request ("fix the overcooked
+  golden hour in Rio and any similar spot"). Only `rio` faced the low sun in
+  the original shot list; `nyc-skyline-sun`, `powell-sun`, `yosemite-sun` and
+  `nyc-cruise-sun` were added to the capture tool for it.
+- Manhattan noon foreground: lower third 25 below baseline (47 in the first
+  merge).
+- Shimmer, pass off against pass on in one session (`fin3-off`, `fin3-on`):
+  nyc-street golden 0.40 to 0.69 (1.73x), dusk 1.01 to 1.22, noon 1.21 to
+  1.47, skyline toward the sun 0.87 to 0.79, Powell toward the sun 0.31 to
+  0.26. The golden-hour street ratio is over the 1.25 working limit. The
+  sign-off audit ruled it should not hold the release: each stream alone is
+  inside the limit (FACADE 1.17x, GRADE 1.24x, SHADOW 1.07x), no code defect
+  explains it, the absolute value is below the same pose at noon in the old
+  look, and the metric counts luma jumps over 30, which rises with
+  lit-against-shaded contrast on unchanged edges. It is the first item of the
+  owner's motion check.
+- Cost: no new pass or render target. Triangles are 13 to 27% over baseline
+  in the city, at the harbour and at Rio, from the longer shadow cascade reach
+  (`LOOK_SHADOW.reach`, 1 = 8 km on Ultra and 5 km on High).
+- Gates: `npm run verify:beta` passes, the production build passes, and
+  `npm run smoke:beta` passes 27 of 27 on the RTX 5080. The six look gates
+  pass: `verify-look-atmos`, `-grade`, `-shadow`, `-facade`, `-layers`,
+  `-tier`.
+
+### Lower tiers
+
+Medium, phone and Low keep the previous pixels. All five streams ask one
+predicate, `lookTierAllowed` in `lib/fly/look-tier.js`: the cinema profile is
+`ultra`, `ultra-balanced`, `high` or `high-balanced`, and the device is not in
+the mobile class. Two consequences: on governor steps that drop the profile to
+medium or low while the stored tier is still high, the whole look now switches
+off together (haze and facades used to stay on); and a touch tablet whose
+benchmark grants desktop effects gets the previous look, not a partial one.
+
+Two leaks to the lower tiers were found by audits and fixed, both in SHADOW:
+the low-sun fill and key change (round 3, fixed in the close-out), and the
+soft terrain shadow filter (20 depth taps where there were 4, wider at low
+sun), which was compiled in for every tier. The second was live on `main` in
+`9cc6594c` for about an hour before `0b756552` put it behind a uniform written
+from the same predicate. Proof after the fix, desktop Medium, all five flags on
+against all off: 0.3% of pixels changed at Powell's golden hour and 0.9% over
+Manhattan, against a same-flags floor of 0.2% and 0.4%. A Medium capture has to
+wait for the terrain shadow map to fill, or it reads clean when it is not: the
+orchestrator's first Medium check missed this leak that way.
+
+Known cost that remains on lower tiers: the new shader text is compiled there
+and skipped at run time, because no material knows its tier when it is built.
+GitHub CI's smoke test runs on software rendering and has timed out since
+before this pass; with the larger programs it now times out earlier.
+
+### The dials to reach for first
+
+| Symptom | Dial |
+|---|---|
+| Buildings sparkle in motion at golden hour or dusk | `LOOK_GRADE.contrastLow` (0.10; lower is calmer), `LOOK_SHADOW.lowSun.key` (0.2), `LOOK_FACADE.day.lowSunEase`; `?flags=-LOOK_GRADE` to confirm the cause |
+| Frame time at the harbour, Rio or over the city | `LOOK_SHADOW.reach` (0.75 brings Ultra to 6 km) |
+| Golden hour too bright or too flat | `LOOK_GRADE` golden lift (0.22 stop) and `contrastLow` |
+| Too much or too little haze | `LOOK_ATMOS.density`, `LOOK_ATMOS.mistLevel` |
+| Manhattan street canyons too dark or too light at noon | `LOOK_SHADOW.occlusion` (0.1) |
+| Horizon cloud bank | `LOOK_LAYERS.bank` (0 = off, as shipped) |
+
+### Owner's run list (RTX 5080, in flight)
+
+1. Manhattan at golden hour and at dusk, low and slow: do the building edges
+   and glass faces sparkle? Compare with `?flags=-LOOK_GRADE`.
+2. Fly toward a low sun at Rio, over Manhattan and at cruise, then turn away:
+   exposure eases by about a stop over about a second. Does it feel like
+   adaptation or like a pump?
+3. Golden-hour cirrus away from the sun, while turning: does it swim?
+4. Frame time at the harbour, Rio and over Manhattan against the previous
+   build (the longer shadow reach).
+5. Force a quality step down in flight: haze and facades switch off in one
+   frame while the grade eases over half a second. Is there a visible pop?
+6. First-flight compile hitch: the terrain shadow and architecture program
+   keys changed.
+
+### Follow-ups
+
+- The horizon cloud bank is off. Three attempts read as drawn shapes; it needs
+  a rebuild on the cloud noise, not on analytic domes.
+- A flat, hard-topped pale haze band at noon (Rio, Powell, Manhattan and from
+  cruise). ATMOS measured that its layer does not draw it; the owner of that
+  band is not yet identified.
+- `powell__night`: the lit road is fainter than before the pass.
+- Dusk reads uniformly blue; a little warm key on lit faces would help.
+- `alps__noon`: a dusty tone remains at the foot of the large near cloud; it
+  comes from the cloud composite, not the march.
+- Yosemite's cliff shadow edge needs a finer terrain shadow map on High and
+  Ultra to be clean.
+- Lower tiers compile the look's shader text. Leaving it out needs the tier at
+  material build time.
+- The sign-off art review's small grading notes: a little golden contrast back
+  on the Manhattan lit faces, a slightly stronger soft glint and sun path
+  toward the sun.
+- Add `verify-look-tier.mjs` and the other look gates to `npm run
+  verify:beta`.
+- Gates outside the CI set that are red for reasons older than this pass (they
+  fail the same way with all five flags off): `verify-play-city` (5),
+  `verify-ship-city` (3), `verify-ship-light` 0a and 0b, `verify-ship-sky`
+  SK-3 l and TEXT a, `verify-living-sky` 1c.
+
+### Evidence
+
+Under `.graphics-review/look-pass/` (not in git): `baseline` and `sun-off`
+(before), `merged-1`, `merged-2`, `merged-3`, `sun-merged-1` to `-3`, the
+per-stream rounds `<stream>-r1` to `-r5`, and `compare/<a>__vs__<b>/` with a
+`sheet.jpg`, one pair per shot and `compare.json`. Start with
+`compare/baseline__vs__merged-3/sheet.jpg` and
+`compare/sun-off__vs__sun-merged-3/sheet.jpg`.
+
+### Lessons
+
+- Review the combined frame early. Every stream passed alone; the first merge
+  was where the look broke, in five places at once.
+- A shot list that never faces the sun cannot find a problem that only exists
+  facing the sun. One pose out of seven did, by accident.
+- Shimmer is measured in one session with a flag toggled. The stored baseline
+  for a pose that is still streaming reads about twice the settled value.
+- A ratio limit on a threshold metric penalises contrast. Read the absolute
+  number next to it.
+- Saving a source file during a capture hot-reloads the page and the frame
+  comes out blank. The capture tool now detects that and retries.
+- Do not move the tree an auditor is reading.
+- A workflow resume replays only the unchanged prefix of agent calls. Editing
+  an early prompt re-runs everything after it.
