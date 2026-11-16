@@ -113,8 +113,10 @@ export function SatSkylineLayer({ runtime, flight }) {
     });
   }, [engine]);
 
-  useFrame(({ clock }) => {
+  useFrame(({ clock, camera, size }) => {
     const t = clock.elapsedTime;
+    // WORLD PASS C (REACH): the camera's focal length in CSS px (a no-op with the stream off).
+    if (camera?.isPerspectiveCamera) engine.setStandInView(size.height / (2 * Math.tan((camera.fov * Math.PI) / 360)), runtime.origin?.anchor);
     nowRef.current = t;
     const eyeAgl = eyeAglVis(runtime, flight); // R24 B (GROUND_VIS)
     const gVis = groundElevVis(runtime, flight);
