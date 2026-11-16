@@ -162,5 +162,36 @@ const OFF = { ...LOOK_SHADOW, enabled: false };
 // (8) r3 terrain shadow soft edge: flag on only
 check('(8) terrain shadow soft edge with the flag on only', LS.lookShadowTerrainSoft(ON) === true && LS.lookShadowTerrainSoft(OFF) === false);
 
+// (8b) sign-off fix (rule 5): the soft ring is gated at run time by the shared
+// tier test. Off (uTsSoft 0, the original 2x2 PCF) for Medium, Low and every
+// phone profile; on for Ultra, Ultra-balanced, High and High-balanced; 0
+// everywhere with the flag off. The shader text carries the branch on the uniform.
+{
+  const offNames = ['medium', 'low', 'phone', 'phone-low', 'phone-balanced', 'phone-economy', 'phone-lean'];
+  const onNames = ['ultra', 'ultra-balanced', 'high', 'high-balanced'];
+  const byName = Object.fromEntries(Object.values(CINEMA_PROFILES).map((p) => [p.name, p]));
+  const g = (n, cfg = ON) => LS.lookShadowTerrainSoftGate(byName[n], cfg);
+  const badOff = offNames.filter((n) => !byName[n] || g(n) !== 0), badOn = onNames.filter((n) => !byName[n] || g(n) !== 1);
+  const badFlag = Object.keys(byName).filter((n) => g(n, OFF) !== 0);
+  check('(8b) terrain soft ring: off for medium, low and phone; on for ultra, ultra-balanced, high, high-balanced; off with the flag off',
+    !badOff.length && !badOn.length && !badFlag.length && LS.lookShadowTerrainSoftGate(null, ON) === 0,
+    `${badOff.length ? `ON at ${badOff} ` : ''}${badOn.length ? `OFF at ${badOn} ` : ''}${badFlag.length ? `flag-off ON at ${badFlag}` : ''}`);
+  if (LS.lookShadowTerrainSoft()) {
+    const TS = await imp('lib/fly/terrain-shadow.js');
+    const t = TS.terrainShadowGLSL('map');
+    const stub = 'uniform sampler2D uEarthAppearance;\n#include <lights_fragment_end>\nfloat coastWeight=';
+    const shader = { uniforms: {}, fragmentShader: stub };
+    TS.applyTerrainShadowPatch(shader, 'map');
+    const hz = { uniforms: {}, fragmentShader: stub };
+    TS.applyTerrainShadowPatch(hz, 'horizon');
+    check('(8c) receiver: one uTsSoft branch around the four footprints and tsR; the 2x2 PCF runs first, unconditionally; uniform bound on the map path only',
+      t.split('if(uTsSoft>0.){').length === 2 && t.split('uniform float uTsSoft;').length === 2 && t.indexOf('float lit=mix(') < t.indexOf('if(uTsSoft>0.){')
+        && t.indexOf('if(uTsSoft>0.){') < t.indexOf('float tsR=') && t.indexOf('tsPcf(c.xy') > t.indexOf('if(uTsSoft>0.){')
+        && shader.uniforms.uTsSoft === LS.lookShadowTerrainSoftUniform && hz.uniforms.uTsSoft === undefined && !TS.terrainShadowGLSL('horizon').includes('uTsSoft')
+        && TS.terrainShadowKey('map').endsWith('-ls5') && !TS.terrainShadowKey('horizon').includes('-ls'),
+      TS.terrainShadowKey('map'));
+  }
+}
+
 console.log(`\nverify-look-shadow: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
