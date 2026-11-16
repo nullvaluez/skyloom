@@ -81,8 +81,11 @@ const runArm = name => {
 const off = runArm('off'), on = runArm('on'), independent = runArm('independent'), look = runArm('look');
 check('LOOK_FACADE on: both rings assemble its day and night edits under their own key', () => {
   for (const [name, p] of Object.entries(look)) {
-    assert.equal(p.key.replace('|look-facade-v2', ''), on[name].key, name);
-    assert.ok(p.key.includes('|look-facade-v2'), name);
+    assert.equal(p.key.replace('|look-facade-v3', ''), on[name].key, name);
+    assert.ok(p.key.includes('|look-facade-v3'), name);
+    // r3: distance retire of the pane/floor pattern, the far-skyline lift, the low-sun knee, houses keep their glow.
+    assert.ok(p.fs.includes('float lfFadeD=') && p.fs.includes('float lfFadeK=') && p.fs.includes('float lfKeep='), `${name} r3 night/day terms`);
+    if (p.fs.includes('float lfDay=') && p.fs.includes('float realGlassMask=')) assert.ok(p.fs.includes('float lfKO='), `${name} low-sun knee`);
     assert.ok(p.fs.includes('float lfE1='), `${name} night`);
     // The day edit needs the realism albedo; Classic programs keep it but cityDay is 0 there.
     assert.ok(p.fs.includes('float lfDay='), `${name} day`);
