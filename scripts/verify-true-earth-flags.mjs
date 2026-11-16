@@ -11,6 +11,8 @@
  *       no-op — the R24 "pre-set and read by NOTHING" lesson.
  *  (6)   the device report (lib/fly/device-report.js FLAGS) lists every block,
  *       so a report always says which flags were on.
+ * (8-9) WORLD PASS: one reader (lib/fly/world-pass.js), never named in the
+ *       worker, and the reader's latched tier test.
  *
  * Run: node scripts/verify-true-earth-flags.mjs
  */
@@ -143,6 +145,114 @@ check(
     stray.length === 0 && noEnabled.length === 0,
     stray.length || noEnabled.length ? `stray: ${stray.join(' | ')}; no enabled: ${noEnabled.join(', ')}` : `${blocks.length} blocks`,
   );
+}
+
+// (8) WORLD PASS (FLY_WORLD_PASS.md, rules 1-3): the five WORLD_* blocks have
+//     exactly ONE pinned reader, lib/fly/world-pass.js; only that file and the
+//     device report import them; the worker (vector-tile.worker.js and
+//     lib/fly/toy-world/worker/**) never names them, because a worker has no
+//     pins and must take the resolved values from the build request.
+{
+  const WP = blocks.filter((b) => /^WORLD_/.test(b));
+  const files = [];
+  for (const dir of ['lib', 'components', 'app', 'hooks', 'stores']) {
+    const walk = (d) => {
+      for (const f of readdirSync(d)) {
+        const p = path.join(d, f);
+        if (f === 'node_modules' || f === 'vendor') continue;
+        if (statSync(p).isDirectory()) walk(p);
+        else if (/\.(m?js|jsx)$/.test(f) && !p.endsWith('fly-constants.js')) files.push([path.relative(ROOT, p).split(path.sep).join('/'), readFileSync(p, 'utf8')]);
+      }
+    };
+    walk(path.join(ROOT, dir));
+  }
+  const problems = [];
+  for (const b of WP) {
+    const readers = files.filter(([, t]) => new RegExp(`pinned\\(\\s*${b}\\s*,`).test(t)).map(([f]) => f);
+    if (readers.length !== 1 || readers[0] !== 'lib/fly/world-pass.js') problems.push(`${b} readers: ${readers.join(', ') || 'none'}`);
+    const importers = files.filter(([, t]) => new RegExp(`import\\s*\\{[^}]*\\b${b}\\b[^}]*\\}\\s*from\\s*['"][^'"]*fly-constants`).test(t)).map(([f]) => f);
+    const stray = importers.filter((f) => f !== 'lib/fly/world-pass.js' && f !== 'lib/fly/device-report.js');
+    if (stray.length) problems.push(`${b} imported by ${stray.join(', ')}`);
+    const inWorker = files.filter(([f, t]) => (f === 'lib/fly/toy-world/vector-tile.worker.js' || f.startsWith('lib/fly/toy-world/worker/')) && new RegExp(`\\b${b}\\b`).test(t)).map(([f]) => f);
+    if (inWorker.length) problems.push(`${b} named in the worker: ${inWorker.join(', ')}`);
+  }
+  check('(8) every WORLD PASS block has one reader (lib/fly/world-pass.js) and the worker never names it', WP.length === 5 && problems.length === 0, problems.length ? problems.join(' | ') : `${WP.length} blocks`);
+}
+
+// (8b) WORLD PASS, the worker half of the request (W0-C): the worker's own
+//      all-off copy (lib/fly/toy-world/worker/tile-ctx.js OFF_STREAMS, which it
+//      keeps because it cannot import the store-reading reader) names the same
+//      streams and sub-switches, in the same order, as lib/fly/world-pass.js
+//      WORLD_PASS_STREAMS; and `options.worldPass` is read in tile-ctx.js only
+//      (every builder takes tileCtx.worldPass).
+{
+  const W = await import('../lib/fly/world-pass.js');
+  const ctxSrc = readFileSync(path.join(ROOT, 'lib/fly/toy-world/worker/tile-ctx.js'), 'utf8');
+  const m = /const OFF_STREAMS = (\{[\s\S]*?\n\});/.exec(ctxSrc);
+  let off = null;
+  try {
+    off = m ? new Function(`return (${m[1]});`)() : null;
+  } catch {
+    off = null;
+  }
+  const want = Object.fromEntries(Object.entries(W.WORLD_PASS_STREAMS).map(([s, d]) => [s, [...d.subs]]));
+  const same = off !== null && JSON.stringify(off) === JSON.stringify(want);
+  const workerDir = path.join(ROOT, 'lib/fly/toy-world/worker');
+  const readers = [];
+  const walk = (d) => {
+    for (const f of readdirSync(d)) {
+      const p = path.join(d, f);
+      if (statSync(p).isDirectory()) walk(p);
+      else if (/\.m?js$/.test(f) && /options\??\.worldPass/.test(readFileSync(p, 'utf8'))) readers.push(path.relative(ROOT, p).split(path.sep).join('/'));
+    }
+  };
+  walk(workerDir);
+  const workerMain = readFileSync(path.join(ROOT, 'lib/fly/toy-world/vector-tile.worker.js'), 'utf8');
+  if (/options\??\.worldPass/.test(workerMain)) readers.push('lib/fly/toy-world/vector-tile.worker.js');
+  const readersOk = readers.length === 1 && readers[0] === 'lib/fly/toy-world/worker/tile-ctx.js';
+  check(
+    '(8b) the worker\'s all-off request matches the reader\'s streams, and only tile-ctx.js reads options.worldPass',
+    same && readersOk,
+    `${same ? 'schema same' : `schema drift: worker ${JSON.stringify(off)} vs reader ${JSON.stringify(want)}`}; options.worldPass read in: ${readers.join(', ') || 'none'}`
+  );
+}
+
+// (9) the World Pass reader: off by default; ?flags=NAME is on only at a
+//     desktop High/Ultra boot preset; Medium and the mobile class get the
+//     all-off request; the latch survives a governor tier step.
+{
+  const W = await import('../lib/fly/world-pass.js');
+  const { useFlyStore } = await import('../stores/fly-store.js');
+  const st = useFlyStore.getState();
+  const prev = { preset: st.qualityPreset, tier: st.qualityTier };
+  const run = (preset, pins) => {
+    globalThis.window = { matchMedia: () => ({ matches: false }), ...pins };
+    st.setQualityPreset(preset);
+    W.__resetWorldPassLatchForTests();
+    const r = { req: W.worldPassRequest(), key: W.worldPassKey(), allowed: W.worldPassTierAllowed() };
+    st.setQualityTier('low'); // a governor step after the latch
+    r.after = W.worldPassRequest();
+    delete globalThis.window;
+    return r;
+  };
+  const off = run('ultra', {});
+  const on = run('ultra', { __flyWorldTruthOverride: { enabled: true } });
+  const onHigh = run('high', { __flyWorldTruthOverride: { enabled: true } });
+  const med = run('medium', { __flyWorldTruthOverride: { enabled: true } });
+  const mob = run('high', { __flyWorldTruthOverride: { enabled: true }, __flyWorldPassTierOverride: { mobile: true } });
+  const all = run('ultra', Object.fromEntries(['Truth', 'Arrival', 'Reach', 'Look', 'Ground'].map((n) => [`__flyWorld${n}Override`, { enabled: true }])));
+  W.__resetWorldPassLatchForTests();
+  st.setQualityPreset(prev.preset);
+  st.setQualityTier(prev.tier);
+  const allOff = (r) => r.key === 'wp1-0' && r.req.any === false && r.req.tier === null && Object.keys(W.WORLD_PASS_STREAMS).every((s) => Object.entries(r.req[s]).every(([k, v]) => (k === 'worker' ? v === null : v === false)));
+  const ok =
+    allOff(off) && off.allowed &&
+    on.req.truth.on && on.req.truth.heights && on.req.tier === 'ultra' && !on.req.arrival.on && on.after === on.req && Object.isFrozen(on.req.truth) &&
+    onHigh.req.truth.on && onHigh.req.tier === 'high' && onHigh.key !== on.key &&
+    allOff(med) && !med.allowed && allOff(mob) && !mob.allowed &&
+    Object.keys(W.WORLD_PASS_STREAMS).every((s) => all.req[s].on) &&
+    JSON.stringify(structuredClone(on.req)) === JSON.stringify(on.req);
+  check('(9) world-pass reader: all-off by default, ?flags=WORLD_TRUTH on at desktop High/Ultra only, latched', ok, `off ${off.key}; on ${on.key}; high ${onHigh.key}; medium ${med.key}; mobile ${mob.key}; all ${all.key}`);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

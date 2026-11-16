@@ -7,6 +7,20 @@
 >   Enhanced Satellite is the default on every device
 >   (`VISUALS.defaultProfile:'enhanced'`), and `R25_SKY` / `R25_GROUND` ship
 >   `enabled:true`.
+> - **World Pass (2026-11-16, owner-requested, IN PROGRESS on branch
+>   `phresh/mystifying-curran-97a006`, not on `main`):**
+>   [FLY_WORLD_PASS.md](FLY_WORLD_PASS.md) is the plan and the record. How the
+>   Enhanced satellite world is generated on desktop High and Ultra (buildings,
+>   far city, trees, ground contact) so every place looks like itself. Five
+>   flags, all `enabled:false`: `WORLD_TRUTH`, `WORLD_ARRIVAL`, `WORLD_REACH`,
+>   `WORLD_LOOK`, `WORLD_GROUND`, read only through `lib/fly/world-pass.js`
+>   (tier latched once per page from the boot preset and device class, never
+>   the governor). The worker never reads a flag: it reads the resolved request
+>   (`worldPass: worldPassRequest()` in every build, `tileCtx.worldPass` in the
+>   builders now split into `lib/fly/toy-world/worker/`). W0 (seams, protocol
+>   25, opt-in stage counters) is done; with the flags off the worker output is
+>   byte-identical to `c2bf5c06` but for the protocol number
+>   (`scripts/world-pass-worker-proof.mjs`). The five streams have not started.
 > - **Look Pass (2026-11-14 to 16, owner-requested, MERGED and pushed to `main`
 >   with all five flags ON):** [FLY_LOOK_PASS.md](FLY_LOOK_PASS.md) is the plan
 >   and the record. A visual pass on the Enhanced look for desktop High and

@@ -17,6 +17,11 @@
  *       failure, never a fetch) and compare with <label>.json. Exit 1 on any
  *       difference, naming the case and the field.
  *   --only <substring>   restrict to cases whose id contains the substring.
+ *   --ignore-protocol    compare with the top-level `v` (WORKER_PROTOCOL) of
+ *                        every result masked, on both sides, and report the
+ *                        protocol pairs seen instead. ONLY that field: a
+ *                        nested `v` and every other byte still count.
+ *   --no-stages          skip the `+stages` cases (a worker that predates them).
  *   --worker <path>      build with another worker file (default: the tree's), e.g. a
  *                        `git archive c2bf5c06 lib stores hooks` export; `@/` resolves there.
  *
@@ -25,6 +30,12 @@
  * sharp behind a minimal OffscreenCanvas / createImageBitmap polyfill, so the
  * worker's WorldCover path runs (in a bare node it would return null).
  * Timing fields (`tessMs`) are excluded; everything else is compared.
+ *
+ * STAGE CASES (W0-C): `.../+stages` cases build with the worker's diag switch
+ * on (the opt-in stage counters, lib/fly/toy-world/worker/stages.js). They are
+ * not in any baseline; --check proves instead that the result WITHOUT its
+ * `wpStages` key is byte-identical to its diag-off sibling built in the same
+ * run, i.e. the counters add one key and change nothing else.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -44,6 +55,8 @@ const arg = (name) => {
 const saveLabel = arg('--save');
 const checkLabel = arg('--check');
 const only = arg('--only');
+const ignoreProtocol = argv.includes('--ignore-protocol');
+const noStages = argv.includes('--no-stages'); // e.g. a --worker from before the stage counters
 const workerPath = path.resolve(ROOT, arg('--worker') ?? 'lib/fly/toy-world/vector-tile.worker.js');
 if (!saveLabel === !checkLabel) {
   console.error('usage: --save <label> | --check <label> [--only <substr>] [--worker <path>]');
@@ -298,7 +311,29 @@ function buildCases() {
       if (name === 'midtown' || name === 'powell-oh') cases.push({ id: `${tag}/14/full/toy`, z: 14, x, y, detail: 'full', options: {}, patch });
     }
   }
-  return only ? cases.filter((c) => c.id.includes(only)) : cases;
+  // STAGE CASES: diag on, compared against the diag-off sibling (see header).
+  const STAGE_PLACES = new Set(['midtown', 'paris', 'tokyo', 'phoenix-suburb', 'powell-oh', 'owens', 'lagos']);
+  for (const [name, lat, lon] of PLACES) {
+    if (noStages || !STAGE_PLACES.has(name)) continue;
+    const [x, y] = tileOf(lat, lon, 14);
+    const tag = `${name}/14/${x}/${y}`;
+    cases.push({ id: `${tag}/sat-buildings/enh+stages`, z: 14, x, y, detail: 'sat-buildings', options: BUILDING_VARIANTS[0][1], diag: true, stagesOf: `${tag}/sat-buildings/enh` });
+    cases.push({ id: `${tag}/sat-buildings/novisuals+stages`, z: 14, x, y, detail: 'sat-buildings', options: BUILDING_VARIANTS[2][1], diag: true, stagesOf: `${tag}/sat-buildings/novisuals` });
+    cases.push({ id: `${tag}/sat-skyline/enh-high+stages`, z: 14, x, y, detail: 'sat-skyline', options: SKYLINE_VARIANTS[0][1], diag: true, stagesOf: `${tag}/sat-skyline/enh-high` });
+    cases.push({ id: `${tag}/sat-skyline/classic-plain+stages`, z: 14, x, y, detail: 'sat-skyline', options: SKYLINE_VARIANTS[4][1], diag: true, stagesOf: `${tag}/sat-skyline/classic-plain` });
+  }
+  const kept = only ? cases.filter((c) => c.id.includes(only)) : cases;
+  // a stage case needs its sibling in the same run
+  const ids = new Set(kept.map((c) => c.id));
+  for (const c of kept.slice()) {
+    if (!c.stagesOf || ids.has(c.stagesOf)) continue;
+    const sib = cases.find((d) => d.id === c.stagesOf);
+    if (sib) {
+      kept.unshift(sib);
+      ids.add(sib.id);
+    }
+  }
+  return kept;
 }
 
 // --- canonical fingerprint ------------------------------------------------------
@@ -356,6 +391,7 @@ if (!api?.buildTile) {
 }
 const cases = buildCases();
 const results = {};
+const stageResults = {};
 let errors = 0;
 for (const c of cases) {
   const tc = performance.now();
@@ -383,6 +419,12 @@ for (const c of cases) {
     if (c.diag) await api.setDiag(false);
     for (const [obj, key, val] of undo.reverse()) obj[key] = val;
   }
+  if (c.stagesOf) {
+    const stages = r?.wpStages;
+    const rest = r && typeof r === 'object' ? Object.fromEntries(Object.entries(r).filter(([k]) => k !== 'wpStages')) : r;
+    stageResults[c.id] = { of: c.stagesOf, stages: stages ?? null, ...fingerprint(rest) };
+    continue;
+  }
   const fp = fingerprint(r);
   const nb = Object.keys(fp.buffers).length;
   results[c.id] = { ...fp, ms: Math.round(performance.now() - tc) };
@@ -402,6 +444,15 @@ if (recording) {
 const base = JSON.parse(fs.readFileSync(path.join(PROOF, `${checkLabel}.json`), 'utf8')).results;
 let diff = 0;
 let same = 0;
+// --ignore-protocol: mask ONLY the top-level `v` of a result's canonical JSON.
+const protocolPairs = {};
+const maskProtocol = (json) => {
+  const o = JSON.parse(json);
+  if (!o || typeof o !== 'object' || Array.isArray(o) || !('v' in o)) return { json, v: undefined };
+  const v = o.v;
+  o.v = '$protocol';
+  return { json: JSON.stringify(o), v };
+};
 const ids = new Set([...Object.keys(base).filter((id) => !only || id.includes(only)), ...Object.keys(results)]);
 for (const id of ids) {
   const a = base[id];
@@ -414,10 +465,20 @@ for (const id of ids) {
   const bad = [];
   for (const k of new Set([...Object.keys(a.buffers), ...Object.keys(b.buffers)]))
     if (a.buffers[k] !== b.buffers[k]) bad.push(`buffer ${k}: ${a.buffers[k] ?? '-'} -> ${b.buffers[k] ?? '-'}`);
-  if (a.jsonSha !== b.jsonSha) {
+  let aj = a.json;
+  let bj = b.json;
+  if (ignoreProtocol && a.jsonSha !== b.jsonSha) {
+    const ma = maskProtocol(aj);
+    const mb = maskProtocol(bj);
+    aj = ma.json;
+    bj = mb.json;
+    const pair = `${ma.v}->${mb.v}`;
+    protocolPairs[pair] = (protocolPairs[pair] ?? 0) + 1;
+  }
+  if (aj !== bj) {
     let i = 0;
-    while (i < a.json.length && a.json[i] === b.json[i]) i++;
-    bad.push(`json differs at char ${i}: ...${a.json.slice(Math.max(0, i - 80), i + 80)}... vs ...${b.json.slice(Math.max(0, i - 80), i + 80)}...`);
+    while (i < aj.length && aj[i] === bj[i]) i++;
+    bad.push(`json differs at char ${i}: ...${aj.slice(Math.max(0, i - 80), i + 80)}... vs ...${bj.slice(Math.max(0, i - 80), i + 80)}...`);
   }
   if (bad.length) {
     diff += 1;
@@ -425,5 +486,24 @@ for (const id of ids) {
   } else same += 1;
 }
 const nbuf = Object.values(results).reduce((s, r) => s + Object.keys(r.buffers).length, 0);
-console.log(`\n${diff === 0 && missing.length === 0 ? 'IDENTICAL' : 'DIFFERENT'}: ${same}/${ids.size} cases identical, ${nbuf} buffers + ${Object.keys(results).length} meta objects compared against '${checkLabel}'; ${missing.length} unrecorded inputs; ${elapsed.toFixed(1)} s`);
-process.exit(diff === 0 && missing.length === 0 ? 0 : 1);
+// Stage cases: diag-on minus `wpStages` must equal the diag-off sibling.
+let stageBad = 0;
+for (const [id, s] of Object.entries(stageResults)) {
+  const sib = results[s.of];
+  const okSame = !!sib && sib.jsonSha === s.jsonSha && JSON.stringify(sib.buffers) === JSON.stringify(s.buffers);
+  const okHas = !!s.stages && typeof s.stages === 'object';
+  if (!okSame || !okHas) stageBad += 1;
+  const st = s.stages ?? {};
+  const h = st.height;
+  const brief =
+    st.ring === 'near'
+      ? `polys ${st.polygons} clip-${st.clipDropped} floor-${st.areaFloorDropped} (15-70 m2 ${st.areaFloorDropped15to70}) mega-${st.megaDropped} airport-${st.airportDropped} monument-${st.monumentDropped} admitted ${st.admitted}; h mapped ${h?.mapped} synth5 ${h?.untaggedSynth5} untagged ${h?.untagged} | house ${h?.inferredHouse} typo ${h?.inferredTypology} curve ${h?.inferredCurve} | inferred p50/p90 ${h?.inferredP50}/${h?.inferredP90}`
+      : st.ring === 'far'
+        ? `polys ${st.polygons} picked ${JSON.stringify(st.picked)} lock-${st.lockDropped} candidates ${st.candidates} admitted ${st.admitted} bodyCap-${st.bodyCapDropped} triCap-${st.triangleCapDropped} reserve-${st.reserveDropped} degenerate-${st.degenerateDropped} emitted ${st.emittedPolygons}/${st.emittedTriangles} tris`
+        : 'no stages';
+  console.log(`${okSame && okHas ? 'STAGES' : 'STAGES-BAD'} ${id}${okSame ? '' : ' (differs from its diag-off sibling beyond wpStages)'}: ${brief}`);
+}
+if (ignoreProtocol) console.log(`protocol pairs masked (baseline->now): ${JSON.stringify(protocolPairs)}`);
+const okAll = diff === 0 && missing.length === 0 && stageBad === 0;
+console.log(`\n${okAll ? 'IDENTICAL' : 'DIFFERENT'}${ignoreProtocol ? ' (top-level protocol field masked)' : ''}: ${same}/${ids.size} cases identical, ${nbuf} buffers + ${Object.keys(results).length} meta objects compared against '${checkLabel}'; ${Object.keys(stageResults).length} stage cases (${stageBad} bad); ${missing.length} unrecorded inputs; ${elapsed.toFixed(1)} s`);
+process.exit(okAll ? 0 : 1);
