@@ -157,6 +157,25 @@ Shimmer, same session (`layers-r4-off`, `?flags=-LOOK_LAYERS`): powell noon
 0.497 off / 0.476 on, rio noon 0.273 / 0.276, powell golden 0.146 / 0.204
 (both under 0.3). Alps noon was not re-captured (it never settles: r2 notes).
 
+## Round 5 (`layers-r5`, 2026-11-16, final art review: brown noon cloud bases)
+
+The review saw 5919deea (before r4). r4 had already removed most of it (rio 0,
+harbor 171); the leftovers were the half-lit band just above the base (powell,
+street) and the alps foot. Change: `lookCool` now starts at 1-lit 0.02 and is full
+by 0.4 (was 0.1..0.6), and at noon the ground bounce tint is fully greyed (0.8 ->
+1.0 off the low-sun and night weights). Golden, dusk and night are unchanged (both
+terms are gated by the same noon weight). Brown count, upper 330 rows, merged-2 ->
+r5: rio 9,249 -> 0, powell 24,884 -> 1,567 (the rest is 166/162/155, neutral
+light grey), street 8,244 -> 215, harbor 33,012 -> 22. Alps blotch region
+(x 1220-1560, y 420-600) mean RGB 156/152/143 -> 150/152/152; the remaining
+dusty tone there is the cloud-shadowed slope seen through the thin cloud foot
+(its edge follows the ridge behind), in the composite, which LAYERS does not touch.
+merged-2 vs r5 absDiff: alps 1.40, harbor 11.11, street 7.43, powell 7.65,
+rio 7.82 (cloud drift). Shimmer, same session (`layers-r5-off`): powell 0.465 off
+/ 0.443 on, street 1.483 / 1.548 (1.04x), harbor 0.445 / 0.442, rio 0.271 /
+0.271, alps 0.124 / 0.140 (both under 0.3). Gates as r4 (21/21, 8/8, 6/6, 12/12,
+14/14, 4/4; living-sky 20/1 1c, ship-sky 47/2 SK-3 l + TEXT a), eslint clean.
+
 ## Dials (`LOOK_LAYERS`)
 
 `volume`, `bank`, `high` (0 = that layer exactly as before, shader text
