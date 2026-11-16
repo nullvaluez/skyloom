@@ -109,13 +109,80 @@ phone and Low get the identity uniforms.
      0.65 x the night weight (yosemite__night's black hole). The night weight
      now rides the volume dial too (it rode only the bank).
 
+7. **Round 4 (2026-11-16, close-out on the balanced frame, base 5919deea).**
+   - **Gate**: new `scripts/verify-look-layers.mjs` (21 rows, one process per
+     leg): flag off leaves no LOOK_LAYERS text in the march, composite or filter;
+     every dial at 0 is byte-identical to flag off; composite and filter are the
+     same text flag on and off; the bank is off by default (calibrated by a
+     `bank:1` leg that does carry it); High/Ultra profiles take the look,
+     Medium/phone/Low get the flag-off Living and LOOK uniforms exactly at noon,
+     golden, dusk and night.
+   - **Noon bases**: the brown band under a lit crown was the warm key, dimmed,
+     under the art grade's warm lit end (not the ambient, which r3 had already
+     greyed). After the art mix, the shaded part (`1-lit` 0.1..0.6) goes to a cool
+     blue-grey of the same luminance (`lookCool`). Noon only: off once the low-sun
+     weight passes 0.25 (sun below ~16 deg) and at night, so golden, dusk and
+     night do not move.
+   - **Golden high layer away from the sun**: `highCfg.awayCover` 0.12 adds cover
+     (`uLookBank2.w`, dead since the bank went off) where the ray is more than
+     ~70 deg from the sun (ramping in from 70 to 90 deg), sun above +1 deg only.
+     The patch field decides where, so it varies by place; the sun term was
+     already warm-tinted. Within 70 deg of the sun the text adds 0.
+
+## Round 4 capture (`layers-r4`, RTX 5080, 2026-11-16, 11 shots, burst)
+
+| shot | vs | absDiff | luma | sparkle ref -> r4 |
+|---|---|---|---|---|
+| powell noon | merged-2 | 8.33 | +0.65 | 0.466 -> 0.476 |
+| rio noon | merged-2 | 7.53 | -0.02 | 0.301 -> 0.276 |
+| nyc-harbor noon | merged-2 | 8.52 | -0.22 | 0.436 -> 0.427 |
+| nyc-cruise noon | merged-2 | 6.98 | -0.86 | 0.113 -> 0.113 |
+| nyc-cruise golden | merged-2 | 6.89 | +0.16 | 0.127 -> 0.119 |
+| powell golden | merged-2 | 7.16 | -0.03 | 0.198 -> 0.204 |
+| nyc-harbor golden | merged-2 | 6.51 | +0.25 | 0.302 -> 0.291 |
+| rio golden | sun-merged-2 | 8.54 | -1.51 | 0.173 -> 0.152 |
+| powell-sun golden | sun-merged-2 | 3.71 | -1.60 | 0.415 -> 0.409 |
+| nyc-skyline-sun golden | sun-merged-2 | 8.00 | -0.26 | 1.825 -> 1.810 |
+| nyc-cruise-sun golden | sun-merged-2 | 1.82 | -0.29 | 0.084 -> 0.066 |
+
+Noise reference: the same build's rio golden in merged-2 against sun-merged-2
+reads absDiff 11.1 (cloud drift on the running clock), so every row above is
+inside run-to-run noise; the toward-the-sun sheet shows only cumulus drift.
+Noon bases, upper 330 rows, pixels with r > b+4 and luma 60..200 (brown):
+powell 24,884 -> 2,183, rio 9,249 -> 0, harbor 33,012 -> 171. The darkest 5% of
+cloud pixels read luma 131-144 against tops of 211-221 (above half). Golden
+away from the sun: nyc-cruise golden and powell golden gain a light streak
+layer at the upper right; harbor golden (patch field empty there) none.
+Shimmer, same session (`layers-r4-off`, `?flags=-LOOK_LAYERS`): powell noon
+0.497 off / 0.476 on, rio noon 0.273 / 0.276, powell golden 0.146 / 0.204
+(both under 0.3). Alps noon was not re-captured (it never settles: r2 notes).
+
+## Round 5 (`layers-r5`, 2026-11-16, final art review: brown noon cloud bases)
+
+The review saw 5919deea (before r4). r4 had already removed most of it (rio 0,
+harbor 171); the leftovers were the half-lit band just above the base (powell,
+street) and the alps foot. Change: `lookCool` now starts at 1-lit 0.02 and is full
+by 0.4 (was 0.1..0.6), and at noon the ground bounce tint is fully greyed (0.8 ->
+1.0 off the low-sun and night weights). Golden, dusk and night are unchanged (both
+terms are gated by the same noon weight). Brown count, upper 330 rows, merged-2 ->
+r5: rio 9,249 -> 0, powell 24,884 -> 1,567 (the rest is 166/162/155, neutral
+light grey), street 8,244 -> 215, harbor 33,012 -> 22. Alps blotch region
+(x 1220-1560, y 420-600) mean RGB 156/152/143 -> 150/152/152; the remaining
+dusty tone there is the cloud-shadowed slope seen through the thin cloud foot
+(its edge follows the ridge behind), in the composite, which LAYERS does not touch.
+merged-2 vs r5 absDiff: alps 1.40, harbor 11.11, street 7.43, powell 7.65,
+rio 7.82 (cloud drift). Shimmer, same session (`layers-r5-off`): powell 0.465 off
+/ 0.443 on, street 1.483 / 1.548 (1.04x), harbor 0.445 / 0.442, rio 0.271 /
+0.271, alps 0.124 / 0.140 (both under 0.3). Gates as r4 (21/21, 8/8, 6/6, 12/12,
+14/14, 4/4; living-sky 20/1 1c, ship-sky 47/2 SK-3 l + TEXT a), eslint clean.
+
 ## Dials (`LOOK_LAYERS`)
 
 `volume`, `bank`, `high` (0 = that layer exactly as before, shader text
 removed). Sub-blocks: `vol` (occK, baseDark, rim, scatterB, baseTop), `form`
 (erosion, fine, edge), `bankCfg` (startM, endM, towerH, cover, scaleM, opacity,
 airMix), `highCfg` (coverFloor, coverCap, opacity, fibre, slantCap, fadeM,
-lowSun, lowSunCover), `sun` (goldenDeg, nightDeg).
+lowSun, lowSunCover, sunClear, duskDim, awayCover), `sun` (goldenDeg, nightDeg).
 
 ## Tried and rejected
 
@@ -217,6 +284,10 @@ it (26-33 in the upper third); the rest is the mid-field haze and exposure
 
 ## Gates
 
+- Round 4: `verify-look-layers` 21/21 (new), `verify-true-earth-flags` 8/8,
+  `verify-cloud-calm` 6/6, `verify-phys-sky` 12/12, `verify-true-scale` 14/14,
+  `verify-hdr-guard` 4/4; `verify-living-sky` 20/1 (1c), `verify-ship-sky` 47/2
+  (SK-3 l, TEXT a): the same known rows as r3. eslint clean.
 - Round 3: `verify-true-earth-flags` 8/8, `verify-cloud-calm` 6/6,
   `verify-phys-sky` 12/12, `verify-true-scale` 14/14, `verify-hdr-guard` 4/4;
   `verify-living-sky` 20/1 (1c), `verify-ship-sky` 47/2 (SK-3 l, TEXT a),
