@@ -258,3 +258,108 @@ for a slot), not this stream, which adds no geometry, pass or target.
 - nyc-cruise__noon: the ground is now lifted and blue with a band under the
   slab, but the slab itself (the sky) is unchanged; parks are a little muted
   by the blue veil at mid range.
+
+## Round 3 (balancing inside the combined frame, base 2755f844)
+
+### Toward the low sun (owner's ask, must, first)
+
+Measured share first: the merged look with `?flags=-LOOK_ATMOS`
+(`atmos-wip-off`) against sun-off at golden hour reads rio +58, powell-sun
++46, nyc-skyline-sun +53, yosemite-sun +36 frame luma. ATMOS's own share in
+sun-merged-1 was rio +26 (middle band +48), powell-sun +10, nyc-skyline-sun
++9, yosemite-sun +26 (middle band +55). So the +30 target cannot be met from
+this stream alone: most of the lift (the amber water and the lifted lower
+third) is present with this flag off.
+
+Cause in this stream, found by an extreme test (cone 89 deg, depth 0, cap 0
+still left +7): the haze COLOUR, not its opacity. The layer's colour is the
+sky row in the ray's own azimuth, and toward a low sun that row is the
+aureole, many times the key light, so even a 10% opacity whited the mid
+ground. Also the rim melt began at 0.45 of the world fade's start, which at
+Rio is the 5-12 km mid ground, and inside the rim none of the cuts applied.
+
+Fixed (new `LOOK_ATMOS.layer.sun`, uniforms `uLookAtmosG/H`): inside a cone
+of 40 deg round the sun's azimuth at golden hour,
+- the haze colour is the sky row 55 deg off the sun, warmed 35% toward the
+  key's hue (bounded, still golden), x0.9;
+- the rim melt starts at 0.85 instead of 0.45 of the fade start (the mid
+  ground keeps its silhouette, the horizon still melts);
+- optical depth x0.3, ceiling 0.4 (was 0.85), sunlit scatter and forward
+  lobe x0.2;
+- the ground mist's forward lobe keeps 35% at golden hour
+  (`mist.forwardGolden`, new `uGMLook.z`; the mist text now declares vec3).
+The grazing band at the horizon keeps the full sky row: the glow stays a warm
+band at the horizon.
+
+### Other items
+
+- alps__golden hard horizontal line (critic must): **fixed, cause found.** It
+  was not the layer top: it was the eye-level horizon. The grazing band was
+  one-sided (only rays that look down, ramped in over 0.002 rad), so above eye
+  level the layer carried its sunlit scatter and below it did not. The band
+  is now symmetric about the horizon and the scatter taper is symmetric; the
+  higher ceiling still applies only below, ramped over a degree. The line is
+  gone in atmos-wip.
+- Golden horizon slab with a straight top (must): partly. The scatter now
+  tapers over 0.1 rad (was 0.06) above the ground horizon, so the far field
+  converges on the sky row behind it instead of a paler grey slab. The
+  straight top in the combined frames is mostly the base of LAYERS' horizon
+  bank, which is not compensated for here.
+- yosemite__golden mist (should): evening 0.8 -> 0.55 and the forward lobe
+  cut above.
+- nyc-cruise__golden cream ground (should): `highGoldenDark` 0.45 darkens the
+  layer seen from altitude at golden hour; modest (lower third 147 -> 141).
+- rio/nyc-harbor golden density (should): `goldenBoost` 0.3 -> 0.05 (about
+  -20% at 3-10 km).
+- powell__night lights (should): `nightK` 0.3 -> 0.15. Not re-checked at
+  night this round.
+- nyc-cruise__noon flat slab (should): declined this round (time); the slab
+  is the sky's horizon row, which this layer only melts into.
+
+### Gates (round 3)
+
+`verify-look-atmos` 15/0 (5c now looks for `uniform vec3 uGMLook;`),
+`verify-true-earth-flags` 8/0, `verify-phys-sky` 12/0, `verify-twilight` 6/0,
+`verify-twilight-balance` 13/0; `verify-ship-sky` 47/2, `verify-r25-sky`
+47/2, `verify-living-ground` 22/2: the same items fail on look-int
+(4ef85d08). living-ground (2c) reads 9767 vs 15011 here and 9767 vs 13361 on
+the base: the flag-off text is identical, the flag-on text carries the new
+layer code.
+
+### Round 3 capture (atmos-r3, burst, RTX 5080, Ultra)
+
+Toward the sun, frame luma (middle band) and p95:
+
+| shot | sun-off | sun-merged-1 | atmos-r3 | over sun-off | p95 |
+|---|---|---|---|---|---|
+| rio__golden | 82.5 (101) | 166.4 (196) | 155.4 (173) | +73 | 226 |
+| nyc-cruise-sun__golden | 101.9 (141) | 164.5 (192) | 150.8 (191) | +49 | 221 |
+| nyc-skyline-sun__golden | 95.2 (99) | 157.1 (171) | 151.7 (160) | +56 | 228 |
+| yosemite-sun__golden | 79.0 (101) | 140.7 (194) | 128.6 (167) | +50 | 224 |
+| powell-sun__golden | 84.5 (96) | 139.9 (169) | 132.4 (157) | +48 | 219 |
+| rio__dusk | 31.5 | 70.5 | 64.7 | +33 | 140 |
+
+With ATMOS off the combined frame already reads rio +58, nyc-skyline-sun
++53, powell-sun +46, yosemite-sun +36 over sun-off, so the rest of the gap
+to +30 is outside this stream (water, lower third, overall grade). Hills,
+skyline, Sugarloaf ridges and the rivers seen from cruise are back as
+silhouettes; p95 is under 240 everywhere.
+
+Hero shots against merged-1: powell__golden -3.5 (middle -6.8), yosemite__golden
+-2.5, nyc-street__golden -1.2, noon and night unchanged within 1 luma
+(harbor night +1.0).
+
+Shimmer against baseline: every hero shot down or within 1.25x except
+nyc-street__golden 0.862 -> 1.48 (merged-1 already 1.51: the facade item).
+Against sun-off: powell-sun 0.287 -> 0.389 (1.36x; merged-1 0.337) and
+yosemite-sun 0.149 -> 0.279 (both under 0.3): with less haze toward the sun,
+more ground detail shows.
+
+### Still weak (round 3)
+
+- rio__golden is the weakest shot: +73 over sun-off. The mid ground now has
+  ridges, but the left (sea side, just outside the cone's full weight) keeps
+  a pale veil, and the amber water and lower third are not this stream's.
+- The horizon slab top in powell/nyc-street/nyc-harbor golden sits on the
+  LAYERS bank base; until that bank changes the edge stays visible.
+- nyc-cruise__noon slab: not touched this round.

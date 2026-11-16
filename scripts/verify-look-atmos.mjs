@@ -71,7 +71,7 @@ LA.updateLookAtmos({ day: 0, golden: 0, overcast: 0 }, true);
 check('(5b) at night the mist shape is the old law (1, 0)', LA.LOOK_MIST_SHAPE.value.x === 1 && LA.LOOK_MIST_SHAPE.value.y === 0);
 const GM = await import('../lib/fly/ground-mist.js');
 check('(5c) the mist text carries the shape only with the flag on',
-  LA.LOOK_ATMOS_ON ? GM.GROUND_MIST_GLSL.includes('uniform vec2 uGMLook;') && 'uGMLook' in GM.GROUND_MIST_UNIFORMS
+  LA.LOOK_ATMOS_ON ? GM.GROUND_MIST_GLSL.includes('uniform vec3 uGMLook;') && 'uGMLook' in GM.GROUND_MIST_UNIFORMS
     : !GM.GROUND_MIST_GLSL.includes('uGMLook') && !('uGMLook' in GM.GROUND_MIST_UNIFORMS));
 
 console.log(`\n${pass} passed, ${fail} failed`);
