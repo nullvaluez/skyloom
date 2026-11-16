@@ -1,0 +1,5 @@
+{ "refLatDeg": 40, "minAreaM2": 120, "maxFootprintM2": 60000, "minH": 6, "houseMax": 220, "houseH": [5, 8],
+  "typo": { "maxTallTagged": 2, "tallM": 40, "maxFootprintCover": 0.12, "bands": [
+    { "maxAreaM2": 600, "hM": [6, 9] }, { "maxAreaM2": 2500, "aspectMin": 3, "hM": [6, 8] }, { "maxAreaM2": 2500, "hM": [7, 12] },
+    { "maxAreaM2": 10000, "hM": [8, 14] }, { "maxAreaM2": 1e12, "hM": [10, 14] } ] },
+  "skyMinArea": 900, "fs": { "hM": [10, 22], "hardCapM": 25 } }

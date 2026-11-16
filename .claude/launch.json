@@ -8,6 +8,12 @@
       "port": 3000
     },
     {
+      "name": "world-pass-int",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["next", "dev", "--webpack", "--port", "3320"],
+      "port": 3320
+    },
+    {
       "name": "skyloom-dev-3123",
       "runtimeExecutable": "npx",
       "runtimeArgs": ["next", "dev", "--port", "3123"],

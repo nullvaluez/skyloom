@@ -52,6 +52,8 @@ const POSES = {
 };
 // Target true solar elevation in degrees on the afternoon branch; 'noon' is solar noon + 2 h.
 const TIMES = { noon: null, golden: 7, dusk: -3, night: -20 };
+// --posefile=<json>: extra poses { name: { lat, lon, altM, headingDeg, note } } merged over the fixed set.
+if (typeof args.posefile === 'string') Object.assign(POSES, JSON.parse(fs.readFileSync(path.resolve(args.posefile), 'utf8')));
 
 if (args.list) { console.log(JSON.stringify({ poses: POSES, times: TIMES }, null, 1)); process.exit(0); }
 
@@ -265,6 +267,7 @@ async function waitWorld(page, timeout) {
       const gl = scene.__r3f?.root?.getState()?.gl;
       return { sunElevation: Math.asin(r.sun?.sinEl) * 180 / Math.PI, quality: s.qualityTier, visuals: s.visuals, aglM: r.flight.pos.y - r.flight.groundElev,
         render: gl ? { calls: gl.info.render.calls, triangles: gl.info.render.triangles, programs: gl.info.programs.length, textures: gl.info.memory.textures } : null,
+        world: Object.fromEntries(['satBuildings', 'satSkyline', 'satRoads', 'satVeg', 'satClutter', 'parcelHomes'].map(k => [k, r[k]?.stats ? Object.fromEntries(Object.entries(r[k].stats).filter(([, v]) => typeof v === 'number' || typeof v === 'string' || typeof v === 'boolean')) : null])),
         fps: window.__flyStats?.fps ?? null, urlFlags: window.__flyUrlFlags ?? null };
     });
     const burst = args.burst && !why ? await burstMetric(p).catch(e => ({ error: e.message })) : null;
