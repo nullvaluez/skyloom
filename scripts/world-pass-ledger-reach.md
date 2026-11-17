@@ -104,7 +104,87 @@ Dubai 598 vs 58, Hong Kong 1,604 vs 58, SF 2,240 vs 69, Powell 2 vs 0, Owens 0,
 Iowa 0. Total 33,030 vs 729 (45x). Worker build 14 to 72 ms per dense tile
 (the old horizon tile: 18 to 71 ms, `stream.md` 3.4).
 
-(the browser tables are below in "Browser measurements")
+Diag stage counters (the worker's `reach` record summed over the 24 resident
+groups, `?flags=WORLD_REACH,WORLD_PASS_DIAG`, `satSkyline.stats.wpReach_*`,
+`node scripts/wp-reach-info-probe.cjs --pose=paris-mid
+--flags=WORLD_REACH,WORLD_PASS_DIAG`), Paris from 1,500 m, 384 z14 tiles:
+admitted 533,572 (mapped 100,862, untagged 432,710); untagged house-sized
+335,802, untagged under 900 m2 in a suburban tile 10,679, density ramp 2,035,
+under the 6 m size key 4,405, degenerate 0, cap 0; emitted 180,651 stand-ins
+(129 tiles were suburban contexts).
+
+### Browser measurements (Ultra, RTX 5080)
+
+`node scripts/world-pass-budget.cjs --url=http://localhost:3323
+--pose=nyc-low,paris,tokyo,phoenix-suburb,powell --quality=ultra
+--flags=WORLD_REACH --out=.graphics-review/world-pass/reach/budget-ultra-on`
+against the W0 base table (FLY_WORLD_PASS.md "Budget", flags off):
+
+| pose | draws on (base) | horizon MiB on (base) | stand-ins resident | drawn | stand-in tris (main pass) | minPx after budget | horizon first / full s on (base) | skyline finalize max ms |
+|---|---|---|---|---|---|---|---|---|
+| nyc-low | 385 (385 / 536) | 16.9 (47.4) | 631,341 | 249,095 | 1,494,570 | 0.99 (wanted 326,658) | 45.8 / 61.4 (9.6 / 26.0) | 34.9 |
+| paris | 383 (383) | 4.9 (49.1) | 182,637 | 174,945 | 1,049,670 | 0.80 | 13.5 / 25.5 (5.2 / 15.4) | 14.4 |
+| tokyo | 401 (401) | 12.8 (48.0) | 480,391 | 246,484 | 1,478,904 | 0.94 (wanted 329,794) | 7.1 / 30.0 (4.4 / 15.0) | 24.0 |
+| phoenix-suburb | 369 (369) | 7.8 (35.6) | 290,225 | 244,551 | 1,467,306 | 0.80 | 4.5 / 16.5 (4.5 / 13.2) | 9.6 |
+| powell | 357 (356 / 538) | 0.3 (9.4) | 10,030 | 8,441 | 50,646 | 0.80 | 4.7 / 16.1 (4.0 / 10.5) | 1.6 |
+
+The old horizon at the same poses drew 478 k (nyc-low), 507 k (paris),
+479 k (tokyo), 366 k (phoenix), 96 k (powell) triangles in about 40 to 85
+bodies per z14 tile; the stand-ins draw 8 k to 250 k BUILDINGS. Draws are
+unchanged (one per group). Geometry is 3 to 10 times smaller than the old mass.
+
+Arrival: the budget tool's horizon "first / full" seconds at nyc-low read
+45.8 / 61.4 on, against the W0 table's 9.6 / 26.0 off. That W0 number is
+from a quieter machine: re-measured OFF on this server under the same load
+(`node scripts/world-pass-budget.cjs --url=http://localhost:3323
+--pose=nyc-low --quality=ultra --out=.../reach/budget-ultra-off-nyc`, five
+dev servers and other streams' captures running) it reads 43.1 / 54.0, and
+its detailed ring 51.5 / 91.2. So the first horizon group arrives as fast as
+today; the FULL ring is about 7 s later at Midtown (61 against 54 s), the
+cost of building ~3,000 records per Midtown tile instead of ~80 bodies on
+the one skyline worker. At the other poses it is within a few seconds of
+base. In the capture runs (warm page, warp from the
+previous pose) the horizon first / full seconds were: paris-mid 4.2 / 14.3,
+nyc-bay 4.8 / 14.3, lagos-mid 34.2 / 40.7 (v3 run), nyc-mid 0.6 / 3.8,
+tokyo-mid 2.8 / 3.9 (v1 run). The per-group finalize (merge, drape, upload)
+is 1.6 to 35 ms, under the old mass's.
+
+High (`look-pass-capture.cjs --quality=high --flags=WORLD_REACH`, out
+`high-on/`): the 0.8 M budget binds and minPx rises: nyc-bay 790,770
+stand-in triangles at minPx 2.44 (349,714 wanted at 0.8), paris-mid 798,654
+at 1.59, tokyo-mid 742,326 at 1.81. Medium with the flag in the URL
+(`medium-on/`): the shipped 10-group horizon, no stand-in counters (the
+latched tier test says no).
+
+THE COASTAL REFLECTION. renderer.info counts every stand-in mesh twice near
+water: `lib/fly/coastal-reflection.js` renders the skyline group again into
+its 768 x 512 reflection target (it did so for the old mass too).
+`node scripts/wp-reach-info-probe.cjs --pose=paris-mid`: first version, the
+reflection drew 0.86 M stand-in triangles on top of the main pass's 1.03 M;
+with the reflection's own focal length and 2 x minPx (`reflectionPxK`) it
+draws 0.49 M. So near water the stand-ins cost up to the tier budget in the
+main pass plus about half of it in the reflection.
+
+Motion (`node scripts/wp-reach-motion.cjs --url=http://localhost:3323
+--flags=WORLD_REACH --scenarios=paris-cruise-500,paris-boost-500
+--frameSec=4 --out=.graphics-review/world-pass/reach/motion-on`, summary
+`node scripts/wp-reach-motion-summary.cjs <out>/probe.json`), straight line
+15 km into Paris at 500 m AGL, golden hour sun:
+
+| run | group births (true distance p10 / p50) | births without a fade (pops) | stand-ins drawn p50 | skyline finalize max |
+|---|---|---|---|---|
+| on, cruise 180 m/s | 14 (12.8 / 13.4 km) | 0 | 169,134 | 4 ms |
+| on, boost 750 m/s | 18 (12.4 / 13.2 km) | 0 | 167,327 | 4 ms |
+| off, cruise | 13 (12.7 / 13.5 km) | 0 | - | 11 ms |
+| off, boost | 15 (11.6 / 13.0 km) | 0 | - | 7 ms |
+
+Every group birth is a CHUNK_FADE birth 12 km out; within a group the size
+threshold is a vertex-shader dissolve, and minPx did not move during either
+flight (no budget step). At boost the detail ring cannot keep up (review
+S-F2) and the OFF arm shows Paris as photo with a handful of towers; the ON
+arm shows the whole city as stand-ins (strip:
+`motion-on/strip-boost-on-left-off-right.png`). The headless frame times of
+both arms are dominated by the screenshots and are not a verdict.
 
 ## Shared-file edits
 
@@ -149,6 +229,62 @@ block of `lib/fly/fly-constants.js`. `WORKER_PROTOCOL` is unchanged.
   `far_version`): ours is the minimum-area oriented rectangle, area-preserving,
   for every footprint, not only rectangular ones.
 
+## Acceptance frames (final, Ultra, `--flags=WORLD_REACH,WORLD_PASS_DIAG`)
+
+`.graphics-review/world-pass/reach/final/<pose>__<time>.png`, off side
+base-1 / base-2 / base-3 (and `reach/off/lagos-mid__noon.png`, a tight off
+pair on this server). Per pose: stand-ins resident / drawn / triangles /
+minPx after the budget, from `final/manifest.json`.
+
+| shot | resident | drawn | triangles | minPx | verdict |
+|---|---|---|---|---|---|
+| nyc-bay noon / golden | 498,337 | 248,741 | 1,492,446 | 1.13 | Manhattan, Jersey City and Hoboken now continue dense past the detail ring to Midtown; no ring cliff |
+| nyc-top noon | 631,341 | 245,207 | 1,471,242 | 1.13 | Upper Manhattan continues to the bridges |
+| nyc-mid noon | 499,337 | 249,897 | 1,499,382 | 1.11 | the cliff at ~3 km is gone; Midtown dense to the horizon |
+| nyc-high noon | 482,458 | 249,999 | 1,499,994 | 1.20 | the pose sits inside a cloud deck in every arm (base included): not evidence |
+| paris-mid noon | 180,651 | 171,881 | 1,031,286 | 0.80 | the Haussmann fabric carries on to the horizon; the far ring reads a little brighter and more varied than the photo (palette, stream D) |
+| tokyo-bay noon / night | 389,095 | 213,123 | 1,278,738 | 0.80 | denser far city; night keeps a warm lit fraction (the shared window emission averages per building) |
+| tokyo-mid noon | 419,717 | 243,076 | 1,458,456 | 0.80 | Shinjuku side fills in; Tokyo's map is sparse (553 k of 992 k admitted are untagged houses) |
+| phoenix-mid noon | 275,705 | 245,185 | 1,471,110 | 0.80 | little change past the ring: houses stay photo by the untagged rule; the visible cliff here is the NEAR ring's invented slabs (stream A) |
+| lagos-mid noon | 214,675 | 139,483 | 836,898 | 0.80 | the mainland carries mass to the horizon (tight pair `reach/v3/cmp-lagos-tight.png`) |
+| dubai-bay noon | 109,923 | 71,705 | 430,230 | 0.80 | close to base; small infill |
+| iowa-farm noon | 1,597 | 1,533 | 9,198 | 0.80 | farmland stays empty; the 1,597 are mapped buildings in towns of the 48 km ring |
+
+Boxes on water, parks or runways: none seen; a stand-in exists only for an
+OpenFreeMap building footprint the near ring admits (airport and marquee
+footprints excluded by the same admission).
+
 ## Open
 
-(see the bottom of this file, kept current)
+- **Untagged houses and stream A.** Rule (1) drops untagged footprints at or
+  under 220 m2 because the near model gives them 5 to 8 m. In Paris 335,802
+  of 432,710 untagged footprints (Haussmann parcels) fall under it, in
+  Tokyo 553 k, Lagos 466 k. When stream A's far height for `standIn` items
+  matches the near model, set `WORLD_REACH.worker.houseMaxAreaM2` to 0 and let
+  the size key decide: that is when Paris and Tokyo gain their small-parcel
+  fabric. Until then untagged non-house stand-ins use the far hatch band
+  (10 to 22 m).
+- **Colour.** The far ring uses the far palette (stream D's `colourOf`); at 5+
+  km it reads a little brighter and more varied ("confetti") than the photo.
+  A photo-sampled far roof colour (D) is the fix.
+- **Arrival.** The full ring is about 7 s later at Midtown than the shipped
+  horizon (one skyline worker builds ~3,000 records per dense tile). The
+  first group is not later. A second skyline worker or B's shared tile service
+  would take it back.
+- **Reflection.** Near water the coastal reflection draws the stand-ins again
+  (about half the main pass's triangles after `reflectionPxK`). The tier
+  budget counts the main pass only.
+- **Shader anchors.** The stand-in material depends on three text anchors in
+  the far architecture shader (see Seam requests); if stream D moves them the
+  console logs `[wp-reach] stand-in material: ... anchor not found` and the
+  stand-ins would draw wrong. No gate checks it in node (it needs a browser
+  compile); `scripts/wp-reach-info-probe.cjs` prints that console line.
+- **Prewarm.** The stand-in program has its own cache key and is compiled on
+  the first group's first draw, not in `prewarm.js` (FlyScene-owned). A
+  one-time compile hitch when the first group appears is likely; not measured.
+- **Owner motion check.** Sub-pixel boxes (0.8 to 1.6 px) are dissolved with
+  the ordered Bayer dither; the 5080 motion read (shimmer of the far city in
+  a slow turn) has not been done by the owner. `minPx` / `fadePx` are main-
+  thread tunables in the block.
+- **Medium, phones**: untouched (the latched tier test), proven by a Medium
+  capture with the flag in the URL (shipped 10-group horizon).
