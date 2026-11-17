@@ -5,6 +5,55 @@ Flag `WORLD_LOOK` (ships `enabled:false`; `?flags=WORLD_LOOK` for one page load,
 desktop High and Ultra only). Request field `worldPass.look`
 (`roofPhoto`, `walls`, `structures`, `authority`, `worker`).
 
+## For stream C (REACH): the far colour function (round 2)
+
+ONE exported worker function owns every far colour, in
+`lib/fly/toy-world/worker/sat-buildings/colour.js`:
+
+```js
+lookFarPrepare(admitted, tileCtx)            // once per far tile, before any lookFarColour call
+lookFarColour(item, style, tileCtx, far01?)  // -> { wall: [r, g, b], roof: [r, g, b], mode }
+```
+
+- `admitted`: the tile's admitted footprints (`admitFootprints(tileCtx, classifyRingsSat)`,
+  the near ring's set). `lookFarPrepare` relates the parts (`relateParts`,
+  nothing dropped) so a far body takes its structure root's look id and facts,
+  exactly as the near ring does. No-op unless `look.on` and `look.structures`.
+  Measured cost (node, 3 x 3 tiles): NYC 3 to 61 ms, Paris 17 to 53 ms, Tokyo
+  5 to 28 ms per z14 tile, about 1.5 to 2 x the admission itself.
+- `item`: an admitted footprint or a copy of one (`item.polys[0]` is the key:
+  the whole footprint), with `item.h` set. `style`: `architectureStyle(item, ...)`,
+  restyled in place to the root's (write it into the vertices after the call).
+- `far01`: optional; **round 3: the default is 0** (`look.worker.far.far01`).
+  Do not pass it from a far tile: a far tile is built once and seen from every
+  distance, so no build knows a fixed distance (round 2's baked 0.6 was the
+  measured handoff step). At 0 the far wall IS the near wall, colour and
+  material (gate F in `scripts/wp-look-agree.mjs`, every wall, as the live
+  callers ask, with a round-2 control arm that must differ).
+- `wall`, `roof`: linear [0, 1], no glass offset. `mode`: 0 the shader's
+  choice, 1 curtain glass (a tag), 2 opaque (a tag, or an untagged mid-rise
+  where the region's offices are not glass: Hong Kong), exactly the near
+  ring's material. The wall is the near ring's wall (`lookWall`); with far01 >
+  0 it is also pulled toward the regional photo and desaturated. The roof is
+  the near ring's own fallback roof: the regional (z11) photo at the building,
+  times the roof-against-region correction (this worker's learned one, else the
+  request's `photo.fallbackCorr`, round 3), or for a tall structure the neutral
+  roof family with that luma.
+- Round 3: a far tile ('sat-skyline') with the look on waits, after its vector
+  fetch, at most `photo.farRegionalWaitMs` (2,500 ms) for the regional photo
+  (`look-roofs.js lookFarBegin`), so it is never built without it.
+- Tunables: `look.worker.far` = { photoPull 0.7, valueLift 1.6, desat 0.45,
+  far01 0 } (constants WORLD_LOOK block, carried in the request).
+- The existing entry point `colourOf(item, style, tileCtx, 'far')` calls it
+  (the glass / opaque offset added to the red channel for the architecture
+  shader). Seams in stream C's files (`// WORLD PASS D x C seam`):
+  `worker/sat-skyline-stand-ins.js` calls `lookFarPrepare(admitted, tileCtx)`
+  after admission and, round 3, writes the decoded `mode` into the high bits of
+  the stand-in's family byte (`family + 16 x mode`, only when mode is not 0);
+  `lib/fly/sat-stand-in-material.js` decodes it into the wall's style z
+  (`1 + mode`, the near ring's 2 / 3 code), so a far glass tower is the same
+  curtain wall by day as its near self.
+
 ## Design
 
 **Where the colour comes from today.** The worker bakes a vertex colour per
@@ -348,3 +397,618 @@ anchored edit once, near and far; sub-switches; latched).
   tile tones after the owner's look.
 - Not run: verify-ship-city and verify-night-city-identity (red on the base),
   the browser building harnesses, the 5080 motion check.
+
+## Round 2
+
+Branch `world/look`, merged with the integration head `d40dfd25` first (fast
+forward: the other streams' code, the two merge seams, protocol 26). The flag
+still ships `enabled:false`. Evidence is live on the RTX 5080 through this
+stream's dev server (`:3324`), every before/after against a flags-off control
+shot in the same session from the same server; frames in
+`mystifying-curran-97a006/.graphics-review/world-pass/r2/look/` (`control/`,
+`own/` = `?flags=WORLD_LOOK`, `all4/` = `?flags=WORLD_TRUTH,WORLD_ARRIVAL,WORLD_REACH,WORLD_LOOK`,
+`tri-*.jpg` = control | own | all four, `crop-*.jpg`, `frames.json`).
+
+### 1. Roof photo coverage: the build no longer waits; the late photo recolours in place
+
+Finding (verifier, wave 1): live, 25 to 54 % of roofs took the photo and 31 to
+68 % fell back to the palette, whole tiles at a time: six builds shared one
+queue of 8 fetches, the 2.5 s wait held a build slot, and a miss was latched
+for the session. Tiles without a photo looked worse than today.
+
+Changed:
+
+- No build waits for any photo. `worker/look-roofs.js` (new): `lookBegin`
+  starts the regional z11 tile at the request (one fetch per 64 tiles, never
+  awaited) and hands the build its inputs (`frame()`); `lookAfterBuild` runs
+  only when the tile has buildings, indexes every roof vertex of the finished
+  bundle (and every wall vertex whose local earth was not known yet) by
+  building and kind, and stamps `result.lookPatch`. The z16 photo is fetched
+  only when the main thread asks for the patch, so an empty tile (farm,
+  desert, water) and a result nobody collects (the water backfill) fetch
+  nothing.
+- `worker/photo-sampler.js`: `fetchPhoto` retries a network error twice
+  (800 / 2,500 ms), never latches a miss (the LATCH is gone), 12 in flight per
+  worker, the whole tile bounded by 45 s. The Cache API name comes in the
+  request (item 7).
+- `lib/fly/look-roof-patch.js` (new, main thread): asks the worker that built
+  the tile, then writes the new colours into the bundle if the tile is still
+  draping (it is born with them), or fades the colour attribute of a drawn tile
+  over 900 ms (steps at most every 50 ms, one update range, its own
+  requestAnimationFrame that runs only while a fade is in flight). A result is
+  patched only if the chunk's colour attribute IS that result's array, so a
+  rebuilt or evicted tile can never take a stale patch. No rebuild, no new
+  geometry, no new program. One marked line in `sat-building-engine.js`
+  (`// WORLD PASS D x B seam`).
+- One rule decides every roof, at build time and again when the photo lands
+  (`colour.js lookRoofDecisions`), and the worker keeps each finished tile's
+  roofs, so a rebuild after the photo draws exactly the colours the fade ended
+  on (no patch). Before the photo the roof is the fallback, never a typology
+  palette: the regional (z11) photo at the building (a 5 x 5 pixel window,
+  about 300 m), corrected per regional tile by what this worker's finished
+  tiles measured (roof against region, geometric mean per channel, after 8
+  reads), chroma clamped to 0.3, +-5 % value by building; else the neighbour
+  tiles' own-read medians; else the neutral family.
+
+Measured:
+
+- Patch exactness (node, `node scripts/wp-look-patch.mjs`, 5 places x 3 arms:
+  look; look + ARRIVAL workerPrep (Uint8 colours, compacted vertices); and the
+  same with the regional photo not yet landed at build time): PASS, 15 / 15.
+  A tile built without its photo and then patched equals the tile built with
+  it, every colour byte (P2: 0 vertices differ; the split-wall vertices whose
+  colour is interpolated match within one Float32 ulp or one Uint8 step: 0 to
+  132 of them, cold arms only); every other attribute byte-identical (P1); the
+  rebuild after the patch equals the photo build and asks for no patch (P3);
+  the fallback build differs from the photo build (P4, so the gate can fail:
+  it did, on six real defects while it was written: shared anchors, Phoenix's
+  wall earth read from the z16 photo, interpolated wall faces).
+- Live share of roofs coloured from the z16 photo (own read, structure mates,
+  block median, tall family with the photo's luma), READY near-ring chunks,
+  Ultra, `?flags=WORLD_LOOK`, cold page per pose, `node scripts/wp-look-live.cjs`
+  (`.graphics-review/world-pass/r2/look/live/`):
+
+  | pose | at settle | +20 s | own read | patches landed / asked | into bundle / faded | slowest patch (s) | z16 requests |
+  |---|---|---|---|---|---|---|---|
+  | nyc-low | 99.0 % | 99.0 % | 73.9 % | 16 / 16 | 16 / 0 | 19.4 | 268 |
+  | brooklyn | 99.9 % | 99.9 % | 94.8 % | 16 / 16 | 16 / 0 | 15.6 | 268 |
+  | paris | 99.9 % | 99.9 % | 68.8 % | 16 / 16 | 7 / 9 | 13.7 | 272 |
+  | phoenix-suburb | 99.7 % | 99.7 % | 91.3 % | 16 / 16 | 12 / 4 | 7.6 | 272 |
+
+  (Round 1, verifier, same probe idea: photo 25 to 54 %, palette 31 to 68 %.)
+  The remainder is buildings the photo gives no evidence for (regional
+  fallback, 7 to 38 roofs per ring). "Own read" is lower in Midtown and Paris
+  because their roofs of 30 m and over take the neutral family (item 2).
+  z16 requests: 16 per built tile plus the terrain's own (12 to 16 in the off
+  arm, wave 1); see the empty-tile row below for a farm.
+- The fallback against its neighbours (node, `node scripts/wp-look-fallback.mjs`):
+  a 3 x 3 block of tiles, the eight neighbours patched first, the centre built
+  without its photo. CIELAB dE76 of the sRGB roof medians against the
+  neighbours' mean:
+
+  | place | fallback (before its photo) | final (after its photo) | round 1's palette fallback | spread of the neighbours themselves |
+  |---|---|---|---|---|
+  | Brooklyn | 3.5 | 1.7 | 27.8 | 1.4 |
+  | Paris | 1.9 | 2.0 | 17.2 | 2.1 |
+  | Phoenix | 5.1 | 4.3 | 29.1 | 4.3 |
+  | Midtown | 1.8 | 1.3 | 11.6 | 2.4 |
+
+  A tile waiting for its photo now sits within the neighbours' own spread
+  (round 1's palette tile sat 12 to 29 away: the patchwork).
+
+### 2. Tall buildings: a neutral roof family, luma only
+
+Finding: roofs of buildings 30 m and taller took the block median of the low
+roofs around them (khaki and olive on Midtown towers, Madison Square Garden,
+Barclays Center), on every setback tier.
+
+Changed (`photo-sampler.js prepareRoofLook`, `colour.js lookRoofDecisions`):
+a roof is "tall" when its own height or its STRUCTURE's top (podium parts and
+setback terraces included) is `maxH` (30 m) or more. A tall roof that is not
+wide takes a neutral family (seven greys: membrane light and dark, white TPO,
+gravel ballast, tar, concrete, mechanical deck; picked by the structure's look
+id, +-4 % by part) whose luma moves 35 % toward the photo's block median luma
+(or the regional fallback's), never its hue. A wide tall roof (footprint at
+least twice its height: MSG, malls) still reads its own pixels, with the
+deeper inset, chroma clamped to 0.12.
+
+Measured (live, the item-1 probe): the tall family covers 7,922 + 365 of
+41,391 Midtown roofs at nyc-low, 5,204 of 42,837 in Paris (legacy heights put
+Haussmann blocks over 30 m; stream A's heights move them), 1,134 in Brooklyn,
+982 in Phoenix (the legacy 30 m office slabs, stream A's). In the frames:
+Midtown tower roofs and MSG are grey membrane (`crop-nyc-low-roofs.jpg`).
+
+### 3. 1 Penn Plaza, night, Lower Manhattan slabs
+
+Findings: 1 Penn Plaza rendered as two materials (a blue-black glass frame
+round a dark grey face with scattered pale cells), near-black maroon at night
+with no lit windows; the lower third of nyc-low at night 6.7 luma darker than
+the old world; from the bay, two Lower Manhattan towers flat saturated blue and
+maroon slabs.
+
+Cause: 1 Penn Plaza is mapped as two parts tagged `#1e2320` (229 m) and
+`#4d4a46` (219 m), and in the nyc-low view 2 Penn Plaza (126 m, `#add8e6`)
+stands in front of it, so the "frame and face" are two buildings. Round 1 called only blue-cyan tags glass, so both were
+OPAQUE walls in a near-black tag colour (luma clamp 0.04): the window panes
+(the shader's glazing + 0.035) read as pale cells on a black face, and at night
+the face kept its near-black albedo. Pale blue `#add8e6` was opaque too
+(round 1 excluded tags brighter than 0.8): a flat light-blue slab. Saturated
+tags kept 45 % of their chroma.
+
+Changed:
+
+- `colour.js tagMaterial`: curtain glass = blue-cyan at ANY value, or a dark
+  near-neutral (max channel at most 0.32, saturation under 0.4: tinted glass or
+  dark metal, never paint). Opaque tags keep at most 30 % chroma and luma
+  [0.08, 0.6]. 1 Penn Plaza is now ONE curtain wall (both parts glass): dark
+  glass with the facade grid and frames by day.
+- The wall material moved from the red-channel offset into the wall vertices'
+  style byte (2 curtain glass, 3 opaque, 1 the shader's choice;
+  `look-roofs.js encodeWallModes`, decoded in `applyWorldLook` right after
+  `float isWall = style.z;`, program key `world-look-v3`). A wall colour stays in
+  [0, 1], so ARRIVAL's Uint8 colour packing now holds on Manhattan tiles
+  (`col` Uint8Array at nyc and nyc + cold in the patch gate; round 1 forced
+  Float32 on any tile with a tagged wall). The far mass keeps the red offset
+  (both decoded).
+- The far colour of a tagged glass tower is its tag mostly greyed at the value
+  of tinted glass (item 6), never the flat tag colour.
+
+Measured (frames `r2/look/{control,own,all4}`, same session, same server):
+- Daylight, `crop-nyc-low-penn.jpg` (control | own | all four): the pale
+  salmon face with its scattered cells is gone; 1 Penn Plaza and 2 Penn Plaza
+  are both curtain glass with the facade grid. It still reads as two tones: a
+  near-black face (`#1e2320`) inside blue-tinted setback sides, because the two
+  buildings carry different tags and the coat tint follows the tag. Partly
+  fixed: one material class, two coat values. nyc-low lower third 63.5
+  (control) / 69.0 (own) / 75.9 (all four) sRGB luma.
+- Lower Manhattan from the bay, `crop-nyc-bay-lowermanhattan.jpg`: the flat
+  pale-blue slab is curtain glass now; lower-half chroma 41.4 / 39.8 / 39.5.
+  One maroon-tagged tower stays visibly red (an opaque tag keeps 30 % of its
+  chroma by rule); with all four flags its taller TRUTH body makes it more
+  prominent. Not fully fixed: a lower chroma cap for tall opaque tags (or
+  pulling them toward the regional photo like the far wall) would close it.
+
+- Night, NOT fixed. nyc-low at night, lower third: 29.44 (control) / 25.16
+  (own) / 23.24 (all four) sRGB luma; lit pixels (luma > 110, lower 55 %)
+  6.70 / 5.78 / 5.79 %; mean of the unlit pixels 26.79 / 24.59 / 23.09. Ruled
+  out in node (3 x 3 z14 tiles round Penn Station, the bundle itself): the
+  window emission inputs are unchanged (profile occupancy x window share x
+  the darkBuilding and glow hashes per m2 of wall: 0.0694 off / 0.0693 look /
+  0.0694 look without structures), and the roofs are brighter, not darker
+  (area-weighted linear roof luma 0.215 off / 0.338 look). Remaining
+  candidate, not proven: more walls are curtain glass now (every dark
+  near-neutral tag), and `city-facades.js` mixes a curtain wall toward the dark
+  coat tint at night too (`cityWall=mix(..., cityCurtain)` has no day term).
+  What would settle it: the same night pose with `look.walls` off; if the
+  deficit goes, keep a curtain wall's night albedo at its daytime wall value or
+  give curtain walls the office floor-lit emission.
+
+### 4. Regions
+
+Findings: San Francisco, Lagos, Rio and Sydney fell to 'temperate' (San
+Francisco a red-brick city); Hong Kong towers near-uniform dark slate; Tokyo
+almost monochrome grey near and far.
+
+Changed (`colour.js REGIONS`, `regionKey`, `lookWall`, `wallContext`):
+
+- New regions: `pacific` (the Bay Area and coastal California: painted wood and
+  stucco in white, cream, pale grey and muted pastel, little brick), `oceania`
+  (sandstone, cream render, some face brick; also the Natural Earth 'oceania'
+  style round 1 dropped), `latam` (white and cream concrete, pastel render;
+  also every 'latin' tile), `africa` (off-white and beige render, faded paint,
+  grey concrete). `temperate` (North America and anything unnamed) is
+  brick-light: one brick in six.
+- Every region but the four curated cities pulls its wall hue toward the
+  REGIONAL photo's lit ground (`earth`: 0.1 Japan and Hong Kong, 0.15 to 0.35
+  elsewhere), read from the z11 tile the build already holds
+  (`photo-sampler.js regionalGround`: the lit half of the non-vegetation pixels
+  over the tile and one tile round it), so an unlisted city sits in its own
+  imagery; round 1 read the z16 photo, which the build no longer has. A wall
+  built before the regional photo landed is recoloured by the late patch
+  (patch gate, cold arms: 24,852 to 31,924 wall vertices, exact).
+- `glass` per region: the share of untagged office towers (family 4) kept as
+  curtain glass; the rest become concrete towers (family 3) with the region's
+  'mod' palette. Hong Kong 0.3 and `officeGlass: false` (an untagged mid-rise
+  or tower there is tile and concrete, written as opaque in the style byte, so
+  the shader's office cuts cannot make it a curtain wall); Japan 0.55;
+  Manhattan 1 (its glass variety stays).
+- Japan gained the tan and brown tile of the mansions next to its greys; Hong
+  Kong warmer pale tile.
+
+Measured (frames, control / own / all four; `crop-<place>.jpg`):
+
+| pose | region key | lower-third luma | lower-half chroma | read |
+|---|---|---|---|---|
+| sf-hills | pacific | 77.9 / 90.7 / 91.3 | 28.3 / 26.9 / 27.0 | the red brick is gone: cream, white and pale grey with darker towers. Fixed. |
+| lagos | africa | 100.3 / 98.2 / 99.9 | 35.8 / 35.9 / 36.2 | off-white and beige render; was the temperate palette. |
+| hongkong | hongkong | 83.5 / 85.6 / 86.6 | 37.0 / 35.7 / 35.4 | towers still mostly dark slate; a few warmer pale mid-rises. Partly fixed. |
+| tokyo | japan | 59.4 / 59.9 / 55.8 | 29.8 / 27.9 / 28.5 | still near-monochrome grey near and far. NOT fixed. |
+
+Rio is `latam` and Sydney `oceania` by the key (node), not shot. The
+chroma column is frame-wide (water and parks included) and cannot by itself
+show building variety; the reads are from the crops. Hong Kong and Tokyo: the
+regional-photo pull (0.1) and the glass share are too weak against the
+shader's own dark coat for towers; what would fix them is a per-building value
+spread for the tower families in those two regions (and the HK curtain glass
+share lowered further), judged on the owner's screen.
+
+### 5 and 6. Near and far agree; the far colour sits in the photo
+
+Findings: `lookFar` keyed colour on the part id while the near ring keyed on
+the structure root (multi-part structures changed colour at the handoff);
+with REACH on the far stand-ins were white and salt-like north of the Seine
+against the warm grey near ring, salmon / pink / cream / blue confetti over
+Manhattan, with a tonal step along the ring boundary.
+
+Changed: ONE far colour function (`lookFarPrepare` + `lookFarColour`, see the
+top of this ledger), the near ring's structure key, wall and fallback roof
+rule; the far wall pulled toward the regional photo at the building (hue, and
+value at most 1.6 x the photo's luma) by 0.7 x far01 and desaturated by
+0.45 x far01. `colourOf(..., 'far')` calls it. Seam: one marked line in
+`worker/sat-skyline-stand-ins.js`.
+
+Measured: gate F (item 8): with the near ring's key, 0 of 83 Midtown, 87 Paris,
+82 Tokyo and 24 London multi-part buildings differ from the near wall at
+far01 = 0; with round 1's part key 63 / 41 / 57 / 13 do. 
+
+The far frames, live (`farstack-<pose>.jpg`: control | own | TRUTH + ARRIVAL +
+REACH without LOOK | all four; sRGB luma / chroma of two horizontal bands of the
+city below the horizon, the second the far ring):
+
+| pose | band | control | own (legacy far mass) | three flags, no LOOK | all four |
+|---|---|---|---|---|---|
+| paris-mid | 52-62 % | 123.4 / 57.8 | 123.0 / 57.8 | 127.5 / 52.6 | 129.1 / 49.8 |
+| paris-mid | 62-75 % | 112.6 / 45.5 | 115.1 / 43.3 | 120.6 / 38.4 | 128.9 / 27.1 |
+| nyc-mid | 62-75 % | 112.6 / 43.1 | 112.6 / 42.4 | 110.5 / 46.5 | 110.2 / 43.5 |
+| nyc-bay | 62-75 % | 86.8 / 46.4 | 87.7 / 43.5 | 85.8 / 47.4 | 86.5 / 43.8 |
+
+Over Manhattan the far colour now sits with REACH's own (no confetti in the
+frames; band within 1 luma of control). Over Paris it does NOT: on the legacy
+far mass LOOK moves the band 2.5 luma, but on REACH's stand-ins it adds 8 luma
+and takes chroma 38 to 27 on top of REACH's own 8: the stand-ins north of the
+Seine stay paler and greyer than the near ring. The value pull this round
+(`valueLift`) moved it 1.2 luma. Likely cause (not proven live): the far roof
+is the regional photo with this worker's learned roof correction, and a far
+tile is built in a worker that may have patched no near tile (correction
+null: the raw regional colour, Paris's pale limestone and streets); the 0.27
+desaturation adds to it. What would fix it: carry the near ring's learned
+correction per z11 tile in the request (main thread holds it from the patches)
+or a per-region default, and judge desat on the owner's screen.
+
+### 7. The worker read TERRA_CACHE.enabled
+
+Changed: `photo-sampler.js` no longer imports `fly-constants`. The Cache API
+store name travels in the request: `WORLD_LOOK.worker.photo.cacheName` is a
+getter resolved on the main thread when the request is built (the latch),
+from the same inputs as `terrain-engine.js terraCacheOn()`
+(`TERRA_CACHE.enabled`, `window.__flyTerraPin`, the dev-only
+`window.__flyTerraForce.cache`), so a terrain pin reaches the worker. The
+worker reads `cfg.cacheName` only (null: the store is not read).
+
+### 8. Metrics that can fail
+
+`node scripts/wp-look-agree.mjs` (`.graphics-review/world-pass/look/r2/agree-gate.json`),
+every number read off the bundle the worker emits (vertex colours and style
+bytes) or off the far colour function, each with a control arm:
+
+| measure | look on | control | bar |
+|---|---|---|---|
+| S: multi-part structures whose kept parts carry different walls in the bundle (Midtown / London / Paris / Tokyo) | 0 of 184 / 0 of 29 / 0 of 43 / 0 of 32 | `structures` off: 63 / 19 / 40 / 32 | 0, and the control must disagree |
+| M: seam halves with the same wall top in both bundles, Midtown E-W / N-S | 25 of 27 / 29 of 32 | (as measured, no bar) | none |
+| F: far wall at far01 = 0 against the near walls of the same building (Midtown / Paris / Tokyo / London) | 0 of 2,336 / 1 of 3,523 / 0 of 889 / 0 of 1,099; multi-part 0 / 0 / 0 / 0 | the round-1 part key: 63 / 41 / 57 / 13 (all multi-part) | no multi-part, at most 0.1 % |
+
+Round 1's "part piles 214 to 0" counted a relation's own bookkeeping (true by
+construction); S reads the emitted colours and the control shows what the
+relation removes. The seam numbers M are the verifier's measurement redone on
+the bundle; the 2 + 3 split halves have different style families (each half's
+clipped area feeds the classifier: stream A's `sid` and a shared descriptor
+would fix it). The one Paris building in F is a classifier difference between
+two builds of one footprint (family 0 near, 1 far), not a key.
+
+The gate found three real defects while it was written: the far restyle
+skipped a root whose structure top differs from its own height (fixed in
+`lookFarColour`), and two measurement faults (a partial footprint key that
+collided, the brightest wall vertex of a stepped building).
+
+### Cost and rules (round 2)
+
+- Flags off: `node scripts/world-pass-worker-proof.mjs --check c2bf5c06 --ignore-protocol`
+  IDENTICAL, 1,062 / 1,062 cases, 7,308 buffers, 28 stage cases (0 bad), at
+  the final commit. `WORKER_PROTOCOL` unchanged (26).
+- Rule 1: the worker reads only the request (`worldPass.look`, its `worker`
+  tunables; the cache name now among them). No constants gate in the worker.
+- Flags off, per frame: nothing new. `look-roof-patch.js` runs only for a
+  result carrying `lookPatch` (look.roofPhoto in the request) and its
+  requestAnimationFrame only while a fade is in flight. The engine seam is one
+  property test per build result. No new program with the flag off (the shader
+  edit and key are behind the latched `worldLookShader()`).
+- Geometry: none added. With ARRIVAL on, the colours of tiles with tagged walls
+  now pack to Uint8 (3 B a vertex, not 12): the offset that forced Float32 left
+  the near ring.
+- Worker: the roof index after each build (one pass over the bundle) and, per
+  tile with buildings, one z16 photo (16 fetches + the cached z11), its decode
+  and one decision pass when the main thread asks. The far ring pays
+  `lookFarPrepare` (3 to 61 ms a z14 tile, node, see the top of this ledger).
+- Main thread: a fade writes the roof vertices of one tile (about 50 to 120
+  thousand) at most every 50 ms for 900 ms and re-uploads one colour range.
+- Live draws / triangles at the 12 poses (Ultra, capture tool, settled):
+  control 348 to 412 / 2.09 to 6.41 M; own 349 to 409 / 2.09 to 6.42 M (the
+  same within single-run noise); all four 351 to 410 / 2.45 to 7.16 M (Paris).
+  Inside the all-four budget (900 draws, 8 M triangles). Geometry MiB was not
+  read this round (`world-pass-budget.cjs` not run); LOOK adds no vertices.
+
+### Shared-file edits (round 2)
+
+- `lib/fly/toy-world/vector-tile.worker.js`: the WORLD PASS D blocks now import
+  `lookBegin, lookAfterBuild, lookRoofPatch` (was `startRoofPhoto`), call
+  `lookBegin` before the vector fetch (no await, no cancel needed), build the
+  'sat-buildings' tile with `lookIn.frame()` spread into its frame and return
+  `lookAfterBuild(out, ctx)`, and add `api.lookRoofPatch` before `expose`. All
+  inside `// WORLD PASS D begin` / `end`. With the flag off `lookBegin` returns
+  null and the build and its result are the shipped ones.
+- `lib/fly/toy-world/sat-building-engine.js` (B's): one import and one line in
+  the build-result handler, `// WORLD PASS D x B seam`:
+  `if (result.lookPatch) requestLookRoofPatch(this, slot ? slot.api : this.worker, key, result);`
+- `lib/fly/toy-world/worker/sat-skyline-stand-ins.js` (C's): one import and one
+  line after admission, `// WORLD PASS D x C seam`:
+  `lookFarPrepare(admitted, tileCtx);` (a no-op unless look.structures).
+- `lib/fly/fly-constants.js`: only the WORLD_LOOK block (and the
+  `worldLookTerraCacheName` helper right above it, inside the D seam).
+
+### Gates (round 2)
+
+`node scripts/wp-look-patch.mjs` (new, 15 arms) PASS; `node scripts/wp-look-agree.mjs`
+(new) PASS; `node scripts/wp-look-shader.mjs` 17 / 17 (check (2) rewritten for
+the style-byte decode); `node scripts/wp-look-fallback.mjs` (new, a measure, no
+bar); node gates on the merged tree: graphics-unit PASS, verify-true-earth-flags
+11 / 11, verify-stylized-earth 22 / 22, verify-city-horizon PASS,
+verify-building-handoff 4 / 4, verify-attribution 4 / 4; eslint clean on every
+changed file.
+
+### Still open after round 2
+
+- Night (item 3): the lower third of nyc-low at night is still 4.3 (own) to
+  6.2 (all four) luma darker than the control; window inputs and roofs ruled
+  out; curtain glass at night is the open candidate (item 3 says how to settle
+  it).
+- 1 Penn Plaza still reads two-tone (two buildings, two tags, one material);
+  one maroon-tagged Lower Manhattan tower stays red.
+- Tokyo still near-monochrome and Hong Kong towers mostly dark slate (item 4).
+- The far step (item 6): see the far rows above; with all four flags the far
+  stand-ins north of the Seine still read paler than the near ring.
+- Two to three of 27 to 32 seam halves differ in family (the classifier reads
+  each half's clipped area; stream A's `sid` and a shared descriptor).
+- Not run: the 5080 motion check, `world-pass-budget.cjs` geometry MiB, the
+  empty-tile z16 fetch count live (node only: `lookAfterBuild` stamps no patch
+  without buildings), verify-ship-city and verify-night-city-identity.
+
+## Round 3 (the verifier's three blocking items)
+
+Same branch, no merge needed (the integration head `d40dfd25` was already in).
+The flag still ships `enabled:false`; `WORKER_PROTOCOL` unchanged (26). Live
+evidence on this machine's RTX 5080 through `:3324`, one session, one server:
+`mystifying-curran-97a006/.graphics-review/world-pass/r2/look/r3/`
+(`control/`, `three/` = `?flags=WORLD_TRUTH,WORLD_ARRIVAL,WORLD_REACH`,
+`nostruct/` = WORLD_LOOK with `structures:false`, and the first attempt's
+`own/`, `all4/`) and `r3c/` (the final code: `own/`, `all4/`, `crop-*.jpg`,
+`frames-metrics.json`, `handoff-all.json`). Controls were shot before the
+final arms in the same session (none of round 3's edits touches the flags-off
+or three-flag paths: the worker proof and the stand-in seam's material-0
+branch). `r3b/` is an intermediate step (seeds only; its all-four arm may have
+straddled a hot reload: not used for any claim).
+
+New tools: `scripts/wp-look-handoff.cjs` (a copy of the capture tool that
+also saves, per shot, a second plain frame and the frames with the far layer
+and the near layer hidden) and `scripts/wp-look-handoff-metric.cjs` (the
+handoff step from those frames: the pixels each layer draws, blurred against
+the renderer's grain, noise and both-set pixels left out, a 3 x 3 majority;
+then the mean sRGB luma and chroma of the full frame on each side of the ring
+boundary, within 24 px of the other set; `step` = far side minus near side);
+`scripts/wp-look-metrics.cjs` (band luma, chroma, lit share); `scripts/wp-look-night.mjs`
+(node: the night wall albedo by family and material); `scripts/wp-look-far.mjs`
+(node: each building's far colour against what the near ring draws for it, in
+three worker states); `scripts/wp-look-pins.cjs` (a preload that sets console
+pins in every page a capture tool opens, for sub-switch ablations).
+
+### R3-1. Night: the structure's shared draw, and the darker look walls
+
+Finding (verifier): nyc-low at night, lower third 28.86 (control) / 24.58
+(own) / 22.67 (all four); lit share of the lower 55 % 6.62 / 5.71 / 5.72 %;
+London unaffected.
+
+Diagnosis, measured:
+- Node (`wp-look-night.mjs`, 3 x 3 z14 tiles round Penn Station): at night the
+  facade pass steps aside and a wall shows its vertex colour. Area-weighted
+  wall luma (linear): flags off 0.356, look 0.308 (Midtown brick and dark
+  glass; family 0 0.18 against 0.40, family 4 0.19 against 0.28, tagged glass
+  8 % of the wall area at 0.15).
+- Live ablation, same session: with `structures:false` (walls and the new night
+  gain on) the night matches the control: lower third 29.50 against 29.30, lit
+  share 6.69 against 6.67 %. With structures on and only the albedo fixed it
+  did not (25.29 / 5.79 %). Cause: `restyle` gave every part of a structure
+  its root's family and seed. The night lighting keys on both (dark building,
+  activity, glow, lit floors on the seed; occupancy, the office / home share
+  and the lamp on the family), so a whole multi-part tower became one draw and
+  a tower that drew dark took all its parts dark (the bright tower right of
+  centre in `r3c/crop-nyc-low-night-control-own-all4.jpg`). Keeping own seeds
+  only: 28.08 / 6.30 %; own seeds and own families: below.
+
+Changed:
+- `colour.js restyle`: a part keeps its OWN family and seed in the vertices;
+  the root's family becomes `style.lookFamily`, which `lookWall` reads for the
+  palette group and the glass share, so the structure's colour is still one
+  (gate S: 0 of 184 / 29 / 43 / 32 structures split; control 139 / 22 / 41 /
+  32). The material is the structure's too: `lookMaterial` (near and far
+  alike) writes a grouped part's material from the structure (glass for an
+  office structure, else opaque), since its own family could make the shader
+  choose another. `structures.js lookOf` now says `grouped`.
+- Night gain: the style byte of a look wall is `material + 4 x (gain code + 1)`
+  (6 bits, 0.5 to 8, log-spaced, `colour.js nightGainCode`); the gain is the
+  old palette's mean value over the look wall's value (the family's old palette,
+  so seam halves and parts share it). `applyWorldLook` decodes it and scales the
+  wall albedo by it at night only (`mix(1., gain, uArchitectureNight)`): by day
+  the look is untouched. Program key `world-look-v4`. Night wall albedo (node):
+  0.354 against 0.356 off (was 0.308). `wp-look-shader.mjs` (5) checks the code
+  round trip against the GLSL decode as written.
+
+Measured live, nyc-low at night (sun -20 deg), sRGB:
+
+| arm | lower third luma | lit share, lower 55 % | unlit mean, lower 55 % |
+|---|---|---|---|
+| control | 29.30 | 6.67 % | 26.64 |
+| own (final) | 29.54 | 6.66 % | 26.94 |
+| all four (final) | 29.26 | 6.64 % | 26.83 |
+| three flags, no LOOK | 29.46 | 6.69 % | 26.85 |
+| own, round 3's first attempt (gain only) | 25.29 | 5.79 % | 25.01 |
+| own, structures off | 29.50 | 6.69 % | 26.96 |
+
+London at night: lower third 33.16 (control) / 32.67 (own) / 33.75 (all four);
+lit share 3.53 / 3.35 / 4.25 %. Own sits 0.5 luma under the control there; the
+first own run of the session read 32.96, so this is within run-to-run spread,
+but it is not "above" either. Fixed at nyc-low; London level within noise.
+
+Day cost of own families and seeds (not separately measured beyond the gates):
+the parts of one structure keep one colour and one material, but window pitch
+jitter, storey band period and glint tilt follow each part's own seed again, as
+in the old world.
+
+### R3-2. Near and far agree as the live callers ask
+
+Finding (verifier): `colourOf(..., 'far')` passed no far01, so every far body
+used 0.6; gate F measured only far01 = 0 and untagged walls. At the live 0.6
+the far wall stood 5 to 7 dE (90th percentile up to 12; tagged up to 26) from
+its near wall.
+
+Changed: `far01` defaults to 0 (constants and `FAR_DEFAULTS`). A far tile is
+built once and seen from every distance as the player flies, so any distance
+term baked into it is right for no camera; distance is the shader's aerial
+perspective. The tagged-glass greying is gone; the far body carries the near
+ring's material instead (the far mass in its red offset, the stand-in in its
+family byte: the D x C seam below). `lookFarColour` and `lookNear` share one
+material rule (`lookMaterial`).
+
+Gate F now runs the live call (no far01), every wall including tagged and
+material-coded ones, and checks the material as well as the colour, with a
+control arm at round 2's far01 0.6 that must differ (`node scripts/wp-look-agree.mjs`,
+`.graphics-review/world-pass/look/r3/agree-gate.json`):
+
+| place | buildings | differ (colour or material) | multi-part differ | control far01 0.6 differs | part-key control differs |
+|---|---|---|---|---|---|
+| Midtown | 3,274 | 0 | 0 of 612 | 2,974 | 137 |
+| Paris | 3,541 | 1 | 0 of 90 | 3,540 | 87 |
+| Tokyo | 906 | 0 | 0 of 93 | 846 | 84 |
+| London | 1,257 | 0 | 0 of 92 | 1,253 | 47 |
+
+This is equal BY CONSTRUCTION now (the far wall is the near wall times a
+constant); it proves the live path takes that construction, not that the
+handoff looks right. The pixels do that (R3-3). The one Paris building is a
+classifier difference between two builds of one footprint (round 2).
+
+Node, `wp-look-far.mjs` (`.graphics-review/world-pass/look/r3/far.json`): far
+walls 0.0 dE from the near wall (median and 90th percentile, all six places,
+untagged and material-coded) once the worker has the regional photo; without
+it, Tokyo and Phoenix walls 1.1 / 1.5 (their local earth). Far ROOFS are the
+regional photo at the building (a 300 m window) against the near ring's
+per-building photo reads, so per building they do not agree (median 7 to 16
+dE) and cannot: what matters is the tile median, below.
+
+### R3-3. The far city against the near ring (Paris), and the cold far tile
+
+Findings: with all four flags the far stand-ins north of the Seine were pale,
+salt-white and grey above a warmer, darker near ring, with a step at the
+boundary (verifier: band 62-75 % 128.2 / 27.5 against control 113.2 / 45.3).
+
+Diagnosis (node, `wp-look-far.mjs`): a far tile built before its worker had
+decoded the regional photo drew neutral grey roofs (sRGB luma 156, chroma 4,
+every place: the "salt"); a far-only worker had no learned roof correction and
+drew the raw regional colour. Live (first round-3 attempt, far01 0 alone): the
+far walls and roofs were the near ring's albedo, but a far body is a lit box
+(no resolved windows, no ground occlusion, the far material receives no
+shadows), so it rendered paler than the near ring with the same albedo.
+
+Changed:
+- `photo.fallbackCorr` [1.18, 1.43, 1.66]: roof against region for a worker
+  that has learned nothing there, the geometric mean of what six cities' near
+  tiles learned (NYC, Brooklyn, Paris, London, Tokyo, Phoenix). Tile-median far
+  roof against near, sRGB luma, a far-only worker (was raw regional): Paris
+  133.6 / 142.1, NYC 130.0 / 132.6, Brooklyn 145.9 / 172.7, London 118.1 /
+  103.1, Tokyo 97.1 / 105.3, Phoenix 165.8 / 183.7.
+- `look-roofs.js lookFarBegin`: a far tile with the look on starts the
+  regional photo at the request and waits for it after its vector fetch, at
+  most `photo.farRegionalWaitMs` (2,500 ms; one regional tile serves 64 z14
+  tiles and is the terrain's own imagery). Not measured live (no counter of
+  far tiles built cold); node shows what it prevents (the cold column above).
+- `far.wallShade` 0.6, `far.roofShade` 0.85: the far colour is the near colour
+  times these constants (the same at every distance, so no distance term),
+  standing in for the near ring's facade and shadow darkening. Calibrated live
+  at the boundary in two steps (1, then 0.7 / 0.9, then 0.6 / 0.85).
+
+Measured live, the handoff step (far side minus near side, sRGB luma / chroma,
+`wp-look-handoff-metric.cjs`, 24 px each side):
+
+| pose | control | three flags, no LOOK | own (final) | all four, first attempt | all four (final) |
+|---|---|---|---|---|---|
+| paris-mid | +31.0 / -8.0 | +25.3 / -6.1 | +3.3 / +1.7 | +33.7 / -8.1 | +22.1 / -6.0 |
+| nyc-mid | +16.1 / +2.4 | +19.3 / -0.5 | +10.4 / +6.1 | +22.0 / +1.0 | +9.2 / +4.5 |
+| nyc-low (noon) | +74.1 | +68.5 | +70.4 | +53.9 | +53.8 |
+
+(nyc-low's near ring fills the frame; its few far pixels are the haze line.)
+
+paris-mid frame bands, sRGB luma / chroma: 52-62 %: control 123.9 / 57.1,
+three 126.9 / 53.2, all four 128.0 / 51.1; 62-75 %: control 115.3 / 43.3,
+three 120.6 / 38.7, own 114.6 / 43.2, all four 124.1 / 30.4 (first attempt
+133.5 / 25.7; verifier, round 2 code: 128.2 / 27.5). Crop:
+`r3c/crop-paris-mid-far-control-three-all4r3a-all4final.jpg` (control, three
+flags, all four first attempt, all four final).
+
+Read: with LOOK the step at the Paris boundary is now smaller than with the
+three other flags alone (22.1 against 25.3) and than the old world (31.0); with
+LOOK alone, 3.3. The salt-white city is gone (the far city reads beige). NOT
+fully fixed: the far band is still 3.5 luma paler and 8 chroma greyer than the
+three-flag frame (LOOK's Paris palette is cream limestone; the city facade
+palette it replaces is warmer), and a step remains, most of it the three other
+flags' own.
+
+### R3 seam edits (stream C's files, marked `// WORLD PASS D x C seam`)
+
+- `lib/fly/toy-world/worker/sat-skyline-stand-ins.js`: the decoded far
+  material rides the family byte: `col[m*8+3] = mode ? (family & 15) | (mode << 4) : family & 255`.
+  Material 0 (every stand-in with look.authority off): the byte is unchanged.
+- `lib/fly/sat-stand-in-material.js`: `standInStyle` decodes it: family =
+  byte mod 16, wall z = `sWall * (1 + material)` (the near ring's 2 / 3 code,
+  decoded by `applyWorldLook`). Material 0: the same family and z as before.
+- Stream B's `sat-building-engine.js` and the worker's D blocks as round 2; the
+  worker D block adds `lookFarBegin` and its bounded await (inside
+  `// WORLD PASS D begin` / `end`).
+
+### Rules and cost (round 3)
+
+- Flags off: `node scripts/world-pass-worker-proof.mjs --check c2bf5c06 --ignore-protocol`
+  IDENTICAL, 1,062 / 1,062, at the final commit.
+- The worker reads only the request (`fallbackCorr`, `farRegionalWaitMs`,
+  `far.*` are request tunables). Nothing new per frame with the flag off; the
+  shader edits are behind the latched `worldLookShader()`.
+- Ultra, all four (capture tool telemetry, final arm): 341 to 401 draws, 4.02 to
+  6.16 M triangles (900 / 8 M budget). LOOK adds no vertices. Geometry MiB not
+  measured this round.
+
+### Gates (round 3)
+
+`node scripts/wp-look-agree.mjs` PASS (S, M, F as above); `node scripts/wp-look-patch.mjs`
+PASS 15 / 15; `node scripts/wp-look-shader.mjs` 18 / 18; `node scripts/wp-look-fallback.mjs`
+(measure) brooklyn 3.5, paris 1.9, phoenix 5.1, midtown 1.8 dE (unchanged);
+graphics-unit PASS, verify-true-earth-flags 11 / 11, verify-stylized-earth
+22 / 22, verify-city-horizon PASS, verify-building-handoff 4 / 4,
+verify-attribution 4 / 4; eslint clean on every changed file.
+
+### Still open after round 3
+
+- Paris far band: paler and greyer than the three-flag frame (above).
+- Seam halves: M reads 22 of 27 and 28 of 32 same (colour 2 and 3 differ, the
+  classifier's family; material 1 and 1; night gain 4 and 3 where the halves'
+  families pick different old palettes).
+- The far-tile regional wait is not measured live; the late-photo recolour
+  during arrival (verifier's note) is unchanged; London night own 0.5 luma
+  under the control (within the session's spread).
+- Not run: the 5080 motion check, geometry MiB, verify-ship-city,
+  verify-night-city-identity, a LOOK Medium / phone arm.
