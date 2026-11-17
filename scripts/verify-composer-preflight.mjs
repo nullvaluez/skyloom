@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { BackSide, BoxGeometry, DirectionalLight, DoubleSide, Group, Mesh, MeshDepthMaterial, MeshStandardMaterial, PerspectiveCamera, Scene, ShaderMaterial, Texture, WebGLRenderTarget } from 'three';
 import { createComposerPreflight, shadowWarmMaterial } from '../lib/fly/composer-preflight.js';
+import { KawaseBlurPass, MipmapBlurPass, Pass } from 'postprocessing';
+import { N8AOPostPass } from 'n8ao';
 
 function fixture(parallel = true) {
   const scene = new Scene(), camera = new PerspectiveCamera(), target = new WebGLRenderTarget(2, 2);
@@ -155,6 +157,41 @@ check('context restore re-arms exact programs and disposal detaches scene listen
   f.gl.ready = false; f.gl.restore(); assert.equal(f.warm.prepare(), false); assert.equal(f.gl.calls.length, before + 4);
   f.dispose(); const listenerCount = Object.values(f.scene._listeners ?? {}).reduce((sum, values) => sum + values.length, 0);
   assert.equal(listenerCount, 0); assert.equal(f.warm.prepare(), false);
+});
+
+check('real mipmap bloom and Kawase passes prepare both swapped materials before a screen exists', () => {
+  const f=fixture(),mipmap=new MipmapBlurPass(),kawase=new KawaseBlurPass();mipmap.levels=3;
+  const parent=f.pass;parent.effects=[{mipmapBlurPass:mipmap,blurPass:kawase}];
+  assert.equal(mipmap.fullscreenMaterial,null);
+  f.warm.invalidatePosts();assert.equal(f.warm.prepare(),false);
+  const materialCalls=new Map();for(const call of f.gl.calls)for(const object of call.objects)materialCalls.set(object.material,{call,object});
+  for(const [material,target]of [[mipmap.downsamplingMaterial,mipmap.downsamplingMipmaps[0]],[mipmap.upsamplingMaterial,mipmap.upsamplingMipmaps[0]],
+    [kawase.blurMaterial,kawase.renderTargetA],[kawase.copyMaterial,f.composer.inputBuffer]]){
+    const found=materialCalls.get(material);assert.ok(found,material.name);assert.equal(found.call.target,target);
+    assert.equal(found.object.geometry,Pass.fullscreenGeometry,'Use the installed pass triangle, not a guessed layout');
+  }
+  assert.equal(mipmap.fullscreenMaterial,null,'Preparation must not mutate the pass material or create its live screen');
+  f.gl.ready=true;f.warm.prepare();const calls=f.gl.calls.length;
+  mipmap.fullscreenMaterial=mipmap.upsamplingMaterial;kawase.fullscreenMaterial=kawase.copyMaterial;
+  f.warm.prepare();assert.equal(f.gl.calls.length,calls,'Render-time material swapping does not recompile stable variants');
+  mipmap.dispose();kawase.dispose();f.dispose();
+});
+
+check('real N8AO quads include accumulation and retain their exact geometry and empty light state', () => {
+  const f=fixture(),ao=new N8AOPostPass(f.scene,f.pass.camera,4,4);ao.configuration.halfRes=true;
+  f.composer.passes.unshift(ao);f.warm.invalidatePosts();assert.equal(f.warm.prepare(),false);
+  const materialCalls=new Map();for(const call of f.gl.calls)for(const object of call.objects)materialCalls.set(object.material,{call,object});
+  for(const [name,target]of [['depthDownsampleQuad',ao.depthDownsampleTarget],['effectShaderQuad',ao.writeTargetInternal],
+    ['poissonBlurQuad',ao.writeTargetInternal],['accumulationQuad',ao.accumulationRenderTarget],
+    ['effectCompositerQuad',ao.outputTargetInternal],['copyQuad',f.composer.inputBuffer]]){
+    const quad=ao[name],found=materialCalls.get(quad.material);assert.ok(found,name);assert.equal(found.call.target,target);
+    assert.equal(found.object.geometry,quad._mesh.geometry);assert.equal(found.object.geometry.attributes.position.itemSize,2);
+    assert.equal(found.call.world.environment,null);assert.equal(found.call.world.fog,null);
+    let lights=0;found.call.world.traverseVisible(o=>{if(o.isLight)lights++;});assert.equal(lights,0);
+  }
+  f.gl.ready=true;f.warm.prepare();const before=f.gl.calls.length;
+  ao.effectShaderQuad.material.needsUpdate=true;f.warm.prepare();assert.equal(f.gl.calls.length,before+1);
+  ao.dispose();f.dispose();
 });
 
 check('unsupported drivers and failed dispatches retain explicit renderer fallback', () => {

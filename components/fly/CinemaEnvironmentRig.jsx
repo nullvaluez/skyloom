@@ -6,6 +6,7 @@ import { CINEMA_GLSL, CINEMA_UNIFORMS, cinemaEnvironment } from '@/lib/fly/cinem
 import { PHYS_SKY_TEXT_ACTIVE } from '@/lib/fly/cinema-sky';
 import { isMobileGraphicsClass } from '@/lib/fly/device-class';
 import {registerCinemaResources} from '@/lib/fly/cinema-resources';
+import {createCinemaEnvironmentPrewarm} from '@/lib/fly/cinema-environment-prewarm';
 
 // PHYS_SKY: the lower hemisphere is lit ground (albedo x sun + sky
 // irradiance) instead of a near-black fill, which lit the aircraft bellies
@@ -29,23 +30,27 @@ export function CinemaEnvironmentRig({runtime}) {
       fragmentShader:'varying vec2 vUv;uniform sampler2D a,b;uniform float amount;void main(){gl_FragColor=mix(texture2D(a,vUv),texture2D(b,vUv),amount);}'});
     blendScene.add(new Mesh(quadGeometry,blend));
     const next={sky,pmrem,blendScene,camera,blend,current:null,next:null,display:null,elapsed:0,last:-Infinity,signature:null,fade:1,size:isMobileGraphicsClass()?128:256};
+    next.warm=createCinemaEnvironmentPrewarm(gl,next);
     rig.current=next;
     const release=registerCinemaResources('sky-environment',()=>({current:next.current,next:next.next,display:next.display}));
     const lost=()=>{
       next.lost=true;scene.environment=null;
+      next.warm.dispose();
       next.current?.dispose();next.next?.dispose();next.display?.dispose();next.pmrem.dispose();
       next.current=next.next=next.display=null;next.pmrem=null;
     };
-    const restore=()=>{next.pmrem=new PMREMGenerator(gl);next.signature=null;next.last=-Infinity;next.lost=false;};
+    const restore=()=>{next.pmrem=new PMREMGenerator(gl);next.warm=createCinemaEnvironmentPrewarm(gl,next);next.signature=null;next.last=-Infinity;next.lost=false;};
     gl.domElement.addEventListener('webglcontextlost',lost);
     gl.domElement.addEventListener('webglcontextrestored',restore);
     return()=>{release();scene.environment=previous.environment;scene.environmentIntensity=previous.intensity;
       gl.domElement.removeEventListener('webglcontextlost',lost);
       gl.domElement.removeEventListener('webglcontextrestored',restore);
-      next.current?.dispose();next.next?.dispose();next.display?.dispose();next.pmrem?.dispose();material.dispose();geometry.dispose();blend.dispose();quadGeometry.dispose();rig.current=null;delete runtime.cinemaIBL;};
+      next.warm.dispose();next.current?.dispose();next.next?.dispose();next.display?.dispose();next.pmrem?.dispose();material.dispose();geometry.dispose();blend.dispose();quadGeometry.dispose();rig.current=null;delete runtime.cinemaIBL;};
   },[gl,scene,runtime]);
   useFrame((_,dt)=>{
     const r=rig.current;if(!r||r.lost||!runtime.cinemaEnvironment)return;
+    runtime.cinemaIBL??={};runtime.cinemaIBL.programWarm=r.warm.state;
+    if(!r.warm.prepare())return;
     const e=cinemaEnvironment;r.elapsed+=Math.min(dt,.1);
     const signature=[...e.horizon,...e.zenith,...e.keyDir,e.overcast];
     const changed=!r.signature||signature.some((v,i)=>Math.abs(v-r.signature[i])>.012);
@@ -66,7 +71,7 @@ export function CinemaEnvironmentRig({runtime}) {
       }
       scene.environment=r.display.texture;scene.environmentIntensity=e.environment;
       if(r.next&&r.fade>=1){r.current.dispose();r.current=r.next;r.next=null;}
-      runtime.cinemaIBL={size:r.size,width:r.display.width,height:r.display.height,blending:!!r.next};
+      runtime.cinemaIBL={size:r.size,width:r.display.width,height:r.display.height,blending:!!r.next,programWarm:r.warm.state};
     }
   },-.8);
   return null;
