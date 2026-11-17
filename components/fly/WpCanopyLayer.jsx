@@ -471,7 +471,12 @@ function writeOp(j, s, meshes, engine, tc, cfg, q) {
   const n = j.nF;
   if (n >= tc.farCap) return;
   const a = ch.canopy['l' + lvl], o = i * 7;
-  const lx = a[o], lz = a[o + 1], r = a[o + 2], h = a[o + 3], sp = a[o + 4];
+  const r0 = a[o + 2], h = a[o + 3], sp = a[o + 4];
+  // L2 and L3 patches of a full forest sit on their fixed cell grid; a small
+  // offset and size jitter keeps a hillside of them from reading as a lattice
+  const jx = lvl >= 2 ? (hashF(a[o] * 0.13, a[o + 1] * 0.29) - 0.5) * 0.6 * r0 * k : 0;
+  const jz = lvl >= 2 ? (hashF(a[o + 1] * 0.23, a[o] * 0.17) - 0.5) * 0.6 * r0 * k : 0;
+  const lx = a[o] + jx, lz = a[o + 1] + jz, r = r0 * (lvl >= 2 ? 0.88 + 0.24 * hashF(a[o] * 0.07, a[o + 1] * 0.05) : 1);
   // the outer edge dissolves (dithered), with a little per-cell jitter so it is no circle
   const dens = (look['d' + lvl] ? look['d' + lvl][i] : 1) * edgeDensity(j.plan, op.d[q] * (0.97 + 0.06 * hashF(lz, lx)));
   if (dens < 0.02) return;
