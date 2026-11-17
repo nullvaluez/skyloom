@@ -11,6 +11,10 @@ registerHooks({resolve(s,c,n){
 }});
 const {LIVE_AIRCRAFT,resolveLiveAircraft,liveGearDown}=await import('../lib/fly/live-aircraft.js');
 const {buildLiveAirframe}=await import('../lib/fly/live-aircraft-geometry.js');
+// World Pass ships on since 2026-11-17 (WORLD_GROUND replaces the living
+// forest at desktop High/Ultra); this gate certifies the old world, so it
+// latches the reader on the five -WORLD_ flags first (FLY_WORLD_PASS.md).
+await (await import('./_world-pass-off.mjs')).latchWorldPassOff();
 const {buildForestCluster,LivingForest}=await import('../lib/fly/living-forest.js');
 const {deriveWorldContent}=await import('../lib/fly/world-content.js');
 const {architectureRegion}=await import('../lib/fly/living-regions.js');

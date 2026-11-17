@@ -173,6 +173,19 @@ async function bootFly(
     // (unpinPins(['__flyTitleBypass']) / (['__flyVisualsOverride'])).
     window.__flyTitleBypass = true;
     window.__flyVisualsOverride = 'classic';
+    // World Pass (2026-11-17, SANCTIONED harness edit, the same idiom): the
+    // five World Pass streams ship ON at desktop High/Ultra. The legacy fleet
+    // was certified on the old world, so it pins all five OFF: exactly the
+    // `?flags=-WORLD_<NAME>` arm, whose worker output
+    // scripts/world-pass-worker-proof.mjs proves byte-identical to c2bf5c06.
+    // A pin wins over the URL. A gate that wants the shipped world un-pins
+    // with unpinPins(['__flyWorldTruthOverride', ...]) (FLY_WORLD_PASS.md
+    // "Default on (2026-11-17)"; verify-true-earth-flags (9b) checks both legs).
+    window.__flyWorldTruthOverride = { enabled: false };
+    window.__flyWorldArrivalOverride = { enabled: false };
+    window.__flyWorldReachOverride = { enabled: false };
+    window.__flyWorldLookOverride = { enabled: false };
+    window.__flyWorldGroundOverride = { enabled: false };
     try {
       localStorage.setItem('fly-controls-seen', '1');
       // Round 10: the APP default is now satellite (PauseMenu defaults an
@@ -220,6 +233,11 @@ async function bootFly(
       window.__flyBoostInfinite = true;
       window.__flyTitleBypass = true; // round 25: same idiom, reload leg
       window.__flyVisualsOverride = 'classic';
+      window.__flyWorldTruthOverride = { enabled: false }; // World Pass: same idiom, reload leg
+      window.__flyWorldArrivalOverride = { enabled: false };
+      window.__flyWorldReachOverride = { enabled: false };
+      window.__flyWorldLookOverride = { enabled: false };
+      window.__flyWorldGroundOverride = { enabled: false };
       localStorage.setItem('fly-controls-seen', '1');
       localStorage.setItem('fly-map-style-2', s || 'toy'); // round 10: default toy for harnesses
     }, { s: style, terraPin });

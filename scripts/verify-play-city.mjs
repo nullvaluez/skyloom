@@ -63,6 +63,9 @@ async function child(arm) {
   const { createSatelliteArchitectureMaterial } = await import('../lib/fly/satellite-architecture-material.js');
   const { useFlyStore } = await import('../stores/fly-store.js');
   const { playPassOn } = await import('../lib/fly/play-pass.js');
+  // World Pass ships on since 2026-11-17; these programs are certified on the
+  // old world, so latch the reader on the five -WORLD_ flags (FLY_WORLD_PASS.md).
+  await (await import('./_world-pass-off.mjs')).latchWorldPassOff();
   delete globalThis.window; // pins are read once, at module load
   const out = { on: playPassOn('CITY_FACADES'), programs: {} };
   for (const visuals of ['enhanced', 'classic']) {

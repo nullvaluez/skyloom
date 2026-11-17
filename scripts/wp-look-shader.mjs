@@ -2,7 +2,9 @@
  * World Pass D (LOOK) node gate: the architecture program with the look stream
  * on and off. Builds the near and far materials against three's real standard
  * program (the graphics-unit idiom) and checks:
- *   (1) flag off: no WORLD_LOOK text and no look key (the program is today's);
+ *   (1) flag off (?flags=-WORLD_LOOK; the stream ships on since 2026-11-17):
+ *       no WORLD_LOOK text and no look key (the program is the old one);
+ *       (1b) the shipped default carries the look edits;
  *   (2) look on (pins: ?flags=WORLD_LOOK at desktop Ultra): every anchored edit
  *       applied exactly once, near and far, and the key names the switches;
  *   (3) with a sub-switch off the matching edits are absent;
@@ -43,11 +45,20 @@ const program = (distant) => {
 };
 const count = (s, t) => s.split(t).length - 1;
 
-// (1) off
+// (1) off: since 2026-11-17 WORLD_LOOK ships on, so the off arm is explicit
+// (the `?flags=-WORLD_LOOK` pin), not the default.
 WP.__resetWorldPassLatchForTests();
+window.__flyWorldLookOverride = { enabled: false };
 for (const distant of [false, true]) {
   const p = program(distant);
-  check(`(1) off ${distant ? 'far' : 'near'}: no WORLD_LOOK edit, no key`, !p.frag.includes('wlBase') && !p.frag.includes('WORLD_LOOK') && !p.key.includes('world-look'));
+  check(`(1) off (?flags=-WORLD_LOOK) ${distant ? 'far' : 'near'}: no WORLD_LOOK edit, no key`, !p.frag.includes('wlBase') && !p.frag.includes('WORLD_LOOK') && !p.key.includes('world-look'));
+}
+// (1b) the shipped default (no look pin, the store's default High preset, desktop): look on.
+WP.__resetWorldPassLatchForTests();
+delete window.__flyWorldLookOverride;
+for (const distant of [false, true]) {
+  const p = program(distant);
+  check(`(1b) shipped default ${distant ? 'far' : 'near'}: WORLD_LOOK edits and key present`, p.frag.includes('wlBase') && /\|world-look-v\d+-rw?/.test(p.key), p.key);
 }
 // (2) on
 WP.__resetWorldPassLatchForTests();

@@ -6,7 +6,12 @@ import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
 
 const off = process.argv.includes('--off');
-globalThis.window = { location: { search: '' }, __flyCityHorizonOverride: { enabled: !off }, __flyBuildingRealismOverride: { enabled: false } };
+// World Pass (2026-11-17): the five streams ship ON; this gate's numbers are
+// the old world's (WORLD_REACH replaces the horizon caps it certifies), so it
+// pins the five streams off, exactly the `?flags=-WORLD_<NAME>` arm and the
+// harness fleet pin in scripts/_boot.js (FLY_WORLD_PASS.md "Default on").
+const WORLD_PASS_OFF = Object.fromEntries(['Truth', 'Arrival', 'Reach', 'Look', 'Ground'].map((n) => [`__flyWorld${n}Override`, { enabled: false }]));
+globalThis.window = { location: { search: '' }, __flyCityHorizonOverride: { enabled: !off }, __flyBuildingRealismOverride: { enabled: false }, ...WORLD_PASS_OFF };
 const workerURL = new URL('../lib/fly/toy-world/vector-tile.worker.js', import.meta.url).href;
 const baselineWorkerSource = execFileSync('git', ['show', 'HEAD:lib/fly/toy-world/vector-tile.worker.js'], { encoding: 'utf8', maxBuffer: 2e6 });
 registerHooks({

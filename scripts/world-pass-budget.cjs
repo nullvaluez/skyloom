@@ -7,6 +7,10 @@
  *   node scripts/world-pass-budget.cjs --url=http://localhost:3320 --pose=nyc-low,paris --quality=ultra \
  *        --flags=WORLD_TRUTH --out=<dir> [--posefile=<json>] [--settleTimeout=180000] [--label=base]
  *
+ * Since 2026-11-17 the five streams ship ON, so a run with no --flags measures the new world. The old
+ * world is --flags=-WORLD_TRUTH,-WORLD_ARRIVAL,-WORLD_REACH,-WORLD_LOOK,-WORLD_GROUND; one stream off
+ * is --flags=-WORLD_<NAME> (FLY_WORLD_PASS.md "Default on (2026-11-17)").
+ *
  * --pose (or --poses): comma list from the fixed set below + scripts/world-pass-poses.json (+ --posefile).
  * Per pose: draws and triangles (renderer info), geometry MiB by layer (attribute + index arrays of every
  * unique geometry: buildings, horizon/skyline, veg/trees, roads, terrain, other), JS heap, the building and

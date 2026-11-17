@@ -31,6 +31,11 @@
  * worker's WorldCover path runs (in a bare node it would return null).
  * Timing fields (`tessMs`) are excluded; everything else is compared.
  *
+ * OFF ARM (2026-11-17): the five streams ship ON, so the `*wpoff` cases send
+ * the request the real reader builds for `?flags=-WORLD_TRUTH,...,-WORLD_GROUND`
+ * at desktop Ultra (checked equal to the all-off literal; see WP_OFF). Cases
+ * with no `worldPass` field are the pre-W0 request shape, unchanged.
+ *
  * STAGE CASES (W0-C): `.../+stages` cases build with the worker's diag switch
  * on (the opt-in stage counters, lib/fly/toy-world/worker/stages.js). They are
  * not in any baseline; --check proves instead that the result WITHOUT its
@@ -218,10 +223,49 @@ const horizon = (t, b) => ({ cityHorizon: { maxTriangles: t, maxBodies: b, minMa
 // The all-off World Pass request the main thread sends with every flag off
 // (lib/fly/world-pass.js buildRequest, schema v1). No worker code may read it
 // differently from an absent one.
-const WP_OFF = (() => {
+//
+// Since 2026-11-17 the five streams ship ON (FLY_WORLD_PASS.md "Default on"),
+// so the old world is the EXPLICIT off arm: the request is built by the REAL
+// reader (lib/fly/world-pass.js in this tree) on a desktop Ultra page with the
+// five streams forced off exactly as `?flags=-WORLD_TRUTH,-WORLD_ARRIVAL,
+// -WORLD_REACH,-WORLD_LOOK,-WORLD_GROUND` installs them (installUrlFlags), and
+// must equal the hand-written all-off literal below. So IDENTICAL here means
+// the `?flags=-WORLD_<NAME>` page is the c2bf5c06 world byte for byte.
+const WP_OFF_LITERAL = (() => {
   const streams = { truth: ['heights', 'typology', 'smallBand', 'roofs'], arrival: ['fastQuery', 'drapeCap', 'workerPrep', 'uploads', 'footings', 'readiness'], reach: ['standIns'], look: ['roofPhoto', 'walls', 'structures', 'authority'], ground: ['trees', 'bridges'] };
   const req = { v: 1, key: 'wp1-0', any: false, tier: null };
   for (const [s, subs] of Object.entries(streams)) req[s] = { on: false, ...Object.fromEntries(subs.map((k) => [k, false])), worker: null };
+  return req;
+})();
+const WP_OFF = await (async () => {
+  const W = await import(pathToFileURL(path.join(ROOT, 'lib/fly/world-pass.js')).href);
+  const { installUrlFlags } = await import(pathToFileURL(path.join(ROOT, 'lib/fly/fly-pins.js')).href);
+  const { useFlyStore } = await import(pathToFileURL(path.join(ROOT, 'stores/fly-store.js')).href);
+  const st = useFlyStore.getState();
+  const prevPreset = st.qualityPreset;
+  const flags = Object.values(W.WORLD_PASS_STREAMS).map((d) => `-${d.flag}`).join(',');
+  const win = { matchMedia: () => ({ matches: false }), console: { info() {} }, location: { search: `?flags=${flags}` } };
+  installUrlFlags(win);
+  const hadWindow = 'window' in globalThis;
+  const prevWindow = globalThis.window;
+  globalThis.window = win;
+  let req, allowed;
+  try {
+    st.setQualityPreset('ultra');
+    W.__resetWorldPassLatchForTests();
+    req = JSON.parse(JSON.stringify(W.worldPassRequest()));
+    allowed = W.worldPassTierAllowed();
+  } finally {
+    W.__resetWorldPassLatchForTests();
+    st.setQualityPreset(prevPreset);
+    if (hadWindow) globalThis.window = prevWindow;
+    else delete globalThis.window;
+  }
+  if (!allowed || JSON.stringify(req) !== JSON.stringify(WP_OFF_LITERAL)) {
+    console.error(`world-pass-proof: the reader's ?flags=${flags} request at desktop Ultra is not the all-off request:\n  reader  ${JSON.stringify(req)}\n  literal ${JSON.stringify(WP_OFF_LITERAL)} (tier allowed: ${allowed})`);
+    process.exit(1);
+  }
+  console.log(`world-pass-proof: off arm = the reader's request for ?flags=${flags} at desktop Ultra (${req.key}, equal to the all-off literal)`);
   return { worldPass: req };
 })();
 const BUILDING_VARIANTS = [

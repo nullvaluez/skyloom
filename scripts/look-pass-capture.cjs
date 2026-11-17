@@ -17,6 +17,9 @@
  * remounts, the WebGL context is lost or the frame comes out blank. Editing a source file while
  * a capture runs causes exactly that (hot reload), so wait for DONE before editing.
  * The reference labels baseline and baseline-a are read-only without --rebaseline.
+ * World Pass (2026-11-17): the five WORLD_ streams ship ON, so a run with no --flags shows the new
+ * world at High / Ultra; the old world is --flags=-WORLD_TRUTH,-WORLD_ARRIVAL,-WORLD_REACH,
+ * -WORLD_LOOK,-WORLD_GROUND (labels captured before that date were the old world by default).
  */
 const { chromium } = require('playwright');
 const fs = require('node:fs');

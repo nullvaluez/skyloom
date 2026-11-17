@@ -8,6 +8,7 @@
  *
  *   node scripts/world-pass-worker-live.cjs [--url http://localhost:3320] [--quality high] [--wait 120000]
  * Exit 0 when buildings stream (ready >= 3) with no worker / page errors.
+ * Since 2026-11-17 the World Pass streams ship ON, so at High / Ultra this boots the new world.
  */
 const { chromium } = require('playwright');
 
