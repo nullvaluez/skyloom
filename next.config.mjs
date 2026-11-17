@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
+import { configureDevWorkerAssets } from './lib/build/dev-worker-assets.mjs';
 
 // TRUE EARTH: device reports name the exact build they measured.
 function buildSha() {
@@ -15,11 +16,11 @@ const nextConfig = {
   distDir: process.env.FLY_BUILD_DIR || '.next',
   outputFileTracingRoot: fileURLToPath(new URL('.', import.meta.url)),
   // Keep the normal Turbopack path free of custom webpack configuration.
-  ...(process.env.FLY_BUILD_DIR ? {
-    webpack(config) {
+  ...((process.env.FLY_BUILD_DIR || !process.env.TURBOPACK) ? {
+    webpack(config, context) {
       // Node 25's incremental webpack WASM hash path fails on this workstation.
-      config.cache = false;
-      return config;
+      if (process.env.FLY_BUILD_DIR) config.cache = false;
+      return configureDevWorkerAssets(config, context);
     },
   } : {}),
   reactStrictMode: true,
