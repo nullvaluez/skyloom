@@ -1,8 +1,32 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import vm from 'node:vm';
 import { Scene, Mesh, BoxGeometry, MeshStandardMaterial, MeshDepthMaterial, ShaderMaterial, PerspectiveCamera, OrthographicCamera,
   DirectionalLight, WebGLRenderTarget, DataTexture, EquirectangularReflectionMapping, FloatType, RGBAFormat, WebGLCoordinateSystem } from 'three';
 import { createHangarPrewarm } from '../lib/fly/hangar-prewarm.js';
+import { createHangarFrameGate } from '../lib/fly/hangar-frame-gate.js';
+
+function fiberLoopFixture() {
+  const directory=new URL('../node_modules/@react-three/fiber/dist/',import.meta.url);
+  const file=fs.readdirSync(directory).find(name=>/^events-.*\.esm\.js$/.test(name));
+  const source=fs.readFileSync(new URL(file,directory),'utf8');
+  const extract=name=>{const start=source.indexOf(`function ${name}(`);assert.ok(start>=0);return source.slice(start,source.indexOf('\n}',start)+2);};
+  const roots=new Map();let globalEffects=0;
+  const loop=vm.runInNewContext(`let subscribers,subscription,running=false,useFrameInProgress=false,repeat,frame,state;
+    ${['update','loop','invalidate','advance'].map(extract).join('\n')}
+    ({loop,invalidate,advance})`,{_roots:roots,requestAnimationFrame:()=>1,cancelAnimationFrame(){},flushGlobalEffects(){globalEffects++;}});
+  const root=()=>{
+    let state,draws=0,callbacks=0,delta=null;const listeners=new Set();
+    const store={getState:()=>state,subscribe(listener){listeners.add(listener);return()=>listeners.delete(listener);}};
+    state={frameloop:'always',clock:{elapsedTime:12,getDelta:()=>.016},scene:{},camera:{},
+      gl:{xr:{isPresenting:false},render(){draws++;}},internal:{active:true,frames:0,priority:0,subscribers:[]},
+      setFrameloop(frameloop){state={...state,frameloop};listeners.forEach(listener=>listener(state));}};
+    state.internal.subscribers.push({store,ref:{current(_state,dt){callbacks++;delta=dt;}}});
+    roots.set(store,{store});
+    return {store,draws:()=>draws,callbacks:()=>callbacks,delta:()=>delta};
+  };
+  return {loop,root,globalEffects:()=>globalEffects};
+}
 
 function fixture({hdr=false,parallel=true}={}) {
   const scene=new Scene(),camera=new PerspectiveCamera(),mirror=new PerspectiveCamera(),shadowCamera=new OrthographicCamera();
@@ -115,6 +139,40 @@ check('React integration preserves one-shot contact callbacks and re-arm uses st
   const contact=fs.readFileSync(new URL('../node_modules/@react-three/drei/core/ContactShadows.js',import.meta.url),'utf8');
   assert.equal((scene.match(/frames=\{preparing\?Infinity:1\}/g)??[]).length,2);
   assert.match(contact,/let count = 0/);assert.match(contact,/count\+\+/);assert.match(rig,/advance\(clock\.elapsedTime, effects\)/);
-  assert.match(scene,/frameloop=\{prepared\?'always':'never'\}/);assert.match(rig,/setFrameloop\('always'\)/);
+  assert.match(scene,/frameloop=\{prepared\?'always':'never'\}/);assert.match(rig,/controller\.current\?\.resume\(\)/);
+});
+check('installed R3F queued-frame escape reproduces, then the gate stops both callbacks and main draws',()=>{
+  const f=fiberLoopFixture(),hangar=f.root(),flight=f.root();
+  f.loop.invalidate(hangar.store.getState());hangar.store.getState().setFrameloop('never');
+  f.loop.loop(1000);
+  assert.equal(hangar.callbacks(),1,'Red calibration: never alone still executes Drei callbacks');
+  assert.equal(hangar.draws(),1,'Red calibration: never alone still draws a queued main frame');
+  hangar.store.getState().setFrameloop('always');f.loop.invalidate(hangar.store.getState());
+  const gate=createHangarFrameGate(hangar.store);gate.hold();
+  f.loop.loop(2000);
+  assert.equal(hangar.callbacks(),1);assert.equal(hangar.draws(),1);assert.equal(flight.draws(),2);
+  assert.equal(hangar.store.getState().internal.frames,0);assert.ok(gate.state.drainedFrames>0);
+  f.loop.invalidate(hangar.store.getState());f.loop.loop(3000);
+  assert.equal(hangar.draws(),1,'Invalidation while held cannot queue another shared frame');
+  gate.dispose();
+});
+check('stale Canvas and ready commits cannot reopen a newer preparation generation',()=>{
+  const f=fiberLoopFixture(),hangar=f.root(),gate=createHangarFrameGate(hangar.store);
+  const oldReady=gate.hold();gate.hold();
+  hangar.store.getState().setFrameloop('always');
+  assert.equal(hangar.store.getState().frameloop,'never');assert.equal(gate.release(oldReady),false);
+  f.loop.loop(1000);assert.equal(hangar.draws(),0);assert.equal(hangar.callbacks(),0);
+  assert.equal(gate.release(gate.state.generation),true);
+  f.loop.loop(2000);assert.equal(hangar.draws(),1);assert.equal(hangar.callbacks(),1);
+  gate.dispose();
+});
+check('held root-local advance preserves zero delta and leaves other roots/global effects untouched',()=>{
+  const f=fiberLoopFixture(),hangar=f.root(),flight=f.root(),gate=createHangarFrameGate(hangar.store);
+  gate.hold();f.loop.advance(hangar.store.getState().clock.elapsedTime,false,hangar.store.getState());
+  assert.equal(hangar.callbacks(),1);assert.equal(hangar.delta(),0);assert.equal(flight.callbacks(),0);assert.equal(f.globalEffects(),0);
+  gate.dispose();gate.dispose();const replay=createHangarFrameGate(hangar.store);replay.hold();
+  hangar.store.getState().setFrameloop('always');f.loop.loop(1000);
+  assert.equal(hangar.callbacks(),1,'StrictMode replacement owner retains the hold');
+  replay.dispose();
 });
 console.log(`HANGAR PREWARM: ${count}/${count}`);

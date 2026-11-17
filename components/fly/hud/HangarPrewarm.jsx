@@ -1,8 +1,9 @@
 'use client';
 import { createContext, useContext, useEffect, useLayoutEffect, useRef } from 'react';
 import { Environment, useEnvironment } from '@react-three/drei';
-import { useThree } from '@react-three/fiber';
+import { useStore, useThree } from '@react-three/fiber';
 import { createHangarPrewarm } from '@/lib/fly/hangar-prewarm';
+import { createHangarFrameGate } from '@/lib/fly/hangar-frame-gate';
 
 export const HangarWarmContext = createContext(null);
 export function createHangarWarmSignal() {
@@ -31,7 +32,7 @@ export function HangarEnvironment({ files, ...props }) {
 
 export function HangarPrewarm({ signal, preparing, modelReady, changeKey, onPrepared }) {
   const gl = useThree(s => s.gl), scene = useThree(s => s.scene), camera = useThree(s => s.camera);
-  const advance = useThree(s => s.advance), clock = useThree(s => s.clock), setFrameloop = useThree(s => s.setFrameloop);
+  const store = useStore(), advance = useThree(s => s.advance), clock = useThree(s => s.clock);
   const controller = useRef(null), active = useRef(preparing), notify = useRef(onPrepared);
   useLayoutEffect(() => { active.current = preparing; notify.current = onPrepared; }, [preparing, onPrepared]);
 
@@ -39,20 +40,27 @@ export function HangarPrewarm({ signal, preparing, modelReady, changeKey, onPrep
     // In R3F's never mode delta = timestamp - clock.elapsedTime. Using the
     // current stored elapsed time also guarantees dt=0 on later re-arms.
     const warm = createHangarPrewarm(gl, scene, camera, (_timestamp, effects) => advance(clock.elapsedTime, effects));
-    controller.current = warm;
+    const gate = createHangarFrameGate(store);
+    warm.state.frameGate = gate.state;
     const watched = new Set();
-    let frame = 0, disposed = false;
+    let frame = 0, disposed = false, readyGeneration = -1;
+    const owner = { resume() { return gate.release(readyGeneration); } };
+    controller.current = owner;
     const tick = () => {
       frame = 0;
       if (disposed || !active.current) return;
       // Wait for the React commit that sets ContactShadows frames=Infinity.
       // No Drei useFrame callback runs before that commit during preparation.
-      if (warm.prepare()) { notify.current(true); return; }
+      if (warm.prepare()) {
+        readyGeneration = gate.state.generation;
+        notify.current(true);
+        return;
+      }
       frame = requestAnimationFrame(tick);
     };
     const request = () => {
       if (disposed) return;
-      setFrameloop('never'); warm.invalidate(); notify.current(false);
+      gate.hold(); warm.invalidate(); notify.current(false);
       if (!frame) frame = requestAnimationFrame(tick);
     };
     const add = object => {
@@ -67,7 +75,7 @@ export function HangarPrewarm({ signal, preparing, modelReady, changeKey, onPrep
     };
     const added = event => { add(event.child); request(); }, removed = event => { remove(event.child); request(); };
     add(scene);
-    const lost = () => { setFrameloop('never'); warm.invalidate(true); notify.current(false); if (!frame) frame = requestAnimationFrame(tick); };
+    const lost = () => { gate.hold(); warm.invalidate(true); notify.current(false); if (!frame) frame = requestAnimationFrame(tick); };
     const restored = () => { warm.invalidate(true); request(); };
     gl.domElement.addEventListener('webglcontextlost', lost);
     gl.domElement.addEventListener('webglcontextrestored', restored);
@@ -78,17 +86,19 @@ export function HangarPrewarm({ signal, preparing, modelReady, changeKey, onPrep
       unsubscribe();
       gl.domElement.removeEventListener('webglcontextlost', lost);
       gl.domElement.removeEventListener('webglcontextrestored', restored);
-      warm.dispose();
-      if (controller.current === warm) controller.current = null;
+      gate.dispose(); warm.dispose();
+      if (controller.current === owner) controller.current = null;
     };
-  }, [gl, scene, camera, advance, clock, setFrameloop, signal]);
+  }, [gl, scene, camera, advance, clock, store, signal]);
 
   useLayoutEffect(() => { signal.invalidate(); }, [signal, changeKey]);
   useLayoutEffect(() => {
     // The final React commit also restores ContactShadows frames=1. Only
     // after it commits may the normal root loop execute that one real capture.
-    if (!preparing) setFrameloop('always');
+    // A child asset/layout commit may have invalidated the batch earlier in
+    // this same commit. Only the still-current ready generation can resume.
+    if (!preparing) controller.current?.resume();
     else signal.invalidate();
-  }, [preparing, modelReady, setFrameloop, signal]);
+  }, [preparing, modelReady, signal]);
   return null;
 }
