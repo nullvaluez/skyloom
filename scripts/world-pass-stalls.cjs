@@ -14,9 +14,9 @@
  * navigator.webdriver defaults to false at every quality, matching the player
  * shader-diagnostic and default-tier policy. --automation explicitly sets it
  * true for a diagnostic reproduction; do not label those timings player production.
- * The ON URL is /; the OFF URL adds only the five negative WORLD flags.
- * A fixed-pose run uses documented scene pins, but no network interception and no
- * graphicsReview query. HTTP, Cache API and shader caches survive page 2 and the
+ * Plain runs use / or /?flags=<five negatives>. Fixed-pose runs also use
+ * the documented scene pins and --review query for runtime telemetry.
+ * HTTP, Cache API and shader caches survive page 2 and the
  * warm browser restart. A fresh phase requires a nonexistent profile directory.
  * --profile-root=<dir> can reuse the profile from an earlier warm-only run.
  * Screenshots occur after the timing window. Only one page renders at a time.
@@ -60,7 +60,7 @@ fs.mkdirSync(profileRoot, { recursive: true });
 let gitHead = null;
 try { gitHead = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim(); } catch {}
 const report = {
-  tool: 'world-pass-stalls', version: 5, started: new Date().toISOString(), mode, gitHead,
+  tool: 'world-pass-stalls', version: 6, started: new Date().toISOString(), mode, gitHead,
   serverRef: typeof args['server-ref'] === 'string' ? args['server-ref'] : null,
   url: baseUrl.origin, quality, seconds, poses: poseNames, arms, phases, pages,
   profiled: !!args.profile, plain: !!args.plain, review: !!args.review, automation: !!args.automation,
@@ -118,6 +118,24 @@ function installMonitor({ durationMs }) {
     launchRemovedMs: null, warpMs: null, fullRingObservedMs: null, durationMs, visibilityChanges: [],
   };
   const at = () => +performance.now().toFixed(3);
+  // A driver's first context may block without producing a Long Tasks API
+  // entry. Measure the browser call itself on every new canvas, including
+  // the benchmark and hangar. Each context is recorded once and never polled.
+  m.contexts = [];
+  const seenContexts = new WeakSet();
+  const getContext = HTMLCanvasElement.prototype.getContext;
+  HTMLCanvasElement.prototype.getContext = function(type, ...options) {
+    if (type !== 'webgl' && type !== 'webgl2' && type !== 'experimental-webgl') return getContext.call(this, type, ...options);
+    const startMs = at();
+    const gl = getContext.call(this, type, ...options);
+    if (gl && !seenContexts.has(gl)) {
+      seenContexts.add(gl);
+      m.contexts.push({ type, startMs, durationMs: +(at() - startMs).toFixed(2),
+        connected: this.isConnected, hangar: !!this.closest('[data-testid="hangar"]'),
+        width: this.width, height: this.height, powerPreference: options[0]?.powerPreference });
+    }
+    return gl;
+  };
   const visibility = () => m.visibilityChanges.push({ atMs: at(), state: document.visibilityState });
   visibility(); document.addEventListener('visibilitychange', visibility);
   // The literal production page intentionally has no runtime handles. Capture
@@ -176,8 +194,8 @@ function installMonitor({ durationMs }) {
     if (last != null && inWindow(last)) m.raf.push({ startMs: +last.toFixed(3), durationMs: +(t - last).toFixed(3) });
     last = t;
     if (m.boot100Ms == null && window.__flyBoot?.pct === 100) { m.boot100Ms = t; m.readinessAtBoot100 = readiness(); }
-    if (m.firstWorldFrameMs == null && window.__fly?.framesRendered > 0) m.firstWorldFrameMs = t;
-    const frame = window.__fly?.framesRendered;
+    const frame = window.__fly?.framesRendered ?? window.__flyComposer?.getRenderer?.()?.__flyMainDraw?.frames;
+    if (m.firstWorldFrameMs == null && frame > 0) m.firstWorldFrameMs = t;
     if (frame > 0 && frame !== lastWorldFrame) {
       if (lastWorldAt != null && inWindow(lastWorldAt)) m.worldFrames.push({ startMs: +lastWorldAt.toFixed(3), durationMs: +(t - lastWorldAt).toFixed(3), count: frame - lastWorldFrame });
       lastWorldFrame = frame; lastWorldAt = t;
@@ -242,8 +260,8 @@ function holdPose(pose) {
 
 function readEnd() {
   const r = window.__fly, state = window.__flyStore?.getState?.();
-  let renderer = null;
-  if (r?.engine?.object) { let scene = r.engine.object; while (scene.parent) scene = scene.parent; renderer = scene.__r3f?.root?.getState()?.gl; }
+  let renderer = window.__flyComposer?.getRenderer?.() ?? null;
+  if (!renderer && r?.engine?.object) { let scene = r.engine.object; while (scene.parent) scene = scene.parent; renderer = scene.__r3f?.root?.getState()?.gl; }
   const gl = renderer?.getContext() ?? window.__worldStallGL;
   const ext = gl?.getExtension('WEBGL_debug_renderer_info');
   const gpu = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : null;
@@ -253,7 +271,7 @@ function readEnd() {
   return {
     monitor: window.__worldStallMonitor, endPerfMs: performance.now(), gpu,
     boot: window.__flyBoot ?? null, worldPass: window.__flyStats?.worldPass?.state ?? null,
-    preset: state?.qualityPreset ?? null, tier: state?.qualityTier ?? null, flightPhase: state?.phase ?? null,
+    preset: state?.qualityPreset ?? window.__flyStats?.worldPass?.state?.preset ?? null, tier: state?.qualityTier ?? null, flightPhase: state?.phase ?? null,
     webdriver: navigator.webdriver,
     shaderErrorsChecked: renderer?.debug?.checkShaderErrors ?? null,
     programCensus: window.__flyStats?.census?.programs ?? null,
@@ -335,6 +353,14 @@ async function measure(context, page, arm, poseName, phase, pageNumber) {
       fullRingEngineSec: row.buildings?.fullRingSec ?? null,
     };
     if (!row.gpu || /swiftshader|llvmpipe|software|basic render/i.test(row.gpu)) row.errors.push(`Not a verified hardware renderer: ${row.gpu}`);
+    if (!args.plain) {
+      if (quality !== 'default' && row.preset !== quality) row.errors.push(`Requested ${quality}, observed ${row.preset}`);
+      const streams = ['truth', 'arrival', 'reach', 'look', 'ground'];
+      const flagsMatch = streams.every(key => row.worldPass?.flags?.[key] === (arm === 'on'));
+      if (!row.worldPass?.allowed || !flagsMatch) row.errors.push('World Pass latch differs from the requested desktop flag arm');
+      if (seconds >= 90 && m.fullRingObservedMs == null) row.errors.push('Full building ring was never observed within 90 seconds');
+      if (seconds >= 90 && row.summary.medianWorldFrame60to90Ms == null) row.errors.push('No completed world frames in the steady measurement window');
+    }
     if (row.composerWarm?.status === 'failed') row.errors.push(`Composer preparation failed: ${row.composerWarm.error}`);
     for (const [name, state] of Object.entries(row.auxiliaryWarm ?? {})) if (state?.error || state?.status === 'failed') row.errors.push(`${name} preparation failed: ${state.error}`);
     if (row.programCensus?.linkFailures > 0) row.errors.push(`${row.programCensus.linkFailures} shader links failed`);
