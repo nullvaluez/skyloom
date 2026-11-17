@@ -54,15 +54,15 @@ function instrument() {
       const tb = Date.now();
       for (const at of LOOK) {
         await L.sleep(Math.max(0, at * 1000 - (Date.now() - tb)));
-        await page.mouse.move(800, 450);
-        await page.mouse.down({ button: 'right' });
-        await page.mouse.move(800 + Number(args.dragPx || 900), 470, { steps: 12 });
-        await L.sleep(500);
+        // the orbit camera (what a right-mouse drag feeds): ~180 degrees of yaw (yawRate 7 rad a screen width)
+        await page.evaluate((f) => { const i = window.__fly.input; i.setLookActive(true); i.addLook(f, 0); }, Number(args.lookFrac || 0.449));
+        await L.sleep(700);
         await page.screenshot({ path: path.join(out, `lookback-${tag}-t${at}.png`) });
-        await page.mouse.up({ button: 'right' });
+        run.lookYaw = await page.evaluate(() => window.__fly.chaseRig?._look?.yaw ?? null);
+        await page.evaluate(() => window.__fly.input.setLookActive(false));
       }
       await L.sleep(Math.max(0, SEC * 1000 - (Date.now() - tb)));
-      const d = await page.evaluate(() => { const P = window.__bp; clearInterval(P.timer); return { samples: P.samples, deaths: P.deaths, look: window.__fly.chaseCam?._look ?? null }; });
+      const d = await page.evaluate(() => { const P = window.__bp; clearInterval(P.timer); return { samples: P.samples, deaths: P.deaths, look: window.__fly.chaseRig?._look ?? null }; });
       Object.assign(run, d);
       // deaths of tiles behind the aircraft while still within the ring radius (true metres)
       const ringM = Number(args.ringM || 4400);

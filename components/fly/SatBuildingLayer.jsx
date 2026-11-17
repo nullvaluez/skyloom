@@ -4,7 +4,7 @@ import { immersiveOn } from '@/lib/fly/immersive';
 import { stylizedEarthOn } from '@/lib/fly/stylized-earth';
 
 import { useEffect, useMemo, useRef } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import { wrap } from 'comlink';
 import { SatBuildingEngine } from '@/lib/fly/toy-world/sat-building-engine';
 import {
@@ -67,6 +67,7 @@ const atLeastTier = (tier, min) => TIERS.indexOf(tier) >= TIERS.indexOf(min);
  * gate A asserts the toy pipeline is never built in satellite).
  */
 export function SatBuildingLayer({ runtime, flight }) {
+  const getThree = useThree((s) => s.get); // WORLD PASS B r2: compileAsync for the quantized building program (stable getter)
   const qualityTier = useFlyStore((s) => s.qualityTier);
   const engine = useMemo(
     () => new SatBuildingEngine({ groundAt: (lon, lat) => runtime.engine?.getGroundAt(lon, lat) }),
@@ -218,6 +219,8 @@ export function SatBuildingLayer({ runtime, flight }) {
     for (let i = 1; i < poolSize; i++) extra.push(spawn());
     engine.setWorker(api, extra.length ? extra.map((e) => e.a) : null);
     if (arrival) {
+      // r2 (quantize): compile the decoded building program before its first mesh shows
+      engine.setCompiler((obj) => { const { gl, camera, scene } = getThree(); return gl.compileAsync ? gl.compileAsync(obj, camera, scene) : Promise.resolve(); });
       worker.addEventListener('error', () => engine.onWorkerError(api));
       engine.setWorkerSpawner(spawn, [() => worker.terminate(), ...extra.map((e) => e.dispose)]);
     }
@@ -229,7 +232,7 @@ export function SatBuildingLayer({ runtime, flight }) {
       for (const w of live) w.terminate(); // r2: replacements too
       if (process.env.NODE_ENV === 'development') delete window.__satBuildings;
     };
-  }, [engine, runtime]);
+  }, [engine, runtime, getThree]); // getThree: the store's stable getter
 
   // A warp opens the accept-coarse-fast window so the destination city pops in.
   useEffect(() => {
