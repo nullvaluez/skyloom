@@ -1351,3 +1351,43 @@ real canvas acquired its context at 12,969 ms. The cached GPU identity took
 1 ms. The remaining freeze can occur before either the flight WebGL renderer
 or terrain workers exist. The four literal production title captures above
 did not exercise this failing sequence. These rows remain in the evidence.
+
+The [matched table](docs/reviews/world-pass-performance/stall-table.md) and
+[task timeline](docs/reviews/world-pass-performance/longtasks.csv) retain all
+32 baseline and 32 candidate fixed-pose combinations at this stage, including
+the original readings, their retakes and missing coverage. Across 16 production
+captures, the largest post-reveal task was 331 ms and the largest post-reveal
+completed-frame gap was 358 ms. The returning fresh Paris flight also had a
+10,034 ms startup task. New York's production median ranged from 16.7 to
+33.3 ms and included a slower first page. The steady frame interval varies
+between runs on this machine.
+
+The [fixed-pose comparison](docs/reviews/world-pass-performance/production-still-comparison.jpg)
+shows NYC and Paris with all five flags on and off before and after the shader
+and streaming repairs. Building placement, facade selection, river alignment
+and ground detail match visually. The live traffic, contrails, moving cloud
+shadows and HUD fade differ between shots.
+
+### Returning-page CPU profile and GPU trace
+
+In a fresh NYC production pair on `8e3dfddb`, the second page spent 10.80 s
+in its first minimap draw. The flight did not yet exist. A second profile
+with native-call timing measured 11.974 s in its first `setTransform`.
+Chrome had accepted `willReadFrequently:true` for that second page's dial.
+The browser trace measured 11.973 s in the new renderer's command-buffer
+initialization. On the GPU thread, destruction of the previous tab's command
+buffer occupied 12.998 s; two ANGLE worker jobs each used over 13 s of CPU.
+They started during the previous page's screenshot, before its close. With
+screenshots disabled, another fresh pair still measured 4.895 s in the
+unmodified dial's `setTransform`. That separate trace exceeded its output
+cap. The native timing and 25-second CPU profile were preserved.
+
+`605ff4b9` defers allocating the 5 Hz dial until a flight exists. Its first
+ordinary, unprofiled NYC production return reached the world at 2.63 s,
+with a 385 ms maximum task, 408 ms maximum rAF gap and 100 ms maximum
+post-reveal world gap. Its cold first page had a 2.47 s initial rAF delay.
+The shader probe returned from its worker in 2.52 s. This pair alone does
+not establish that driver teardown is fixed. The old title-bypass diagnostic
+also measured a 3.66 s hangar draw under the boot overlay on a page left
+in its hangar. Its profile includes the floor reflection, HDR conversion and
+first-use uniforms. The fixed-pose flight measurements close that hangar.
