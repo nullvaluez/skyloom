@@ -156,9 +156,14 @@ async function photoFor(z, x, y, cfg) {
 //   M  seam halves (Midtown E-W 4824|4825 and N-S 6157|6158): building halves
 //      paired by their contact span on the shared seam (+-3 tile units), wall
 //      tops compared in the two bundles. Reported as measured (no bar).
-//   F  near vs far: for every admitted building, the far wall at far01 = 0
-//      (lookFarColour) against the near wall in the bundle; with lookFarPrepare
-//      (the near ring's structure key) and without it (the round-1 part key).
+//   F  near vs far: for every admitted building, every wall (tagged included),
+//      the far wall exactly as the live callers ask for it (lookFarColour with
+//      no far01, as colourOf 'far' calls it; divided by the constant far wall
+//      shade) and its material, against the near wall and material in the
+//      bundle; with lookFarPrepare (the near ring's structure key), without it
+//      (the round-1 part key), and at round 2's live far01 0.6 (a control that
+//      must differ). Round 3: round 2 measured only far01 = 0 and untagged walls,
+//      while the live callers used 0.6 (verifier, far-verify.json).
 const LR = await import(pathToFileURL(path.join(ROOT, 'lib/fly/toy-world/worker/look-roofs.js')).href);
 const ST = await import(pathToFileURL(path.join(ROOT, 'lib/fly/toy-world/worker/sat-buildings/structures.js')).href);
 const AD = await import(pathToFileURL(path.join(ROOT, 'lib/fly/toy-world/worker/sat-buildings/admission.js')).href);
@@ -287,14 +292,17 @@ for (const [name, ll] of [['nyc', PLACES.nyc], ['london', PLACES.london], ['pari
   };
   for (const [label, P, Q, sa, sb2] of [['E-W 4824|4825', A, B, 'E', 'W'], ['N-S 6157|6158', A, S2, 'S', 'N']]) {
     const Lc = contacts(P, sa), Rc = contacts(Q, sb2);
-    let pairs = 0, same = 0;
+    let pairs = 0, same = 0, colourDiffers = 0, materialDiffers = 0, gainDiffers = 0;
     for (const l of Lc) {
       const m = Rc.find((q) => Math.abs(q.lo - l.lo) < 3 && Math.abs(q.hi - l.hi) < 3);
       if (!m) continue;
       pairs += 1;
       if (dmax(l.r.c, m.r.c) <= TOL && l.r.z === m.r.z) same += 1;
+      if (dmax(l.r.c, m.r.c) > TOL) colourDiffers += 1;
+      if (l.r.z % 4 !== m.r.z % 4) materialDiffers += 1;
+      else if (l.r.z !== m.r.z) gainDiffers += 1;
     }
-    report.seams[label] = { pairs, sameWallTop: same };
+    report.seams[label] = { pairs, sameWallTop: same, colourDiffers, materialDiffers, gainDiffers };
     console.log('M', label, JSON.stringify(report.seams[label]));
   }
 }
@@ -305,11 +313,11 @@ for (const [name, ll] of [['nyc', PLACES.nyc], ['paris', PLACES.paris], ['tokyo'
   const N = await near(14, x, y);
   const mvt = await getBytes(TEMPLATE.replace('{z}', 14).replace('{x}', x).replace('{y}', y));
   const res = {};
-  for (const arm of ['prepared', 'partKey']) {
+  for (const arm of ['prepared', 'partKey', 'round2']) {
     const req = lookRequest();
     const ctxF = createTileCtx(new VectorTile(new PbfReader(new Uint8Array(mvt.body))), { ...frameOf(14, x, y) }, { z: 14, x, y, detail: 'sat-skyline', options: { ...opts, worldPass: req }, v: 26 });
     const adm = AD.admitFootprints(ctxF, G.classifyRingsSat);
-    if (arm === 'prepared') CO.lookFarPrepare(adm, ctxF);
+    if (arm !== 'partKey') CO.lookFarPrepare(adm, ctxF);
     const arch = architectureContext(ctxF.vt, ctxF);
     const sig = (it) => it.polys.map((p) => p.outer.map((q) => `${q.x},${q.y}`).join(";")).join("|"); // the whole footprint (a partial key collides)
     const nearBySig = new Map(N.items.map((it) => [sig(it), it]));
@@ -318,17 +326,32 @@ for (const [name, ll] of [['nyc', PLACES.nyc], ['paris', PLACES.paris], ['tokyo'
     adm.forEach((it, i) => {
       const nit = nearBySig.get(sig(it));
       const row = nit && N.rows.get(nit);
-      if (!row || !(row.z === 1)) return; // untagged-or-shader walls; tagged glass is a different look at a distance by design
+      if (!row) return;
       const item = { ...it, h: nit.h };
       const style = architectureStyle(item, arch, ctxF.extent, ctxF.kA);
-      const f = CO.lookFarColour(item, style, ctxF, 0);
+      // Round 3: the far colour exactly as the live callers ask for it (colourOf
+      // 'far' passes no far01), every wall, tagged ones included; and the far
+      // material must be the near wall's (style byte: material + 4 x (gain + 1)).
+      const f = CO.lookFarColour(item, style, ctxF, arm === 'round2' ? 0.6 : undefined); // round2: the control, round 2's live far01
+      const m = row.z % 4;
+      if (f.mode !== (m === 2 ? 1 : m === 3 ? 2 : 0)) {
+        n += 1;
+        differ += 1;
+        if (rel.group[i] >= 0) {
+          multiN += 1;
+          multiDiffer += 1;
+        }
+        return;
+      }
       // The far wall, scaled the two ways the near ring scales its wall (top and
       // the AO base), must be a colour the near walls of that building carry.
-      const farTop = f.wall.map((c) => c * C.SAT_BUILDINGS.wallTopGain);
+      // Round 3: the far wall is the near wall times the far wall shade (a constant, look.worker.far.wallShade).
+      const shade = C.WORLD_LOOK.worker.far.wallShade ?? 1;
+      const farTop = f.wall.map((c) => (c / shade) * C.SAT_BUILDINGS.wallTopGain);
       const T = CO.buildingTones();
       const aoT = Math.min(1, Math.max(0, nit.h / C.SAT_BUILDINGS.wallBaseRefM));
       const baseMul = T.wallBaseMul[0] + (T.wallBaseMul[1] - T.wallBaseMul[0]) * aoT;
-      const farBase = f.wall.map((c) => c * baseMul);
+      const farBase = f.wall.map((c) => (c / shade) * baseMul);
       const q = (v) => Math.round(Math.min(1, v) * 255) / 255;
       const bad = !row.all.some((c) => dmax(farTop.map(q), c) <= TOL || dmax(farBase.map(q), c) <= TOL);
       n += 1;
@@ -345,11 +368,12 @@ for (const [name, ll] of [['nyc', PLACES.nyc], ['paris', PLACES.paris], ['tokyo'
   // Bar: no multi-part structure may differ (the key), and at most 0.1 % of all
   // buildings (round 2 measured 1 of 3,523 in Paris: the classifier gave one
   // footprint family 0 in the near build and 1 in the far build; not a key).
-  if (res.prepared.multiPartDiffer || res.prepared.differ > 0.001 * res.prepared.buildings) fail(`F ${name}: ${res.prepared.differ} of ${res.prepared.buildings} far walls (${res.prepared.multiPartDiffer} multi-part) differ from the near wall at far01 = 0`);
+  if (res.prepared.multiPartDiffer || res.prepared.differ > 0.001 * res.prepared.buildings) fail(`F ${name}: ${res.prepared.differ} of ${res.prepared.buildings} far walls (${res.prepared.multiPartDiffer} multi-part) differ from the near wall (colour or material) as the live callers ask`);
+  if (!res.round2.differ) fail(`F ${name}: the round-2 control (far01 0.6) agrees too, so the measure cannot fail here`);
   if (res.partKey.multiPart && !res.partKey.multiPartDiffer) fail(`F ${name}: the part-key control agrees on every multi-part building, so the measure cannot fail here`);
 }
 
-const out = arg('--out') ?? path.join(ROOT, '.graphics-review/world-pass/look/r2/agree-gate.json');
+const out = arg('--out') ?? path.join(ROOT, '.graphics-review/world-pass/look/r3/agree-gate.json');
 fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(out, JSON.stringify(report, null, 1));
 console.log(report.pass ? 'PASS' : `FAIL (${report.fails.length})`, out);
