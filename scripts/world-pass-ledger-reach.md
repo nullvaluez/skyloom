@@ -288,3 +288,296 @@ footprints excluded by the same admission).
   thread tunables in the block.
 - **Medium, phones**: untouched (the latched tier test), proven by a Medium
   capture with the flag in the URL (shipped 10-group horizon).
+
+## Round 2
+
+2026-11-16/17, implementer. Built on the integration head `d40dfd25` (merged
+in, fast-forward: the other three streams, the two wave-1 seams, protocol 26).
+Everything below is behind `WORLD_REACH` (still `enabled:false`); every new
+line on the main thread is inside `this._reach` (latched once per page) or the
+stand-in material; the worker path is reached only through
+`tileCtx.worldPass.reach`.
+
+Venue for every number: this machine's RTX 5080, installed Chrome, D3D11,
+dev server :3323 on this worktree, Ultra unless stated, 1600 x 900, noon + 2 h,
+live world (OpenFreeMap's 2026-11-15 planet). The control (flags off) was shot
+in the same session from the same server. Frames:
+`.graphics-review/world-pass/r2/reach/` in the main checkout (not in git):
+`control/`, `reach/` (WORLD_REACH alone), `all4/`
+(WORLD_TRUTH,WORLD_ARRIVAL,WORLD_REACH,WORLD_LOOK), nine poses each, crops`
+`*-pair.jpg` (control above, four flags below) and `*-zoom.jpg` (control left);`
+`it1-*`, `it2-*`, `fin-*` are the same frames by capture batch (`it2` and`
+`fin` carry the shipped code; between them only comments changed).
+"Round 1" numbers are the verifier's and the integrator's (wave-1 journal,
+`int-1`), which ran on other servers; they are the defect report, not a tight
+before.
+
+### 1. Far colour and street pattern
+
+Finding: the far ring was a bright confetti (Paris white and salt-like, the
+boulevards hidden, a tonal step at the Seine; Manhattan salmon, pink, cream and
+blue over a blue-grey near ring).
+
+What changed:
+- **One colour adapter** (`farLookColour` in
+  `worker/sat-skyline-stand-ins.js`). Every stand-in's base wall and roof
+  colour comes through it. LOOK off: the legacy far palette, which in Enhanced
+  is the near ring's own palette (`architecturalColor(style.walls/roofs
+  [variant])` in both `farColour` and `nearColour`), so the far ring has the
+  near ring's palette statistics. LOOK on: today `colourOf(..., 'far')`
+  (LOOK's `lookFar`). LOOK's round-2 work in progress (uncommitted in
+  `wp-look` when this was written) names its export `lookFarColour(item,
+  style, tileCtx, far01)` plus `lookFarPrepare(admitted, tileCtx)` once per
+  tile; `colourOf(..., 'far')` already calls `lookFarColour`, so the adapter
+  picks it up on merge and the integrator only adds the `lookFarPrepare`
+  call. LOOK's function also desaturates by distance: `farLook.desaturate`
+  (0.15) may then go to 0.
+- **The ground photo** (worker, request tunables `photoZoom` 12,
+  `photoWaitMs` 1500): one Esri World Imagery tile per z12 (one per 4 x 4
+  skyline group, the terrain's own source and URL, `cache: 'force-cache'`),
+  decoded in the skyline worker, latched per z14 tile (a tile built without
+  it stays without it), sampled 3 x 3 pixels (about 75 to 90 m) around each
+  stand-in, de-lit (luma clamped to [0.035, 0.45], chroma to 0.35) and packed
+  as a fifth instance attribute (`aStandInGround`, 4 bytes: 32 bytes an
+  instance). No photo: the tile's mean roof (the palette's own statistics).
+  Measured at nyc-bay: the photo was there in time for 332 of 384 tiles.
+- **The shader** (`sat-stand-in-material.js`, key `|wp-reach-standin-v2`),
+  after every albedo pass and before lighting: from `farLook.fromM` 1,500 m to
+  `toM` 7,000 m the stand-in is desaturated by 0.15 and pulled toward the
+  ground albedo (roofs 0.85 at gain 0.85, walls 0.6 at gain 0.75); never at
+  night. Every wall's foot is darkened (x 0.45 at the ground, 1 at 60 % of the
+  height): a stand-in casts and receives no shadow, so this is what turns the
+  gap between two boxes back into a street canyon.
+- **Street pattern** (worker): a box under `sliverM` 3 m across is dropped
+  (unless mapped 40 m or more; 52 at nyc-bay); every box is inset by
+  `insetM` 1.5 m a side, at most `insetK` 12 % of its own width (a first try
+  at a flat 1.5 m with a 5 m sliver rule dropped Brooklyn's brownstone rows
+  from 6,000 to 1,306 a tile and was reverted).
+
+Measured (`scripts/wp-reach-colour-stats.cjs`, sRGB 0-255; L mean luma, C mean
+chroma, chf mean neighbour chroma difference = colour confetti). Far-ring
+crop x 500-1100, y 470-560:
+
+| pose | control (photo) | round 1, four flags (int-1, other server) | round 2, REACH alone | round 2, four flags |
+|---|---|---|---|---|
+| paris-mid | L 119.7 C 58.3 chf 2.7 | L 132.3 C 43.8 chf 6.2 | L 120.1 C 56.2 chf 4.4 | L 123.0 C 53.1 chf 4.7 |
+| nyc-mid | L 123.8 C 58.6 chf 3.3 | L 124.8 C 56.8 chf 5.0 | L 123.0 C 58.2 chf 3.8 | L 123.6 C 58.0 chf 3.6 |
+
+Whole lower frame (y 450-700): paris-mid control 118.2 / 48.6, round 2
+121.2 / 43.3 (round 1 128.5 / 37.3); nyc-mid 118.9 / 46.9 against 116.4 /
+47.7; tokyo-mid 112.8 / 49.2 against 111.1 / 52.8. The first round-2 try
+(desaturate 0.5, no gains, no canyon: `it1-all4/`) was greyer and whiter
+(Paris crop L 127.2 C 52.4 in the wider band); the shipped values are `it2`.
+
+What the frames show (`it2-paris-mid-pair.jpg`, `it2-paris-zoom.jpg`,
+`it2-nyc-zoom.jpg`, `it2-tokyo-mid-pair.jpg`, `it2-phoenix-mid-pair.jpg`):
+Paris's far ring is cream and grey with shaded walls, no white carpet and no
+colour step at the Seine; Manhattan's far ring is grey-blue towers, no salmon
+or pink confetti; Tokyo continues the near ring's tone; Phoenix shows no ring
+edge (its brighter lower rows are the near ring, stream A's heights and LOOK's
+roofs, not stand-ins).
+
+Still open (said plainly): the Manhattan avenue grid does not read in the far
+ring at nyc-mid. The avenues run nearly along the view (heading 25 against
+the grid's 29) and 50 to 200 m boxes at a 17 degree look-down cover them, as
+real towers would; the control shows them because the photo is draped flat.
+The canyon darkening helps the cross streets, not the avenues. Paris's far
+ring is still about 3 luma brighter and 5 chroma greyer than the photo, and
+its fine contrast (hf) is higher than a flat photo's, as any 3D city's is.
+LOOK on, the far colour is `colourOf(..., 'far')` until LOOK's function lands;
+the combined look of both distance terms is unmeasured.
+
+### 2. Triangle cap (every pass)
+
+Finding: near water the coastal reflection drew the stand-ins a second time;
+the cap counted only the main pass (nyc-bay 2.00 M, paris-mid 1.60 M,
+tokyo-bay 1.56 M at Ultra against 1.5 M; High up to 1.00 M against 0.8 M).
+
+What changed: `SatSkylineLayer` passes the reflection's state
+(`runtime.coastalReflection`); `_updateStandInCounts` adds the reflection's
+own count (its focal length from the target height, `reflectionPxK` x minPx)
+to the sum the budget search drives, so minPx rises until main plus
+reflection fits. `reflectionPxK` 2 to 4 (the water's roughness blurs a
+sub-4 px box away). The per-tile backstop `maxPerTile` 6,000 to 9,000, so the
+only thing that drops a building is its screen size (the minPx threshold is
+uniform in pixels across groups). Probe: `scripts/wp-reach-verify-budget.cjs`
+(the verifier's, kept): it wraps each stand-in mesh's onBeforeRender and sums
+instanceCount x 6 per render target over 90 frames.
+
+| pose (four flags) | main | reflection | all passes, max frame | minPx | cap |
+|---|---|---|---|---|---|
+| nyc-bay Ultra | 1,353,552 | 88,650 | 1,442,202 | 1.16 | 1.5 M |
+| paris-mid Ultra | 1,023,024 | 142,512 | 1,165,536 | 0.88 | 1.5 M |
+| tokyo-bay Ultra | 1,258,902 | 64,578 | 1,323,480 | 0.82 | 1.5 M |
+| hongkong Ultra | 187,506 | 101,664 | 289,170 | 0.80 | 1.5 M |
+| sf-hills Ultra | 831,864 | 14,790 | 846,654 | 0.80 | 1.5 M |
+| nyc-low Ultra | 1,159,806 | 71,130 | 1,230,936 | 1.25 | 1.5 M |
+| nyc-bay High | 754,146 | 27,150 | 781,296 | 2.78 | 0.8 M |
+| paris-mid High | 716,130 | 2,358 | 718,488 | 2.21 | 0.8 M |
+| nyc-low High | 603,270 | 21,846 | 625,116 | 2.68 | 0.8 M |
+
+JSON: `r2/reach/budget/verify-budget-all4-{ultra,high}.json`. REACH alone at
+nyc-bay (smoke run): 1,451,856. Not measured: the High rows sit below the cap
+with the hysteresis' 10 % headroom, so they are not proof the cap would bind
+exactly at High.
+
+### 3. Arrival
+
+Finding: the far ring arrived later than the old mass (nyc-low full ring 33.2
+against 26.0 s; the verifier +0.7 to +8.4 s first, +1.6 to +14.1 s full).
+
+Cause (node, `node scripts/wp-reach-node-bench.mjs --time`, worker ms per
+tile, recorded inputs, median of 3, sum of the 20 recorded tiles): base 535,
+reach 680, the other three streams with the old mass 969, all four 1,002. Most
+of the four-flag cost is stream A's truth table (a CPU profile of the Hong Kong
+tile: `truthTable` and `geom.test`/`pointInPoly` lead; `buildSatStandIns`
+itself about 30 ms of 160). The far ring is one worker building 384 tiles in
+turn, so the ring pays about 1.9 x in worker time.
+
+What changed: with the stream on, `SatSkylineLayer` gives the engine a pool of
+`workers` 3 skyline workers (least-loaded dispatch, `P.concurrent` x 3 in
+flight); the lattice drape and the heal run inside stream B's ground-query
+batch (a no-op unless ARRIVAL's fastQuery is armed). The ground photo is
+awaited only after the admission work and never more than 1.5 s from its
+first request.
+
+Interleaved A/B (`world-pass-budget.cjs`, one page warped pose to pose, first
+pose cold; off, four, off, four; JSON `r2/reach/arrival/`), horizon first /
+full seconds:
+
+| pose | off run 1 | four flags run 1 | off run 2 | four flags run 2 |
+|---|---|---|---|---|
+| nyc-low (cold) | 8.9 / 26.0 | 6.9 / 25.9 | 9.4 / 27.8 | 8.5 / 28.5 |
+| paris-mid | 5.2 / 12.2 | 4.6 / 8.4 | 4.1 / 12.5 | 4.8 / 8.4 |
+| nyc-bay | 2.9 / 11.1 | 2.6 / 5.5 | 3.1 / 10.0 | 2.7 / 6.7 |
+| hongkong | 3.8 / 10.1 | 3.7 / 4.9 | 3.5 / 6.8 | 3.9 / 5.8 |
+| tokyo-bay | 2.5 / never | 3.2 / 16.3 | 2.7 / never | 2.3 / 13.2 |
+
+Full ring: earlier or equal at every warm pose (by 3 to 6 s); at the cold
+nyc-low equal within noise (-0.1 s and +0.7 s). First group: earlier or equal
+in 7 of 10 pairs; later by 0.7 s (tokyo-bay run 1), 0.7 s (paris-mid run 2
+against run 2's off) and 0.4 s (hongkong run 2). Two runs on a shared machine
+cannot separate differences under a second: "no later" holds for the full
+ring, and the first group is equal within that noise, not proven earlier.
+
+### 4. Ground
+
+Finding: stand-ins draped on a 300 m lattice: paris-mid p95 15.7 m, max 67 m;
+Hong Kong p95 20.1 m; Owens Valley p95 274 m on the Sierra slopes.
+
+What changed: `_refineStandIns` (engine), inside stream B's ground-query batch,
+1.5 ms a frame: each stand-in gets its own `getGroundAt` on the drawn terrain
+mesh, nearest group first and the size-sorted drawn prefix first; within
+`drape.cornerM` 3,000 m of the camera the four box corners are queried too and
+the lowest wins (no daylight under the downhill wall). A group is re-swept
+every 4 s so a refined terrain tile re-seats its buildings; the lattice heal
+never overwrites a building's own answer; uploads are update ranges.
+
+Measured (four flags, 20 s dwell after settle, `verify-budget-all4-ultra.json`):
+centre error against the drawn mesh p50 0 / p95 0 to 0.2 / p99 0 to 3.1 m at
+all six poses (max 42 m at paris-mid, 11 m Hong Kong). That centre number is
+close to true by construction (the same query, minus any terrain refined in
+the last 4 s), so the independent check is the box corners: the wall bottom
+(base - 6 m sink) over the lowest corner's ground. p95 -5.5 to -2.5 m (buried
+below grade everywhere at p95); corners floating more than 1 m: nyc-bay 3 of
+3,785, paris-mid 2 of 3,679, tokyo-bay 1 of 3,157, hongkong 19 of 2,457,
+sf-hills 9 of 3,139, nyc-low 3 of 3,918; the worst float 14.6 to 64.2 m
+(sf-hills; a box beyond the 3 km corner radius on a steep street). Boxes whose
+highest corner's ground is over the roof (buried on the uphill side): 1 to 15
+a pose. Not measured: Owens Valley (no pose this round), and stand-ins past
+the drawn prefix (they are not drawn).
+
+### 5. Stability (minPx)
+
+Finding: on an NYC cruise minPx breathed between 0.80 and 1.48 (round 1).
+
+What changed: hysteresis on the budget factor (`hysteresis` in the block): it
+rises the frame the total passes the cap (never over the cap for a frame), to
+a fit with 10 % headroom; it falls only when a 1.25 x lower factor would still
+fill under 75 % of the cap, over 4 s; between the two it holds.
+
+Motion burst (`scripts/wp-reach-verify-motion.cjs`, straight 15 km at 500 m,
+cruise; `r2/reach/motion/*/probe.json`), during the flight only:
+
+| run | minPx range | direction reversals (steps > 0.02) | pops (added already over the half-fade) |
+|---|---|---|---|
+| REACH, nyc-cruise-500 | 1.64 to 2.26 | 1 | 0 of 138,798 |
+| four flags, nyc-cruise-500 | 1.66 to 2.30 | 1 | 63 of 142,860 (max 3.5 px; the examples sit 0.01 px over the threshold at 2.5 km) |
+| four flags, paris-boost-500 | 0.82 to 1.10 | 1 | 0 of 24,880 |
+
+minPx now moves once each way: up while the ring arrives, then down slowly as
+the detail ring covers the near groups. It sits higher than round 1 at
+Midtown because the reflection now counts. The 63 four-flag pops are
+attributed to the covered radius stepping (the probe excludes stand-ins
+inside it, so a radius drop re-counts close ones), not shown to be visible.
+
+### 6. Near-edge at boost
+
+Finding: near the player at boost the stand-ins read as crude dark blocks.
+
+What changed: the far material's facade detail (`uArchitectureDetail`, a
+uniform 0 for the distant material) is redefined in the stand-in program as a
+per-vertex ramp: 1 within `nearDetail.fullM` 1,200 m, 0 past 2,600 m. A
+stand-in close to the camera wears windows, floor bands and relief like the
+near ring. Frames: `r2/reach/motion/strip-boost-all4-left-control-right.jpg`.
+Not proven: there is no pinned same-frame A/B against round 1 (the boost
+frames land at different moments), and no speed-aware distance was added. The
+owner's motion check is the read.
+
+### 7. Stream off: nothing per frame
+
+`SatSkylineLayer` now calls `setStandInView` only when `engine.standInsOn`
+(the latched flag): with the stream off the frame loop does one boolean read
+and nothing else (no tan, no call). One worker, as before.
+
+### 8. tokyo-bay
+
+Cause: every lattice sample of three groups answers from a drawn terrain tile
+coarser than `demZ` 10 (flat bay and reclaimed land never refine), so
+`fillSkylineGrid` fails and the group restarts forever (both arms, about 310
+restarts). Fix (stream on only; the old mass is untouched): a finite coarse
+answer is kept aside; after `drape.coarseAfterSec` 6 s an all-coarse lattice is
+accepted at zoom 1 (it is what the terrain draws there, rule 4), and the heal
+and per-building drape re-seat it when a finer tile arrives. Measured: the
+four-flag full ring at tokyo-bay 16.3 and 13.2 s; off never completes in
+either run.
+
+### 9. Verifier scripts
+
+Committed: `scripts/wp-reach-verify-budget.cjs` (now also records console
+shader errors, the box-corner float metric, the budget state and `--dwell`),
+`-motion.cjs`, `-tier.cjs`. New: `wp-reach-colour-stats.cjs`,
+`wp-reach-pair.cjs`, `wp-reach-zoom.cjs`, `wp-reach-strip.cjs`, and
+`wp-reach-node-bench.mjs --time`.
+
+### Proofs at the round-2 commit
+
+- `node scripts/world-pass-worker-proof.mjs --check c2bf5c06 --ignore-protocol`:
+  see the commit's result line below.
+- Node gates: `graphics-unit.mjs`, `verify-true-earth-flags` (11/11),
+  `verify-stylized-earth` (22/22), `verify-city-horizon`,
+  `verify-building-handoff`, `verify-attribution` (4/4),
+  `wp-reach-node-bench.mjs` (G1-G5; the gate request uses worker defaults, so
+  photo, inset and sliver are off in it).
+- eslint on the changed files: the one pre-existing
+  `SatSkylineLayer.jsx` react-hooks/immutability error, nothing new.
+- No browser shader error on any run (`errors: []` in every probe JSON).
+
+### Seams and shared files
+
+None edited. Uses stream B's exported `beginGroundBatch` / `endGroundBatch`
+(no edit); LOOK's far colour through the adapter (no edit).
+
+### Open after round 2
+
+- Manhattan's avenue grid in the far ring (see 1).
+- `houseMaxAreaM2` stays 220: TRUTH's far height now equals the near model
+  for stand-ins, so 0 would add Paris's and Tokyo's small-parcel fabric, at a
+  budget cost (minPx would rise) that was not measured this round.
+- LOOK's `lookFarColour` and `lookFarPrepare` (merge step; then decide
+  `farLook.desaturate`).
+- Owens Valley ground (no pose), the 3 km corner radius on steep cities
+  (sf-hills worst float 64 m beyond it), the near-edge A/B and the owner's
+  5080 motion check.
+- The worker pool is three skyline workers on top of ARRIVAL's two building
+  workers; CPU contention on a smaller desktop is unmeasured.

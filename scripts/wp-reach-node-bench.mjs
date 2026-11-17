@@ -105,6 +105,49 @@ const wpReq = (standIns) => {
 
 await import(pathToFileURL(path.join(ROOT, 'lib/fly/toy-world/vector-tile.worker.js')).href);
 const api = globalThis.__wpReachApi;
+
+// --time: worker build ms per tile, median of 3, for the shipped horizon (base),
+// reach alone, the other three wave-1 streams (three) and all four on (truth,
+// arrival, reach, look) with their shipped worker tunables. The browser's far
+// ring is one worker building 384 of these tiles in turn, so the sum is what
+// the ring's arrival pays in worker time.
+if (argv.includes('--time')) {
+  const C = await import(pathToFileURL(path.join(ROOT, 'lib/fly/fly-constants.js')).href);
+  const allReq = (names) => {
+    const streams = { truth: ['heights', 'typology', 'smallBand', 'roofs'], arrival: ['fastQuery', 'drapeCap', 'workerPrep', 'uploads', 'footings', 'readiness'], reach: ['standIns'], look: ['roofPhoto', 'walls', 'structures', 'authority'], ground: ['trees', 'bridges'] };
+    const blocks = { truth: C.WORLD_TRUTH, arrival: C.WORLD_ARRIVAL, reach: C.WORLD_REACH, look: C.WORLD_LOOK, ground: C.WORLD_GROUND };
+    const req = { v: 1, key: `wp1-ultra-${names.join('')}`, any: true, tier: 'ultra' };
+    for (const [s, subs] of Object.entries(streams)) {
+      const on = names.includes(s);
+      req[s] = { on, ...Object.fromEntries(subs.map((k) => [k, on && blocks[s][k] !== false])), worker: on ? JSON.parse(JSON.stringify(blocks[s].worker ?? {})) : null };
+    }
+    return req;
+  };
+  const arms = { base: HIGH, reach: { ...HIGH, worldPass: allReq(['reach']) }, three: { ...HIGH, worldPass: allReq(['truth', 'arrival', 'look']) }, all4: { ...HIGH, worldPass: allReq(['truth', 'arrival', 'reach', 'look']) } };
+  const sums = Object.fromEntries(Object.keys(arms).map((k) => [k, 0]));
+  for (const [name, lat, lon, extra] of PLACES) {
+    if (only && !name.includes(only)) continue;
+    const [x0, y0] = tileOf(lat, lon, 14);
+    for (const [dx, dy] of [[0, 0], ...extra]) {
+      const cells = [];
+      for (const [arm, req] of Object.entries(arms)) {
+        const ms = [];
+        for (let r = 0; r < 3; r++) {
+          const t = performance.now();
+          const res = await api.buildTile(14, x0 + dx, y0 + dy, 'sat-skyline', req);
+          ms.push(performance.now() - t);
+          if (r === 0 && res.satStandIns) cells.n = res.satStandIns.n;
+        }
+        ms.sort((a, b) => a - b);
+        sums[arm] += ms[1];
+        cells.push(`${arm} ${ms[1].toFixed(1).padStart(6)}`);
+      }
+      console.log(`${name.padEnd(16)} ${x0 + dx}/${y0 + dy}  ${cells.join(' | ')}  (${cells.n ?? 0} stand-ins)`);
+    }
+  }
+  console.log(`SUM ms ${Object.entries(sums).map(([k, v]) => `${k} ${v.toFixed(0)}`).join(' | ')}`);
+  process.exit(0);
+}
 const sha = (v) => crypto.createHash('sha256').update(JSON.stringify(v, (k, x) => (k === 'tessMs' ? undefined : ArrayBuffer.isView(x) ? crypto.createHash('sha256').update(Buffer.from(x.buffer, x.byteOffset, x.byteLength)).digest('hex') : x))).digest('hex');
 
 const fails = [];
