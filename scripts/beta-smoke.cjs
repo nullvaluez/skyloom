@@ -83,10 +83,6 @@ async function ready(){for(let i=0;i<120;i++){try{if((await fetch(base)).ok)retu
   // title-bypass or quality-governor pins are applied.
   await page.goto(base+'/?graphicsReview=1'+(flags?'&flags='+encodeURIComponent(flags):''),{waitUntil:'domcontentloaded'});
   await page.getByTestId('title-screen').waitFor({timeout:60000});
-  const world=await page.evaluate(()=>window.__flyStats?.worldPass);
-  const worldAllowed=['high','ultra'].includes(desktopQuality);
-  const worldStreams=['truth','arrival','reach','look','ground'];
-  check('desktop smoke exercises the selected World Pass tier',world?.state?.allowed===worldAllowed&&worldStreams.every(stream=>world?.request?.[stream]?.on===(worldAllowed&&!flags.split(',').includes('-WORLD_'+stream.toUpperCase()))),{quality:desktopQuality,key:world?.state?.key});
   renderer=await page.evaluate(()=>{const g=document.createElement('canvas').getContext('webgl2');const e=g?.getExtension('WEBGL_debug_renderer_info');const name=e?g.getParameter(e.UNMASKED_RENDERER_WEBGL):'unknown';g?.getExtension('WEBGL_lose_context')?.loseContext();return name;});
   console.log('Renderer',renderer);
   software=process.env.BETA_TRUSTED_INPUT!=='1'&&/SwiftShader|llvmpipe|softpipe|Software/i.test(renderer);console.log('Input',software?'DOM presses (software GL)':'trusted');
@@ -136,7 +132,14 @@ async function ready(){for(let i=0;i<120;i++){try{if((await fetch(base)).ok)retu
   await page.getByTestId('explorer-guide').waitFor({timeout:software?300000:90000});
   check('first flight starts with skippable guidance',await page.getByRole('button',{name:'Skip tips',exact:true}).isVisible());
   await press(page.getByRole('button',{name:'Skip tips',exact:true}));
-  await page.waitForFunction(()=>window.__fly?.worldLoading!==true&&window.__flyBoot?.pct===100);
+  // The title is visible before streaming engines latch their worker request.
+  // Judge the normal first flight after the world is ready, without forcing a
+  // latch or bypassing any title/hangar controls.
+  await page.waitForFunction(()=>window.__fly?.worldLoading!==true&&window.__flyBoot?.pct===100&&!!window.__flyStats?.worldPass?.request);
+  const world=await page.evaluate(()=>window.__flyStats.worldPass);
+  const worldAllowed=['high','ultra'].includes(desktopQuality);
+  const worldStreams=['truth','arrival','reach','look','ground'];
+  check('desktop smoke exercises the selected World Pass tier',world.state.preset===desktopQuality&&world.state.allowed===worldAllowed&&worldStreams.every(stream=>world.request[stream]?.on===(worldAllowed&&!flags.split(',').includes('-WORLD_'+stream.toUpperCase()))),{quality:desktopQuality,key:world.state.key});
   await page.waitForFunction(()=>window.__fly.weather?.wx.source==='beta-fixture');
   await key(page,'p');await page.getByTestId('photo-composition').waitFor();
   check('photo composition has no weather or time override controls',await page.getByTestId('flight-conditions').count()===0&&await page.getByTestId('photo-conditions').count()===0&&await page.getByTestId('conditions-panel').count()===0);
@@ -153,9 +156,34 @@ async function ready(){for(let i=0;i<120;i++){try{if((await fetch(base)).ok)retu
   await press(page.getByTestId('photo-shutter'));await page.getByText('capture failed',{exact:true}).first().waitFor();
   check('failed photo encoding awards no photograph',await page.evaluate(()=>!(JSON.parse(localStorage.getItem('fly-exploration-v1')||'{"photos":[]}').photos?.length)));
   await page.evaluate(()=>{HTMLCanvasElement.prototype.toBlob=window.__betaToBlob;delete window.__betaToBlob;});
-  const downloading=page.waitForEvent('download');await press(page.getByTestId('photo-shutter'));const download=await downloading;
-  await download.saveAs(path.join(OUT,'flight-memory.png'));
-  check('photo export produces a PNG',download.suggestedFilename().endsWith('.png'));
+  // Windows Chrome can offer native file sharing too. This check asserts the
+  // download fallback, so record native support for the actual exported File
+  // while declining sharing for this one capture. Restore the browser's
+  // original capability immediately after the checked export, even on failure.
+  await page.evaluate(()=>{
+    const originalCanShare=navigator.canShare,ownCanShare=Object.getOwnPropertyDescriptor(navigator,'canShare');
+    const nativeWouldShare=[];
+    window.__betaPhotoShare={nativeWouldShare,restore:()=>{
+      if(ownCanShare)Object.defineProperty(navigator,'canShare',ownCanShare);else delete navigator.canShare;
+    }};
+    Object.defineProperty(navigator,'canShare',{configurable:true,value(data){
+      try{nativeWouldShare.push(typeof originalCanShare==='function'&&originalCanShare.call(navigator,data));}catch(error){nativeWouldShare.push(String(error));}
+      return false;
+    }});
+  });
+  try{
+    const [download]=await Promise.all([page.waitForEvent('download'),press(page.getByTestId('photo-shutter'))]);
+    await download.saveAs(path.join(OUT,'flight-memory.png'));
+    const bytes=readFileSync(path.join(OUT,'flight-memory.png'));
+    const photoDownload={filename:download.suggestedFilename(),bytes:bytes.length,png:bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]))};
+    check('photo export produces a PNG',photoDownload.filename.endsWith('.png')&&photoDownload.png,photoDownload);
+  }finally{
+    const nativeWouldShare=await page.evaluate(()=>{
+      const state=window.__betaPhotoShare;if(!state)return [];
+      try{return state.nativeWouldShare;}finally{state.restore();delete window.__betaPhotoShare;}
+    });
+    console.log('Photo native sharing support',JSON.stringify(nativeWouldShare));
+  }
   await press(page.getByTestId('photo-exit'));
   await key(page,'Escape');
   check('flight and pause menus have no manual condition controls',await page.getByTestId('flight-conditions').count()===0&&await page.getByTestId('conditions-panel').count()===0);
