@@ -64,7 +64,10 @@ for (const distant of [false, true]) {
 check('(2) look-facade roof value steps aside', /lfDay\*lfRoof\*0\.\)/.test(on[false].frag));
 for (const distant of [false, true]) {
   const p = on[distant], name = distant ? 'far' : 'near';
-  check(`(2) on ${name}: wall glass mode decoded before any pass`, count(p.frag, 'float wlMode=wlBase.r>7.5?2.:wlBase.r>3.5?1.:0.;') === 1 && p.frag.indexOf('diffuseColor.rgb=wlBase;') < p.frag.indexOf('cityDay='));
+  // Round 2: the near ring's material code is in the style byte (2 / 3), the far mass's in the red offset.
+  const wf = p.frag.indexOf('float isWall = style.z;'), fl = p.frag.indexOf('isWall=min(isWall,1.);');
+  const firstUse = p.frag.indexOf('isWall', p.frag.indexOf('float wlZ=isWall;') + 'float wlZ=isWall;'.length + 1);
+  check(`(2) on ${name}: wall material decoded (style byte and red offset) before any pass`, count(p.frag, 'float wlMode=wlZ>2.5?2.:wlZ>1.5?1.:0.;') === 1 && count(p.frag, 'float wlModeR=wlBase.r>7.5?2.:wlBase.r>3.5?1.:0.;') === 1 && wf >= 0 && fl > wf && firstUse === fl && p.frag.indexOf('diffuseColor.rgb=wlBase;') < p.frag.indexOf('cityDay='));
   check(`(2) on ${name}: wall albedo from the worker, the tag decides curtain glass`, count(p.frag, 'cityWall=wlBase;') === 1 && count(p.frag, 'cityCurtain=wlMode>1.5?0.:wlMode>.5?1.:cityCurtain;') === 1);
   check(`(2) on ${name}: look-facade wall identity terms step aside, dark glass on curtain only`, /lfDay\*lfFace\*0\.\)/.test(p.frag) && /lfDarkT\*cityCurtain\)/.test(p.frag));
 }
