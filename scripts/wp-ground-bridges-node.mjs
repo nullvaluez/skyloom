@@ -105,22 +105,87 @@ const G = C.WORLD_GROUND;
 const subs = { truth: ['heights', 'typology', 'smallBand', 'roofs'], arrival: ['fastQuery', 'drapeCap', 'workerPrep', 'uploads', 'footings', 'readiness'], reach: ['standIns'], look: ['roofPhoto', 'walls', 'structures', 'authority'], ground: ['trees', 'bridges'] };
 const wp = { v: 1, key: 'wp1-node-ground', any: true, tier: 'ultra' };
 for (const [s, list] of Object.entries(subs)) wp[s] = { on: s === 'ground', ...Object.fromEntries(list.map((k) => [k, s === 'ground'])), worker: s === 'ground' ? JSON.parse(JSON.stringify(G.worker)) : null };
-const PL = { 'tokyo-bay': [35.625, 139.785], 'nyc-bay': [40.7, -74.03], 'nyc-top': [40.754, -73.984], paris: [48.853, 2.33], brooklyn: [40.678, -73.97], london: [51.502, -0.1], 'sf-golden-gate': [37.8199, -122.4783] };
+const PL = { 'tokyo-bay': [35.625, 139.785], 'nyc-bay': [40.7, -74.03], 'nyc-top': [40.754, -73.984], 'nyc-mid': [40.755, -73.99], paris: [48.853, 2.33], brooklyn: [40.678, -73.97], london: [51.502, -0.1], 'sf-golden-gate': [37.8199, -122.4783] };
+if (typeof args.places === 'string') for (const k of Object.keys(PL)) if (!args.places.split(',').includes(k)) delete PL[k];
 const report = {};
+// Round 2: an independent joint count. For every end the worker marks LANDING,
+// re-read the tile's raw bridge ways (the replayed MVT, not the worker's runs)
+// and ask whether a way that is not part of this chain has an in-tile vertex
+// within 2 m of the end (a joint between two OSM ways, where the deck must stay
+// up). A raw way is "part of this chain" when every in-tile vertex of it lies
+// on the chain's polyline (0.5 m).
+const BW = { motorway: 1, trunk: 1, primary: 1, secondary: 1, tertiary: 1, minor: 1, service: 1, rail: 1, transit: 1, busway: 1 };
+const WORLD = 2 * Math.PI * 6378137;
+const tileUrl = (z, x, y) => Object.keys(index).find((u) => u.includes('openfreemap') && u.endsWith(`/${z}/${x}/${y}.pbf`));
+async function rawBridgeWays(z, x, y) {
+  const u = tileUrl(z, x, y); if (!u) return null;
+  const res = await globalThis.fetch(u); if (!res.ok) return null;
+  const vt = new VectorTile(new Pbf(new Uint8Array(await res.arrayBuffer())));
+  const L = vt.layers.transportation; if (!L) return [];
+  const span = WORLD / 2 ** z, sc = span / L.extent, ways = [];
+  for (let i = 0; i < L.length; i++) {
+    const f = L.feature(i); if (f.type !== 2 || f.properties.brunnel !== 'bridge' || !BW[f.properties.class]) continue;
+    for (const line of f.loadGeometry()) {
+      const v = line.map((p) => [p.x * sc - span / 2, p.y * sc - span / 2, p.x > 0.5 && p.y > 0.5 && p.x < L.extent - 0.5 && p.y < L.extent - 0.5]);
+      if (v.some((p) => p[2])) ways.push(v);
+    }
+  }
+  return ways;
+}
+const segD = (px, pz, ax, az, bx, bz) => { const dx = bx - ax, dz = bz - az, l = dx * dx + dz * dz; const t = l ? Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / l)) : 0; return Math.hypot(px - ax - t * dx, pz - az - t * dz); };
 for (const [name, [lat, lon]] of Object.entries(PL)) {
   const n = 2 ** 13, x0 = Math.floor((lon + 180) / 360 * n), r = lat * Math.PI / 180, y0 = Math.floor((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * n);
-  const agg = { tiles: 0, chains: 0, water: 0, landmark: 0, features: 0, clear: [], lengths: [], ribbonVertsOff: 0, ribbonVertsOn: 0 };
+  const kM = 1 / Math.cos(r);
+  const agg = { tiles: 0, chains: 0, water: 0, landmark: 0, features: 0, ways: 0, joined: 0, clear: [], lengths: [], ribbonVertsOff: 0, ribbonVertsOn: 0, ribbonRows: 0, ends: 0, landings: 0, jointLandings: 0, glowChains: 0 };
   for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
     const on = await api.buildTile(13, x0 + dx, y0 + dy, 'sat-roads', { airportLandmarks: false, operationsAirports: [], worldPass: wp });
     const off = await api.buildTile(13, x0 + dx, y0 + dy, 'sat-roads', { airportLandmarks: false, operationsAirports: [] });
-    agg.tiles++;
+    agg.tiles++; agg.stamped = (agg.stamped ?? 0) + (on && on.wp === wp.key ? 1 : 0); agg.offStamped = (agg.offStamped ?? 0) + (off && off.wp !== undefined ? 1 : 0);
     agg.ribbonVertsOff += off?.satRoads ? off.satRoads.pos.length / 3 : 0;
     agg.ribbonVertsOn += on?.satRoads ? on.satRoads.pos.length / 3 : 0;
     const b = on?.wpBridges; if (!b) continue;
-    agg.chains += b.stats.chains; agg.water += b.stats.water; agg.landmark += b.stats.landmark; agg.features += b.stats.features;
-    for (let c = 0; c < b.chains.length; c += 9) { agg.clear.push(+b.chains[c + 3].toFixed(1)); agg.lengths.push(Math.round(b.chains[c + 8])); }
+    agg.chains += b.stats.chains; agg.water += b.stats.water; agg.landmark += b.stats.landmark; agg.features += b.stats.features; agg.ways += b.stats.ways ?? 0; agg.joined += b.stats.joined ?? 0;
+    agg.ribbonRows += b.ribbon ? b.ribbon.length / 8 : 0;
+    const raw = await rawBridgeWays(13, x0 + dx, y0 + dy);
+    const ST = b.stats.ways !== undefined ? 10 : 9;
+    for (let c = 0; c < b.chains.length; c += ST) {
+      agg.clear.push(+b.chains[c + 3].toFixed(1)); agg.lengths.push(Math.round(b.chains[c + 8]));
+      if (ST === 10 && b.chains[c + 9] > 0) agg.glowChains++;
+      const first = b.chains[c], np = b.chains[c + 1];
+      const P = (i) => [b.pts[(first + i) * 2], b.pts[(first + i) * 2 + 1]];
+      const onChain = (q) => { for (let i = 0; i + 1 < np; i++) { const a = P(i), e = P(i + 1); if (segD(q[0], q[1], a[0], a[1], e[0], e[1]) < 0.5 * kM) return true; } return false; };
+      for (const [end, li] of [[0, 5], [np - 1, 6]]) {
+        agg.ends++;
+        if (!(b.chains[c + li] > 0.5)) continue;
+        agg.landings++;
+        if (!raw) continue;
+        const q = P(end);
+        let joint = false;
+        // A raw vertex near the end belongs to THIS chain when the way runs on
+        // along the chain from it (a neighbour vertex on the chain); otherwise
+        // the end meets another way there (a joint, or a T into its span).
+        for (const w of raw) {
+          for (let i = 0; i < w.length && !joint; i++) {
+            const v = w[i];
+            if (!v[2] || Math.hypot(v[0] - q[0], v[1] - q[1]) >= 2 * kM) continue;
+            // the way's direction from v toward neighbour j: a point 3 m along it
+            const along = (j) => {
+              if (j < 0 || j >= w.length) return false;
+              const d = Math.hypot(w[j][0] - v[0], w[j][1] - v[1]);
+              if (d <= 0.5 * kM) return false;
+              const t = Math.min(1, (3 * kM) / d);
+              return onChain([v[0] + (w[j][0] - v[0]) * t, v[1] + (w[j][1] - v[1]) * t]);
+            };
+            if (!(along(i - 1) || along(i + 1))) joint = true;
+          }
+          if (joint) break;
+        }
+        if (joint) { agg.jointLandings++; if (process.env.JDBG) console.log("JOINT", name, dx, dy, JSON.stringify(q), JSON.stringify(raw.filter((w) => w.some((v) => Math.hypot(v[0] - q[0], v[1] - q[1]) < 2 * kM)).map((w) => [w.length, w.filter(onChain).length, w.slice(0, 3)])), "chain", np, JSON.stringify(P(0)), JSON.stringify(P(np - 1))); }
+      }
+    }
   }
   const q = (a, p) => { const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.min(s.length - 1, Math.floor(p * s.length))] : null; };
+  agg.jointPctOfLandings = +(100 * agg.jointLandings / Math.max(1, agg.landings)).toFixed(1);
   report[name] = { ...agg, clear: undefined, lengths: undefined, clearP50: q(agg.clear, 0.5), clearP90: q(agg.clear, 0.9), clearMax: q(agg.clear, 1), lengthP50: q(agg.lengths, 0.5), lengthMax: q(agg.lengths, 1), clearHist: agg.clear.reduce((h, v) => { const k = v <= 3 ? '2.5' : v <= 6 ? '5.5-6' : v <= 12 ? '6-12' : v <= 25 ? '12-25' : '25-45'; h[k] = (h[k] || 0) + 1; return h; }, {}) };
   console.log(name, JSON.stringify(report[name]));
 }
