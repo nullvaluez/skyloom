@@ -113,7 +113,10 @@ async function runArm(browser, name) {
   const ctx = await browser.newContext(ctxOpts);
   const page = await ctx.newPage();
   const res = { quality: A.quality, flags: A.flags, device: A.device ?? 'desktop', errors: [] };
-  page.on('pageerror', (e) => res.errors.push(e.message.slice(0, 300)));
+  page.on('pageerror', (e) => {
+    res.errors.push(e.message.slice(0, 300));
+    (res.pageErrorStacks ??= []).push(e.stack ?? e.message);
+  });
   try {
     await page.addInitScript(hookWorkers);
     await page.addInitScript(({ quality }) => {
