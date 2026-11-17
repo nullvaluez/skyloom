@@ -165,7 +165,6 @@ export function PrewarmRig({ runtime }) {
   useEffect(() => {
     if (!PREWARM.enabled || !runtime) return;
     runtime.prewarm = prewarmState();
-    const store = useFlyStore.getState();
     const t0 = performance.now();
     let timer = null;
     let idle = null;
@@ -176,8 +175,6 @@ export function PrewarmRig({ runtime }) {
         gl,
         camera,
         scene,
-        style: store.mapStyle,
-        tier: store.qualityTier,
         adoptWarmScene: (object) => runtime.adoptCinematicWarmScene?.(object),
         beforeWarm: () => runtime.terrainPrewarm?.wait(),
       });

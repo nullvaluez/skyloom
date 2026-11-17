@@ -26,6 +26,7 @@ import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import vm from 'node:vm';
+import { pathToFileURL } from 'node:url';
 import { shipPassBase } from './_ship-pass-base.mjs';
 
 register('./_node-resolve.mjs', import.meta.url);
@@ -33,7 +34,7 @@ register('./_node-resolve.mjs', import.meta.url);
 const ROOT = path.resolve(import.meta.dirname, '..');
 const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8').replace(/\r\n/g, '\n');
 const git = (...a) => execFileSync('git', ['-C', ROOT, ...a], { encoding: 'utf8', maxBuffer: 64 << 20, stdio: ['ignore', 'pipe', 'ignore'] }).replace(/\r\n/g, '\n');
-const mod = (rel) => import(path.join(ROOT, rel));
+const mod = (rel) => import(pathToFileURL(path.join(ROOT, rel)).href);
 
 let passed = 0;
 let failed = 0;
@@ -111,7 +112,7 @@ async function shipPassUnder(search) {
   installUrlFlags(win);
   globalThis.window = win;
   try {
-    return await import(`${path.join(ROOT, 'lib/fly/ship-pass.js')}?pin=${++pinSeq}`);
+    return await import(`${pathToFileURL(path.join(ROOT, 'lib/fly/ship-pass.js')).href}?pin=${++pinSeq}`);
   } finally {
     if (had) globalThis.window = prev;
     else delete globalThis.window;
@@ -343,13 +344,13 @@ async function shipPassUnder(search) {
     assert(live >= 5, 'prewarm.js still reads the two idle halves');
     return `equirect half dead (immersive ${IMMERSIVE.environmentSize} px); the flag reaches ${live} reads in prewarm.js (shadow-twin warm + environment re-queue, both on frames <= ${ENV_UNIFORM.idleFrameMs} ms)`;
   });
-  await check('FR-3 (e) wiring: boot tier rides the boot drain, the ladder queues after it, PrewarmRig rescans tier/env/late entries; flag-gated', () => {
+  await check('FR-3 (e) wiring: selected boot tier rides the drain, PrewarmRig rescans actual tier/env/late entries without a standby ladder; flag-gated', () => {
     const src = read('lib/fly/prewarm.js');
     const run = src.slice(src.indexOf('export async function runPrewarm'));
-    const boot = run.indexOf("queueRegistryWarm({ gl, camera, scene, tiers: [tier], reason: 'boot' })");
+    const boot = run.indexOf("queueRegistryWarm({ gl, camera, scene, reason: 'boot' })");
     const drainAt = run.indexOf('await drain(t0');
     const ladder = run.indexOf("reason: 'ladder'");
-    assert(boot > 0 && drainAt > boot && ladder > drainAt, 'boot → drain → ladder');
+    assert(boot > 0 && drainAt > boot && ladder === -1, 'selected boot → drain, no standby ladder');
     assert(/if \(!PREWARM\.enabled \|\| !shipPassOn\('SHADER_READY'\)/.test(src), 'queueRegistryWarm is flag-gated');
     const rig = read('components/fly/PrewarmRig.jsx');
     for (const r of ["run('tier'", "run('rescan')", "run('env')", "addEventListener('webglcontextrestored', lost)"]) assert(rig.includes(r), `PrewarmRig: ${r}`);
@@ -652,7 +653,7 @@ async function shipPassUnder(search) {
 {
   const store = new Map();
   globalThis.window = { localStorage: { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)) } };
-  const fa = await import(path.join(ROOT, 'lib/fly/frame-api.js') + '?fr9');
+  const fa = await import(pathToFileURL(path.join(ROOT, 'lib/fly/frame-api.js')).href + '?fr9');
   const { presentationFps, paceTarget } = await mod('lib/fly/pace-adapt.js');
   await check('FR-9 (a) setFrameCadence persists to fly-frame-rate-v1, notifies, ignores junk; the default is 60', () => {
     assert(fa.FRAME_RATE_KEY === 'fly-frame-rate-v1');

@@ -131,7 +131,7 @@ await check('general warm awaits measured profiles before done and keeps depth/e
   const entry = source.indexOf('export async function runPrewarm');
   assert.ok(source.indexOf('await warmMeasuredWorld(gl, camera, scene)', entry) < source.indexOf('_state.done = true', entry));
   assert.match(source, /enqueue\('shadow-depth', \(\) => warmShadowDepth\(gl, camera, warmScene\)\)/);
-  assert.match(source, /warmPassGroup\(gl, camera, st, t, alpha, size\)/);
+  assert.match(source, /warmPassGroup\(gl, camera, style, selected\.qualityTier, alpha, size\)/);
 });
 await check('a completed general queue cannot certify failed or bypassed required profiles', () => {
   let retries = 0;

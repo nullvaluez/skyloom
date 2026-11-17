@@ -1391,3 +1391,21 @@ not establish that driver teardown is fixed. The old title-bypass diagnostic
 also measured a 3.66 s hangar draw under the boot overlay on a page left
 in its hangar. Its profile includes the floor reflection, HDR conversion and
 first-use uniforms. The fixed-pose flight measurements close that hangar.
+
+A subsequent production trace on the same RTX 5080 isolated the wait inside
+Chrome's GPU process. Destroying the previous tab's command buffer took
+7,554 ms. It spent 7,493 ms inside `Program::MainLinkLoadEvent::wait`. Creating
+the next tab's buffer took 6,781 ms, matching a 6,782 ms wait in its first
+minimap draw. The native trace recorded no data loss. No JavaScript shader
+link started during the screenshot or page close.
+
+A second donor flight identified the programs by matching their shader
+source fingerprints to the pending pair in that trace. Ultra was using three
+shadow cascades, and its required terrain and world programs were ready.
+The optional `terrain-profile-2` job nevertheless submitted opaque and
+transparent terrain for two cascades at 87.35 s. Each had a 21,494-character
+vertex shader and a fragment shader over 167,000 characters. Both still
+reported incomplete at page hide. The same flight had already prepared terrain
+for zero and one cascade at 60.52 and 73.47 s. This explains how the previous
+flight could animate smoothly while leaving the next page waiting on work
+for a quality setting the player had never selected.
