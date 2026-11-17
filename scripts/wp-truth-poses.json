@@ -1,0 +1,4 @@
+{
+  "powell-subdiv2": { "lat": 40.205, "lon": -83.088, "altM": 520, "headingDeg": 339, "note": "TRUTH r2: the Powell subdivision of the wave-1 verifier (about 250 m above ground)" },
+  "tokyo-akasaka": { "lat": 35.665, "lon": 139.728, "altM": 300, "headingDeg": 330, "note": "TRUTH r2: large central-Tokyo footprints by the palace grounds" }
+}
