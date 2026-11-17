@@ -6,7 +6,8 @@ import { register } from 'node:module';
 import vm from 'node:vm';
 register('./_node-resolve.mjs', import.meta.url);
 const THREE = await import('three');
-const { buildCanopySeasonAtlas, patchCanopyMaterial } = await import('../lib/fly/ground-canopy-material.js');
+const { buildCanopySeasonAtlas, createCanopyMaterials } = await import('../lib/fly/ground-canopy-material.js');
+const { CanopyPhoto } = await import('../lib/fly/ground-canopy-photo.js');
 const { createCinematicTreeMaterial, canopyForm } = await import('../lib/fly/cinematic-ground.js');
 const { applyBendAnchor } = await import('../lib/fly/toy-world/world-bend.js');
 const { SPECIES_FORM, edgeDensity } = await import('../lib/fly/ground-canopy-select.js');
@@ -55,7 +56,8 @@ check('filtered leaf-off and full-leaf masks remain visible through the coarse m
     width = w; height = h; data = next;
   }
 });
-const materials = [false, true].map(depth => patchCanopyMaterial(createCinematicTreeMaterial(applyBendAnchor, { depth }), depth));
+const pair = createCanopyMaterials(applyBendAnchor);
+const materials = [pair.material, pair.depth];
 const shaders = materials.map((m, i) => {
   const lib = THREE.ShaderLib[i ? 'depth' : 'standard'];
   const shader = { vertexShader: lib.vertexShader, fragmentShader: lib.fragmentShader, uniforms: THREE.UniformsUtils.clone(lib.uniforms) };
@@ -75,14 +77,22 @@ check('visible and depth shaders share leaf coverage and only screen-dither the 
   const masks = s => s.fragmentShader.slice(s.fragmentShader.indexOf('vec4 wpLeaf'), s.fragmentShader.indexOf('#include <alphahash_fragment>'));
   assert.equal(masks(shaders[0]), masks(shaders[1]));
 });
-check('one atlas is shared by visible/depth and disposed after its final owner', () => {
-  assert.equal(materials[0].alphaMap, materials[1].alphaMap);
-  const texture = materials[0].alphaMap;
-  let disposals = 0; texture.addEventListener('dispose', () => disposals++);
-  materials[0].dispose(); assert.equal(disposals, 0);
-  materials[1].dispose(); assert.equal(disposals, 1);
-  const next = patchCanopyMaterial(createCinematicTreeMaterial(applyBendAnchor), false);
-  assert.notEqual(next.alphaMap, texture); next.dispose();
+check('visible and depth materials share their own layer texture across independent mounts', () => {
+  const other = createCanopyMaterials(applyBendAnchor);
+  assert.equal(pair.material.alphaMap, pair.seasonTexture);
+  assert.equal(pair.depth.alphaMap, pair.seasonTexture);
+  assert.notEqual(other.seasonTexture, pair.seasonTexture);
+  for (const owner of [pair, other]) {
+    owner.material.dispose(); owner.depth.dispose(); owner.seasonTexture.dispose();
+  }
+});
+check('a replayed canopy photo loader can request a tile abandoned by its predecessor', () => {
+  const first = new CanopyPhoto(() => null, { maxActive: 0 });
+  const chunk = {};
+  first.request(chunk); first.request(chunk); assert.equal(first.queue.length, 1);
+  first.dispose(); first.request({}); assert.equal(first.queue.length, 0);
+  const next = new CanopyPhoto(() => null, { maxActive: 0 });
+  next.request(chunk); assert.deepEqual(next.queue, [chunk]); next.dispose();
 });
 
 // Run the production placement function without React; the matrix, instance

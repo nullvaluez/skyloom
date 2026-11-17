@@ -48,15 +48,15 @@
  * (`wpGrid`; a chunk is drawn once it has one). Patches use the grid. The
  * closest crowns also ride the smoothed near-contact support.
  */
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { BufferAttribute, BufferGeometry, Color, InstancedBufferAttribute, InstancedMesh, DynamicDrawUsage } from 'three';
 import { applyBendAnchor } from '@/lib/fly/toy-world/world-bend';
-import { buildCinematicTreeGeometry, createCinematicTreeMaterial, canopyForm } from '@/lib/fly/cinematic-ground';
+import { buildCinematicTreeGeometry, canopyForm } from '@/lib/fly/cinematic-ground';
 import { worldPassConfig, worldPassRequest } from '@/lib/fly/world-pass';
 import { planCanopy, edgeDensity, SPECIES_FORM } from '@/lib/fly/ground-canopy-select';
 import { CanopyPhoto } from '@/lib/fly/ground-canopy-photo';
-import { patchCanopyMaterial } from '@/lib/fly/ground-canopy-material';
+import { createCanopyMaterials } from '@/lib/fly/ground-canopy-material';
 import { NEAR_SUPPORT, updateNearContactMatrices } from '@/lib/fly/near-ground-support';
 import { SAT_SHADOWS, SAT_VEG, SETTLE_CALM } from '@/lib/fly/fly-constants';
 import { immersiveOn } from '@/lib/fly/immersive';
@@ -160,10 +160,14 @@ export function WpCanopyLayer({ engine, runtime, flight, tier }) {
     return { cfg, t, tc: cfg[t] };
   }, []);
   const { cfg, tc } = setup;
-  const photo = useMemo(() => new CanopyPhoto(() => runtime.engine?.imagerySource, { zoom: cfg.photoZoom, leafRatio: cfg.leafRatio, maxActive: PHOTO_ACTIVE }), [runtime, cfg]);
+  const photoRef = useRef(null);
+  useLayoutEffect(() => {
+    const photo = new CanopyPhoto(() => runtime.engine?.imagerySource, { zoom: cfg.photoZoom, leafRatio: cfg.leafRatio, maxActive: PHOTO_ACTIVE });
+    photoRef.current = photo;
+    return () => { photoRef.current = null; photo.dispose(); };
+  }, [runtime, cfg]);
   const meshes = useMemo(() => {
-    const material = patchCanopyMaterial(createCinematicTreeMaterial(applyBendAnchor), false);
-    const depth = patchCanopyMaterial(createCinematicTreeMaterial(applyBendAnchor, { depth: true }), true);
+    const { material, depth, seasonTexture } = createCanopyMaterials(applyBendAnchor);
     const nearGeo = buildCinematicTreeGeometry(tc.nearCap);
     const farGeo = buildCanopyPatchGeometry(tc.farCap);
     nearGeo.setAttribute('aWpDens', new InstancedBufferAttribute(new Float32Array(tc.nearCap * 3), 3));
@@ -172,8 +176,6 @@ export function WpCanopyLayer({ engine, runtime, flight, tier }) {
     const far = new InstancedMesh(farGeo, material, tc.farCap);
     near.name = 'wp-canopy-near';
     far.name = 'wp-canopy-far';
-    const shadowPin = typeof window !== 'undefined' && window.__flySatShadowOverride === 0;
-    const shadowOn = SAT_SHADOWS.enabled && (tier === SAT_SHADOWS.minTier || immersiveOn('lighting')) && !shadowPin;
     for (const m of [near, far]) {
       m.instanceMatrix.setUsage(DynamicDrawUsage);
       m.setColorAt(0, new Color(1, 1, 1));
@@ -183,9 +185,7 @@ export function WpCanopyLayer({ engine, runtime, flight, tier }) {
       m.frustumCulled = false; // instances span the ring; every pass rewrites them
       m.count = 0;
       m.visible = false;
-      m.receiveShadow = shadowOn;
     }
-    near.castShadow = shadowOn && cfg.castShadow;
     near.customDepthMaterial = depth;
     near.userData.r22Caster = 'trees';
     installCascadeZeroShadow(near);
@@ -197,12 +197,18 @@ export function WpCanopyLayer({ engine, runtime, flight, tier }) {
     };
     // the instance colour divides by the material's base colour, read once (never the live value)
     const base = material.color, inv = [1 / (base.r * 0.86), 1 / (base.g * 0.86), 1 / (base.b * 0.86)];
-    return { material, depth, near, far, nearGeo, farGeo, stage, inv, shadowCasts: near.castShadow };
-  }, [tc, cfg, tier]);
+    return { material, depth, seasonTexture, near, far, nearGeo, farGeo, stage, inv };
+  }, [tc]);
+  useLayoutEffect(() => {
+    const shadowPin = window.__flySatShadowOverride === 0;
+    const enabled = SAT_SHADOWS.enabled && (tier === SAT_SHADOWS.minTier || immersiveOn('lighting')) && !shadowPin;
+    meshes.near.receiveShadow = meshes.far.receiveShadow = enabled;
+    meshes.near.castShadow = enabled && cfg.castShadow;
+  }, [meshes, cfg, tier]);
   useEffect(() => () => {
     meshes.material.dispose(); meshes.depth.dispose(); meshes.nearGeo.dispose(); meshes.farGeo.dispose();
-    photo.dispose();
-  }, [meshes, photo]);
+    meshes.seasonTexture?.dispose(); meshes.near.dispose(); meshes.far.dispose();
+  }, [meshes]);
 
   const st = useRef({
     t: -Infinity, atX: Infinity, atZ: Infinity, yaw: 0, sig: '', prevNear: 0, prevFar: 0, born: new Map(), ramping: false,
@@ -215,6 +221,7 @@ export function WpCanopyLayer({ engine, runtime, flight, tier }) {
 
   useEffect(() => {
     if (process.env.NODE_ENV !== 'development' || typeof window === 'undefined') return undefined;
+    const photo = photoRef.current;
     const handle = {
       meshes,
       photo,
@@ -237,9 +244,11 @@ export function WpCanopyLayer({ engine, runtime, flight, tier }) {
     };
     window.__wpCanopy = handle;
     return () => { if (window.__wpCanopy === handle) delete window.__wpCanopy; };
-  }, [meshes, photo, flight]);
+  }, [meshes, runtime, cfg, flight]);
 
   useFrame(({ clock, camera }) => {
+    const photo = photoRef.current;
+    if (!photo) return;
     const t = clock.elapsedTime;
     const s = st.current;
     // The arrival hold: no photo looks, no exact re-samples, no fine grids or
@@ -511,5 +520,5 @@ function swapJob(s, meshes, tc) {
   st.cut = p ? p.cut : 0; st.farthestM = p ? Math.round(p.farthest) : 0; st.sigma = +s.sigma.toFixed(3);
   st.edgeM = p ? Math.round(p.edgeB / j.k) : 0;
   st.triangles = nN * CROWN_TRIS + nF * PATCH_TRIS;
-  st.shadowTriangles = meshes.shadowCasts ? nN * CROWN_TRIS : 0; // cascade 0 submits every crown
+  st.shadowTriangles = meshes.near.castShadow ? nN * CROWN_TRIS : 0; // cascade 0 submits every crown
 }
