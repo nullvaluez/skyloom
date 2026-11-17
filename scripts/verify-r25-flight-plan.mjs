@@ -833,13 +833,16 @@ const dispatchMarkup=html=>html.replace(/<link[^>]*rel="preload"[^>]*>/g,'')
   .replace(/<img\b[^>]*class="ops-fleet-thumbnail"[^>]*>/g,'<glyph/>')
   .replace(/<div class="fleet-customize"><button aria-expanded="false">Customize<\/button><\/div>/g,'')
   .replace('<span>Umbra</span><small>Stealth wing</small>','<span>Umbra</span><small></small>');
-const render = (Mod, mode) => {
-  const arm = { flightMode: mode, hangarOpen: true, screen: 'hangar', spawn: null };
+const render = (Mod, mode, spawn = { lat: kosuGeo.lat, lon: kosuGeo.lon }) => {
+  const arm = { flightMode: mode, hangarOpen: true, screen: 'hangar', spawn };
   Object.assign(useFlyStore.getInitialState(), arm);
   useFlyStore.setState(arm);
   const runtime = { geo: { x: kosuGeo.lon, y: kosuGeo.lat } };
   return renderToStaticMarkup(React.createElement(Mod.GroundHangar, { runtime }));
 };
+await tryGate('8 startup selection pending', () => {
+  gate('8 startup selection pending: no phantom hangar before spawn resolves', render(NEWH, 'ops', null) === '');
+});
 await tryGate('8a flag-off identity', () => {
   setPlan(false);
   const w0ops = render(W0H, 'ops');

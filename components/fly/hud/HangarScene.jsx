@@ -16,6 +16,7 @@ import { LandingGear } from '../LandingGear';
 import { attachVectorControls, fleetAnimator, applyFleetLivery, disposeFleetGeometry } from '@/lib/fly/fleet-animation';
 import { useAdventureStore } from '@/stores/adventure-store';
 import { applyAirframeDetail } from '@/lib/fly/airframe-detail';
+import { applyShaderErrorPolicy } from '@/lib/fly/shader-ready';
 class ModelBoundary extends Component {
   state={error:false};
   static getDerivedStateFromError(){return {error:true};}
@@ -284,7 +285,7 @@ function StageBay({aircraft,airport,onReady,onError,onExteriorReady,view}){
 }
 export function HangarScene({aircraft,airport,onReady,onError,onExteriorReady,view}){
   return <ModelBoundary onError={onError}>
-    <Canvas shadows dpr={[1,1.5]} camera={{fov:42,near:.1,far:6000}} aria-label={`${aircraft.entry.name} in the open hangar at ${airport.id}; drag to inspect`}>
+    <Canvas shadows dpr={[1,1.5]} camera={{fov:42,near:.1,far:6000}} onCreated={({gl})=>applyShaderErrorPolicy(gl)} aria-label={`${aircraft.entry.name} in the open hangar at ${airport.id}; drag to inspect`}>
       {STAGE
         ?<StageBay aircraft={aircraft} airport={airport} onReady={onReady} onError={onError} onExteriorReady={onExteriorReady} view={view}/>
         :<Bay aircraft={aircraft} airport={airport} onReady={onReady} onError={onError} onExteriorReady={onExteriorReady} view={view}/>}

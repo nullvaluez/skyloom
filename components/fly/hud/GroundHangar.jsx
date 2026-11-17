@@ -26,7 +26,9 @@ import './mobile-flight.css';
 import { AirportPicker } from './AirportPicker';
 const SERVICE_RETRY_MS=250;
 export function GroundHangar({runtime}){
-  const open=useFlyStore(s=>s.hangarOpen);
+  // The store starts in hangar until FlyMode resolves the opening screen.
+  // Wait for that pre-mount decision before creating a separate preview canvas.
+  const open=useFlyStore(s=>s.hangarOpen&&!!s.spawn);
   const draft=useAdventureStore(s=>s.preflight);
   return open?<HangarBody key={draft?.id||'standard'} runtime={runtime}/>:null;
 }
