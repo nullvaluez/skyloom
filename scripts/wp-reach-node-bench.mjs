@@ -124,7 +124,8 @@ for (const [name, lat, lon, extra] of PLACES) {
     await api.setDiag(false);
     const shipped = await api.buildTile(14, x, y, 'sat-skyline', HIGH);
     const subOff = await api.buildTile(14, x, y, 'sat-skyline', { ...HIGH, worldPass: wpReq(false) });
-    if (sha({ ...subOff, worldPass: undefined }) !== sha(shipped)) fails.push(`G5 ${name} ${x}/${y}: standIns:false differs from shipped`);
+    // wave 1 merge: stream B stamps every any-on result with `wp` (the request key); mask it
+    if (sha({ ...subOff, worldPass: undefined, wp: undefined }) !== sha(shipped)) fails.push(`G5 ${name} ${x}/${y}: standIns:false differs from shipped`);
     const oldBodies = old.wpStages?.emittedPolygons ?? 0;
     const oldTris = old.wpStages?.emittedTriangles ?? 0;
     const si = neu.satStandIns;
