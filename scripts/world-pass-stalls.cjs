@@ -21,7 +21,9 @@
  * HTTP, Cache API and shader caches survive page 2 and the
  * warm browser restart. A fresh phase requires a nonexistent profile directory.
  * --profile-root=<dir> can reuse the profile from an earlier warm-only run.
- * Screenshots occur after the timing window. Only one page renders at a time.
+ * Screenshots occur after the timing window, but can affect the next page's
+ * GPU/cache state. --no-shot disables them; compare matched transfer conditions.
+ * Only one page renders at a time.
  */
 const { chromium } = require('playwright');
 const fs = require('node:fs');
@@ -62,10 +64,11 @@ fs.mkdirSync(profileRoot, { recursive: true });
 let gitHead = null;
 try { gitHead = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim(); } catch {}
 const report = {
-  tool: 'world-pass-stalls', version: 7, started: new Date().toISOString(), mode, gitHead,
+  tool: 'world-pass-stalls', version: 8, started: new Date().toISOString(), mode, gitHead,
   serverRef: typeof args['server-ref'] === 'string' ? args['server-ref'] : null,
   url: baseUrl.origin, quality, seconds, poses: poseNames, arms, phases, pages,
   profiled: !!args.profile, exceptions: !!args.exceptions, plain: !!args.plain, review: !!args.review, automation: !!args.automation,
+  screenshotsEnabled: !args['no-shot'],
   viewport: { width: 1600, height: 900 },
   venue: 'Headed installed Chrome, ANGLE D3D11, live providers, exclusive capture lock',
   pins: [...(args.plain ? [] : ['governor hold', 'Enhanced satellite', 'title bypass', 'sound off', 'tutorial done', 'fixed afternoon sun', 'baseline weather', 'arrival counters', 'fixed pose after runtime exists']),
@@ -360,6 +363,7 @@ const median = (values) => { if (!values.length) return null; const sorted = [..
 async function measure(context, page, arm, poseName, phase, pageNumber) {
   const id = `${mode}-${quality}-${arm}-${poseName}-${phase}-page${pageNumber}`;
   const row = { id, mode, quality, arm, pose: poseName, phase, page: pageNumber, profiled: !!args.profile, exceptions: !!args.exceptions, automation: !!args.automation,
+    screenshotsEnabled: report.screenshotsEnabled, screenshotAttempted: false,
     url: `${baseUrl.origin}/${args.review || arm === 'off' ? `?${[...(args.review ? ['graphicsReview=1'] : []), ...(arm === 'off' ? [`flags=${minusAll}`] : [])].join('&')}` : ''}`, errors: [], consoleErrors: [] };
   page.on('pageerror', (e) => {
     row.errors.push(e.message.slice(0, 500));
@@ -495,6 +499,7 @@ async function measure(context, page, arm, poseName, phase, pageNumber) {
     // Saving before screenshot preserves timing evidence even if readback fails.
     fs.writeFileSync(path.join(out, `${id}.json`), JSON.stringify(row, null, 2));
     if (!args['no-shot']) {
+      row.screenshotAttempted = true;
       try { await page.screenshot({ path: path.join(out, `${id}.png`), timeout: 15000 }); row.screenshot = `${id}.png`; } catch (e) { row.screenshotError = e.message; }
     }
     await page.close().catch(() => {});
