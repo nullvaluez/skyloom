@@ -392,7 +392,8 @@ the number from source. A stream that changes a payload under its flag does
 NOT bump it again: the flag-off payload is unchanged, and a flag-on bundle
 carries `wp` (see the request contract). The wave 1 merge bumped it once more,
 25 to 26, at the same ten sites, so a worker bundle from before the merge is
-dropped.
+dropped. The wave 2 merge bumped it again, 26 to 27, at the same ten
+sites.
 
 ### W0 proofs
 
@@ -751,6 +752,174 @@ Round 2 (asked by one stream of another, not wired at the merge):
   anchors (`#include <common>`, `void main() {`, `float skyA = uSkyFade;`).
 - D to A: carry the feature id and its polygon count on the item, so the look
   can prefer the OSM id for single-polygon features.
+
+## Wave 2 record
+
+2026-11-17. The owner asked for all five streams on the integration branch
+with every flag OFF, so each can be flown with `?flags=`. Merged into
+`phresh/mystifying-curran-97a006` by exact commit, `git merge --no-ff`, in
+this order: A TRUTH `d774900a` (merge `0c3c8a2e`), D LOOK `14b50cee`
+(`0fdf7a14`), B ARRIVAL `237dfef8` (`788a7419`), C REACH `bd10d10c`
+(`ff6e21d8`), E GROUND `0a8f3041` (`a2d0a620`). GROUND is merged for the
+first time. Every flag still ships `enabled:false`. Nothing is on `main`:
+`main` still has the four wave 1 streams at `d40dfd25`.
+
+URL arms (one page load each):
+
+- one stream: `?flags=WORLD_TRUTH`, `?flags=WORLD_ARRIVAL`,
+  `?flags=WORLD_REACH`, `?flags=WORLD_LOOK`, `?flags=WORLD_GROUND`
+- all five: `?flags=WORLD_TRUTH,WORLD_ARRIVAL,WORLD_REACH,WORLD_LOOK,WORLD_GROUND`
+
+### Conflicts and seams at the merge
+
+Two textual conflicts, both resolved by keeping both sides:
+
+- `sat-building-engine.js` imports: LOOK's `requestLookRoofPatch` and
+  ARRIVAL's `wp-frame-slice` import.
+- `worker/sat-skyline-stand-ins.js`, the far colour call: REACH's one
+  adapter `farLookColour(...)` (which is `colourOf(..., 'far')`, and that now
+  calls LOOK's `lookFarColour`), keeping LOOK's `farMode` (the wall material
+  rides the family byte).
+
+Already wired by the streams themselves (each merged the earlier ones
+first), checked and needing no edit:
+
+- `result.wp`: only ARRIVAL's wrapper stamps it, for every detail, so
+  GROUND's 'sat-veg' and 'sat-roads' bundles carry it too.
+- LOOK's late roof patch writes in ARRIVAL's packed Uint8 colour range and
+  on its compacted vertices (`wp-look-patch.mjs` arms with workerPrep).
+- One finalize allowance a frame for ARRIVAL's slices and REACH's stand-in
+  group finalize (`wp-frame-slice.js`, `// WORLD PASS B x C seam`).
+- REACH's and GROUND's ground loops run inside ARRIVAL's
+  `beginGroundBatch()` / `endGroundBatch()`.
+- GROUND's wider vegetation ring is its own: the legacy ring every other
+  consumer reads (`engine.legacy`) is computed exactly as with the flag off,
+  and GROUND's ground detail waits for ARRIVAL's building ring
+  (`ground-arrival.js`, reading `_wp.fullRingSec`, at most 75 s).
+- ARRIVAL's quantized decode chains onto the architecture material's
+  existing `onBeforeCompile` and program key; REACH's stand-in material is
+  its own instance and keeps its three shader anchors.
+- LOOK's far colour no longer desaturates by distance (`far01` 0), so it
+  does not stack with REACH's shader `farLook.desaturate`.
+
+No new seam code was needed.
+
+`WORKER_PROTOCOL` 26 to 27 at the same ten sites (`72ffecdf`; grep finds no
+others and nothing still says 26): the streams changed flag-on bundle formats
+in round 2 (ARRIVAL's quantized vertices, LOOK's late roof patch, GROUND's
+canopy and bridge keys), so a bundle from before the merge is dropped.
+
+### What round 2 changed, per stream (from the ledgers)
+
+- **A TRUTH.** US house prior split into `us` and `us-sunbelt` (Powell
+  two-storey houses back); big unmapped footprints in dense centres read a
+  wider cover window with open land left out, railway is no longer
+  industrial, a big box needs commercial land use or a car-scale region; a
+  believable spread of heights around each class centre; seam halves
+  measured over every geometric pair. Second pass: dense civic and
+  industrial footprints, an arid regional prior (Turkey, Morocco, the Gulf
+  and neighbours), the far mass's arrival cost reduced but not removed.
+- **D LOOK.** The build no longer waits for its roof photo: a tile is born on
+  the regional (z11) fallback and the z16 photo recolours its roofs in place
+  (`lib/fly/look-roof-patch.js`, a 900 ms fade); tall roofs take a neutral
+  family with the photo's luma; regional palettes reworked; near and far
+  agree. Round 3: night keeps each part's family and seed with a night wall
+  gain; the far colour is the near colour (`far01` 0, shared material, far
+  shade); the far tile waits for the regional photo.
+- **B ARRIVAL.** Quantized building vertices (`worker.quantize`: Int16
+  position, anchor and uv; bundle bytes over nine places 98.0 to 45.5 MiB);
+  the ground-query memo outlives the batch (2.4 M live queries, 0
+  differences); the quantized program compiled ahead under the composer's
+  target; a build timeout with worker replacement; tiles behind the aircraft
+  kept at boost; footings as insurance. Round 2b: boost eviction at Paris and
+  every World Pass finalize under one allowance a frame.
+- **C REACH.** One far colour adapter; the triangle cap holds on every pass
+  (the coastal reflection included); stand-ins grounded per corner on the
+  drawn terrain inside ARRIVAL's batch; minPx stability and the near edge at
+  boost. Round 2b: arrival with REACH alone and with all four, and the
+  street pattern at 1,500 m from a ground photo atlas (Esri z13, about 4
+  requests a group).
+- **E GROUND.** Night bridge lights; Powell parcel homes (the legacy ring
+  view, `engine.legacy`); bridge landings at joints (and the FableFlight
+  credit corrected); crown colour from the photo; dense forest; motion cost;
+  a stricter arrival hold; fewer Paris night specks. Its implementer marks
+  these fixed; its verifier has not confirmed them.
+
+### Proofs on the merged tree
+
+- `node scripts/world-pass-worker-proof.mjs --check c2bf5c06 --ignore-protocol`:
+  "IDENTICAL (top-level protocol field masked): 1062/1062 cases identical,
+  7308 buffers + 1062 meta objects compared against 'c2bf5c06'; 28 stage
+  cases (0 bad); 0 unrecorded inputs". Protocol pairs `24->27` x 1,062.
+- Node gates PASS: `graphics-unit.mjs`, `verify-true-earth-flags` (11),
+  `verify-stylized-earth` (22), `verify-city-horizon`,
+  `verify-building-handoff` (4), `verify-attribution` (4).
+- Stream probes, all exit 0: TRUTH `wp-truth-probe.mjs`,
+  `wp-truth-r2-probe.mjs` (measurement tools); LOOK `wp-look-patch.mjs`
+  PASS (15 arms, with ARRIVAL's prep), `wp-look-agree.mjs` PASS,
+  `wp-look-shader.mjs` 18 passed, `wp-look-structures.mjs`,
+  `wp-look-roofphoto.mjs`; ARRIVAL `wp-arrival-worker-prep.mjs` PASS
+  (quantized 98.0 to 45.5 MiB), `wp-arrival-ground-churn.mjs` PASS (60,900 +
+  60,900, 0 differences), `wp-arrival-r2b-frameslice.mjs` PASS,
+  `wp-arrival-r2b-colgrid.mjs` PASS, `wp-arrival-bytes.mjs`; REACH
+  `wp-reach-node-bench.mjs` PASS G1 to G5; GROUND `wp-ground-bridges-node.mjs`,
+  `wp-ground-canopy-node.mjs`, `wp-ground-unit.mjs` 9 passed.
+- `npx eslint` on the 179 JS files changed since `c2bf5c06`: seven errors, all
+  react-hooks/immutability in `SatRoadLayer.jsx` (1), `SatSkylineLayer.jsx` (1)
+  and `SatVegLayer.jsx` (5), the same errors at `c2bf5c06` (lines moved). No
+  new errors.
+- `npm run verify:beta`: 34 PASS, 0 FAIL.
+- Not run on this tree: `next build` (not run in this directory by rule),
+  any browser run, the owner's 5080 motion check.
+- Path hygiene: the tracked files no longer carry an absolute home path:
+  `.claude/launch.json` (the five stream servers point at `../wp-<key>`),
+  `scripts/wp-probe-stream-tiles.mjs` (output beside the script), and the
+  GPU slot lock in `wp-ground-verify-{arrival,live,look,motion}.cjs` and
+  `wp-look-live.cjs` (found from `git rev-parse --git-common-dir`, as
+  `look-pass-capture.cjs` does).
+
+### Verifier results as they stand
+
+- **TRUTH: second check FAILED on two items.** The arid and Turkish height
+  prior draws Izmir and Istanbul 1 to 3 storeys where the old world drew 6
+  to 8. With TRUTH on, the far ring fills about 50 % later in Paris and
+  Tokyo.
+- **LOOK: second check UNPROVEN.** It got no GPU slot. Unmeasured: night
+  against a flags-off control, the Paris far tonal step, the night far ring,
+  the budget and motion.
+- **REACH, ARRIVAL, GROUND: second checks still running.** Their previous
+  blocking items: REACH, the far ring arrives later than the old world and
+  hides the Paris boulevards and the Manhattan avenue grid. ARRIVAL, tiles
+  behind the aircraft die at boost in Paris and the tile finalize is not
+  fully sliced. GROUND, night bridge stripes, missing Powell homes and
+  bridge joints (fixed by its implementer, not yet confirmed).
+
+### Open after wave 2
+
+- The five verifier verdicts above: TRUTH's two failed items, LOOK's unproven
+  check, and the three checks still running.
+- No browser run of any kind on this merged tree, with one flag or all five.
+  The seams above are proven by the node gates and by reading the code.
+- The owner's 5080 motion check, for every stream.
+- REACH's ground photo pull and LOOK's far colour both pull the far ring
+  toward the photo; the combined look is not tuned (REACH round 2b: in the
+  four-flag Paris frame the far ring is paler and the boulevards fainter
+  than with REACH alone).
+- REACH's stand-in group finalize (about 14 ms a frame) is not sliced; the
+  shared allowance only keeps it from stacking with ARRIVAL's slices.
+- Paris over the 256 MiB geometry row at Ultra in some arms (ARRIVAL alone
+  263 MiB at boost; its GPU estimate 261.4 MiB settled).
+- GROUND: six crowns under drawn roofs (the canopy keep-out reads the raw
+  building layer, not what the building worker draws); the bridge photo on
+  the water under each deck; golden-hour crowns brighter than the photo.
+- Asked of another stream and not wired here: A to B, the lean 15 to 70 m2
+  band body buffer; B to A, keep an existing bounding box in
+  `installArchitectureShadowRange` and keep `partitionArchitectureIndex` and
+  `emit.js partitionBody` in step; C to A, `houseMaxAreaM2` to 0 once the far
+  height matches the near model everywhere; D to A, the feature id and its
+  polygon count on the item; E, an earth-surface repaint under bridge decks.
+- Each ledger's own "Open" list stands
+  (`scripts/world-pass-ledger-<key>.md`).
 
 ## Second wave
 

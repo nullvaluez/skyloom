@@ -18,7 +18,7 @@ const poses = String(args.pose).split(',');
 const tag = String(args.tag || Date.now());
 const shotAt = String(args.shots || '15,30,45').split(',').map(Number);
 const out = path.resolve(args.out); fs.mkdirSync(out, { recursive: true });
-const lockDir = 'C:/Users/bfecho/skyloom-3/.graphics-review/look-pass/.locks'; fs.mkdirSync(lockDir, { recursive: true });
+const lockDir = path.join((() => { try { return path.resolve(require('node:child_process').execSync('git rev-parse --path-format=absolute --git-common-dir', { cwd: __dirname, encoding: 'utf8' }).trim(), '..'); } catch { return path.resolve(__dirname, '..'); } })(), '.graphics-review', 'look-pass', '.locks'); // the main checkout's shared GPU slot lock (as look-pass-capture.cjs) fs.mkdirSync(lockDir, { recursive: true });
 let held = null;
 async function slot() { for (;;) { for (let i = 0; i < 3; i++) { const p = path.join(lockDir, `slot-${i}`); try { fs.mkdirSync(p); fs.writeFileSync(path.join(p, 'owner.txt'), `wp-ground-arrival ${process.pid} ${new Date().toISOString()}`); held = p; return; } catch { try { if (Date.now() - fs.statSync(p).mtimeMs > 25 * 60e3) fs.rmSync(p, { recursive: true, force: true }); } catch {} } } await new Promise((r) => setTimeout(r, 4000)); } }
 const release = () => { if (held) { try { fs.rmSync(held, { recursive: true, force: true }); } catch {} held = null; } };

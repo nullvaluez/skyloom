@@ -8,8 +8,9 @@ import * as PbfNS from 'pbf';
 const Pbf = PbfNS.PbfReader;
 import fs from 'node:fs';
 import zlib from 'node:zlib';
+import { fileURLToPath } from 'node:url';
 
-const OUT = 'C:/Users/bfecho/skyloom-3/.claude/worktrees/mystifying-curran-97a006/.graphics-review/world-pass/review/stream/tiles.json';
+const OUT = fileURLToPath(new URL('../.graphics-review/world-pass/review/stream/tiles.json', import.meta.url));
 const tj = await (await fetch('https://tiles.openfreemap.org/planet')).json();
 const tmpl = tj.tiles[0];
 const lon2x = (lon, z) => Math.floor(((lon + 180) / 360) * 2 ** z);

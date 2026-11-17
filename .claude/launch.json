@@ -16,31 +16,31 @@
     {
       "name": "wp-truth",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["next", "dev", "C:/Users/bfecho/skyloom-3/.claude/worktrees/wp-truth", "--webpack", "--port", "3321"],
+      "runtimeArgs": ["next", "dev", "../wp-truth", "--webpack", "--port", "3321"],
       "port": 3321
     },
     {
       "name": "wp-arrival",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["next", "dev", "C:/Users/bfecho/skyloom-3/.claude/worktrees/wp-arrival", "--webpack", "--port", "3322"],
+      "runtimeArgs": ["next", "dev", "../wp-arrival", "--webpack", "--port", "3322"],
       "port": 3322
     },
     {
       "name": "wp-reach",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["next", "dev", "C:/Users/bfecho/skyloom-3/.claude/worktrees/wp-reach", "--webpack", "--port", "3323"],
+      "runtimeArgs": ["next", "dev", "../wp-reach", "--webpack", "--port", "3323"],
       "port": 3323
     },
     {
       "name": "wp-look",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["next", "dev", "C:/Users/bfecho/skyloom-3/.claude/worktrees/wp-look", "--webpack", "--port", "3324"],
+      "runtimeArgs": ["next", "dev", "../wp-look", "--webpack", "--port", "3324"],
       "port": 3324
     },
     {
       "name": "wp-ground",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["next", "dev", "C:/Users/bfecho/skyloom-3/.claude/worktrees/wp-ground", "--webpack", "--port", "3325"],
+      "runtimeArgs": ["next", "dev", "../wp-ground", "--webpack", "--port", "3325"],
       "port": 3325
     },
     {

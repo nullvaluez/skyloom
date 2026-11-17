@@ -25,7 +25,7 @@ const report = { label, url, quality, flags, date: new Date().toISOString(), pos
 const file = path.join(out, `live-${label}-${quality}.json`);
 const save = () => fs.writeFileSync(file, JSON.stringify(report, null, 2));
 
-const lockDir = path.join('C:/Users/bfecho/skyloom-3', '.graphics-review', 'look-pass', '.locks');
+const lockDir = path.join((() => { try { return path.resolve(require('node:child_process').execSync('git rev-parse --path-format=absolute --git-common-dir', { cwd: __dirname, encoding: 'utf8' }).trim(), '..'); } catch { return path.resolve(__dirname, '..'); } })(), '.graphics-review', 'look-pass', '.locks'); // the main checkout's shared GPU slot lock (as look-pass-capture.cjs)
 fs.mkdirSync(lockDir, { recursive: true });
 let heldSlot = null;
 async function acquireSlot() {

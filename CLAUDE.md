@@ -18,11 +18,13 @@
 >   the governor). The worker never reads a flag: it reads the resolved request
 >   (`worldPass: worldPassRequest()` in every build, `tileCtx.worldPass` in the
 >   builders now split into `lib/fly/toy-world/worker/`). W0 (seams, opt-in
->   stage counters) is done. Wave 1: four streams (TRUTH, LOOK, ARRIVAL,
->   REACH) are merged into this branch with all flags off (protocol 26);
->   GROUND is pending. With the flags off the worker output is byte-identical
->   to `c2bf5c06` but for the protocol number
->   (`scripts/world-pass-worker-proof.mjs`). Not on `main` yet.
+>   stage counters) is done. Wave 2: all five streams (TRUTH, LOOK, ARRIVAL,
+>   REACH and GROUND) are merged into this branch with all flags off
+>   (protocol 27); fly one with `?flags=WORLD_<NAME>`. Their round 2 checks
+>   have not all passed (FLY_WORLD_PASS.md "Wave 2 record"). With the flags
+>   off the worker output is byte-identical to `c2bf5c06` but for the
+>   protocol number (`scripts/world-pass-worker-proof.mjs`). `main` still has
+>   only the four wave 1 streams, at `d40dfd25`.
 > - **Look Pass (2026-11-14 to 16, owner-requested, MERGED and pushed to `main`
 >   with all five flags ON):** [FLY_LOOK_PASS.md](FLY_LOOK_PASS.md) is the plan
 >   and the record. A visual pass on the Enhanced look for desktop High and
