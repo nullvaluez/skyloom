@@ -1,4 +1,8 @@
 {
   "powell-subdiv2": { "lat": 40.205, "lon": -83.088, "altM": 520, "headingDeg": 339, "note": "TRUTH r2: the Powell subdivision of the wave-1 verifier (about 250 m above ground)" },
-  "tokyo-akasaka": { "lat": 35.665, "lon": 139.728, "altM": 300, "headingDeg": 330, "note": "TRUTH r2: large central-Tokyo footprints by the palace grounds" }
+  "tokyo-akasaka": { "lat": 35.665, "lon": 139.728, "altM": 300, "headingDeg": 330, "note": "TRUTH r2: large central-Tokyo footprints by the palace grounds" },
+  "alpharetta-ga": { "lat": 34.0560, "lon": -84.2650, "altM": 600, "headingDeg": 30, "note": "TRUTH r2b: Atlanta north suburb, the Sun Belt house prior (ground about 330 m)" },
+  "istanbul": { "lat": 41.0400, "lon": 28.9800, "altM": 480, "headingDeg": 200, "note": "TRUTH r2b: Beyoglu, the arid prior's worst loss in round 2" },
+  "kowloon": { "lat": 22.3200, "lon": 114.1700, "altM": 420, "headingDeg": 200, "note": "TRUTH r2b: Kowloon, civic and industrial footprints among towers" },
+  "casablanca": { "lat": 33.5900, "lon": -7.6200, "altM": 420, "headingDeg": 30, "note": "TRUTH r2b: Casablanca centre, town houses mapped at 5 to 7 storeys" }
 }

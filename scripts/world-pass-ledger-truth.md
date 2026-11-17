@@ -755,3 +755,299 @@ its record depends on those files. My scripts now live under
 - M3 roof forms, as in wave 1.
 - C to A (`WORLD_REACH.worker.houseMaxAreaM2` to 0) is REACH's call: the far
   heights now match the near ring for every unmapped stand-in.
+
+## Round 2, second pass (the verifier's three blocking items)
+
+2026-11-17. The round-2 verifier blocked on three items: big unmapped civic
+and industrial footprints in dense cover still drawn as 2-storey sheds, the
+law losing to the legacy rule across the `arid` region, and an arrival
+regression the ledger did not report. This pass fixes those and nothing else
+it was not asked to (the passed items keep their round-2 behaviour except
+where noted). The flag still ships `enabled:false`. Code: `eaca3702`.
+
+Every number below is on the LIVE OpenFreeMap build `20261115_080022_pt`
+(node replay of this tree's worker modules over 3 x 3 z14 tiles per place),
+or live in Chrome on this machine's RTX 5080 through :3321. "r2" is the
+round-2 code (`eb3ab2dd`) run the same way, in the same session. Evidence:
+`<integration worktree>/.graphics-review/world-pass/r2/truth/`:
+
+- `r2b-control/`, `r2b-truth/`, `r2b-all4/`: 14 noon frames each (Ultra,
+  1600 x 900, same server, one session; the round-2 poses plus `istanbul`,
+  `kowloon`, `casablanca` and `alpharetta-ga`, now in
+  `scripts/wp-truth-poses.json`), `r2b-crops/` stacks control / TRUTH / all
+  four (`stack.cjs` beside them);
+- `r2b-budget/`: live arrival and budget, five arms, `iowa-farm` first as a
+  warm-up pose; `r3-budget-a/`: an earlier repeat (control, TRUTH, x2) of
+  this code before two height-only edits (same cost);
+- `r2b-holdout.md` (the table below), `r2b-holdout-now.json`,
+  `r2b-holdout-r2code.json`, `r2b-dense-sheds-*.json` (the verifier's own
+  probe 3, re-run), `r2b-big-dense-holdout.txt`, `r2b-bench-*.json`,
+  `r2b-gates/` (gate logs and the flags-off proof).
+
+New tools (not product code): `scripts/wp-truth-r2b-tune.mjs` (hold-out per
+place and per class, the dense-shed count, the big-dense hold-out with
+`--big`, house storey share; tiles cached under `--cache`) and
+`scripts/wp-truth-r2b-bench.mjs` (worker cost per z14 tile: near ring
+admission + heights and the far mass, legacy against the law).
+
+### 1. Big civic and industrial footprints in dense cover
+
+Causes (the verifier's reading, confirmed): civic had a fixed centre `mu`
+(2 or 3 storeys) in most regions, and the coastal cores fell outside every
+Natural Earth country (Lower Manhattan, 8 of the 9 Midtown tiles, Kowloon,
+Lisbon, Jersey City, Long Island City, Copenhagen, Rio, half of Istanbul and
+Dubai), so they took the `other` (civic 2 to 3) or `tropics` (civic 1 to 3,
+block 2 to 5) prior; industrial was a size-only rule.
+
+Changes:
+
+- `truthCountry` (typology.js): a point outside every country takes the
+  nearest country on rings of 0.03 / 0.08 / 0.2 / 0.5 degrees around its
+  0.02-degree cell (a pure function of the cell; a memo only caches it).
+  Midtown, Lower Manhattan, LIC and Jersey City are now `us`, Kowloon
+  `east-asia`, Lisbon `mediterranean`, Copenhagen `europe`, Rio `latin`.
+- Civic is density-driven in every region (`[lo, hi, null]`, e.g. europe and
+  france 2 to 6, us 2 to 6, us-sunbelt 1 to 4).
+- Industrial follows the mapped industrial buildings of its size in the tile
+  (the storey classes' evidence rule, in metres; the size law is its prior).
+- The neighbourhood (`heights.context`): per 16 x 16 cell a 16-bin histogram
+  of mapped ground-standing heights (capped 40 m), summed over the wide
+  window (seam windows for straddlers). A big unmapped footprint (1,000 m2
+  or more) in wide cover of 0.3 or more stands at least 0.65 x the median of
+  its mapped neighbours (spread per building), unless its own class's mapped
+  sample is representative. Never for houses, terraces, sheds.
+
+The verifier's count (unmapped, 1,000 m2 or more, wide cover 0.3 or more,
+legacy 12 m or more, law under 9 m; its probe re-run), r2 -> now: Kowloon
+50 -> 1, London 27 -> 13, Buenos Aires 27 -> 13, Rome 18 -> 3, Boston 15
+-> 13, Barcelona 14 -> 9, Paris 11 -> 2, Vienna 9 -> 7, Tokyo 8 -> 0,
+Amsterdam 7 -> 5, NYC 6 -> 0; with the same rule in my probe, Lisbon 91 ->
+49 and Jersey City 40 -> 12.
+
+What is left is industrial in every city but Barcelona (4 civic) and Boston
+(3 apartments). Is that low height right? The legacy number is not truth, so
+I measured the buildings that ARE mapped: footprints of 1,000 m2 or more in
+wide cover of 0.3 or more, mapped 40 m or under, predicted as if unmapped
+(their own height left out of the evidence and of the neighbourhood), median
+absolute error law / legacy, mapped median in brackets:
+
+| place | civic | industrial |
+|---|---|---|
+| NYC | 10.5 / 11.0 (26 m, n 41) | 2.0 / 21.4 (12 m, n 3) |
+| Paris | 6.4 / 17.8 (15 m, n 75) | n 1 |
+| London | 5.1 / 13.9 (22 m, n 41) | n 1 |
+| Tokyo | 5.3 / 13.2 (22 m, n 40) | 2.0 / 32.6 (20 m, n 2) |
+| Amsterdam | 5.6 / 13.1 (23 m, n 21) | 2.8 / 26.1 (10 m, n 35) |
+| Rome | 4.3 / 23.2 (15 m, n 42) | n 1 |
+| Vienna | 5.0 / 19.3 (15 m, n 81) | 6.3 / 20.7 (19 m, n 11) |
+| Boston | 7.1 / 13.5 (21 m, n 167) | 4.7 / 25.6 (9 m, n 12) |
+| Barcelona | 4.4 / 20.7 (11 m, n 46) | 4.1 / 34.0 (8 m, n 6) |
+| Kowloon | 6.4 / 12.0 (19 m, n 77) | 11.0 / 16.9 (15 m, n 54) |
+| Lisbon | 4.7 / 20.7 (15 m, n 16) | 2.7 / 30.8 (8 m, n 4) |
+| Long Island City | 7.3 / 17.3 (23 m, n 39) | 2.0 / 27.0 (9 m, n 147) |
+| Chicago | 9.8 / 20.0 (15 m, n 93) | 2.9 / 27.0 (8 m, n 54) |
+| Athens | 9.7 / 18.4 (22 m, n 8) | 3.2 / 30.9 (8 m, n 8) |
+
+The mapped big industrial buildings in these cores stand at 8 to 10 m
+(Amsterdam, LIC, Chicago, Boston, Lisbon, Athens): the remaining "sheds" are
+the height their mapped neighbours of the same kind have. The one place the
+law runs high is Kowloon industrial (law median 24 m against 15 m mapped:
+the neighbourhood there is towers), still closer than legacy.
+
+Live: `r2b-crops/kowloon.png`, `casablanca.png`, `istanbul.png`,
+`tokyo-akasaka.png`, `paris.png` (control / TRUTH / all four).
+
+### 2. The arid region (Turkey, Morocco, Azerbaijan, Saudi Arabia, Egypt, Gulf)
+
+Cause: arid houses are up to 600 m2 with a 1.8-storey centre, and the only
+way past a prior's top was representative evidence capped at top + 1. Where
+mapping was sparse (Istanbul, Ankara, Cairo) the evidence was averaged with
+the prior and then stopped 0.4 storeys under the top. I did not split the
+region by country: Baku, Riyadh and Dubai map their houses at 4 to 6 m, so
+the difference is local, not national. Changes (`height.js truthHeight`):
+
+- Sparse evidence moves the centre `w = min(0.85, n / (n + 16))` of the way
+  to the sample median; where that median stands past the prior's top it may
+  lift the draw up to 3 storeys past the top (`evidence.sparseHeadroom`).
+- A house or a town house with no evidence of its own reads the
+  neighbourhood's SMALL mapped buildings (40 to 600 m2; a tower on a big
+  plate does not count; Buenos Aires showed why) the same way, `w` at most
+  0.5 (`context.smallMinM2/smallMaxM2/n0/wMax`).
+- Representative house or terrace evidence may reach one storey past its own
+  median (Casablanca maps its town houses at 7 storeys; bigger classes keep
+  top + 1 because their matched sample holds the towers: NYC apartments went
+  to the 30 m cap when I tried it for every class).
+- A house the evidence lifts to 4 storeys or more is drawn as an apartment
+  house (form `school`, mid roof; `promoteHouseStoreys`).
+- A mode class (a house) may be lifted to 0.15 under its top by evidence
+  inside its range (was 0.4; `spread.topGapMode`).
+
+Median error on mapped heights up to 24 m, r2 / now / legacy: Istanbul 7.74
+/ 3.52 / 6.15, Istanbul Kadikoy 4.53 / 3.56 / 6.12, Ankara 6.28 / 3.34 /
+3.49, Casablanca 6.36 / 1.57 / 3.43, Cairo 5.37 / 4.43 / 10.40, Riyadh 4.58
+/ 3.67 / 14.19, Baku 4.44 / 4.40 / 15.78, Dubai 3.73 / 2.74 / 14.44; Athens
+(mediterranean) 4.44 / 4.35 / 4.50, Tehran (south-asia) 3.73 / 3.88 / 7.67.
+All heights: Istanbul 9.41 / 4.39 / 7.77, Ankara 8.31 / 3.58 / 4.20,
+Casablanca 6.43 / 2.31 / 3.95. Every arid city now beats the legacy rule.
+Inferred median: Istanbul 9.6 -> 12.5 m, Ankara 9.4 -> 12.4, Casablanca 7.7
+-> 11.9.
+
+Live: `r2b-crops/istanbul.png` and `istanbul-zoom.png` (control / TRUTH /
+all four): the Beyoglu fabric is a dense mid-rise carpet again, at its mapped
+neighbours' height. `casablanca.png`: the port-side blocks are lower than
+the control's (the control invents 20 to 40 m for every big unmapped
+footprint there); the mapped blocks of that size stand at 20 m (big block
+error 4.4 law / 16.9 legacy, big apartment 2.0 / 9.7).
+
+### The wide hold-out (55 sets)
+
+`r2b-holdout.md` has every place: region (r2 -> now), median error up to 24
+m and over all heights (r2 / now / legacy), the dense-shed count, the house
+storey share and the inferred median. The law beats the legacy rule, up to 24 m and over all
+heights, in 53 of the 54 sets that have mapped buildings (Iowa has none). Where it still
+loses or got worse than r2:
+
+- **Westerville, Ohio** loses, 1.52 against 1.25 m (n 301), as in r2: its
+  mapped houses are 8 m and the law's two-storey house is 6.5 m to the eave.
+- **Kowloon** up to 24 m: 6.40 (r2) -> 7.66 (legacy 11.02); all heights
+  18.48 -> 16.35 (legacy 19.50). The country fix moved it from `tropics` to
+  `east-asia`: taller priors, closer to its towers, further from the low
+  mapped ones the up-to-24 m column keeps by construction.
+- **Buenos Aires** up to 24 m: 4.59 -> 6.62 (legacy 9.33); all heights
+  11.72 -> 11.58. Two tiles moved from `other` to `latin`, and its sparse
+  mapped apartments are the tall ones.
+- **NYC** up to 24 m: 2.47 -> 2.68 (legacy 5.45); all heights 4.60 -> 5.39.
+  8 of 9 Midtown tiles were `other` in r2 and are `us` now. Chicago all
+  heights 2.55 -> 3.28 (up to 24 m unchanged).
+- Houses: Vienna 0.67 -> 0.42 and Berlin 0.57 -> 0.36 of inferred houses at
+  two storeys or more (their few small central footprints follow their mapped
+  small neighbours down); Raleigh 0.35 -> 0.39; Alpharetta 0.33 (unchanged:
+  too few mapped houses near most of them); Richfield 0.73 (12 mapped).
+
+Tuning honesty: this pass's constants were set looking at Istanbul, Ankara,
+Casablanca, Cairo, Riyadh, Baku, Dubai, Athens, Tehran, Kowloon, Paris,
+Rome, London, Boston, Phoenix, Boise, NYC, Buenos Aires, Lisbon, Jersey City,
+LIC, Chicago and Sao Paulo (per-class readings). Never read per class this
+pass: Amsterdam, Osaka, Vienna, Barcelona, Madrid, Berlin, Mexico City,
+Sydney, LA suburb, Warsaw, Singapore, Toronto, Columbus, Seattle suburb,
+Lagos, Seoul, Mumbai, Copenhagen, Rio, Miami, Westerville, Richfield,
+Alpharetta, Raleigh, Houston, Iowa, Powell; of these only Westerville loses.
+The hold-out only scores mapped buildings; where the mapped ones are the
+notable ones (Kowloon, Seoul, Buenos Aires) it says little about the rest.
+
+### 3. Arrival (the regression was real; reduced, not removed)
+
+Round 2's ledger said arrival was "not separately proven faster or slower".
+It was slower: the fact table cost 2 to 3 times a far-mass tile's own build.
+Changes (typology.js, flag-on only):
+
+- the far mass reads the table's decoded footprints instead of decoding the
+  tile again (`truthDecoded`, a marked A x C seam in `sat-skyline.js`; with
+  the flag off it is `null` and the loop is the old one);
+- shared corners from an open-addressing typed table (was a Set per polygon
+  and a Map); POIs decoded only when a class asks (most tiles never);
+  land-use lookups through a 16 x 16 cell index; one seam window per 128-unit
+  stretch of edge, shared by the straddlers in it (was one per straddler; the
+  window is now the stretch around the piece centroid +- 128, not the
+  centroid +- 192); the unused second moments (`aspect`, `fill`) dropped;
+  per-cell neighbourhood medians.
+
+Worker cost per z14 tile (node, warm, minimum of 5 runs, median of 9 tiles;
+the machine was shared with three other capture streams, so +-20 %):
+
+| place | near ring, admission + heights: r2 / now (legacy) | far mass, 9 tiles: r2 / now (ratio to legacy) |
+|---|---|---|
+| NYC | 42.9 / 25.2 ms (11 to 14) | 700 / 377 ms (2.39x / 1.58x) |
+| Paris | 52.3 / 37.7 (18) | 769 / 445 (2.79x / 1.74x) |
+| Tokyo | 50.0 / 32.6 (14 to 16) | 671 / 406 (2.45x / 1.64x) |
+| Kowloon | 42.2 / 25.6 (9) | 690 / 432 (2.12x / 1.45x) |
+| London | 40.6 / 23.4 (9 to 12) | 622 / 373 (2.24x / 1.59x) |
+| Phoenix | 23.7 / 14.3 (8 to 10) | 386 / 202 (2.33x / 1.76x) |
+| Istanbul | 42.9 / 27.7 (10 to 14) | 520 / 291 (2.91x / 1.74x) |
+
+The near ring's full build (roofs, colour, emission) is several times the
+admission + heights measured here, so the near-ring share is smaller than
+the ratio suggests.
+
+Live, Ultra, :3321, `WORLD_PASS_DIAG` in every arm, two repeats per arm,
+`iowa-farm` first (its own numbers are the cold start and are not read);
+full-ring seconds, control -> TRUTH:
+
+| pose | near ring | far mass |
+|---|---|---|
+| nyc-low | 34.8, 33.4 -> 35.0, 31.4 | 13.8, 11.4 -> 15.2, 16.3 |
+| paris | 31.6, 32.5 -> 32.6, 29.1 | 11.5, 11.6 -> 17.3, 14.4 |
+| tokyo | 33.4, 32.4 -> 33.8, 31.6 | 12.1, 12.3 -> 23.8, 21.0 |
+
+The verifier's r2 numbers (far mass): nyc 9.9 / 10.3 -> 19.7 / 20.1, paris
+10.3 / 8.3 -> 18.4 / 19.1, tokyo 18.6 / 11.3 -> 31.7 / 32.8. The near ring
+is at parity now; the far mass still arrives later: NYC +25 %, Paris +37 %,
+Tokyo +84 %. Three capture streams shared the GPU and the CPU during every
+arm (each run waited up to 20 minutes for a GPU slot), so single numbers
+move by several seconds. What would remove the rest: the table's remaining
+cost is spread over the per-polygon facts, the open-land mask, the seam
+windows and the classification (no single part over a fifth); the far mass
+could skip what cannot change a big footprint's class (shared corners), and
+the second wave's one decoded-tile cache would let the near ring and the far
+mass share one table per tile. Neither is done.
+
+### Budget (all four flags, measured, not changed by this pass)
+
+`r2b-budget/all4`: nyc-low 385 draws, 5.47 M triangles, 227.5 MiB; Paris
+384, 7.14 M, 295.1 MiB (buildings 246.2); Tokyo 404, 6.07 M, 231.6 MiB.
+TRUTH alone against control: Paris buildings 320.4 -> 311.7 MiB, nyc-low
+210.7 -> 209.3, Tokyo 216.8 -> 216.3. Paris is still 39 MiB over the 256 MiB
+row with all four on; the round-2 attribution stands (LOOK's wall-mode colour
+offset defeats ARRIVAL's Uint8 colour packing; the verifier's no-LOOK arm
+read 253.9 MiB).
+
+### Non-blocking notes
+
+- Country gaps: fixed (above). Every probed coastal core now has a country.
+- Seams (geometric pairs, both directions, the verifier's probe), r2 / now:
+  Paris 0.951 / 0.951, London 0.962 / 0.950, Rome 0.917 / 0.907, Amsterdam
+  0.902 / 0.902, Vienna 0.909 / 0.909, Kowloon 0.940 / 0.952, Tokyo 0.993 /
+  0.993, Istanbul 1.0 / 1.0, Casablanca 0.972 / 0.972. Unchanged within
+  noise; the rest are sid buckets and buffer-geometry differences (round 2).
+- Tokyo-Akasaka: the mid-rise edge stands with the control again
+  (`r2b-crops/tokyo-akasaka.png`); Tokyo's inferred median 9.6 -> 18.4 m.
+- The per-building id hash stays flag-on only (the proof below).
+
+### Proofs and gates (code commit `eaca3702`, re-run at the final commit)
+
+- `node scripts/world-pass-worker-proof.mjs --check c2bf5c06
+  --ignore-protocol`: IDENTICAL, 1062/1062 cases, 7308 buffers + 1062 meta
+  objects, 28 stage cases (0 bad), 0 unrecorded inputs.
+- Node gates, exit 0: `graphics-unit.mjs`, `verify-true-earth-flags`,
+  `verify-stylized-earth` (22/22), `verify-city-horizon`,
+  `verify-building-handoff`, `verify-attribution`; `wp-reach-node-bench.mjs`
+  PASS G1-G5 (protocol 26 agreed); `wp-truth-probe.mjs` runs.
+- `npx eslint` on the four changed product files and the two new scripts:
+  clean.
+
+### Not measured
+
+- The owner's 5080 motion check; High tier; golden hour and night (noon
+  only); seams live in the browser (node only).
+- The live weather was not pinned in the captures: arms taken 20 to 40
+  minutes apart differ in haze and cloud, so the pixel-change shares in the
+  crops (`r2b-crops/pixel-change.txt`) are an upper
+  bound on what TRUTH changed.
+- Arrival with all four flags against ARRIVAL + REACH + LOOK without TRUTH.
+
+### Incident
+
+My first capture run of this pass was stopped part-way to fix the
+neighbourhood rule (`TaskStop` left its inner shell running). For about 25
+minutes two copies of my own capture script ran against :3321; one took a
+TRUTH arm across the edit. I killed both (all my processes; no other
+stream's), deleted every frame of that run and re-shot all three arms from
+the committed code. No other stream's files or locks were touched.
+
+### Open
+
+- The far-mass arrival cost (above).
+- Kowloon and Buenos Aires up to 24 m, Westerville.
+- Paris all-four budget (LOOK x ARRIVAL colour packing, round 2).
+- M2b (the lean 15 to 70 m2 band), M3 roof forms, as before.
+
