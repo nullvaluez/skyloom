@@ -91,7 +91,7 @@ globalThis.OffscreenCanvas = class {
 await import(pathToFileURL(path.join(ROOT, 'lib/fly/toy-world/vector-tile.worker.js')).href);
 const api = globalThis.__wpGroundApi;
 const C = await import(pathToFileURL(path.join(ROOT, 'lib/fly/fly-constants.js')).href);
-const { selectCanopy } = await import(pathToFileURL(path.join(ROOT, 'lib/fly/ground-canopy-select.js')).href);
+const { selectCanopy, planCanopy } = await import(pathToFileURL(path.join(ROOT, 'lib/fly/ground-canopy-select.js')).href);
 const { VectorTile } = await import('@mapbox/vector-tile');
 const { PbfReader: Pbf } = await import('pbf');
 const { decodeWorldCover } = await import(pathToFileURL(path.join(ROOT, 'lib/fly/world-cover.js')).href);
@@ -179,7 +179,10 @@ for (const name of poseNames) {
   }
   const buildMs = performance.now() - t0;
   const near = [], far = [];
+  const tSel = performance.now();
   const sel = selectCanopy(chunks, px, pz, { k, ...cfg }, (ch, i) => near.push([ch, i]), (ch, lvl, i, f) => far.push([ch, lvl, i, f]));
+  sel.ms = +(performance.now() - tSel).toFixed(1);
+  { const sc = {}; const it = planCanopy(chunks, px, pz, { k, ...cfg, cone: { x: 1, z: 0, cos: Math.cos(1.2), keep: 900 * k } }, sc, () => true); let slices = [], t = performance.now(), r = it.next(); while (!r.done) { slices.push(performance.now() - t); t = performance.now(); r = it.next(); } slices.push(performance.now() - t); sel.planSlicesMaxMs = +Math.max(...slices).toFixed(2); sel.planSlices = slices.length; }
   // real canopy and crowns within R
   const out = { sel, buildMs: Math.round(buildMs), tiles: chunks.length, worker: {} };
   for (const t of chunks) if (t.canopy) for (const [kk, v] of Object.entries(t.canopy.stats.byContext)) out.worker[kk] = (out.worker[kk] || 0) + v;

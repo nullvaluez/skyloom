@@ -241,7 +241,7 @@ export function WpCanopyLayer({ engine, runtime, flight, tier }) {
     sigma: 1, job: null, sliceT0: 0,
     scratch: {},
     contacts: newContacts(), spare: newContacts(),
-    stats: { near: 0, far: 0, cut: 0, farthestM: 0, passMs: 0, passMsMax: 0, sliceMsMax: 0, passFrames: 0, passes: 0, chunks: 0, looks: 0, exact: 0, wantQueued: 0, groundSamples: 0, sigma: 1, triangles: 0, shadowTriangles: 0 },
+    stats: { near: 0, far: 0, cut: 0, farthestM: 0, passMs: 0, passMsMax: 0, sliceMsMax: 0, sliceHist: [0, 0, 0, 0], passFrames: 0, passes: 0, chunks: 0, looks: 0, exact: 0, wantQueued: 0, groundSamples: 0, sigma: 1, triangles: 0, shadowTriangles: 0 },
     want: [], wantAt: 0,
   });
 
@@ -250,7 +250,7 @@ export function WpCanopyLayer({ engine, runtime, flight, tier }) {
     const handle = {
       meshes,
       photo,
-      get stats() { return { ...st.current.stats, photo: { ...photo.stats }, seasons: { ...photo.seasons } }; },
+      get stats() { return { ...st.current.stats, sliceHist: [...st.current.stats.sliceHist], photo: { ...photo.stats }, seasons: { ...photo.seasons } }; },
       /** Every drawn crown and patch as [lon, lat, radiusM(true), level, density] (probes only). */
       dump(px, pz, maxM = 1200) {
         const R = 6378137, D = 180 / Math.PI, out = [];
@@ -274,11 +274,12 @@ export function WpCanopyLayer({ engine, runtime, flight, tier }) {
   useFrame(({ clock, camera }) => {
     const t = clock.elapsedTime;
     const s = st.current;
-    // The arrival hold: one photo look at a time, no exact re-samples, no
-    // re-grids and no ring growth until the buildings have arrived.
+    // The arrival hold: no photo looks, no exact re-samples, no fine grids or
+    // re-grids and no ring growth until the buildings have arrived (round 2:
+    // round 1 still fetched one look at a time and sampled first fine grids).
     const held = groundArrivalHeld(runtime, t);
     engine.setArrivalHold(held);
-    photo.setMaxActive(held ? 1 : PHOTO_ACTIVE);
+    photo.setMaxActive(held ? 0 : PHOTO_ACTIVE);
     s.stats.held = held;
     const k = mercatorScale(flight.latDeg ?? 0);
     s.contacts.radius2 = engine.nearSupport.active ? (NEAR_SUPPORT.radiusM * k) ** 2 : 0;
@@ -401,7 +402,14 @@ function stepJob(s, meshes, engine, tc, cfg, k) {
   const t0 = performance.now();
   s.sliceT0 = t0;
   j.frames++;
-  const finish = () => { const d = performance.now() - t0; j.ms += d; if (d > j.maxSlice) j.maxSlice = d; };
+  const finish = () => {
+    const d = performance.now() - t0;
+    j.ms += d;
+    if (d > j.maxSlice) j.maxSlice = d;
+    // every slice since mount, by length: <= 1.5, 3, 6 ms and longer (probes diff it over a window)
+    const h = s.stats.sliceHist;
+    h[d <= 1.5 ? 0 : d <= 3 ? 1 : d <= 6 ? 2 : 3]++;
+  };
   if (j.it && !j.plan) {
     const r = j.it.next();
     if (!r.done) { finish(); return; }

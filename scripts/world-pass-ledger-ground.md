@@ -144,14 +144,20 @@ is evicted); bridge decks are not rebuilt.
 - `src/trees.rs` lines 915 to 984 (jittered lattice, stand noise
   `0.15 + 2.2 n^2` per species at 140 m, species pick) and `vnoise` (208-215):
   ported in `buildCanopyLattice` / `vnoise`.
-- `src/trees.rs` lines 985 to 991 (crown tint: leaf x 0.55 + photo x 1.1 x 0.45,
-  ratio clamped 0.5..1.8) and the LEAF table (130-145): `lib/fly/ground-canopy-photo.js`
-  and `SPECIES_LEAF` in `lib/fly/ground-canopy-select.js`.
+- `src/trees.rs` LEAF table (130-145): `SPECIES_LEAF` in
+  `lib/fly/ground-canopy-select.js` (round 2: used only as the 15 % hue pull
+  and the no-photo fallback). The round-1 crown tint (985 to 991, leaf x 0.55 +
+  photo x 0.495) is no longer used: round 2 takes the colour from the photo.
 - `src/buildings.rs` lines 135 to 143 (`hash`): `hashU` / `hash2`.
-- `src/roads.rs` lines 189 to 235 (which bridge ends are landings) and 580 to
-  640 (landing heights along the deck, clearance, piers at fixed spacing): the
-  approach of `worker/ground-bridges.js` and `WpBridgeLayer.jsx` (written new,
-  not line-ported).
+- `src/roads.rs` lines 580 to 640 (landing heights interpolated along the
+  deck, a clearance target, piers at a fixed spacing): the approach of
+  `WpBridgeLayer.jsx`, written new, not line-ported.
+- `src/roads.rs` lines 189 to 235 (`bridge_end`): CORRECTED in round 2. Round 1
+  credited it but did not implement it (an end was a landing whenever it was
+  inside the tile). Round 2 implements only its idea, written new: an end
+  within 2.5 m of another bridge way's end or vertex is not a landing. The
+  merge of same-class ways that meet end to end, before the ramps are
+  computed, is this pass's own and is not in FableFlight.
 
 ## Shared-file edits
 
