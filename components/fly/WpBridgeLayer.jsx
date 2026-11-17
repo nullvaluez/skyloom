@@ -139,14 +139,17 @@ function* buildDecks(chunks, sample, ox, oz, kOf, px, pz, maxVerts, side) {
       if (!ok) { held++; yield; continue; }
       const k = kOf(zs[0]);
       const L = arc[n - 1] || 1, Ltrue = L / k;
-      const ramp = Math.min((clear / BRIDGE_DRAW.grade), Ltrue * (landA && landB ? 0.45 : 0.9)) * k;
+      // round 2: a clearance per station (each OSM way's own, ramped between ways)
+      const cl = br.clr ? (i) => br.clr[first + i] : () => clear;
+      const rampOf = (c) => Math.min(c / BRIDGE_DRAW.grade, Ltrue * (landA && landB ? 0.45 : 0.9)) * k;
+      const rampA = rampOf(cl(0)), rampB = rampOf(cl(n - 1));
       const gA = g[0], gB = g[n - 1];
       const y = new Float64Array(n);
       for (let i = 0; i < n; i++) {
         const t = arc[i] / L;
-        const fa = landA ? smooth(arc[i] / Math.max(1e-3, ramp)) : 1;
-        const fb = landB ? smooth((L - arc[i]) / Math.max(1e-3, ramp)) : 1;
-        y[i] = Math.max(gA + (gB - gA) * t + clear * fa * fb, g[i] + BRIDGE_DRAW.minAboveM);
+        const fa = landA ? smooth(arc[i] / Math.max(1e-3, rampA)) : 1;
+        const fb = landB ? smooth((L - arc[i]) / Math.max(1e-3, rampB)) : 1;
+        y[i] = Math.max(gA + (gB - gA) * t + cl(i) * fa * fb, g[i] + BRIDGE_DRAW.minAboveM);
       }
       heights.push(+(Math.max(...Array.from(y, (v, i) => v - Math.min(gA, gB))).toFixed(1)));
       // per-station side vector (miter, world units)

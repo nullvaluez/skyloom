@@ -150,6 +150,7 @@ for (const [name, [lat, lon]] of Object.entries(PL)) {
     const ST = b.stats.ways !== undefined ? 10 : 9;
     for (let c = 0; c < b.chains.length; c += ST) {
       agg.clear.push(+b.chains[c + 3].toFixed(1)); agg.lengths.push(Math.round(b.chains[c + 8]));
+      if (!agg.longest || b.chains[c + 8] > agg.longest.lengthM) agg.longest = { tile: `13/${x0 + dx}/${y0 + dy}`, lengthM: Math.round(b.chains[c + 8]), clearM: +b.chains[c + 3].toFixed(1), landA: b.chains[c + 5], landB: b.chains[c + 6], overWater: b.chains[c + 7], cls: b.chains[c + 4], stations: b.chains[c + 1], ...(b.clr ? (() => { const s = Array.from(b.clr.subarray(b.chains[c], b.chains[c] + b.chains[c + 1])); let step = 0; for (let i = 1; i < s.length; i++) step = Math.max(step, Math.abs(s[i] - s[i - 1])); return { clrMin: +Math.min(...s).toFixed(1), clrMax: +Math.max(...s).toFixed(1), clrMaxStepM: +step.toFixed(2) }; })() : {}) };
       if (ST === 10 && b.chains[c + 9] > 0) agg.glowChains++;
       const first = b.chains[c], np = b.chains[c + 1];
       const P = (i) => [b.pts[(first + i) * 2], b.pts[(first + i) * 2 + 1]];
