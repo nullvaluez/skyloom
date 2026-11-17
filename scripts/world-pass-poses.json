@@ -1,4 +1,7 @@
 {
+  "dublin-canopy": { "lat": 40.0712, "lon": -83.1141, "altM": 338.3, "headingDeg": 206, "note": "Estimated from the Dublin OH bearing/range in the tree screenshot; the HUD displays altitude and heading." },
+  "dublin-buildings": { "lat": 40.0708, "lon": -83.1309, "altM": 932.7, "headingDeg": 55, "note": "Dublin OH dusk neighborhood, from the displayed coordinates, heading and altitude." },
+  "dubai-warp": { "lat": 25.2055, "lon": 55.2523, "altM": 911.35, "headingDeg": 118, "note": "Dubai facades after fast travel, from the displayed coordinates, heading and altitude." },
   "nyc-low": { "lat": 40.7480, "lon": -73.9940, "altM": 230, "headingDeg": 40, "note": "Midtown from just above the roofs: facades, roof detail, street canyons" },
   "nyc-mid": { "lat": 40.7000, "lon": -74.0200, "altM": 1500, "headingDeg": 25, "note": "Manhattan from 1,500 m: near ring to far mass handoff" },
   "nyc-high": { "lat": 40.6500, "lon": -74.0500, "altM": 3500, "headingDeg": 25, "note": "Manhattan from 3,500 m: does the whole island still read as a city" },
