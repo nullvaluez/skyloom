@@ -4,8 +4,8 @@
  * scripts/world-pass-budget.cjs), warps to each pose, waits for the world to settle,
  * then, in ONE synchronous page task per pose (so the terrain tree cannot change
  * under the comparison), samples N points with the shipped reference query
- * (TerrainGroundQuery.sampleReference) and with both exact fast paths
- * (_sampleFast unbatched, _sampleBatched inside begin/endBatch), and requires
+ * (TerrainGroundQuery.sampleReference) and with the exact batched path
+ * (_sampleBatched inside begin/endBatch), and requires
  * identical answers: the same null / undefined, Object.is on elev, the same tileZ
  * and the same tile object. Points: half uniform over a 3 km disc in random order,
  * half the drape's shape (clusters of 2 to 40 points within 30 m, as consecutive
@@ -110,7 +110,7 @@ process.on('SIGINT', () => { releaseSlot(); process.exit(130); });
         // Edge cases: exact tile-box edges are hit by chance; add points on a fine lattice too.
         const ref = new Array(n), fast = new Array(n), bat = new Array(n);
         const t0 = performance.now(); for (let k = 0; k < n; k++) ref[k] = q.sampleReference(lon[k], lat[k]);
-        const t1 = performance.now(); for (let k = 0; k < n; k++) fast[k] = q._sampleFast(lon[k], lat[k]);
+        const t1 = performance.now(); for (let k = 0; k < n; k++) fast[k] = q.sampleReference(lon[k], lat[k]); // reference twice: the run-to-run noise floor
         const t2 = performance.now();
         // Batches of 2,000 (about what one drape frame samples).
         for (let k = 0; k < n; k += 2000) { Q.beginBatch(); try { const e = Math.min(n, k + 2000); for (let j = k; j < e; j++) bat[j] = q._sampleBatched(lon[j], lat[j]); } finally { Q.endBatch(); } }
@@ -125,7 +125,7 @@ process.on('SIGINT', () => { releaseSlot(); process.exit(130); });
         for (let k = 0; k < n; k++) {
           const a = ref[k];
           if (a === null) nulls++; else if (a === undefined) undef++; else { hits++; zs[a.tileZ] = (zs[a.tileZ] || 0) + 1; }
-          if (!same(a, fast[k])) { diffFast++; if (examples.length < 5) examples.push({ k, path: 'fast', ref: a && { elev: a.elev, z: a.tileZ }, got: fast[k] && { elev: fast[k].elev, z: fast[k].tileZ } }); }
+          if (!same(a, fast[k])) { diffFast++; if (examples.length < 5) examples.push({ k, path: 'reference-again', ref: a && { elev: a.elev, z: a.tileZ }, got: fast[k] && { elev: fast[k].elev, z: fast[k].tileZ } }); }
           if (!same(a, bat[k])) { diffBat++; if (examples.length < 5) examples.push({ k, path: 'batched', ref: a && { elev: a.elev, z: a.tileZ }, got: bat[k] && { elev: bat[k].elev, z: bat[k].tileZ } }); }
         }
         let emin = Infinity, emax = -Infinity; for (const a of ref) if (a) { if (a.elev < emin) emin = a.elev; if (a.elev > emax) emax = a.elev; }
@@ -133,7 +133,7 @@ process.on('SIGINT', () => { releaseSlot(); process.exit(130); });
         // The public path as the drape calls it, through the terrain engine, inside a batch.
         const te0 = performance.now(); Q.beginBatch(); try { for (let k = 0; k < n; k += 4) r.engine.getGroundAt(lon[k], lat[k]); } finally { Q.endBatch(); } const te1 = performance.now();
         return { n, hits, nulls, undef, tileZ: zs, elevRange: [emin, emax], diffFast, diffBat, examples,
-          usReference: us(t1 - t0), usFast: us(t2 - t1), usBatched: us(t3 - t2), usReferenceClustered, usBatchedClustered, usEngineBatchedIfArmed: +((te1 - te0) / (n / 4) * 1000).toFixed(3), armed: Q.armed(), fastStats: { ...q.fastStats } };
+          usReference: us(t1 - t0), usReferenceAgain: us(t2 - t1), usBatched: us(t3 - t2), usReferenceClustered, usBatchedClustered, usEngineBatchedIfArmed: +((te1 - te0) / (n / 4) * 1000).toFixed(3), armed: Q.armed(), fastStats: { ...q.fastStats } };
       }, { n: nPoints });
       if (args.profile) {
         m.profile = await p.evaluate(() => {
@@ -169,7 +169,7 @@ process.on('SIGINT', () => { releaseSlot(); process.exit(130); });
       const row = { pose: name, settled, ...m };
       report.poses.push(row); save();
       if (m.diffFast || m.diffBat) ok = false;
-      console.log(name, JSON.stringify({ settled, hits: m.hits, nulls: m.nulls, undef: m.undef, elev: m.elevRange.map((v) => +v.toFixed(1)), tileZ: m.tileZ, diffFast: m.diffFast, diffBat: m.diffBat, us: [m.usReference, m.usFast, m.usBatched], clustered: [m.usReferenceClustered, m.usBatchedClustered] }));
+      console.log(name, JSON.stringify({ settled, hits: m.hits, nulls: m.nulls, undef: m.undef, elev: m.elevRange.map((v) => +v.toFixed(1)), tileZ: m.tileZ, diffFast: m.diffFast, diffBat: m.diffBat, us: [m.usReference, m.usReferenceAgain, m.usBatched], clustered: [m.usReferenceClustered, m.usBatchedClustered] }));
     }
   } catch (e) { ok = false; report.errors.push('fatal ' + e.message); console.error(e); }
   finally {
