@@ -47,7 +47,7 @@ const POSES = {
   'nyc-harbor': { lat: 40.6890, lon: -74.0280, altM: 420, headingDeg: 30, note: 'water, skyline layering' },
   // Cruise: horizon, aerial perspective, cloud decks.
   'nyc-cruise': { lat: 40.62, lon: -74.08, altM: 7000, headingDeg: 30, note: 'horizon haze, altitude atmosphere' },
-  // Owner's home area: suburb roofs, trees, roads.
+  // Ohio suburb: roofs, trees, roads.
   'powell': { lat: 40.1990, lon: -83.0811, altM: 630, headingDeg: 339, note: 'suburb, vegetation, flat light' },
   // Featured: granite valley, long shadows, forest.
   'yosemite': { lat: 37.72, lon: -119.66, altM: 2850, headingDeg: 76, note: 'terrain relief, valley haze' },

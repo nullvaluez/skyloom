@@ -21,5 +21,5 @@
   "tokyo-mid": { "lat": 35.6450, "lon": 139.7500, "altM": 1500, "headingDeg": 335, "note": "Tokyo from 1,500 m: fine grain to the horizon" },
   "phoenix-mid": { "lat": 33.3550, "lon": -111.8400, "altM": 1500, "headingDeg": 0, "note": "Phoenix suburb from 1,500 m: single-storey grid to the horizon" },
   "lagos-mid": { "lat": 6.4300, "lon": 3.3850, "altM": 1500, "headingDeg": 10, "note": "Lagos from 1,500 m: mainland city beyond the near ring" },
-  "powell": { "lat": 40.1580, "lon": -83.0750, "altM": 350, "headingDeg": 0, "note": "Powell, Ohio (the owner's home area): subdivision houses from just above the roofs (altM is above sea level; the ground is near 280 m)" }
+  "powell": { "lat": 40.1580, "lon": -83.0750, "altM": 350, "headingDeg": 0, "note": "Powell, Ohio: subdivision houses from just above the roofs (altM is above sea level; the ground is near 280 m)" }
 }
