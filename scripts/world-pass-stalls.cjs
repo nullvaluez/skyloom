@@ -64,7 +64,7 @@ fs.mkdirSync(profileRoot, { recursive: true });
 let gitHead = null;
 try { gitHead = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim(); } catch {}
 const report = {
-  tool: 'world-pass-stalls', version: 8, started: new Date().toISOString(), mode, gitHead,
+  tool: 'world-pass-stalls', version: 9, started: new Date().toISOString(), mode, gitHead,
   serverRef: typeof args['server-ref'] === 'string' ? args['server-ref'] : null,
   url: baseUrl.origin, quality, seconds, poses: poseNames, arms, phases, pages,
   profiled: !!args.profile, exceptions: !!args.exceptions, plain: !!args.plain, review: !!args.review, automation: !!args.automation,
@@ -115,6 +115,36 @@ process.on('exit', releaseLocks);
 process.on('SIGINT', () => { releaseLocks(); process.exit(130); });
 process.on('SIGTERM', () => { releaseLocks(); process.exit(143); });
 
+// Read the existing engine maps once per sample, never scene objects or tile
+// payloads. The engine's noData count also includes exhausted thrown builds.
+function installEngineObserver() {
+  window.__worldStallReadEngine = (engine) => {
+    const source = engine?.stats;
+    const stats = source ? Object.fromEntries(Object.entries(source).filter(([, value]) => ['number', 'boolean', 'string'].includes(typeof value))) : null;
+    if (source?.emptyByReason) stats.emptyByReason = Object.fromEntries(Object.entries(source.emptyByReason).filter(([key, value]) => /^[a-zA-Z]+$/.test(key) && Number.isFinite(value)));
+    const keep = engine?._wpKeep, chunks = engine?.chunks;
+    if (!keep || !chunks?.get) return { stats, ring: null };
+    const ring = { desired: keep.size, ready: 0, empty: 0, noData: 0, zero: 0, unknown: 0,
+      emptyAfterErrors: 0, failedChunks: 0, staleChunks: 0, unresolved: 0, maxEmptyAttempts: 0 };
+    for (const key of keep) {
+      const c = chunks.get(key);
+      if (c?.failed > 0) ring.failedChunks++;
+      if (c?.stale) ring.staleChunks++;
+      if (c?.state === 'ready') ring.ready++;
+      else if (c?.state === 'empty') {
+        ring.empty++;
+        ring[c.reason === 'zero' ? 'zero' : c.reason === 'no-data' ? 'noData' : 'unknown']++;
+        // A parsed zero after a retry is legitimate. no-data after thrown
+        // attempts is ambiguous: real 404/204 or retry exhaustion, not proof
+        // of absent content. Preserve attempts without inventing a threshold.
+        if (c.attempts > 0 && c.reason !== 'zero') ring.emptyAfterErrors++;
+        ring.maxEmptyAttempts = Math.max(ring.maxEmptyAttempts, c.attempts ?? 0);
+      } else ring.unresolved++;
+    }
+    return { stats, ring };
+  };
+}
+
 // Runs before page scripts. No scene traversal or pixel reads in the frame loop.
 function installMonitor({ durationMs }) {
   const m = window.__worldStallMonitor = {
@@ -127,6 +157,8 @@ function installMonitor({ durationMs }) {
   // filename/line/column fields before page handlers or worker fallbacks run.
   // These observers never preventDefault, pause a worker, or swallow an error.
   m.windowErrors = []; m.workerErrors = []; m.workers = [];
+  m.workerThrows = []; m.workerThrowsDropped = 0;
+  const thrown = new Map();
   const errorFields = (event) => ({ atMs: at(), message: String(event.message ?? ''),
     filename: String(event.filename ?? ''), line: event.lineno ?? null, column: event.colno ?? null,
     name: event.error?.name ?? null, stack: event.error?.stack ?? null });
@@ -157,6 +189,19 @@ function installMonitor({ durationMs }) {
           throw error;
         }
         const blob = workerBlobs.get(url);
+        worker.addEventListener('message', ({ data }) => {
+          // Comlink error replies retain the production exception even when
+          // console warnings are stripped. Do not inspect normal geometry.
+          if (data?.type !== 'HANDLER' || data.name !== 'throw') return;
+          const value = data.value?.value;
+          const name = String(value?.name ?? 'ThrownValue').slice(0, 100);
+          const message = String(value?.message ?? (typeof value === 'string' ? value : '')).slice(0, 2000);
+          const key = `${record.index}:${name}:${message}`, previous = thrown.get(key);
+          if (previous) { previous.count++; previous.lastAtMs = at(); return; }
+          if (m.workerThrows.length >= 100) { m.workerThrowsDropped++; return; }
+          const entry = { workerIndex: record.index, name, message, count: 1, firstAtMs: at(), lastAtMs: at() };
+          thrown.set(key, entry); m.workerThrows.push(entry);
+        });
         worker.addEventListener('error', (event) => {
           if (m.workerErrors.length >= 100) return;
           const failure = { ...errorFields(event), worker: record, stage: 'worker', blobBytes: blob?.size ?? null };
@@ -255,7 +300,6 @@ function installMonitor({ durationMs }) {
     if (t <= durationMs + 1000) requestAnimationFrame(tick);
   };
   requestAnimationFrame(tick);
-  const numeric = (stats) => stats ? Object.fromEntries(Object.entries(stats).filter(([, value]) => typeof value === 'number' || typeof value === 'boolean' || typeof value === 'string')) : null;
   const sample = () => {
     const r = window.__fly, state = window.__flyStore?.getState?.();
     const t = at();
@@ -272,10 +316,15 @@ function installMonitor({ durationMs }) {
       }
       vegJobs = { parked: !!veg._parked, pendingSample: pending.size, samplingKeys, orphanSamplingKeys };
     }
-    if (m.warpMs != null && m.fullRingObservedMs == null && r?.satBuildings?.stats?.fullRingSec >= 0) m.fullRingObservedMs = t;
+    const buildings = window.__worldStallReadEngine(r?.satBuildings), skyline = window.__worldStallReadEngine(r?.satSkyline);
+    if (t <= durationMs && m.warpMs != null && m.fullRingObservedMs == null && buildings.stats?.fullRingSec >= 0) {
+      m.fullRingObservedMs = t;
+      m.fullRingObservation = { atMs: t, buildings };
+    }
     if (t <= durationMs) m.samples.push({ atMs: t, visibility: document.visibilityState, focused: document.hasFocus(), boot: window.__flyBoot ?? null, framesRendered: r?.framesRendered ?? null,
       preset: state?.qualityPreset ?? null, tier: state?.qualityTier ?? null,
-      buildings: numeric(r?.satBuildings?.stats), skyline: numeric(r?.satSkyline?.stats), veg: numeric(r?.satVeg?.stats),
+      buildings: buildings.stats, buildingRing: buildings.ring, skyline: skyline.stats, skylineRing: skyline.ring,
+      veg: window.__worldStallReadEngine(r?.satVeg).stats,
       vegJobs,
       readiness: readiness(),
       worldLoading: r?.worldLoading ?? null, sharp: r?.terraStats?.sharp ?? null });
@@ -321,6 +370,7 @@ function holdPose(pose) {
 
 function readEnd() {
   const r = window.__fly, state = window.__flyStore?.getState?.();
+  const buildings = window.__worldStallReadEngine(r?.satBuildings), skyline = window.__worldStallReadEngine(r?.satSkyline);
   let renderer = window.__flyComposer?.getRenderer?.() ?? null;
   if (!renderer && r?.engine?.object) { let scene = r.engine.object; while (scene.parent) scene = scene.parent; renderer = scene.__r3f?.root?.getState()?.gl; }
   const gl = renderer?.getContext() ?? window.__worldStallGL;
@@ -352,7 +402,8 @@ function readEnd() {
       overlays: numeric(window.__flyComposer?.passes?.find(p => p.name === 'SkyOverlayPass')?.programWarm),
     },
     programCoverage: renderer?.info?.programs?.map(p => ({ key: `${p.type ?? 'program'}${p.name ? ':' + p.name : ''}#${hash(p.cacheKey)}`, composerPrepared: warmKeys.has(p.cacheKey) })) ?? null,
-    buildings: numeric(r?.satBuildings?.stats), skyline: numeric(r?.satSkyline?.stats), veg: numeric(r?.satVeg?.stats),
+    buildings: buildings.stats, buildingRing: buildings.ring, skyline: skyline.stats, skylineRing: skyline.ring,
+    veg: window.__worldStallReadEngine(r?.satVeg).stats,
     draws: renderer?.info?.render?.calls ?? null, triangles: renderer?.info?.render?.triangles ?? null,
     programs: renderer?.info?.programs?.length ?? null,
     heapMiB: performance.memory ? performance.memory.usedJSHeapSize / 1048576 : null,
@@ -384,6 +435,7 @@ async function measure(context, page, arm, poseName, phase, pageNumber) {
       (row.consoleErrorLocations ??= []).push({ message, ...m.location() });
     }
   });
+  await page.addInitScript(installEngineObserver);
   await page.addInitScript(installMonitor, { durationMs: seconds * 1000 });
   if (args.plain) await page.addInitScript((automation) => Object.defineProperty(navigator, 'webdriver', { configurable: true, get: () => automation }), !!args.automation);
   if (!args.plain) await page.addInitScript(installPins, { quality, automation: !!args.automation,

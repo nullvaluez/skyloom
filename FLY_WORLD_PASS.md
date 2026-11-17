@@ -1409,3 +1409,37 @@ reported incomplete at page hide. The same flight had already prepared terrain
 for zero and one cascade at 60.52 and 73.47 s. This explains how the previous
 flight could animate smoothly while leaving the next page waiting on work
 for a quality setting the player had never selected.
+
+On `edc9c0e2` the same 90-second Ultra flight compiled one pair of terrain
+programs, at 4.78 s, for the three cascades it used. The previous zero-,
+one- and two-cascade pairs were absent. Total shader links across its
+contexts fell from 248 to 198. At page hide every observed flight-program
+link had finished. Two programs on the detached text atlas did not expose
+completion status. The clean before/after timings measure navigation separately
+from this instrumented flight.
+
+The selected-profile regression passed 9/9, the terrain readiness checks
+19/19 and composer readiness 12/12. `npm run verify:beta` passed all 34
+checks, and the worker comparison against `c2bf5c06` remained identical
+across 1,062 cases and 7,308 buffers. The geometry tier remains fixed for a
+page. When a player selects a preset with different world detail, Settings
+now indicates that the new detail takes effect on the next page load.
+
+With the five flags on, the first unprofiled production rerun at this
+revision used fresh profiles and took a screenshot after each 90-second
+window. NYC page 2 reached its first world frame in 2.67 s, with a 375 ms
+maximum task. Paris page 2 reached it in 2.49 s, with a 369 ms maximum task.
+Their first pages peaked at 1,202 ms and 1,019 ms respectively. The largest
+post-reveal task in the four flights was 324 ms. Both Paris flights had 40
+building retries and ended with eight ready and eight empty tiles. Their
+reported ring times of 83.2 s and 78.4 s measure resolution to that partial
+state. NYC reached its full ring in 11.7 s and 10.6 s.
+
+Entering the hangar through a real Free Flight click exercised a separate
+renderer. The clean production run showed the hangar UI 58 ms after the
+click. Its next tasks included 1,336 ms, 1,218 ms and 3,447 ms. A separate
+instrumented run reproduced the pause and measured 5,791 ms in slow
+active-uniform queries on that hangar canvas, including 3,033 ms through
+the reflective floor's render. The largest task after the subsequent world
+reveal was 86 ms in the clean run. Hangar UI readiness and its first
+completed 3D frame are distinct events.

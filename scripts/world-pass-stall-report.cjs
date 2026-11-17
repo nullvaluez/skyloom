@@ -32,6 +32,56 @@ const shotPolicy = (row, report) => typeof row.screenshotsEnabled === 'boolean' 
 const shotOutcome = (row, report) => !row ? 'unknown' : row.screenshot ? 'screenshot'
   : Object.hasOwn(row, 'screenshotError') ? 'screenshot-error'
   : shotPolicy(row, report) === false ? 'no-shot' : 'unknown';
+function ringEvidence(row, durationMs) {
+  const m = row.monitor ?? {}, s = row.summary ?? {};
+  const sample = (m.samples ?? []).find(sample => sample.atMs >= (m.warpMs ?? 0) && sample.atMs <= durationMs && finite(sample.buildings?.fullRingSec) && sample.buildings.fullRingSec >= 0);
+  const observation = m.fullRingObservation?.atMs <= durationMs ? m.fullRingObservation.buildings : null;
+  const stats = observation?.stats ?? sample?.buildings ?? row.buildings;
+  const census = observation?.ring ?? sample?.buildingRing ?? null;
+  const settled = s.fullRingObservedWarpMs >= 0 && finite(s.fullRingObservedWarpMs) || s.fullRingEngineSec >= 0 && finite(s.fullRingEngineSec);
+  const source = observation ? 'settled observation' : sample ? 'first settled sample' : stats ? 'end only' : 'unrecorded';
+  const reasons = stats?.emptyByReason;
+  const ready = census?.ready ?? stats?.ready, empty = census?.empty ?? stats?.empty;
+  let complete = null, content = settled ? 'settled; content unknown' : 'not observed';
+  if (settled && source !== 'end only' && stats) {
+    if (census?.failedChunks > 0 || census?.staleChunks > 0) {
+      complete = false; content = 'settled with failed content';
+    } else if (census?.emptyAfterErrors > 0) {
+      content = 'settled; empty after build errors, cause unverified';
+    } else if (census?.unresolved > 0) {
+      complete = false; content = 'settled stamp; observed ring unresolved';
+    } else if (empty === 0 && ready > 0 && (census ? ready === census.desired : ready === stats.chunks)) {
+      complete = true; content = 'settled; all ready';
+    } else if (empty > 0) {
+      const knownEmpty = census ? census.noData + census.zero === empty
+        : reasons && reasons.noData + reasons.zero === empty && reasons.legacy === 0;
+      // Legacy noData conflates 404/204 with exhausted errors. A cumulative
+      // retry count cannot prove which empty tiles failed; keep it uncertain.
+      if (!census && stats.errorRetries > 0 && !(reasons?.zero === empty)) content = 'settled; empty with retries, cause unverified';
+      else if (knownEmpty && (!census || census.ready + empty === census.desired)) {
+        complete = true; content = 'settled; valid empty results';
+      } else content = 'settled; empty reasons unknown';
+    }
+  }
+  return { ringContent: content, ringContentComplete: complete, ringCensusSource: source,
+    ringReady: ready ?? null, ringEmpty: empty ?? null, ringErrorRetries: stats?.errorRetries ?? null,
+    ringNoData: census?.noData ?? reasons?.noData ?? null, ringZero: census?.zero ?? reasons?.zero ?? null,
+    ringUnknownEmpty: census?.unknown ?? reasons?.legacy ?? null,
+    ringEmptyAfterErrors: census?.emptyAfterErrors ?? null, ringFailedChunks: census?.failedChunks ?? null,
+    ringStaleChunks: census?.staleChunks ?? null, ringMaxEmptyAttempts: census?.maxEmptyAttempts ?? null };
+}
+function workerThrowCounts(monitor) {
+  if (!Array.isArray(monitor.workerThrows)) return '';
+  const counts = {};
+  for (const error of monitor.workerThrows) {
+    const message = error.message ?? '';
+    const category = /^http-(?:\d{3}|timeout)$/.test(message) ? message
+      : /failed to fetch|networkerror|load failed/i.test(message) ? 'fetch failure'
+      : ['TypeError', 'RangeError', 'ReferenceError', 'SyntaxError'].includes(error.name) ? error.name : 'other throw';
+    counts[category] = (counts[category] ?? 0) + (error.count ?? 1);
+  }
+  return JSON.stringify(counts); // No raw exception messages, URLs or tile keys.
+}
 for (const source of sources) {
   const dir = path.resolve(source), report = JSON.parse(fs.readFileSync(path.join(dir, 'stalls.json'), 'utf8'));
   if (dir === out) throw Error('The report output directory must differ from each capture directory');
@@ -91,6 +141,7 @@ for (const source of sources) {
       worstWorldGapMs: largest([world.length || s.worstWorldFrameGapMs > 0 ? s.worstWorldFrameGapMs : null, world.length ? intervalsMax(world) : null]), postRevealWorldGapMs,
       medianRafMs: s.medianFrame60to90Ms, medianWorldMs: s.medianWorldFrame60to90Ms,
       ringEngineSec: s.fullRingEngineSec, ringAfterWarpMs: s.fullRingObservedWarpMs,
+      ...ringEvidence(row, durationMs), workerThrowCounts: workerThrowCounts(monitor), workerThrowsDropped: monitor.workerThrowsDropped ?? null,
       profiled: !!(report.profiled || row.profiled), exceptions: !!(report.exceptions || row.exceptions), plain: !!report.plain, review: !!report.review, automation: !!(report.automation || row.automation),
       errors: errors.join('; '), coverage: coverage.join('; '),
       performanceMisses: misses.join(', '),
@@ -127,6 +178,7 @@ const link = (label, target) => `[${safe(label)}](<${target}>)`;
 const status = row => [row.errors ? `INVALID: ${row.errors}` : row.profiled || row.exceptions || row.automation ? 'DIAGNOSTIC' : 'MEASURED',
   row.profiled ? 'PROFILED' : '', row.exceptions ? 'EXCEPTION DIAGNOSTIC' : '', row.automation ? 'AUTOMATED DIAGNOSTIC' : '',
   row.performanceMisses ? `TIMING MISS: ${row.performanceMisses}` : 'no recorded timing miss',
+  row.ringContentComplete !== true && row.ringContent !== 'not observed' ? `CONTENT UNVERIFIED: ${row.ringContent}` : '',
   row.coverage ? `INCOMPLETE: ${row.coverage}` : ''].filter(Boolean).join('; ');
 const md = [
   '# World Pass stall measurements', '',
@@ -137,10 +189,10 @@ const md = [
   '| Dataset | Server ref | Harness ref / v | Mode / quality | Seconds | Context | Rows / invalid / timing misses |',
   '|---|---|---|---|---:|---|---:|',
   ...datasets.map(d => `| ${link(d.dataset, d.record)} | ${safe(d.serverRef || 'UNRECORDED')}${d.serverRefSource === 'explicit --source-ref' ? ' (supplied)' : ''} | ${safe(d.harnessRef.slice(0, 12))} / ${d.version ?? '—'} | ${safe(d.mode)} / ${safe(d.quality)} | ${d.seconds ?? '—'} | ${d.profiled ? 'profiled' : 'unprofiled'}${d.exceptions ? ', exceptions diagnostic' : ''}, ${d.plain ? 'plain URL' : d.review ? 'review pose' : 'fixed pose'}, ${d.automation ? 'automation' : 'player policy'}, shots ${d.screenshots} | ${d.rows} / ${d.invalid} / ${d.timingMisses} |`),
-  '', '| Dataset | Pose / flags | Cache / page / transfer | First world / reveal s | Boot task / rAF ms | Max task / rAF ms | Post-reveal task / rAF / world ms | Median rAF / world ms | Ring after warp s | Status |',
+  '', '| Dataset | Pose / flags | Cache / page / transfer | First world / reveal s | Boot task / rAF ms | Max task / rAF ms | Post-reveal task / rAF / world ms | Median rAF / world ms | Ring settled s / content | Status |',
   '|---|---|---|---:|---:|---:|---:|---:|---:|---|',
-  ...rows.map(r => `| ${safe(r.dataset)} | ${safe(r.pose)} / ${safe(r.arm)} | ${safe(r.cache)} / ${r.page} / ${r.transfer} | ${number(r.firstWorldMs, 1000)} / ${number(r.revealedMs, 1000)} | ${number(r.bootTaskMs)} / ${number(r.bootGapMs)} | ${number(r.worstTaskMs)} / ${number(r.worstRafGapMs)} | ${number(r.postRevealTaskMs)} / ${number(r.postRevealRafGapMs)} / ${number(r.postRevealWorldGapMs)} | ${number(r.medianRafMs)} / ${number(r.medianWorldMs)} | ${number(r.ringAfterWarpMs, 1000)} | ${link(status(r), r.record)} |`),
-  '', 'Ring arrival is elapsed browser time since the fixed-pose warp, observed at one-second sampling intervals. The separate simulation clock can exclude clamped long-frame time. Both clocks, boot-100 time, full-world maximum gaps, source refs and detailed status remain in [stall-table.csv](stall-table.csv). [longtasks.csv](longtasks.csv) lists every supplied task over 200 ms with start, end, duration, window membership, reveal overlap and source-row link.', '',
+  ...rows.map(r => `| ${safe(r.dataset)} | ${safe(r.pose)} / ${safe(r.arm)} | ${safe(r.cache)} / ${r.page} / ${r.transfer} | ${number(r.firstWorldMs, 1000)} / ${number(r.revealedMs, 1000)} | ${number(r.bootTaskMs)} / ${number(r.bootGapMs)} | ${number(r.worstTaskMs)} / ${number(r.worstRafGapMs)} | ${number(r.postRevealTaskMs)} / ${number(r.postRevealRafGapMs)} / ${number(r.postRevealWorldGapMs)} | ${number(r.medianRafMs)} / ${number(r.medianWorldMs)} | ${number(r.ringAfterWarpMs, 1000)} / ${r.ringContent} | ${link(status(r), r.record)} |`),
+  '', 'Ring settled time preserves the engine’s ready-or-empty milestone, observed once per second after the fixed-pose warp; it is not automatically successful content arrival. Valid zero/no-data results remain valid. Retry-exhausted builds also become no-data, so new captures retain desired-ring failure/attempt counts at that milestone; legacy empty rows with retries remain unverified when the reason is missing or ambiguous. End-only evidence cannot certify the earlier milestone. The separate simulation clock can exclude clamped long-frame time. Both clocks, reason counts, coarse worker-error counts, boot-100 time, full-world maximum gaps, source refs and detailed status remain in [stall-table.csv](stall-table.csv). [longtasks.csv](longtasks.csv) lists every supplied task over 200 ms with start, end, duration, window membership, reveal overlap and source-row link.', '',
 ];
 if (priorRef) {
   const matches = (actual, requested) => actual === requested || (/^[\da-f]{7,40}$/i.test(actual) && /^[\da-f]{7,40}$/i.test(requested) && actual.startsWith(requested));
@@ -154,11 +206,12 @@ if (priorRef) {
   const tally = group => `${group.length}/${group.filter(row => row.errors).length}/${group.filter(row => row.performanceMisses).length}`;
   md.push(`## Matched references: ${safe(priorRef)} → ${safe(finalRef)}`, '',
     'Each cell is prior → final. Repeated captures appear as ranges; none is selected away. Counts are rows/invalid/timing-miss rows. Contexts are matched by mode, quality, pose, flags, cache, page, URL type, review, profiling, exception diagnostics, automation and preceding-page screenshot outcome. A missing side is unmeasured; comparisons retain invalid rows and do not imply acceptance.', '',
-    '| Context | Counts | Boot task / rAF ms | Max rAF ms | Post-reveal task / rAF / world ms | First world s | Median rAF ms | Ring after warp s | Evidence |',
+    '| Context | Counts | Boot task / rAF ms | Max rAF ms | Post-reveal task / rAF / world ms | First world s | Median rAF ms | Ring settled s / content | Evidence |',
     '|---|---|---|---:|---|---:|---:|---:|---|');
   for (const key of keys) {
     const a = prior.filter(row => keyOf(row) === key), b = final.filter(row => keyOf(row) === key), r = a[0] ?? b[0];
     const pair = (field, scale = 1) => `${range(a, field, scale)} → ${range(b, field, scale)}`;
+    const content = group => [...new Set(group.map(row => row.ringContent))].join('; ') || 'unmeasured';
     const context = `${r.mode}/${r.quality} ${r.pose}/${r.arm} ${r.cache}/p${r.page} ${r.plain ? 'plain' : r.review ? 'review' : 'pose'}${r.profiled ? ' profiled' : ''}${r.exceptions ? ' exceptions' : ''}${r.automation ? ' automated' : ''} transfer:${r.transfer}`;
     comparisons.push({ context, priorRef, finalRef, priorRows: a.length, finalRows: b.length,
       priorInvalid: a.filter(row => row.errors).length, finalInvalid: b.filter(row => row.errors).length,
@@ -166,8 +219,9 @@ if (priorRef) {
       bootTaskMs: pair('bootTaskMs'), bootGapMs: pair('bootGapMs'), worstRafGapMs: pair('worstRafGapMs'),
       postRevealTaskMs: pair('postRevealTaskMs'), postRevealRafGapMs: pair('postRevealRafGapMs'), postRevealWorldGapMs: pair('postRevealWorldGapMs'),
       firstWorldMs: pair('firstWorldMs'), medianRafMs: pair('medianRafMs'), ringAfterWarpMs: pair('ringAfterWarpMs'),
+      priorRingContent: content(a), finalRingContent: content(b),
       priorRecords: a.map(row => row.record).join('; '), finalRecords: b.map(row => row.record).join('; ') });
-    md.push(`| ${safe(context)} | ${tally(a)} → ${tally(b)} | ${pair('bootTaskMs')} / ${pair('bootGapMs')} | ${pair('worstRafGapMs')} | ${pair('postRevealTaskMs')} / ${pair('postRevealRafGapMs')} / ${pair('postRevealWorldGapMs')} | ${pair('firstWorldMs', 1000)} | ${pair('medianRafMs')} | ${pair('ringAfterWarpMs', 1000)} | ${[...a.map((row, i) => link(`prior ${i + 1}`, row.record)), ...b.map((row, i) => link(`final ${i + 1}`, row.record))].join(', ')} |`);
+    md.push(`| ${safe(context)} | ${tally(a)} → ${tally(b)} | ${pair('bootTaskMs')} / ${pair('bootGapMs')} | ${pair('worstRafGapMs')} | ${pair('postRevealTaskMs')} / ${pair('postRevealRafGapMs')} / ${pair('postRevealWorldGapMs')} | ${pair('firstWorldMs', 1000)} | ${pair('medianRafMs')} | ${pair('ringAfterWarpMs', 1000)} / ${content(a)} → ${content(b)} | ${[...a.map((row, i) => link(`prior ${i + 1}`, row.record)), ...b.map((row, i) => link(`final ${i + 1}`, row.record))].join(', ')} |`);
   }
   md.push('');
 }
