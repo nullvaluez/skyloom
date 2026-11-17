@@ -135,9 +135,9 @@ check('hydrology keeps imagery dominant and mapped roads remain photographic',()
   e._commit({b,index:0,key:'wet',generation:1,result:{surface:wet}},0);
   const width=b.size*4;assert.equal(b.texture.image.data[(25*width+25)*4+3],90);assert.equal(b.texture.image.data[(50*width+25)*4+3],64);e.dispose();
 });
-check('all worker consumers agree on protocol 26',()=>{
+check('all worker consumers agree on protocol 27',()=>{
   assert.equal(config.STYLIZED_EARTH.protocol,workerProtocol,'EarthSurfaceEngine must accept the worker protocol');
-  for(const name of ['sat-building','sat-clutter','sat-road','sat-skyline','sat-veg','toy-world'])assert.match(fs.readFileSync(path.join(root,`toy-world/${name}-engine.js`),'utf8'),/EXPECTED_WORKER_PROTOCOL = 26/);
-  assert.match(fs.readFileSync(path.join(root,'toy-world/vector-tile.worker.js'),'utf8'),/WORKER_PROTOCOL = 26/);
+  for(const name of ['sat-building','sat-clutter','sat-road','sat-skyline','sat-veg','toy-world'])assert.match(fs.readFileSync(path.join(root,`toy-world/${name}-engine.js`),'utf8'),/EXPECTED_WORKER_PROTOCOL = 27/);
+  assert.match(fs.readFileSync(path.join(root,'toy-world/vector-tile.worker.js'),'utf8'),/WORKER_PROTOCOL = 27/);
 });
 console.log(`STYLIZED EARTH: PASS ${checks}/${checks}`);
