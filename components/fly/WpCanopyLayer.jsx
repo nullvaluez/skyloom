@@ -199,12 +199,7 @@ export function WpCanopyLayer({ engine, runtime, flight, tier }) {
     const base = material.color, inv = [1 / (base.r * 0.86), 1 / (base.g * 0.86), 1 / (base.b * 0.86)];
     return { material, depth, seasonTexture, near, far, nearGeo, farGeo, stage, inv };
   }, [tc]);
-  useLayoutEffect(() => {
-    const shadowPin = window.__flySatShadowOverride === 0;
-    const enabled = SAT_SHADOWS.enabled && (tier === SAT_SHADOWS.minTier || immersiveOn('lighting')) && !shadowPin;
-    meshes.near.receiveShadow = meshes.far.receiveShadow = enabled;
-    meshes.near.castShadow = enabled && cfg.castShadow;
-  }, [meshes, cfg, tier]);
+  const shadows = SAT_SHADOWS.enabled && (tier === SAT_SHADOWS.minTier || immersiveOn('lighting')) && globalThis.window?.__flySatShadowOverride !== 0;
   useEffect(() => () => {
     meshes.material.dispose(); meshes.depth.dispose(); meshes.nearGeo.dispose(); meshes.farGeo.dispose();
     meshes.seasonTexture?.dispose(); meshes.near.dispose(); meshes.far.dispose();
@@ -307,8 +302,8 @@ export function WpCanopyLayer({ engine, runtime, flight, tier }) {
 
   return (
     <>
-      <primitive object={meshes.near} />
-      <primitive object={meshes.far} />
+      <primitive object={meshes.near} receiveShadow={shadows} castShadow={shadows && cfg.castShadow} />
+      <primitive object={meshes.far} receiveShadow={shadows} />
     </>
   );
 }
