@@ -7,24 +7,26 @@
 >   Enhanced Satellite is the default on every device
 >   (`VISUALS.defaultProfile:'enhanced'`), and `R25_SKY` / `R25_GROUND` ship
 >   `enabled:true`.
-> - **World Pass (2026-11-16, owner-requested, IN PROGRESS on branch
->   `phresh/mystifying-curran-97a006`, not on `main`):**
+> - **World Pass (2026-11-16, owner-requested; all five flags ON on `main`
+>   since 2026-11-17 at the owner's request):**
 >   [FLY_WORLD_PASS.md](FLY_WORLD_PASS.md) is the plan and the record. How the
 >   Enhanced satellite world is generated on desktop High and Ultra (buildings,
 >   far city, trees, ground contact) so every place looks like itself. Five
->   flags, all `enabled:false`: `WORLD_TRUTH`, `WORLD_ARRIVAL`, `WORLD_REACH`,
->   `WORLD_LOOK`, `WORLD_GROUND`, read only through `lib/fly/world-pass.js`
->   (tier latched once per page from the boot preset and device class, never
->   the governor). The worker never reads a flag: it reads the resolved request
->   (`worldPass: worldPassRequest()` in every build, `tileCtx.worldPass` in the
->   builders now split into `lib/fly/toy-world/worker/`). W0 (seams, opt-in
->   stage counters) is done. Wave 2: all five streams (TRUTH, LOOK, ARRIVAL,
->   REACH and GROUND) are merged into this branch with all flags off
->   (protocol 27); fly one with `?flags=WORLD_<NAME>`. Their round 2 checks
->   have not all passed (FLY_WORLD_PASS.md "Wave 2 record"). With the flags
->   off the worker output is byte-identical to `c2bf5c06` but for the
->   protocol number (`scripts/world-pass-worker-proof.mjs`). `main` still has
->   only the four wave 1 streams, at `d40dfd25`.
+>   flags, `WORLD_TRUTH`, `WORLD_ARRIVAL`, `WORLD_REACH`, `WORLD_LOOK`,
+>   `WORLD_GROUND`, read only through `lib/fly/world-pass.js` (tier latched
+>   once per page from the boot preset and device class; Medium, Low and
+>   phones keep the old world). The worker never reads a flag: it reads the
+>   resolved request (`worldPass: worldPassRequest()`).
+>   - They ship ON although the round 2 checks did not pass (every stream
+>     FAIL or unproven), with no RTX 5080 motion check, and with the owner
+>     reporting a browser freeze with all five on. Performance is the next
+>     session's work. FLY_WORLD_PASS.md "Default on (2026-11-17)" is the
+>     record.
+>   - `?flags=-WORLD_<NAME>` restores the old world for one page load; in
+>     source, one `enabled: false` per block. With all five off the worker
+>     output is byte-identical to `c2bf5c06` but for the protocol number
+>     (`scripts/world-pass-worker-proof.mjs`).
+>   - The `bootFly` harness fleet (`scripts/_boot.js`) pins all five off.
 > - **Look Pass (2026-11-14 to 16, owner-requested, MERGED and pushed to `main`
 >   with all five flags ON):** [FLY_LOOK_PASS.md](FLY_LOOK_PASS.md) is the plan
 >   and the record. A visual pass on the Enhanced look for desktop High and

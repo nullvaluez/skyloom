@@ -5,12 +5,14 @@ the record. Scope: how the Enhanced satellite world is generated on desktop
 High and Ultra: buildings, the far city, trees and ground contact. Medium, Low
 and phones keep today's world.
 
-**Status: W0 is done, and wave 1 has four of the five streams merged into
-branch `phresh/mystifying-curran-97a006`** (TRUTH, LOOK, ARRIVAL, REACH; GROUND
-is still being built). Nothing is on `main`. All five flags still ship
-`enabled:false`, so nothing is visible by default, and the worker's flag-off
-output is byte-identical to `c2bf5c06` apart from the protocol number (now 26).
-See "Wave 1 record".
+**Status (2026-11-17): all five streams are merged and all five flags ship
+`enabled:true`, at the owner's request, before their checks passed.** The
+round 2 checks did not pass, and no stream has had a motion check on the
+owner's RTX 5080. The owner reports that the browser freezes with the five on.
+`?flags=-WORLD_<NAME>` gives the old world for one page load. Performance is
+the next session's work. See "Default on (2026-11-17)". The worker's
+all-off output is still byte-identical to `c2bf5c06` apart from the protocol
+number (now 27).
 
 ## Why this pass exists
 
@@ -158,7 +160,8 @@ dispatch and `WORKER_PROTOCOL`,
 ## Flag registry
 
 Five blocks at the very end of `lib/fly/fly-constants.js`, after the LOOK PASS
-blocks, each shipped `enabled:false`. Each is read ONLY through
+blocks, shipped `enabled:false` until 2026-11-17 and `enabled:true` since
+(see "Default on (2026-11-17)"). Each is read ONLY through
 `lib/fly/world-pass.js`. `?flags=WORLD_TRUTH` turns a stream on for one page
 load (desktop High and Ultra only); `?flags=-WORLD_TRUTH` turns it off.
 
@@ -920,6 +923,190 @@ canopy and bridge keys), so a bundle from before the merge is dropped.
   polygon count on the item; E, an earth-surface repaint under bridge decks.
 - Each ledger's own "Open" list stands
   (`scripts/world-pass-ledger-<key>.md`).
+
+## Default on (2026-11-17)
+
+### The decision
+
+The owner reported that the browser freezes with the five flags on and asked
+to push with all flags on anyway, and to fix performance in a following
+session. So the five blocks in `lib/fly/fly-constants.js` (`WORLD_TRUTH`,
+`WORLD_ARRIVAL`, `WORLD_REACH`, `WORLD_LOOK`, `WORLD_GROUND`) ship
+`enabled:true`. No other value in those blocks moved: every sub-switch keeps
+its value. The tier test is unchanged: only desktop High and Ultra get the new
+world. Medium, Low, phones and tablets keep the old world.
+
+This was done knowing that the checks below had not passed.
+
+### State of the checks at the decision
+
+- **Round 2 adversarial verdicts: all five streams FAIL or are unproven.**
+  - TRUTH: the sparse-evidence prior draws Izmir and Istanbul 1 to 3 storeys
+    where the old world drew 6 to 8. The split hold-out wins 25 of 33 cities.
+    Alone, TRUTH fills the far ring later (Paris +46 %, Tokyo +60 %).
+  - LOOK: unproven. Night against a flags-off control, the Paris far step and
+    the night far ring were never measured (no GPU slot).
+  - REACH: arrival is later than the old world on a cold start (nyc-low far
+    full ring +4.3 to +10.3 s; paris-mid near ring +1.6 to +5.2 s).
+  - ARRIVAL (round 2b): tiles behind the aircraft die at boost in Paris. Tile
+    finalize is not fully sliced (13 to 17.6 ms, and REACH's skyline finalize
+    of 26 to 39 ms shares those frames).
+  - GROUND: its round 2 verify failed. Its second fix round is unverified.
+- **All five on together, merged tree** (orchestrator review of the int-2
+  pair frames).
+  - Gains: Phoenix shows the real low warehouses. Paris has limestone fabric
+    to the horizon. Bridge decks are raised. Geometry is inside the Ultra
+    budget (paris 199.5 MiB against 413.5 with the flags off; nyc-low 170.6
+    against 309.0). The ring fills sooner (paris 11.8 s against 22.2 s).
+  - Defects: Central Park trees read as bare grey sticks. Powell is buried
+    under a conifer forest with dark green roofs. The far city washes pale
+    (nyc-mid, nyc-bay, brooklyn, paris-mid, tokyo-bay). paris-mid golden hour
+    has cold blue far ground under an amber sky. Roofs are sage green in Tokyo
+    and Powell. San Francisco is uniform cream, London paler. Bridge decks are
+    unlit at night. An nyc-mid vegetation tile stayed "sampling" for 150 s.
+    Non-finite drape restarts are 53 / 69 / 76 against 4 to 7 with the flags
+    off. The Tokyo palace tree stands are gone. The horizon stage counters
+    read 0 under REACH (an instrument gap).
+- **The browser freezes with the five on** (owner report, 2026-11-17). At
+  that moment the machine was at 100 % CPU and all three GPU capture slots
+  were used by background agents, so the cause is not separated yet.
+- **No motion check on the owner's RTX 5080** has been done for any World
+  Pass stream.
+- **Not in this push:** unmerged, unverified work parked on stream branches:
+  `world/truth` (round 3 height prior, `e770dc62` plus a WIP commit),
+  `world/look` (round 3 far-city colour and night, `8cf346aa` plus a WIP
+  commit), `world/ground` (second fix round, `2f182579`: crowns keep out of
+  drawn roofs, calendar season, seam pass).
+
+### Getting the old world back
+
+- For one page load: `?flags=-WORLD_TRUTH` (and so on) turns that stream off.
+  All five: `?flags=-WORLD_TRUTH,-WORLD_ARRIVAL,-WORLD_REACH,-WORLD_LOOK,-WORLD_GROUND`.
+  A console pin works the same way
+  (`window.__flyWorldTruthOverride = { enabled: false }` before the canvas
+  mounts).
+- In source: set `enabled: false` in the stream's block in
+  `lib/fly/fly-constants.js`, one line per stream.
+- With all five off the request is `wp1-0`, and the worker output is
+  byte-identical to `c2bf5c06` apart from the protocol number (proof below).
+
+### Gates, re-pointed
+
+The old-world guarantee moved from "the default" to "the explicit off arm".
+No assertion was deleted or loosened.
+
+- `scripts/verify-true-earth-flags.mjs` (9) now asserts: the default at
+  desktop Ultra and High is all five on; each `?flags=-WORLD_<NAME>`
+  (installed through the real `installUrlFlags`) turns exactly that stream
+  off; all five off, or the fleet pin, gives `wp1-0`; Medium, Low and the
+  mobile class get `wp1-0` with the shipped default and with a stream forced
+  on; one stream alone is that stream only; the latch survives a governor
+  step. (9b) is new: `scripts/_boot.js` pins the five streams off in both
+  legs.
+- `scripts/world-pass-worker-proof.mjs` builds its `*wpoff` request with the
+  real reader on a desktop Ultra page with the five `-WORLD_` flags, and
+  fails unless that equals the all-off literal. So IDENTICAL means the
+  `?flags=-WORLD_<NAME>` page is the `c2bf5c06` world.
+- `scripts/world-pass-tier-proof.cjs` arms: `ultra` and `high` (no flags,
+  all five on; `ultra` also steps the governor), `off` (all five `-WORLD_`),
+  `minus-<stream>` x5, `truth-only`, `medium`, `medium-forced`, `low`,
+  `phone` (no flags: all off), `all`, `diag` (stage counters with all five
+  off).
+- `scripts/wp-look-shader.mjs` (1) pins `-WORLD_LOOK` for its off arm, and a
+  new (1b) checks the shipped default carries the look edits.
+- Node gates whose frozen numbers were certified on the old world latch the
+  reader on the five `-WORLD_` flags before they build anything, with the new
+  helper `scripts/_world-pass-off.mjs` (`latchWorldPassOff()`):
+  `verify-play-city`, `verify-architectural-realism`, `verify-look-facade`,
+  `verify-living-earth`. `verify-city-horizon` adds the same five pins to the
+  `window` it already sets. Without this, `verify-architectural-realism` and
+  `verify-look-facade` went red (the architecture program now carries the
+  WORLD_LOOK edits), `verify-city-horizon` threw in REACH's stand-in finalize
+  (its stub worker sends no stand-in parts) and `verify-living-earth` failed
+  earlier than on `0baeb61e` (WORLD_GROUND replaces the living forest).
+- Every other node gate runs the shipped default. In node the reader sees no
+  window, the store's default preset `high` and no mobile class, so it latches
+  all five ON: `graphics-unit`, `verify-stylized-earth`,
+  `verify-building-handoff`, the `verify:beta` set and the stream probes now
+  run the new world.
+
+### Harness posture
+
+- **Browser fleet (every harness that boots through `scripts/_boot.js`
+  `bootFly`): pinned to the old world.** `bootFly` sets `window.__flyWorldTruthOverride`,
+  `__flyWorldArrivalOverride`, `__flyWorldReachOverride`,
+  `__flyWorldLookOverride` and `__flyWorldGroundOverride` to
+  `{ enabled: false }` in the boot leg and the reload leg, the same idiom as
+  the R19 to R25 fleet pins. A pin wins over the URL. No World Pass gate
+  boots through `_boot.js`. A gate that wants the shipped world un-pins with
+  `unpinPins(['__flyWorldTruthOverride', ...])`.
+- **World Pass tools and gates run the shipped default** and choose arms with
+  `--flags`: `look-pass-capture.cjs`, `world-pass-budget.cjs`,
+  `world-pass-tier-proof.cjs`, `world-pass-worker-live.cjs` and the `wp-*`
+  scripts. A capture with no `--flags` is now the new world; labels captured
+  before 2026-11-17 were the old world by default.
+- **Browser scripts that boot without `_boot.js`** (the `review-*` tools,
+  `verify-look-*`, `verify-lounge-mobile.cjs`, `verify-earth-world.cjs` and
+  others) also run the shipped default. None was re-run here.
+- **Production smokes** `beta-smoke.cjs` and `verify-ultra-terrain.cjs` boot
+  the shipped default at Ultra, on a production build. Not run here (no
+  `next build` in this tree).
+- The Look Pass added no fleet pin to `scripts/_boot.js`; it re-pointed its
+  gates one by one (FLY_LOOK_PASS.md rule 8: the old value with the flag off,
+  the new value with it on). The World Pass needs the fleet pin because its
+  tier test does not read the visuals profile: the fleet's Classic pin
+  (`__flyVisualsOverride = 'classic'`) does not keep it out. A Classic session
+  at desktop High or Ultra gets the new world too.
+
+### Proofs at this commit
+
+- `node scripts/world-pass-worker-proof.mjs --check c2bf5c06 --ignore-protocol`:
+  "off arm = the reader's request for ?flags=-WORLD_TRUTH,-WORLD_ARRIVAL,
+  -WORLD_REACH,-WORLD_LOOK,-WORLD_GROUND at desktop Ultra (wp1-0, equal to
+  the all-off literal)"; "IDENTICAL (top-level protocol field masked):
+  1062/1062 cases identical, 7308 buffers + 1062 meta objects compared
+  against 'c2bf5c06'; 28 stage cases (0 bad); 0 unrecorded inputs".
+- `node scripts/world-pass-tier-proof.cjs --url=http://localhost:3320`:
+  PASS 15 arms. `ultra` `wp1-ultra-2hwcf-6d1a0855` (after the governor step:
+  tier low, the same key, all five on); `high` `wp1-high-2hwcf-6d1a0855`;
+  `off` `wp1-0`; `minus-truth` `wp1-ultra-2hwbk-85f5da9c`, `minus-arrival`
+  `wp1-ultra-2ht7j-138f12cd`, `minus-reach` `wp1-ultra-2hmv3-726d17a6`,
+  `minus-look` `wp1-ultra-270fz-cb849d35`, `minus-ground`
+  `wp1-ultra-b8jj-0853c307`; `truth-only` `wp1-ultra-v-1d2d694e`; `medium`,
+  `medium-forced`, `low`, `phone` (mobile true) and `diag` `wp1-0`; `all` the
+  default key. Every posted request carried the latched key.
+- `npm run verify:beta`: 34 PASS, 0 FAIL.
+- Node World Pass gates, all PASS or exit 0: `verify-true-earth-flags` (12),
+  `graphics-unit`, `verify-stylized-earth` (22), `verify-city-horizon`,
+  `verify-building-handoff` (4), `verify-attribution` (4),
+  `verify-lounge-occlusion` (6), `wp-truth-probe`, `wp-truth-r2-probe`,
+  `wp-look-patch`, `wp-look-agree`, `wp-look-shader` (20),
+  `wp-look-structures`, `wp-look-roofphoto`, `wp-arrival-worker-prep`,
+  `wp-arrival-ground-churn`, `wp-arrival-r2b-frameslice`,
+  `wp-arrival-r2b-colgrid`, `wp-arrival-bytes`, `wp-reach-node-bench`
+  (G1 to G5), `wp-ground-bridges-node`, `wp-ground-canopy-node`,
+  `wp-ground-unit` (9).
+- 40 other node gates that import World Pass code were run here; the 23 that
+  were red were run again on a checkout of `0baeb61e`. After the re-pointing
+  above, every one still red here is red there with the same failures
+  (`verify-ship-city` CT-2 / CT-5, `verify-ship-sky`,
+  `verify-ship-light` and `verify-ship-release` (`git archive` of a base
+  fails on the known corrupt object), `verify-play-city`, `verify-play-hud`,
+  `verify-r25-flight-plan`, `verify-r25-sky`, `verify-living-earth`, and the
+  Windows module-loader crashes: `verify-airport-lifecycle`,
+  `verify-airport-set`, `verify-c-flagoff`, `verify-canopy-support`,
+  `verify-cinematic-flight`, `verify-cloud-road-paths`,
+  `verify-measured-world-prewarm`, `verify-night-city-identity`,
+  `verify-ship-frame`, `r24-b-prewarm-proof`; and the suites that run them).
+- Not run: `next build`, any capture or motion check of the default-on page,
+  the production smokes.
+
+### Next session
+
+Performance. First separate the freeze from the machine's load (one page, the
+five flags on, nothing else using the CPU or the GPU slots), then by stream
+with `?flags=-WORLD_<NAME>`. The round 2 defects above and the three parked
+branches stay open.
 
 ## Second wave
 
