@@ -16,6 +16,7 @@ const nextConfig = {
   distDir: process.env.FLY_BUILD_DIR || '.next',
   outputFileTracingRoot: fileURLToPath(new URL('.', import.meta.url)),
   // Keep the normal Turbopack path free of custom webpack configuration.
+  // Next sets TURBOPACK before loading this file, including its default bundler.
   ...((process.env.FLY_BUILD_DIR || !process.env.TURBOPACK) ? {
     webpack(config, context) {
       // Node 25's incremental webpack WASM hash path fails on this workstation.

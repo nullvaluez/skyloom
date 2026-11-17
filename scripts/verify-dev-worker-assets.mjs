@@ -34,7 +34,7 @@ async function compile(context = { dev: true, isServer: false }) {
       hashFunction: 'sha256',
       library: { name: 'workerFixture', type: 'var' },
     },
-    optimization: { minimize: false },
+    optimization: { minimize: false, runtimeChunk: { name: 'webpack' } },
     plugins: context.dev ? [new webpack.HotModuleReplacementPlugin()] : [],
   }, context);
   const compiler = webpack(config);
@@ -56,7 +56,9 @@ async function workerURLs() {
     document: { baseURI: 'http://fixture.test/' },
     Worker: class { constructor(url) { urls.push(new URL(url).pathname); } },
   };
-  vm.runInNewContext(await fs.readFile(path.join(output, 'static/chunks/main.js'), 'utf8'), sandbox);
+  vm.createContext(sandbox);
+  vm.runInContext(await fs.readFile(path.join(output, 'static/chunks/webpack.js'), 'utf8'), sandbox);
+  vm.runInContext(await fs.readFile(path.join(output, 'static/chunks/main.js'), 'utf8'), sandbox);
   sandbox.workerFixture.start();
   return urls.map(url => {
     assert.ok(url.startsWith('/_next/'));

@@ -1,6 +1,7 @@
 /** Combine serialized capture matrices without discarding invalid/outlier rows.
  * node scripts/world-pass-stall-report.cjs --out=<dir> <capture-dir> ...
  * Optional matched comparison: --prior-ref=8c593924 --final-ref=<server-ref>
+ * --final-dev-ref=<server-ref> identifies a separately measured dev-only build.
  * A verified legacy source without serverRef: --source-ref=<dataset>:<ref>
  */
 const fs = require('node:fs');
@@ -9,6 +10,8 @@ const args = process.argv.slice(2);
 const output = args.find(a => a.startsWith('--out='))?.slice(6);
 const option = name => args.find(a => a.startsWith(`--${name}=`))?.slice(name.length + 3);
 const priorRef = option('prior-ref'), finalRef = option('final-ref');
+const finalDevRef = option('final-dev-ref');
+const finalRefFor = mode => mode === 'dev' && finalDevRef ? finalDevRef : finalRef;
 const suppliedRefs = new Map(args.filter(arg => arg.startsWith('--source-ref=')).map(arg => {
   const value = arg.slice('--source-ref='.length), separator = value.lastIndexOf(':');
   if (separator < 1 || separator === value.length - 1) throw Error('--source-ref requires <dataset>:<ref>');
@@ -16,6 +19,7 @@ const suppliedRefs = new Map(args.filter(arg => arg.startsWith('--source-ref='))
 }));
 if (!output) throw Error('--out=<directory> is required');
 if (!!priorRef !== !!finalRef) throw Error('Supply both --prior-ref and --final-ref for a matched comparison');
+if (finalDevRef && !finalRef) throw Error('--final-dev-ref requires a matched comparison');
 const sources = args.filter(a => !a.startsWith('--'));
 if (!sources.length) throw Error('Supply at least one capture directory');
 const out = path.resolve(output);
@@ -196,15 +200,17 @@ const md = [
 ];
 if (priorRef) {
   const matches = (actual, requested) => actual === requested || (/^[\da-f]{7,40}$/i.test(actual) && /^[\da-f]{7,40}$/i.test(requested) && actual.startsWith(requested));
-  const prior = rows.filter(row => matches(row.serverRef, priorRef)), final = rows.filter(row => matches(row.serverRef, finalRef));
+  const prior = rows.filter(row => matches(row.serverRef, priorRef)), final = rows.filter(row => matches(row.serverRef, finalRefFor(row.mode)));
   if (!prior.length || !final.length) throw Error('Comparison refs must match recorded serverRef values; harness gitHead is not server provenance');
+  if (finalDevRef && !final.some(row => row.mode === 'dev')) throw Error('The final development ref has no matching development captures');
   if (prior.some(row => final.includes(row))) throw Error('Prior and final refs must select distinct source rows');
   const keyOf = row => JSON.stringify([row.mode, row.quality, row.pose, row.arm, row.cache, row.page, row.plain, row.review, row.profiled, row.exceptions, row.automation,
     row.transfer === 'unknown' ? `unknown:${row.record}` : row.transfer]);
   const keys = [...new Set([...prior, ...final].map(keyOf))];
   const range = (group, key, scale = 1) => { const values = group.map(row => row[key]).filter(finite); if (!values.length) return '—'; const lo = Math.min(...values), hi = Math.max(...values); return lo === hi ? number(lo, scale) : `${number(lo, scale)}–${number(hi, scale)}`; };
   const tally = group => `${group.length}/${group.filter(row => row.errors).length}/${group.filter(row => row.performanceMisses).length}`;
-  md.push(`## Matched references: ${safe(priorRef)} → ${safe(finalRef)}`, '',
+  const resultRefs = finalDevRef ? `production ${safe(finalRef)}, development ${safe(finalDevRef)}` : safe(finalRef);
+  md.push(`## Matched references: ${safe(priorRef)} → ${resultRefs}`, '',
     'Each cell is prior → final. Repeated captures appear as ranges; none is selected away. Counts are rows/invalid/timing-miss rows. Contexts are matched by mode, quality, pose, flags, cache, page, URL type, review, profiling, exception diagnostics, automation and preceding-page screenshot outcome. A missing side is unmeasured; comparisons retain invalid rows and do not imply acceptance.', '',
     '| Context | Counts | Boot task / rAF ms | Max rAF ms | Post-reveal task / rAF / world ms | First world s | Median rAF ms | Ring settled s / content | Evidence |',
     '|---|---|---|---:|---|---:|---:|---:|---|');
@@ -213,7 +219,7 @@ if (priorRef) {
     const pair = (field, scale = 1) => `${range(a, field, scale)} → ${range(b, field, scale)}`;
     const content = group => [...new Set(group.map(row => row.ringContent))].join('; ') || 'unmeasured';
     const context = `${r.mode}/${r.quality} ${r.pose}/${r.arm} ${r.cache}/p${r.page} ${r.plain ? 'plain' : r.review ? 'review' : 'pose'}${r.profiled ? ' profiled' : ''}${r.exceptions ? ' exceptions' : ''}${r.automation ? ' automated' : ''} transfer:${r.transfer}`;
-    comparisons.push({ context, priorRef, finalRef, priorRows: a.length, finalRows: b.length,
+    comparisons.push({ context, priorRef, finalRef: finalRefFor(r.mode), priorRows: a.length, finalRows: b.length,
       priorInvalid: a.filter(row => row.errors).length, finalInvalid: b.filter(row => row.errors).length,
       priorTimingMisses: a.filter(row => row.performanceMisses).length, finalTimingMisses: b.filter(row => row.performanceMisses).length,
       bootTaskMs: pair('bootTaskMs'), bootGapMs: pair('bootGapMs'), worstRafGapMs: pair('worstRafGapMs'),
