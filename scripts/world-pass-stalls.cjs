@@ -64,7 +64,7 @@ fs.mkdirSync(profileRoot, { recursive: true });
 let gitHead = null;
 try { gitHead = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim(); } catch {}
 const report = {
-  tool: 'world-pass-stalls', version: 9, started: new Date().toISOString(), mode, gitHead,
+  tool: 'world-pass-stalls', version: 10, started: new Date().toISOString(), mode, gitHead,
   serverRef: typeof args['server-ref'] === 'string' ? args['server-ref'] : null,
   url: baseUrl.origin, quality, seconds, poses: poseNames, arms, phases, pages,
   profiled: !!args.profile, exceptions: !!args.exceptions, plain: !!args.plain, review: !!args.review, automation: !!args.automation,
@@ -386,6 +386,9 @@ function readEnd() {
     // that stopped scheduling callbacks after the document already arrived.
     timeOrigin: performance.timeOrigin,
     navigation: performance.getEntriesByType('navigation')[0]?.toJSON() ?? null,
+    // The boot screen can paint while the GPU worker is still identifying
+    // the adapter. Preserve that first visible response independently of rAF.
+    paint: Object.fromEntries(performance.getEntriesByType('paint').map(entry => [entry.name, entry.startTime])),
     bootScripts: performance.getEntriesByType('resource')
       .filter(entry => entry.name.startsWith(location.origin + '/_next/') && /\.js(?:\?|$)/.test(entry.name))
       .map(entry => ({ path: new URL(entry.name).pathname, startMs: entry.startTime,
@@ -404,6 +407,7 @@ function readEnd() {
     programCoverage: renderer?.info?.programs?.map(p => ({ key: `${p.type ?? 'program'}${p.name ? ':' + p.name : ''}#${hash(p.cacheKey)}`, composerPrepared: warmKeys.has(p.cacheKey) })) ?? null,
     buildings: buildings.stats, buildingRing: buildings.ring, skyline: skyline.stats, skylineRing: skyline.ring,
     veg: window.__worldStallReadEngine(r?.satVeg).stats,
+    canopy: window.__wpCanopy?.stats ?? null,
     draws: renderer?.info?.render?.calls ?? null, triangles: renderer?.info?.render?.triangles ?? null,
     programs: renderer?.info?.programs?.length ?? null,
     heapMiB: performance.memory ? performance.memory.usedJSHeapSize / 1048576 : null,
