@@ -5,6 +5,7 @@ import { stylizedEarthOn } from '@/lib/fly/stylized-earth';
 
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
+import { WebGLRenderTarget } from 'three';
 import { wrap } from 'comlink';
 import { SatBuildingEngine } from '@/lib/fly/toy-world/sat-building-engine';
 import {
@@ -205,6 +206,7 @@ export function SatBuildingLayer({ runtime, flight }) {
     const arrival = worldPassOn('arrival');
     const poolSize = arrival ? Math.max(1, worldPassConfig('arrival').workers | 0) : 1;
     const live = new Set(); // r2: every worker this mount made (replacements included)
+    let disposeRt = null; // r2: the compile target (arrival only)
     // r2: a building worker on demand (the pool's replacements too): its `error`
     // event (a script that failed to load, an uncaught error) asks the engine to
     // ping it; dispose terminates it.
@@ -219,14 +221,29 @@ export function SatBuildingLayer({ runtime, flight }) {
     for (let i = 1; i < poolSize; i++) extra.push(spawn());
     engine.setWorker(api, extra.length ? extra.map((e) => e.a) : null);
     if (arrival) {
-      // r2 (quantize): compile the decoded building program before its first mesh shows
-      engine.setCompiler((obj) => { const { gl, camera, scene } = getThree(); return gl.compileAsync ? gl.compileAsync(obj, camera, scene) : Promise.resolve(); });
+      // r2 (quantize): compile the decoded building program before its first mesh shows.
+      // Bound to a render target for the (synchronous) compile pass, as prewarm.js does:
+      // the scene is drawn into the composer's buffer, and three keys the program on the
+      // output colour space / tone mapping of the bound target. Compiled against the
+      // canvas, it minted a variant nothing draws and the real one still linked on the
+      // first frame (measured 2.2 to 2.4 s cold, 0e038cea in the census).
+      let rt = null;
+      engine.setCompiler((obj) => {
+        const { gl, camera, scene } = getThree();
+        if (!gl.compileAsync) return Promise.resolve();
+        rt ??= new WebGLRenderTarget(1, 1);
+        const prev = gl.getRenderTarget();
+        gl.setRenderTarget(rt);
+        try { return gl.compileAsync(obj, camera, scene); } finally { gl.setRenderTarget(prev); }
+      });
+      disposeRt = () => rt?.dispose();
       worker.addEventListener('error', () => engine.onWorkerError(api));
       engine.setWorkerSpawner(spawn, [() => worker.terminate(), ...extra.map((e) => e.dispose)]);
     }
     if (process.env.NODE_ENV === 'development') window.__satBuildings = engine; // harness introspection
     return () => {
       engine.dispose();
+      disposeRt?.();
       worker.terminate();
       for (const e of extra) e.w.terminate(); // WORLD PASS B
       for (const w of live) w.terminate(); // r2: replacements too

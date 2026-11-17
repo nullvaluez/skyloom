@@ -31,13 +31,22 @@ function busiest(profile) {
   for (const n of profile.nodes) for (const c of n.children ?? []) parent.set(c, n.id);
   const name = (id) => { const n = nodes.get(id); return `${n.callFrame.functionName || '(anon)'} ${String(n.callFrame.url).split('/').pop()}:${n.callFrame.lineNumber + 1}`; };
   const idle = (id) => /^\((idle|program)\)/.test(nodes.get(id).callFrame.functionName);
-  let best = { len: 0, us: 0, from: 0 }, cur = { len: 0, us: 0, from: 0 };
+  const runs = [];
+  let cur = { len: 0, us: 0, from: 0 };
   const S = profile.samples, D = profile.timeDeltas;
   for (let i = 0; i < S.length; i++) {
-    if (idle(S[i])) { if (cur.us > best.us) best = cur; cur = { len: 0, us: 0, from: i + 1 }; continue; }
+    if (idle(S[i])) { if (cur.len) runs.push(cur); cur = { len: 0, us: 0, from: i + 1 }; continue; }
     cur.len++; cur.us += D[i] ?? 0;
   }
-  if (cur.us > best.us) best = cur;
+  if (cur.len) runs.push(cur);
+  runs.sort((a, b) => b.us - a.us);
+  const one = (best) => stretch(best, S, D, name, parent);
+  const out = one(runs[0] ?? { len: 0, us: 0, from: 0 });
+  out.next = runs.slice(1, 4).map(one).map((s) => ({ ms: s.ms, self: s.self.slice(0, 6), inclusive: s.inclusive.slice(0, 14) }));
+  return out;
+}
+
+function stretch(best, S, D, name, parent) {
   const self = new Map(), incl = new Map();
   for (let i = best.from; i < best.from + best.len; i++) {
     const id = S[i], dt = D[i] ?? 0;
