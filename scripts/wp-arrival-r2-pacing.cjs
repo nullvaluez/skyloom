@@ -64,6 +64,14 @@ async function watch(page, client, pose, label) {
     const W = (window.__pace = { frames: [], last: performance.now(), t0: performance.now(), ground: null, progN: window.__flyStats?.census?.programs?.afterReveal?.length ?? 0 });
     const tick = () => { const t = performance.now(); W.frames.push(t - W.last); W.last = t; if (!W.stop) requestAnimationFrame(tick); };
     requestAnimationFrame(tick);
+    // r2b: World Pass finalize time per animation frame (document.timeline.currentTime is the frame's
+    // key): the building engine's finalize loop (ARRIVAL slices and commits; the shipped per-tile
+    // finalize off) and the skyline engine's (REACH's stand-in groups with REACH on).
+    W.wp = new Map();
+    const wrap = (o, k, tag) => { if (!o || o['__wp' + k]) return; const f = o[k].bind(o); o['__wp' + k] = true;
+      o[k] = (...a) => { const t = performance.now(); try { return f(...a); } finally { const d = performance.now() - t, key = document.timeline.currentTime; const M = window.__pace.wp, e = M.get(key) ?? { b: 0, s: 0 }; e[tag] += d; M.set(key, e); } }; };
+    wrap(window.__fly.satBuildings, '_finalizePending', 'b');
+    wrap(window.__fly.satSkyline, '_finalizePending', 's');
     W.timer = setInterval(() => {
       if (W.ground != null) return;
       const r = window.__fly, g = r.engine.worldToGeo(r.flight.pos), s = r.engine.getGroundAt(g.x, g.y);
@@ -71,7 +79,7 @@ async function watch(page, client, pose, label) {
     }, 100);
   });
   await L.warp(page, pose);
-  await page.evaluate(() => { window.__pace.t0 = performance.now(); window.__pace.frames.length = 0; window.__pace.last = performance.now(); });
+  await page.evaluate(() => { window.__pace.t0 = performance.now(); window.__pace.frames.length = 0; window.__pace.wp.clear(); window.__pace.last = performance.now(); });
   const t0 = Date.now();
   while (Date.now() - t0 < SEC * 1000) {
     await L.sleep(1000);
@@ -88,7 +96,12 @@ async function watch(page, client, pose, label) {
       finPh: eng?._wp?.finPh ? Object.fromEntries(Object.entries(eng._wp.finPh).map(([k, v]) => [k, +v.toFixed(1)])) : null,
       timeouts: s.buildTimeouts ?? null, workersReplaced: s.workersReplaced ?? null, ready: s.ready ?? null,
       finWorst: eng?._wp?.frameWorst ? Object.fromEntries(Object.entries(eng._wp.frameWorst).map(([k, v]) => [k, +(+v).toFixed(1)])) : null, partitionFallbacks: s.partitionFallbacks ?? null,
-      programs: (window.__flyStats?.census?.programs?.afterReveal ?? []).slice(W.progN ?? 0).sort((a, b) => b.ms - a.ms).slice(0, 6) };
+      programs: (window.__flyStats?.census?.programs?.afterReveal ?? []).slice(W.progN ?? 0).sort((a, b) => b.ms - a.ms).slice(0, 6),
+      wpFrames: (() => { const E = [...W.wp.values()]; const r1 = (v) => +v.toFixed(1);
+        return { frames: E.length, buildingMax: r1(Math.max(0, ...E.map((e) => e.b))), skylineMax: r1(Math.max(0, ...E.map((e) => e.s))), sumMax: r1(Math.max(0, ...E.map((e) => e.b + e.s))),
+          bothOver1: E.filter((e) => e.b > 1 && e.s > 1).length, buildingOver4: E.filter((e) => e.b > 4).length, buildingOver8: E.filter((e) => e.b > 8).length, skylineOver8: E.filter((e) => e.s > 8).length,
+          topBuilding: E.map((e) => e.b).sort((a, b) => b - a).slice(0, 5).map(r1), topSkyline: E.map((e) => e.s).sort((a, b) => b - a).slice(0, 5).map(r1) }; })(),
+      share: { wholeGranted: s.wholeGranted ?? null, wholeRefused: s.wholeRefused ?? null, slicesYielded: s.slicesYielded ?? null }, skylineFinalizeMsMax: window.__fly.satSkyline?.stats?.finalizeMsMax ?? null };
   });
   if (client) { const { profile } = await client.send('Profiler.stop'); m.busiest = busiest(profile); }
   console.log(label, JSON.stringify({ ...m, busiest: m.busiest ? { ms: m.busiest.ms, inclusive: m.busiest.inclusive.slice(0, 8) } : undefined }));
