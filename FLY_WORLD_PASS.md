@@ -245,7 +245,14 @@ the `WORKER_PROTOCOL` check), so two flag arms can never mix bundles.
 ### Engine counters
 
 Plain numbers on `window.__fly.satBuildings.stats` and `satSkyline.stats`
-(so `scripts/look-pass-capture.cjs` `telemetry.world` records them):
+(so `scripts/look-pass-capture.cjs` `telemetry.world` records them). The
+layers read `engine.stats` every frame, so the counters are published only
+while `worldPassCounters()` (`lib/fly/world-pass.js`) is true: any stream on,
+the stage-counter diagnostic on, or the `window.__flyWorldPassCounters = true`
+pin, which the capture and budget tools set (it touches no worker). With every
+stream off and no pin, `stats` and the frame loop are the `c2bf5c06` ones (no
+`_wpStats` call, no `_wpTrackRing` walk). An engine reads it once, in
+`setWorker`.
 
 | key | meaning |
 |---|---|

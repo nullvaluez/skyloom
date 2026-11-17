@@ -160,7 +160,7 @@ function pageInstrument() {
     page.on('pageerror', e => { report.errors.push(e.message.slice(0, 400)); });
     await page.addInitScript(() => {
       window.__flyGovPin = 'hold'; window.__flyVisualsOverride = 'enhanced'; window.__flyTitleBypass = true; window.__flyBoostInfinite = true;
-      window.__flySunOverride = Date.parse('2026-09-22T17:00:00Z'); window.__flyWeatherOverride = 'baseline';
+      window.__flySunOverride = Date.parse('2026-09-22T17:00:00Z'); window.__flyWeatherOverride = 'baseline'; window.__flyWorldPassCounters = true; // World Pass W0 arrival counters on engine stats (worldPassCounters)
       try {
         localStorage.setItem('fly-map-style-2', 'satellite'); localStorage.setItem('fly-quality-tier', 'ultra'); localStorage.setItem('fly-controls-seen', '1');
         localStorage.setItem('fly-sound-on', '0'); localStorage.setItem('fly-visuals', 'enhanced');
