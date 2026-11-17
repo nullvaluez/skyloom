@@ -9,6 +9,8 @@ const {departureId,waitForDeparture}=require('./_hangar-pick'); // G2G W0.8: eit
 const OUT=path.resolve('.graphics-review/beta');mkdirSync(OUT,{recursive:true});
 const PORT=Number(process.env.PORT||3094),base=`http://127.0.0.1:${PORT}`;
 const flags=process.env.BETA_FLAGS||'';
+const desktopQuality=process.env.BETA_QUALITY||'high';
+if(!['low','medium','high','ultra'].includes(desktopQuality))throw Error('Invalid BETA_QUALITY');
 const rows=[];
 function check(name,ok,detail){rows.push({name,ok,detail});console.log(`${ok?'PASS':'FAIL'} ${name}${detail?' '+JSON.stringify(detail):''}`);if(!ok)throw Error(name);}
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
@@ -72,12 +74,16 @@ async function ready(){for(let i=0;i<120;i++){try{if((await fetch(base)).ok)retu
   // Exercise the real weather adapter with an observation, rather than the
   // world fixture's intentional {found:false} response. No runtime weather pin.
   await context.route('**/api/weather?**',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({found:true,source:'beta-fixture',cloudCoverPct:70,visM:20000,windMps:5,windDirDeg:90,precip:'none',tempC:20,observedAt:Date.now(),availability:'live'})}));
-  await context.addInitScript(pin=>{window.__flyTileFixture=pin;localStorage.setItem('fly-sound-on','0');localStorage.setItem('fly-quality-tier','low');},fixturePin(fixture.url));
+  await context.addInitScript(({pin,quality})=>{window.__flyTileFixture=pin;localStorage.setItem('fly-sound-on','0');localStorage.setItem('fly-quality-tier',quality);},{pin:fixturePin(fixture.url),quality:desktopQuality});
   page=await context.newPage();const errors=[];page.setDefaultTimeout(90000);page.on('pageerror',e=>errors.push(e.message));
   // Review exposes the existing diagnostic handles. No feature, world-style,
   // title-bypass or quality-governor pins are applied.
   await page.goto(base+'/?graphicsReview=1'+(flags?'&flags='+encodeURIComponent(flags):''),{waitUntil:'domcontentloaded'});
   await page.getByTestId('title-screen').waitFor({timeout:60000});
+  const world=await page.evaluate(()=>window.__flyStats?.worldPass);
+  const worldAllowed=['high','ultra'].includes(desktopQuality);
+  const worldStreams=['truth','arrival','reach','look','ground'];
+  check('desktop smoke exercises the selected World Pass tier',world?.state?.allowed===worldAllowed&&worldStreams.every(stream=>world?.request?.[stream]?.on===(worldAllowed&&!flags.split(',').includes('-WORLD_'+stream.toUpperCase()))),{quality:desktopQuality,key:world?.state?.key});
   renderer=await page.evaluate(()=>{const g=document.createElement('canvas').getContext('webgl2');const e=g?.getExtension('WEBGL_debug_renderer_info');const name=e?g.getParameter(e.UNMASKED_RENDERER_WEBGL):'unknown';g?.getExtension('WEBGL_lose_context')?.loseContext();return name;});
   console.log('Renderer',renderer);
   software=process.env.BETA_TRUSTED_INPUT!=='1'&&/SwiftShader|llvmpipe|softpipe|Software/i.test(renderer);console.log('Input',software?'DOM presses (software GL)':'trusted');
