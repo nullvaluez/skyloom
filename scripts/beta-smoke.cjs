@@ -10,6 +10,9 @@ const OUT=path.resolve('.graphics-review/beta');mkdirSync(OUT,{recursive:true});
 const PORT=Number(process.env.PORT||3094),base=`http://127.0.0.1:${PORT}`;
 const flags=process.env.BETA_FLAGS||'';
 const desktopQuality=process.env.BETA_QUALITY||'high';
+// Keep bundled Chromium as the CI default; local runs can select installed
+// Chrome with the same PLAYWRIGHT_CHANNEL override as the World Pass tools.
+const browserChannel=process.env.PLAYWRIGHT_CHANNEL;
 if(!['low','medium','high','ultra'].includes(desktopQuality))throw Error('Invalid BETA_QUALITY');
 const rows=[];
 function check(name,ok,detail){rows.push({name,ok,detail});console.log(`${ok?'PASS':'FAIL'} ${name}${detail?' '+JSON.stringify(detail):''}`);if(!ok)throw Error(name);}
@@ -68,7 +71,7 @@ async function ready(){for(let i=0;i<120;i++){try{if((await fetch(base)).ok)retu
  try{
   if(!process.env.BETA_EXTERNAL_SERVER){server=spawn(process.execPath,['node_modules/next/dist/bin/next','start','-p',String(PORT)],{env:{...process.env,FLY_BUILD_DIR:'.next-explorer',NEXT_TELEMETRY_DISABLED:'1'},stdio:['ignore','pipe','pipe'],windowsHide:true});server.stdout.on('data',b=>{log+=b;});server.stderr.on('data',b=>{log+=b;});}
   await ready();
-  browser=await chromium.launch({args:[...(process.env.BETA_SOFTWARE==='1'?['--use-angle=swiftshader']:process.platform==='win32'?['--use-angle=d3d11']:[]),'--enable-unsafe-swiftshader','--ignore-gpu-blocklist']});
+  browser=await chromium.launch({...(browserChannel?{channel:browserChannel}:{}),args:[...(process.env.BETA_SOFTWARE==='1'?['--use-angle=swiftshader']:process.platform==='win32'?['--use-angle=d3d11']:[]),'--enable-unsafe-swiftshader','--ignore-gpu-blocklist']});
   const context=await browser.newContext({viewport:{width:1440,height:900},acceptDownloads:true});
   fixture=await attachFixture(context);
   // Exercise the real weather adapter with an observation, rather than the
