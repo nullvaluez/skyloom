@@ -256,15 +256,24 @@ function installMonitor({ durationMs }) {
   const sample = () => {
     const r = window.__fly, state = window.__flyStore?.getState?.();
     const t = at();
-    const veg = r?.satVeg;
-    const pendingKeys = new Set(veg?.pendingSample?.map((p) => p.key) ?? []);
-    const orphanSamplingKeys = [];
-    for (const chunk of veg?.chunks?.values?.() ?? []) if (chunk.state === 'sampling' && !pendingKeys.has(chunk.key)) orphanSamplingKeys.push(chunk.key);
+    // runtime.satVeg is a read-only placement bus. Only the dev handle exposes
+    // the resident jobs. A missing handle cannot establish zero orphan jobs.
+    const veg = window.__satVeg?.engine;
+    let vegJobs = null;
+    if (veg?.chunks && Array.isArray(veg.pendingSample)) {
+      const pending = new Set(veg.pendingSample.map(job => job.chunk));
+      const samplingKeys = [], orphanSamplingKeys = [];
+      for (const chunk of veg.chunks.values()) if (chunk.state === 'sampling') {
+        samplingKeys.push(chunk.key);
+        if (!pending.has(chunk)) orphanSamplingKeys.push(chunk.key);
+      }
+      vegJobs = { parked: !!veg._parked, pendingSample: pending.size, samplingKeys, orphanSamplingKeys };
+    }
     if (m.warpMs != null && m.fullRingObservedMs == null && r?.satBuildings?.stats?.fullRingSec >= 0) m.fullRingObservedMs = t;
     if (t <= durationMs) m.samples.push({ atMs: t, visibility: document.visibilityState, focused: document.hasFocus(), boot: window.__flyBoot ?? null, framesRendered: r?.framesRendered ?? null,
       preset: state?.qualityPreset ?? null, tier: state?.qualityTier ?? null,
       buildings: numeric(r?.satBuildings?.stats), skyline: numeric(r?.satSkyline?.stats), veg: numeric(r?.satVeg?.stats),
-      vegJobs: { parked: veg?._parked ?? null, pendingSample: veg?.pendingSample?.length ?? null, orphanSamplingKeys },
+      vegJobs,
       readiness: readiness(),
       worldLoading: r?.worldLoading ?? null, sharp: r?.terraStats?.sharp ?? null });
     if (t <= durationMs) setTimeout(sample, 1000);
