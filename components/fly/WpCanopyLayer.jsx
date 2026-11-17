@@ -44,6 +44,9 @@ import { SAT_SHADOWS, SAT_VEG, SETTLE_CALM } from '@/lib/fly/fly-constants';
 import { immersiveOn } from '@/lib/fly/immersive';
 import { mercatorScale } from '@/lib/fly/coords';
 import { eyeAglVis } from '@/lib/fly/ground-vis';
+import { groundArrivalHeld } from '@/lib/fly/ground-arrival';
+
+const PHOTO_ACTIVE = 3; // photo looks in flight at once (1 during the arrival hold)
 
 const smooth = (a, b, v) => {
   const t = Math.min(1, Math.max(0, (v - a) / Math.max(1e-6, b - a)));
@@ -132,7 +135,7 @@ export function WpCanopyLayer({ engine, runtime, flight, tier }) {
     return { cfg, t, tc: cfg[t] };
   }, []);
   const { cfg, tc } = setup;
-  const photo = useMemo(() => new CanopyPhoto(() => runtime.engine?.imagerySource, { zoom: cfg.photoZoom, leafRatio: cfg.leafRatio }), [runtime, cfg]);
+  const photo = useMemo(() => new CanopyPhoto(() => runtime.engine?.imagerySource, { zoom: cfg.photoZoom, leafRatio: cfg.leafRatio, maxActive: PHOTO_ACTIVE }), [runtime, cfg]);
   const meshes = useMemo(() => {
     const material = createCinematicTreeMaterial(applyBendAnchor);
     const depth = createCinematicTreeMaterial(applyBendAnchor, { depth: true });
@@ -204,6 +207,12 @@ export function WpCanopyLayer({ engine, runtime, flight, tier }) {
     const t = clock.elapsedTime;
     const s = st.current;
     const { near, far } = meshes;
+    // The arrival hold: one photo look at a time, no exact re-samples, no
+    // re-grids and no ring growth until the buildings have arrived.
+    const held = groundArrivalHeld(runtime, t);
+    engine.setArrivalHold(held);
+    photo.setMaxActive(held ? 1 : PHOTO_ACTIVE);
+    s.stats.held = held;
     const k = mercatorScale(flight.latDeg ?? 0);
     s.contacts.radius2 = engine.nearSupport.active ? (NEAR_SUPPORT.radiusM * k) ** 2 : 0;
     s.contacts.offset = -cfg.sinkM;
@@ -237,7 +246,7 @@ export function WpCanopyLayer({ engine, runtime, flight, tier }) {
         s.stats.looks = ready.length;
       }
     }
-    sampleExact(s, near, runtime, cfg.sinkM, t);
+    if (!held) sampleExact(s, near, runtime, cfg.sinkM, t);
     updateNearContactMatrices(near, s.contacts, engine.nearSupport);
   }, -45);
 

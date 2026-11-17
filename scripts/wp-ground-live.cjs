@@ -70,7 +70,8 @@ process.on('SIGINT', () => { releaseSlot(); process.exit(130); });
   try {
     const p = await browser.newPage({ viewport: report.viewport, deviceScaleFactor: 1 });
     p.on('pageerror', (e) => { report.errors.push(e.message.slice(0, 300)); save(); });
-    await p.addInitScript(({ quality, sun }) => {
+    await p.addInitScript(({ quality, sun, pin }) => {
+      if (pin) window.__flyWorldGroundOverride = pin;
       window.__flyGovPin = 'hold'; window.__flyVisualsOverride = 'enhanced'; window.__flyTitleBypass = true; window.__flyBoostInfinite = true;
       window.__flySunOverride = sun; window.__flyWeatherOverride = 'baseline';
       try {
@@ -78,7 +79,7 @@ process.on('SIGINT', () => { releaseSlot(); process.exit(130); });
         localStorage.setItem('fly-sound-on', '0'); localStorage.setItem('fly-visuals', 'enhanced');
         localStorage.setItem('fly-explorer-preferences-v1', JSON.stringify({ version: 1, settings: { tutorial: 'done' } }));
       } catch {}
-    }, { quality, sun: noonOf(POSES[poses[0]]) });
+    }, { quality, sun: noonOf(POSES[poses[0]]), pin: typeof args.pin === 'string' ? JSON.parse(args.pin) : null });
     await p.route('**/api/aircraft?**', (r) => r.fulfill({ json: { ac: [], now: Date.now(), total: 0, source: 'world pass budget' } }));
     await p.route('**/api/weather**', (r) => r.fulfill({ json: { found: false } }));
     const t0Boot = Date.now();
@@ -148,13 +149,15 @@ process.on('SIGINT', () => { releaseSlot(); process.exit(130); });
         const contact = { n: 0, buriedOver1m: 0, floatingOver1m: 0, maxBuried: 0, maxFloat: 0, samples: [] };
         const cm = wp?.meshes.near;
         if (cm) { const a = cm.instanceMatrix.array, step = Math.max(1, Math.floor(cm.count / 400)); for (let i = 0; i < cm.count; i += step) { const wx = cm.position.x + a[i * 16 + 12], wz = cm.position.z + a[i * 16 + 14], base = a[i * 16 + 13]; const [lon, lat] = toGeo(wx, wz); const g = r.engine.getGroundAt(lon, lat); if (!g || !Number.isFinite(g.elev)) continue; const d = base - g.elev; contact.n++; if (d < -1) contact.buriedOver1m++; if (d > 1) contact.floatingOver1m++; contact.maxBuried = Math.max(contact.maxBuried, -d); contact.maxFloat = Math.max(contact.maxFloat, d); if (contact.samples.length < 8) contact.samples.push({ d: +d.toFixed(2), sxz: +Math.hypot(a[i * 16], a[i * 16 + 2]).toFixed(2), sy: +a[i * 16 + 5].toFixed(2), dist: +Math.hypot(wx - px, wz - pz).toFixed(0), tileZ: g.tileZ }); } }
-        return { contact, anchor: r.origin?.anchor ?? null, draws: gl.info.render.calls, triangles: gl.info.render.triangles, layers, wpStats: wp?.stats ?? null, forest: r.earthSurface?.forest?.stats ?? null, player: [px, pz], lat: f.latDeg, trees, veg: r.satVeg?.stats ? Object.fromEntries(Object.entries(r.satVeg.stats).filter(([, v]) => typeof v !== 'object')) : null };
+        const wb = window.__wpBridges; if (wb?.mesh?.visible) { const g = wb.mesh.geometry; layers["wp-bridges"] = { meshes: 1, instances: 1, triangles: g.index ? g.index.count / 3 : 0, bytes: Object.values(g.attributes).reduce((s, a) => s + a.array.byteLength, 0) + (g.index?.array.byteLength ?? 0) }; }
+        const parcel = r.parcelSettle ? { ...r.parcelSettle } : null; const parcelDev = window.__flyStats?.parcelHomes ? Object.fromEntries(Object.entries(window.__flyStats.parcelHomes).filter(([, v]) => typeof v !== "object")) : null;
+        return { parcel, parcelDev, bridges: wb ? (({ heights, ...rest }) => ({ ...rest, heightP50: heights.length ? [...heights].sort((a, b) => a - b)[heights.length >> 1] : null, heightMax: heights.length ? Math.max(...heights) : null, heightHist: heights.reduce((h, v) => { const k = v < 3 ? "<3" : v < 8 ? "3-8" : v < 15 ? "8-15" : v < 30 ? "15-30" : "30+"; h[k] = (h[k] || 0) + 1; return h; }, {}) }))(wb.stats) : null, contact, arrival: { firstTileSec: r.satBuildings?.stats?.firstTileSec ?? null, fullRingSec: r.satBuildings?.stats?.fullRingSec ?? null, nonFiniteRestarts: r.satBuildings?.stats?.drapeNonFiniteRestarts ?? null }, anchor: r.origin?.anchor ?? null, draws: gl.info.render.calls, triangles: gl.info.render.triangles, layers, wpStats: wp?.stats ?? null, forest: r.earthSurface?.forest?.stats ?? null, player: [px, pz], lat: f.latDeg, trees, veg: r.satVeg?.stats ? Object.fromEntries(Object.entries(r.satVeg.stats).filter(([, v]) => typeof v !== 'object')) : null };
       });
       const dumpFile = path.join(out, `${name}.dump.json`);
       fs.writeFileSync(dumpFile, JSON.stringify({ player: m.player, lat0: m.lat, trees: m.trees }));
       delete m.trees;
       report.poses.push({ pose: name, settled, settleMs, ...m }); save();
-      console.log(name, JSON.stringify({ contact: m.contact, draws: m.draws, tris: m.triangles, layers: m.layers, wp: m.wpStats, forest: m.forest && { patches: m.forest.patches, draws: m.forest.draws, triangles: m.forest.triangles, replacedBy: m.forest.replacedBy } }));
+      console.log(name, JSON.stringify({ settleMs, arrival: m.arrival, parcel: m.parcel, parcelDev: m.parcelDev, bridges: m.bridges, contact: m.contact, draws: m.draws, tris: m.triangles, layers: m.layers, wp: m.wpStats, forest: m.forest && { patches: m.forest.patches, draws: m.forest.draws, triangles: m.forest.triangles, replacedBy: m.forest.replacedBy } }));
     }
   } catch (e) { report.errors.push('fatal ' + e.message); console.error(e); }
   finally { save(); await browser.close(); releaseSlot(); console.log('DONE', out); }
