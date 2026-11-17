@@ -583,3 +583,383 @@ None edited. Uses stream B's exported `beginGroundBatch` / `endGroundBatch`
   5080 motion check.
 - The worker pool is three skyline workers on top of ARRIVAL's two building
   workers; CPU contention on a smaller desktop is unmeasured.
+
+## Round 2b (the verifier's three blocking items)
+
+2026-11-17, implementer, second fix round. The verifier's round-2 verdict
+named three blocking items: arrival with `WORLD_REACH` alone, arrival with all
+four flags, and the street pattern at 1,500 m. This section covers only those
+three, plus what their fixes had to touch. Everything in "Round 2" that passed
+was left as it was.
+
+- `WORLD_REACH` still ships `enabled:false`.
+- The worker never reads a flag.
+- With the stream off the engine constructs nothing new and runs nothing new
+  per frame. The photo store, its worker, the atlas and the gate exist only
+  while `_reach` is latched on.
+
+Venue: this machine's RTX 5080, installed Chrome, D3D11, dev server :3323 on
+this worktree, Ultra, 1600 x 900, noon + 2 h, the live world. Other streams
+were capturing the whole time (GPU slot waits of 3 to 6 minutes). So every
+arrival number below comes from same-session interleaved runs, and every
+control frame was shot in the same session from the same server. Frames and
+JSON are in `.graphics-review/world-pass/r2/reach/r2b/` in the main checkout:
+- `final-control/` and `final-control2/` (flags off, shot twice, for the noise
+  ceiling);
+- `final-reach/` (`WORLD_REACH`) and `final-all4/` (all four flags);
+- `final-*-4arm.jpg` crops (control / round 2 / REACH / four flags);
+- `arrival2/`, `arrival3/`, `budget/`, `motion/`;
+- `it1`..`it7` (the iteration frames) and `arrival-early/`, `arrival-h/` (the
+  diagnosis; each has a README).
+
+### B1. Arrival with WORLD_REACH alone
+
+Finding (verifier): with REACH alone, every warm pair was later than the old
+world: far first group +0.1 to +3.4 s, far full ring +0.4 to +4.5 s, near
+ring full ring +1.6 to +11.2 s.
+
+Causes, measured one at a time:
+1. **Network share.** Round 2 gave the three-worker pool three times the
+   shipped in-flight cap (24 OpenFreeMap tiles in flight against the old
+   mass's 8), so the far ring took bandwidth from the near ring. Fix: the pool
+   keeps the shipped cap (`CITY_HORIZON` `concurrent`, 8), so it adds CPU and
+   no network share. After that alone, the near ring was level with the old
+   world (`arrival-early/` runs 1 to 3: near full ring within -1.2 to +0.7 s
+   at the warm poses).
+2. **The photo on the build path.** Every tile build fetched and awaited its
+   ground photo (up to 1.5 s) after its own vector tile. The round-2 budget
+   probe summed 35,951 ms of `photoWaitMs` over one nyc-bay ring. Each of the
+   three workers also fetched and decoded the same photo with its own latch.
+   - A first fix (fetch on the main thread when a group enters the ring,
+     never awaited) still competed for the network. paris-mid far full ring
+     15.6 s against 11.1 s (`arrival-early` 2-reach / 1-off).
+   - The same build with photos off: far full ring -0.5 / -3.5 / -1.2 s
+     against flags off (`arrival-h`, one pair).
+3. **Photos beside the arriving world.** With photos loaded only while the far
+   ring was idle (`arrival2`), London's near ring was still later in 2 of 3
+   pairs (+3.3 and +4.8 s), while photos loaded beside it.
+
+What changed:
+- **No photo on any build path.** The worker no longer fetches. A main-thread
+  store (`lib/fly/toy-world/sat-stand-in-photo.js`) with its own small worker
+  (`sat-stand-in-photo.worker.js`) does the fetch, decode and de-lighting.
+  Photos load only when:
+  - the far ring is idle (nothing queued, in flight or waiting to finalize);
+  - the near buildings and the terrain have settled (`setPhotoGate`, from
+    SatSkylineLayer);
+  - one group at a time, nearest first, at low fetch priority.
+- **Fade in.** A photo that lands fades in over `photo.fadeSec` 2.5 s, through
+  a per-slot weight (`uStandInPhotoK`). The per-building colour it was born
+  with is kept, so nothing pops. A group that comes back with its photo cached
+  is born with it.
+- **One page-wide store.** This replaces round 2's per-worker latch, which let
+  a rebuilt tile change colour, and the unbounded `PHOTO_LATCH`. The store is
+  an LRU of `maxCached` 40 decoded photos.
+- **Main-thread cost:** at most 0.3 ms per photo (one `data.set` into the
+  atlas layer). The first version decoded on the main thread at 19 ms (z12)
+  and 208 ms (z13), so decoding moved to the worker.
+- Esri requests are still about 4 per group, 2 x 2 z13 tiles for the street
+  pattern below (B3). They now come after the world has settled, not during
+  arrival.
+
+Measured, `arrival2`: the code before the gate, interleaved off / reach / all4
+/ reach / off / all4 / all4 / off / reach. Per pose: seconds from the warp,
+three runs per arm.
+
+| pose | metric | off | REACH | four flags |
+|---|---|---|---|---|
+| nyc-low | far first | 24.3 / 7.7 / 32.4 (med 24.3) | 28.4 / 7.5 / 25.8 (med 25.8) | 7.7 / 7.5 / 8.7 (med 7.7) |
+| nyc-low | far full | 28.8 / 25 / 39.6 (med 28.8) | 39.5 / 25.3 / 35.8 (med 35.8) | 25.7 / 26.7 / 25.8 (med 25.8) |
+| nyc-low | near first | 29 / 25.1 / 38.7 (med 29) | 39.2 / 22.4 / 32.1 (med 32.1) | 24.2 / 23.8 / 24.5 (med 24.2) |
+| nyc-low | near full | 41.8 / 39.9 / 60.8 (med 41.8) | 59.7 / 36.1 / 55.2 (med 55.2) | 25.4 / 25 / 25.4 (med 25.4) |
+| paris-mid | far first | 4.4 / 5.2 / 4 (med 4.4) | 4.3 / 4.1 / 4.4 (med 4.3) | 4.1 / 4.5 / 4.6 (med 4.5) |
+| paris-mid | far full | 10.4 / 13.9 / 13 (med 13) | 10.6 / 9.4 / 12.1 (med 10.6) | 8.7 / 10.4 / 10 (med 10) |
+| paris-mid | near first | 7.2 / 9.3 / 8.6 (med 8.6) | 6.8 / 5.8 / 7.6 (med 6.8) | 4.3 / 4.6 / 4.8 (med 4.6) |
+| paris-mid | near full | 20.9 / 28.5 / 31.5 (med 28.5) | 22.2 / 20.1 / 27 (med 22.2) | 11 / 11.8 / 13.1 (med 11.8) |
+| nyc-bay | far first | 3.4 / 2.7 / 3.2 (med 3.2) | 3 / 2.7 / 2.9 (med 2.9) | 2.7 / 1.7 / 2.7 (med 2.7) |
+| nyc-bay | far full | 11.5 / 10.1 / 11.2 (med 11.2) | 9.2 / 10.5 / 9.8 (med 9.8) | 8.3 / 6.6 / 6.7 (med 6.7) |
+| nyc-bay | near first | 4.1 / 3.9 / 3.8 (med 3.9) | 4.3 / 3.7 / 3.8 (med 3.8) | 2.6 / 1.9 / 2.7 (med 2.6) |
+| nyc-bay | near full | 16.4 / 16.4 / 18.9 (med 16.4) | 15.1 / 15.7 / 17 (med 15.7) | 7.6 / 5.5 / 5.2 (med 5.5) |
+| london | far first | 3.1 / 2.8 / 3.6 (med 3.1) | 3.7 / 3.5 / 3 (med 3.5) | 3.1 / 4.1 / 3.4 (med 3.4) |
+| london | far full | 9.4 / 8.8 / 9.8 (med 9.4) | 10.6 / 9.1 / 9.8 (med 9.8) | 6.1 / 8.4 / 6.6 (med 6.6) |
+| london | near first | 5.9 / 5.4 / 5.5 (med 5.5) | 6.6 / 6.5 / 4.6 (med 6.5) | 3.1 / 4.1 / 3.4 (med 3.4) |
+| london | near full | 16.7 / 15.3 / 19.7 (med 16.7) | 20 / 15.8 / 24.5 (med 20) | 7.2 / 9.8 / 8.6 (med 8.6) |
+
+The REACH column of `arrival2` is the code without the settle gate.
+`arrival3` is the shipped code, interleaved off / reach / off / reach / all4 /
+off / reach:
+
+| pose | metric | off | REACH | four flags |
+|---|---|---|---|---|
+| nyc-low | far first | 26.6 / 27.9 / 30.8 (med 27.9) | 31.1 / 27.6 / 25.9 (med 27.6) | 7.7 |
+| nyc-low | far full | 33.6 / 35.3 / 37.1 (med 35.3) | 41.2 / 36.9 / 35.3 (med 36.9) | 23.9 |
+| nyc-low | near first | 27.5 / 29.3 / 35 (med 29.3) | 37.6 / 37.6 / 34.8 (med 37.6) | 21.5 |
+| nyc-low | near full | 56.1 / 57.6 / 54.2 (med 56.1) | 65.4 / 59 / 54.6 (med 59) | 22.5 |
+| paris-mid | far first | 4.2 / 4.5 / 3.2 (med 4.2) | 4.7 / 3.9 / 4.5 (med 4.5) | 4.5 |
+| paris-mid | far full | 14.6 / 14.4 / 10.9 (med 14.4) | 14.7 / 13.3 / 12.6 (med 13.3) | 9.7 |
+| paris-mid | near first | 7.8 / 8.3 / 6.2 (med 7.8) | 9.6 / 9.6 / 9.4 (med 9.6) | 4.4 |
+| paris-mid | near full | 31.7 / 34.1 / 23.2 (med 31.7) | 32.9 / 32.9 / 26.5 (med 32.9) | 11.3 |
+| nyc-bay | far first | 3.2 / 3.1 / 2.9 (med 3.1) | 4.1 / 2.9 / 2.8 (med 2.9) | 2 |
+| nyc-bay | far full | 13.1 / 12.3 / 11.4 (med 12.3) | 12.3 / 10.4 / 10.3 (med 10.4) | 7 |
+| nyc-bay | near first | 4.3 / 3.8 / 4.3 (med 4.3) | 4.3 / 3.5 / 3.7 (med 3.7) | 2 |
+| nyc-bay | near full | 22.1 / 19.1 / 19.2 (med 19.2) | 21.1 / 18.6 / 19.1 (med 19.1) | 5.7 |
+| london | far first | 3.7 / 4.1 / 3 (med 3.7) | 3.4 / 5 / 3.3 (med 3.4) | 2.7 |
+| london | far full | 12.2 / 13.8 / 10.4 (med 12.2) | 12.9 / 12 / 11 (med 12) | 7.1 |
+| london | near first | 8 / 6.7 / 5.7 (med 6.7) | 6 / 7.4 / 7.5 (med 7.4) | 2.7 |
+| london | near full | 24.6 / 24.5 / 20.1 (med 24.5) | 22.9 / 22.1 / 25.7 (med 22.9) | 8.9 |
+
+How to read it:
+- `arrival3` ran on a much busier machine than `arrival2`: paris-mid's off
+  near full ring was 23 to 34 s, against 21 to 32 s.
+- Its 6-off run was the fastest off run of the session (paris near full 23.2
+  against 31.7 / 34.1), so the pairs against it lean late.
+
+Result, medians, REACH against off:
+- Far first group, warm poses:
+  - `arrival3`: paris 4.5 vs 4.2, nyc-bay 2.9 vs 3.1, london 3.4 vs 3.7;
+  - `arrival2`: paris 4.3 vs 4.4, nyc-bay 2.9 vs 3.2, london 3.5 vs 3.1.
+- Far full ring, warm poses:
+  - `arrival3`: 13.3 vs 14.4, 10.4 vs 12.3, 12.0 vs 12.2;
+  - `arrival2`: 10.6 vs 13.0, 9.8 vs 11.2, 9.8 vs 9.4.
+- Near ring full ring:
+  - `arrival3`: paris 32.9 vs 31.7, nyc-bay 19.1 vs 19.2, london 22.9 vs
+    24.5;
+  - `arrival2` (no gate): 22.2 vs 28.5, 15.7 vs 16.4, 20.0 vs 16.7.
+
+Still later:
+- Near ring FIRST tile at paris-mid in `arrival3`: 9.6 / 9.6 / 9.4 against
+  7.8 / 8.3 / 6.2. In `arrival2` it was earlier: 6.8 / 5.8 / 7.6 against
+  7.2 / 9.3 / 8.6.
+- So under heavy CPU load the stand-in builds, which cost about 1.4 x the old
+  mass's worker time (`--time`: reach 769 to 938 ms against 549 to 654 ms
+  over the 20 recorded tiles), slow the single near-ring building worker.
+- Adjacent pairs later by more than 0.5 s: 28 of 72 warm metrics in
+  `arrival3` (listed in `arrival3-summary.txt`). Most are against the fast
+  6-off run, and most are near-ring metrics.
+- "No later than the old world" therefore holds at the median for the far ring
+  at every warm pose in both sessions, except paris far first +0.3 s
+  (`arrival3`) and london +0.4 s (`arrival2`), both inside the off arm's
+  own spread. It is NOT shown for the near ring's first tile under load.
+
+Cold nyc-low (first pose after boot) is bimodal in every arm:
+- off far first group 24.3 / 7.7 / 32.4 s;
+- verifier off runs 7.3 to 27.4 s.
+In the bad mode the whole world is late, near ring included. One run per arm
+cannot separate a difference there, so it is reported and not claimed.
+
+### B2. Arrival with all four flags
+
+Finding (verifier): with all four flags the full ring was earlier at warm
+poses, but the first group was later by 0.1 to 0.9 s in most warm pairs. Cold
+nyc-low was later in 3 of 4 pairs.
+
+The B1 changes apply unchanged with all four flags on:
+- the photo is off the build path;
+- the pool keeps the shipped in-flight cap.
+
+`arrival2` four-flag arm, three runs:
+- Far first group, warm poses:
+  - paris-mid 4.1 / 4.5 / 4.6 against off 4.4 / 5.2 / 4.0;
+  - nyc-bay 2.7 / 1.7 / 2.7 against 3.4 / 2.7 / 3.2;
+  - london 3.1 / 4.1 / 3.4 against 3.1 / 2.8 / 3.6.
+- Far full ring is earlier at every warm pose (medians: paris 10.0 against
+  13.0, nyc-bay 6.7 against 11.2, london 6.6 against 9.4).
+- Near full ring is earlier everywhere (stream B's work).
+- Adjacent pairs later by more than 0.5 s: 2 of 27 warm metrics.
+  - London far first +1.3 s (6-all4 / 5-off).
+  - Paris far first +0.6 s (7-all4 / 8-off).
+- Cold nyc-low far first group 7.7 / 7.5 / 8.7 against off 24.3 / 7.7 /
+  32.4 s, so no later in any run.
+- First content is no later at the median at every pose but London (+0.3 s
+  median, inside the 0.3 to 0.8 s spread of the off runs alone).
+
+`arrival3` four-flag run (one, on the loaded machine):
+- far first group / full ring: paris 4.5 / 9.7, nyc-bay 2.0 / 7.0, london
+  2.7 / 7.1;
+- off medians: paris 4.2 / 14.4, nyc-bay 3.1 / 12.3, london 3.7 / 12.2;
+- cold nyc-low: 7.7 / 23.9 against off 27.9 / 35.3.
+
+### B3. Street pattern at 1,500 m
+
+Finding (verifier): beyond the near ring, Paris's boulevards and Manhattan's
+avenue grid disappear into a uniform granular fabric. The control shows both.
+
+What it was, measured in node (`scripts/wp-reach-node-bench.mjs --streets`,
+recorded tiles, 5 x 5 samples per box):
+- Boxes covered almost none of the street: 0.33 % of box samples sat on an
+  OpenFreeMap street corridor.
+- The fabric was not spill. It was the picture:
+  - every 2 to 10 px box drew a lit roof and two walls of similar tone in its
+    palette colour;
+  - the 1.5 m inset opened a fake street between every pair of parcels in a
+    block, so the block hierarchy was gone;
+  - at a 15 to 25 degree look-down, walls are about five times the screen
+    area of roofs.
+- The control reads its streets from the flat photograph.
+
+What changed:
+- **The photograph per fragment.** Each resident group's photo goes into a
+  GPU array texture (`createPhotoAtlas`: 40 layers of 512 x 512 sRGB, 40 MiB
+  of texture, not geometry). The photo is the group tile's 2 x 2 z13 children,
+  about 12 m a pixel in Paris; z12 at 25 m a pixel was tried first (`it4`) and
+  the boulevards stayed faint.
+  - The stand-in vertex shader finds where the view ray through each vertex
+    meets that building's ground. The fragment takes the photo there, the
+    picture the flat ground would show.
+  - Below `photoFullH` 45 m (none above `photoZeroH` 90 m), and from
+    `fromM` 1,200 to `toM` 4,500 m, the albedo is pulled to that colour (roofs
+    0.9, walls 0.85).
+  - The stand-in is lit like the ground (normal toward up, by `photoFlat`
+    0.8), so the photo's streets, trees and boulevards read through the boxes.
+  - Towers keep their own walls and colour, and the silhouettes and heights
+    are unchanged.
+  - Program key `|wp-reach-standin-v3`. It still compiles once.
+- **Blocks read as blocks.** `insetM` 0 and `sliverM` 0, so party walls touch
+  again. In their place, a street-corridor rule in the worker (`streetRaster`,
+  512 cells a tile, class half-widths 4 to 12 m, narrower than the street
+  between facades) shrinks a box that crosses a corridor about its centre,
+  never below 0.55, never dropping it. Boxes sit on the footprint's area
+  centroid (`centroid` 1).
+  - Node, 33,217 stand-ins: spill outside the own footprint 10.29 % -> 7.27 %.
+  - On-street samples 0.57 % -> 0.14 %. This second number is low partly by
+    construction, since the rule tests the same raster.
+  - No stand-in is dropped by the rule (the count is identical).
+- **Wall and look terms** (`farLook`): `fromM` 1500 -> 1200, `toM` 7000 ->
+  4500, `wallGain` 0.75 -> 0.55, `roofGain` 0.85 -> 1, `canyon` 0.45 -> 0.35 at
+  `canyonFrac` 0.85. The canyon and the darker walls now apply only where the
+  stand-in is not flattened.
+
+Measured:
+- Street-pattern score (`scripts/wp-reach-structure.cjs`): Pearson
+  correlation of band-passed luma (box blur r1 1 minus r2 6) against the
+  same-session control, over the ground left and right of the aircraft
+  (x 0-660 and 940-1600, y 480-760).
+- The noise ceiling is a second control shot later in the same session:
+  0.966 to 0.996.
+
+| pose | control2 | REACH | four flags |
+|---|---|---|---|
+| nyc-mid | 0.989 / 0.977 | 0.635 / 0.764 | 0.642 / 0.570 |
+| paris-mid | 0.995 / 0.989 | 0.669 / 0.713 | 0.593 / 0.545 |
+| tokyo-mid | 0.971 / 0.967 | 0.873 / 0.844 | 0.584 / 0.563 |
+| phoenix-mid | 0.996 / 0.988 | 0.959 / 0.960 | 0.274 / 0.429 |
+| nyc-bay | 0.990 / 0.992 | 0.819 / 0.951 | 0.624 / 0.523 |
+
+Before and after against a same-session control (`ctl1`, rect
+300-1300 x 540-720):
+- Round-2 look (`it1`): Paris 0.490, Manhattan 0.609.
+- Shipped look (`it7`): Paris 0.740, Manhattan 0.745.
+- Left rect (0-600 x 470-700): Paris 0.225 -> 0.510.
+
+The four-flag column cannot isolate this stream: the rectangle includes the
+near ring, which streams A, B and D change, so it falls even where the far
+ring is untouched (phoenix-mid).
+
+Crops:
+- `final-paris-far-4arm.jpg` and `final-nyc-far-4arm.jpg` (rows: control /
+  round 2 / REACH / four flags).
+- The boulevards beyond the Seine and Manhattan's avenues and cross streets
+  are lines again in the REACH row.
+- Paris with four flags is paler and the boulevards fainter: LOOK's far colour
+  and stream A's heights act on the same stand-ins, and the combined look of
+  the two distance terms (REACH's and LOOK's `photoPull` / `desat`) is still
+  the integrator's (round-2 note).
+
+Far-band colour (`wp-reach-colour-stats.cjs`, x 500-1100, y 470-560,
+same-session control):
+- Luma within 2 of the control at 6 of 9 poses for REACH. tokyo-mid -3.7,
+  tokyo-bay -6.2, phoenix-mid -5.6.
+- Chroma within 4.3, except tokyo-bay (+6.9).
+- Confetti (chf) 3.3 / 3.7 / 3.8 against 3.3 / 3.6 / 2.6 (nyc-mid / nyc-bay /
+  paris-mid).
+
+### Not regressed (re-measured at `df3915bf`, four flags, Ultra)
+
+- **Triangle cap, all passes** (`budget/`, `wp-reach-verify-budget.cjs`,
+  20 s dwell). Max frame against the 1.5 M cap:
+
+  | pose | max frame | minPx |
+  |---|---|---|
+  | nyc-bay | 1,449,606 | 1.16 |
+  | paris-mid | 1,170,684 | 0.88 |
+  | hongkong | 289,698 | 0.80 |
+  | sf-hills | 850,638 | 0.80 |
+
+- **Ground** (centre p95 / p99 / max, m; corners floating over 1 m):
+
+  | pose | p95 / p99 / max | floating corners |
+  |---|---|---|
+  | nyc-bay | 0 / 0.2 / 2 | 6 of 3,779 |
+  | paris-mid | 0 / 0.3 / 41 | 6 of 3,676 |
+  | hongkong | 0 / 3.3 / 12.2 | 25 of 2,459 |
+  | sf-hills | 0.2 / 2 / 7 | 11 of 3,143 |
+
+  The worst sf-hills corner gap is 152 m (one box beyond the 3 km corner
+  radius; open, as in round 2).
+- **Stability** (`motion/all4`, nyc-cruise-500): minPx 0.80 to 2.37 with one
+  direction reversal over the run, as in round 2. 98 additions over the
+  half-fade of 175,276, max 3.7 px.
+- No page or shader error in any capture, probe or arrival run.
+
+### Proofs at the round-2b commit
+
+At `5a112e18` (the shipped code):
+- `node scripts/world-pass-worker-proof.mjs --check c2bf5c06
+  --ignore-protocol`: "IDENTICAL (top-level protocol field masked):
+  1062/1062 cases identical, 7308 buffers + 1062 meta objects compared against
+  'c2bf5c06'; 28 stage cases (0 bad); 0 unrecorded inputs; 175.8 s".
+- Node gates:
+  - `graphics-unit.mjs` PASS;
+  - `verify-true-earth-flags` 11/11;
+  - `verify-stylized-earth` 22/22;
+  - `verify-city-horizon` PASS;
+  - `verify-building-handoff` 4/4;
+  - `verify-attribution` 4/4;
+  - `wp-reach-node-bench.mjs` G1 to G5 (`--streets` and `--time` as
+    above).
+- eslint on every changed file: only the pre-existing `SatSkylineLayer.jsx`
+  react-hooks/immutability error.
+- `WORKER_PROTOCOL` unchanged.
+- The frames in `final-*` were shot at `df3915bf`. The gate commit after it
+  changes only WHEN photos load, not how the far ring looks once they have.
+  The `arrival3` REACH runs show all 24 groups' photos loaded and faded in
+  by the measurement at every pose (settle + 3 s).
+
+### Shared files and seams
+
+No other stream's file edited. New stream-C files:
+- `lib/fly/toy-world/sat-stand-in-photo.js` (store, gate use, GPU atlas);
+- `sat-stand-in-photo-core.js` (pure: albedo, per-building mean, fetch);
+- `sat-stand-in-photo.worker.js` (fetch and decode off the main thread);
+- `scripts/wp-reach-structure.cjs` (the street-pattern score).
+
+Changed:
+- the worker builder, the engine, the stand-in material and SatSkylineLayer
+  (`setPhotoGate`);
+- the REACH block in `fly-constants.js`;
+- `scripts/wp-reach-node-bench.mjs` (`--streets`).
+
+### Open after round 2b
+
+- **Near-ring first tile under heavy CPU load (B1, not closed).** Paris near
+  first tile was 9.6 / 9.6 / 9.4 s with REACH against 7.8 / 8.3 / 6.2 s off in
+  the loaded session; in the lighter session it was earlier. What would close
+  it: cut the stand-in build's CPU (it is about 1.4 x the old mass's; the
+  per-building oriented box, style and colour calls dominate). Or hold the far
+  pool to one worker until the near ring's first tile after a warp, and prove
+  it does not move the far first group. Not done this round.
+- LOOK integration is the integrator's. `farLookColour` still calls
+  `colourOf(..., 'far')`. The per-fragment photo pull and LOOK's own
+  `photoPull` / `desat` stack, and the combined look is not tuned. In the
+  four-flag Paris frame the far ring is paler and the boulevards fainter than
+  with REACH alone.
+- **The photos arrive after the world.** By design (B1), the street pattern
+  fades in a few seconds after the city has settled (one group at a time,
+  about 0.3 to 1 s a group). The time to the last group is not measured.
+  Before the photo lands, a group shows round 2's palette look.
+- About 4 Esri z13 requests per group.
+- 40 MiB of texture for the atlas; not in the 256 MiB geometry row.
+- Cold nyc-low arrival is bimodal in every arm. Not separable with these runs.
+- Boost minPx jump, corner floats on steep cities, Owens Valley, the 3 km
+  corner radius, and the owner's 5080 motion check: as listed in round 2,
+  unchanged.
