@@ -201,19 +201,32 @@ export function SatBuildingLayer({ runtime, flight }) {
     });
     // WORLD PASS B (ARRIVAL): extra building workers. Off: none, one worker as before.
     const extra = [];
-    const poolSize = worldPassOn('arrival') ? Math.max(1, worldPassConfig('arrival').workers | 0) : 1;
-    for (let i = 1; i < poolSize; i++) {
+    const arrival = worldPassOn('arrival');
+    const poolSize = arrival ? Math.max(1, worldPassConfig('arrival').workers | 0) : 1;
+    const live = new Set(); // r2: every worker this mount made (replacements included)
+    // r2: a building worker on demand (the pool's replacements too): its `error`
+    // event (a script that failed to load, an uncaught error) asks the engine to
+    // ping it; dispose terminates it.
+    const spawn = () => {
       const w = new Worker(new URL('../../lib/fly/toy-world/vector-tile.worker.js', import.meta.url), { type: 'module' });
       const a = withRunwayGeometry(wrap(w));
       a.init().catch(() => {});
-      extra.push({ w, a });
-    }
+      w.addEventListener('error', () => engine.onWorkerError(a));
+      live.add(w);
+      return { w, a, api: a, dispose: () => { w.terminate(); live.delete(w); } };
+    };
+    for (let i = 1; i < poolSize; i++) extra.push(spawn());
     engine.setWorker(api, extra.length ? extra.map((e) => e.a) : null);
+    if (arrival) {
+      worker.addEventListener('error', () => engine.onWorkerError(api));
+      engine.setWorkerSpawner(spawn, [() => worker.terminate(), ...extra.map((e) => e.dispose)]);
+    }
     if (process.env.NODE_ENV === 'development') window.__satBuildings = engine; // harness introspection
     return () => {
       engine.dispose();
       worker.terminate();
       for (const e of extra) e.w.terminate(); // WORLD PASS B
+      for (const w of live) w.terminate(); // r2: replacements too
       if (process.env.NODE_ENV === 'development') delete window.__satBuildings;
     };
   }, [engine, runtime]);
