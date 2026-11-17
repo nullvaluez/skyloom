@@ -5,11 +5,12 @@ the record. Scope: how the Enhanced satellite world is generated on desktop
 High and Ultra: buildings, the far city, trees and ground contact. Medium, Low
 and phones keep today's world.
 
-**Status: W0 is committed on branch `phresh/mystifying-curran-97a006`** (two
-commits: the worker split, then flags / reader / request / counters /
-protocol 25). Nothing is visible: all five flags ship off and the worker's
-flag-off output is byte-identical to `c2bf5c06` apart from the protocol
-number (see "W0 proofs"). The five streams have not started.
+**Status: W0 is done, and wave 1 has four of the five streams merged into
+branch `phresh/mystifying-curran-97a006`** (TRUTH, LOOK, ARRIVAL, REACH; GROUND
+is still being built). Nothing is on `main`. All five flags still ship
+`enabled:false`, so nothing is visible by default, and the worker's flag-off
+output is byte-identical to `c2bf5c06` apart from the protocol number (now 26).
+See "Wave 1 record".
 
 ## Why this pass exists
 
@@ -244,7 +245,14 @@ the `WORKER_PROTOCOL` check), so two flag arms can never mix bundles.
 ### Engine counters
 
 Plain numbers on `window.__fly.satBuildings.stats` and `satSkyline.stats`
-(so `scripts/look-pass-capture.cjs` `telemetry.world` records them):
+(so `scripts/look-pass-capture.cjs` `telemetry.world` records them). The
+layers read `engine.stats` every frame, so the counters are published only
+while `worldPassCounters()` (`lib/fly/world-pass.js`) is true: any stream on,
+the stage-counter diagnostic on, or the `window.__flyWorldPassCounters = true`
+pin, which the capture and budget tools set (it touches no worker). With every
+stream off and no pin, `stats` and the frame loop are the `c2bf5c06` ones (no
+`_wpStats` call, no `_wpTrackRing` walk). An engine reads it once, in
+`setWorker`.
 
 | key | meaning |
 |---|---|
@@ -371,7 +379,7 @@ bodies but emits only 13 to 85 polygons per tile, because the 1,536-triangle
 budget (and its neighbourhood reserve) binds first. The caps, not admission,
 decide what the horizon draws.
 
-### Protocol 25
+### Protocol 25 (26 since wave 1)
 
 W0 bumps `WORKER_PROTOCOL` 24 to 25 once for the whole pass, at all ten pin
 sites in lockstep: `vector-tile.worker.js`; `EXPECTED_WORKER_PROTOCOL` in the
@@ -382,7 +390,9 @@ and the literal regexes in `scripts/graphics-unit.mjs` and
 `scripts/verify-stylized-earth.mjs`. `scripts/verify-city-horizon.mjs` reads
 the number from source. A stream that changes a payload under its flag does
 NOT bump it again: the flag-off payload is unchanged, and a flag-on bundle
-carries `wp` (see the request contract).
+carries `wp` (see the request contract). The wave 1 merge bumped it once more,
+25 to 26, at the same ten sites, so a worker bundle from before the merge is
+dropped.
 
 ### W0 proofs
 
@@ -531,23 +541,216 @@ What the table says before any stream lands:
 
 ### A TRUTH
 
-(empty)
+`scripts/world-pass-ledger-truth.md` (merged in wave 1).
 
 ### B ARRIVAL
 
-(empty)
+`scripts/world-pass-ledger-arrival.md` (merged in wave 1).
 
 ### C REACH
 
-(empty)
+`scripts/world-pass-ledger-reach.md` (merged in wave 1).
 
 ### D LOOK
 
-(empty)
+`scripts/world-pass-ledger-look.md` (merged in wave 1).
 
 ### E GROUND
 
-(empty)
+Not merged yet (branch `world/ground`).
+
+## Wave 1 record
+
+2026-11-16. Four streams merged into `phresh/mystifying-curran-97a006` by
+exact commit, `git merge --no-ff`, in this order: A TRUTH `f1aa4967`
+(merge `e85b627c`), D LOOK `fbfa3ae3` (`bd68cf2f`), B ARRIVAL `1808ab92`
+(`2997d288`), C REACH `1ca67e45` (`a059fdc1`). E GROUND is not merged. All
+four merged with no conflict: each stream edited only its own `WORLD_<NAME>`
+block of `fly-constants.js`, and LOOK and ARRIVAL edit different marked seams
+of `vector-tile.worker.js` (`// WORLD PASS D` and `// WORLD PASS B`). Every
+flag still ships `enabled:false`. Nothing is on `main`.
+
+### Seams wired at the merge
+
+Only what the four flags need to run together (commit `61808488`, both in
+`worker/sat-skyline-stand-ins.js`, both inert with the other stream off):
+
+- **TRUTH x REACH.** The stand-in passed `sid` as the id to `heightOf`, but
+  the truth table is keyed by the admission's polygon id. With both on, every
+  untagged stand-in missed the table and fell back to the old far rule. It
+  now passes the polygon id and keeps `sid` for its hashes, so with TRUTH on a
+  stand-in gets the near ring's height (this meets C's request to A for
+  untagged buildings).
+- **LOOK x REACH.** With `look.authority` on, the far wall carries the glass
+  (+4) or opaque (+8) offset in its red channel. The stand-in packs walls to
+  sRGB bytes, so a tagged wall saturated to full red. It now decodes with
+  `lookWallMode` first (the stand-in has no glass mode).
+
+Checked and needing nothing: only ARRIVAL stamps `result.wp` (one wrapper
+around `buildTile`); ARRIVAL's Uint8 colour packing returns null and keeps
+Float32 when a LOOK glass offset puts a value over 1; LOOK does not touch
+REACH's three shader anchors; the truth table is cached on `tileCtx`, so the
+skyline worker builds it once per tile for admission and heights.
+
+Also: `WORKER_PROTOCOL` 25 to 26 at all ten sites (`e57657b3`; grep finds no
+others), and `scripts/wp-reach-node-bench.mjs` G5 now masks ARRIVAL's `wp`
+stamp (`20802cff`; before that every G5 case failed on the stamp alone).
+
+### Proofs on the merged tree
+
+- `node scripts/world-pass-worker-proof.mjs --check c2bf5c06 --ignore-protocol`:
+  "IDENTICAL (top-level protocol field masked): 1062/1062 cases identical,
+  7308 buffers + 1062 meta objects compared against 'c2bf5c06'; 28 stage
+  cases (0 bad); 0 unrecorded inputs". Protocol pairs `24->26` x 1,062.
+- Node gates PASS: `graphics-unit.mjs`, `verify-true-earth-flags` (11),
+  `verify-stylized-earth` (22), `verify-city-horizon`,
+  `verify-building-handoff` (4), `verify-attribution` (4).
+- Stream probes PASS and reproduce their ledgers' numbers exactly:
+  `wp-truth-probe.mjs`, `wp-look-roofphoto.mjs`, `wp-look-structures.mjs`,
+  `wp-look-shader.mjs` (17), `wp-arrival-worker-prep.mjs`,
+  `wp-reach-node-bench.mjs` (G1 to G5).
+- `npx eslint` on the 107 JS files changed since `c2bf5c06`: one error,
+  `SatSkylineLayer.jsx` react-hooks/immutability at line 81, the same error
+  at `c2bf5c06`. No new errors.
+- Not run on the merged tree: any browser run (budget, captures, tier proof,
+  the building harnesses) and the owner's 5080 motion check. The browser
+  numbers below are each stream's own, on its own branch.
+
+### A TRUTH (`WORLD_TRUTH`)
+
+What it does: one fact table per z14 tile (areas, shape, shared corners, land
+use, local cover, a cross-tile `sid`, a class: shed, house, terrace,
+apartment, block, commercial, civic, industrial, bigbox), and one height law
+for the near ring, the far mass and the style classifier. Mapped heights are
+kept. Unmapped: class-matched mapped evidence from the same tile, else a
+regional prior, quantised to storeys, capped at 24 m. Seam fragments of a
+building that clears the 70 m2 floor are kept. Sub-switches: `heights`,
+`typology`, `smallBand` (today only the seam-fragment rescue; the lean 15 to
+70 m2 band is not built), `roofs` (marks items; the new roof forms are not
+built). Nothing ported from FableFlight.
+
+Numbers (node, 3 x 3 tiles per place; probe and ledger agree):
+
+- Hold-out on mapped heights up to 24 m, median abs error, law against
+  legacy: NYC 2.5 / 5.4 m, Brooklyn 1.7 / 5.3, Paris 2.5 / 4.9, London 3.5 /
+  6.2, Tokyo 5.3 / 6.3, Phoenix suburb 0.6 / 13.9, Lagos 3.8 / 7.3, Dubai
+  3.3 / 15.0.
+- Unmapped heights p50 / p90: Phoenix suburb 3.6 / 6.6 m (legacy 18.9 /
+  23.8), Paris 21.5 / 24 (legacy 20.0 / 28.4), Tokyo 9.6 / 21.6, Lagos
+  6.5 / 9.7.
+- Far = near height for every unmapped far-hatch candidate (100 %, legacy
+  0 %). Seam halves with the same `sid` agree on 63 to 97 % of pairs (legacy
+  0 to 6 %); see the verifier's finding below.
+- Admitted share up about one point (seam fragments). Empty tiles stay
+  empty (Owens, Iowa).
+- No new geometry: Ultra building MiB falls or holds (Phoenix 168 to 137,
+  Paris 321 to 312). Worker cost +25 to +37 ms per near tile.
+
+### D LOOK (`WORLD_LOOK`)
+
+What it does: roof colour read from the Esri photo under each footprint
+(16 z16 tiles and 1 z11 per near tile, fetched in the worker in parallel with
+the vector tile, at most 2.5 s wait), with a structure mate's or the block's
+median read as fallbacks before the typology palette; wall material from the
+tag colour (glass or opaque) or a regional palette by typology group;
+building parts grouped into structures that share one look; and the
+architecture shader taking the worker colour as the albedo, session-latched.
+Sub-switches: `roofPhoto`, `walls`, `structures`, `authority`. Ported:
+FableFlight's trimmed-mean roof colour.
+
+Numbers (node, one centre tile; probe and ledger agree): share of roofs from
+the photo 48 % Midtown, 97 % Brooklyn, 71 % Paris, 83 % London, 65 % Tokyo,
+82 % Phoenix. Roof colour error against the photo (CIELAB dE, mean), today's
+shader against the look: Midtown 25.0 / 16.9, Brooklyn 28.2 / 8.2, Paris
+21.6 / 8.0, London 22.3 / 6.2, Tokyo 23.7 / 16.3, Phoenix 29.5 / 7.6.
+Part piles 214 to 0 at Midtown; seam twins split 13 / 27 to 2 / 27. No new
+geometry or draws. The live shares are lower; see the verifier's finding
+below.
+
+### B ARRIVAL (`WORLD_ARRIVAL`)
+
+What it does: an exact batched ground query on the drawn terrain mesh (same
+answer as the reference on 1,000,000 points); a capped drape; finalize prep
+moved into the worker (degenerate triangles dropped, vertices compacted, runs,
+regions and footing data, Int8 normals and Uint8 colours); a 24 MiB per-frame
+upload budget; two building workers; footings from the footprint's lowest
+corners; readiness weighted to the view direction; the `result.wp` stamp.
+Sub-switches: `fastQuery`, `drapeCap`, `workerPrep`, `uploads`, `footings`,
+`readiness`. Ported: FableFlight's upload byte budget and lowest-ground seat.
+
+Numbers: worker prep PASS on nine places, bundle bytes 98.0 to 63.0 MiB
+(-35.7 %), same triangles minus the degenerate ones (node, re-run on the
+merged tree). Stream ledger only, Ultra, single runs on a shared machine:
+building MiB -34 to -36 %, full ring 36 to 9 s at nyc-low and 43 to 13 s at
+Paris, worst finalize work in a frame 4 to 10 ms (was 89 to 122 ms per tile),
+boost into Midtown arrives with 13 to 15 of 16 tiles (was 0 or 1). These are
+not yet confirmed by the ARRIVAL verifier.
+
+### C REACH (`WORLD_REACH`)
+
+What it does: replaces the capped horizon mass with one instanced
+oriented-box stand-in per admitted building (same admission as the near
+ring, heights from `heightOf`, colours from `colourOf`), drawn per group by
+screen size down to `minPx` 0.8 with a dither fade, under a tier triangle
+budget (Ultra 1.5 M, High 0.8 M). Same draws, same groups; CHUNK_FADE and
+the coverage mask kept. Sub-switch: `standIns`. Ported: FableFlight's
+distance-scaled draw prefix and far rectangle fit.
+
+Numbers: node, 33,030 stand-ins against 729 old horizon bodies on 20 tiles
+(45x); Owens, Iowa and farmland stay empty. Stream ledger, Ultra: horizon
+geometry 47 to 17 MiB at nyc-low and 49 to 5 MiB at Paris, 8 k to 250 k
+buildings drawn, draws unchanged.
+
+### Open after wave 1
+
+Verifier findings, not fixed:
+
+- **LOOK.** Live, only 25 to 54 % of roofs get a photo read (whole tiles get
+  none), which leaves a tile-scale patchwork of roofs. Tiles without a photo
+  look worse than today in Brooklyn, Paris and Phoenix. San Francisco falls
+  to a brick region palette. Hong Kong towers go dark.
+- **REACH.** The stand-in triangle cap is exceeded near water, because the
+  coastal reflection draws the stand-ins again. Far-ring first arrival is
+  later than today. The Paris far ring uses a bright multi-colour palette
+  that hides the boulevard pattern.
+- **TRUTH.** Seam halves agree less than the ledger claims once pairs with
+  different ids are counted. Powell, Ohio two-storey houses become
+  one-storey. Large unmapped footprints in dense centres drop to 6 to 8 m
+  sheds.
+- **ARRIVAL.** Its verifier is still running.
+- **GROUND.** Not merged.
+
+Also open:
+
+- No browser run of any kind on the merged tree, and none with more than one
+  flag on. The two merge seams are proven only by reading the code and by
+  the node gates.
+- The owner's 5080 motion check, for every stream.
+- Each ledger's own "Open" list stands.
+
+Round 2 (asked by one stream of another, not wired at the merge):
+
+- A to C: set `it.sid` on the legacy far mass items (`sat-skyline.js`).
+- A to the merge: derive `hash2` in `sat-buildings/index.js` from
+  `item.sid ?? item.id`, so both halves of a seam building get one tone.
+- A to B: a lean body buffer for the 15 to 70 m2 small band (about 20 bytes
+  a vertex, or one instanced box per body), drawn in the colour pass and
+  shadow cascade 0, kept out of emptiness and collision columns.
+- B to C: wrap the skyline engine's ground loops in `beginGroundBatch()` /
+  `endGroundBatch()` (today they run the reference query).
+- B to A: keep an existing bounding box in `installArchitectureShadowRange`,
+  and keep `partitionArchitectureIndex` and `emit.js partitionBody` in step
+  (or share one module).
+- B to A and D: new emitters keep each building's vertices consecutive under
+  one anchor; a CPU-side colour pass writes in the packed Uint8 range.
+- C to A: once the far height matches the near model for every stand-in, set
+  `WORLD_REACH.worker.houseMaxAreaM2` to 0 (Paris and Tokyo gain their
+  small-parcel fabric).
+- C and D: a photo-sampled far roof colour (removes the far "confetti");
+  call `relateStructures` for the far ring; keep REACH's three shader
+  anchors (`#include <common>`, `void main() {`, `float skyA = uSkyFade;`).
+- D to A: carry the feature id and its polygon count on the item, so the look
+  can prefer the OSM id for single-polygon features.
 
 ## Second wave
 

@@ -189,7 +189,7 @@ async function waitWorld(page, timeout) {
     p.on('console', m => { const t = m.text(); if (m.type() === 'error' && /shader|WebGL|GLSL|ReferenceError|TypeError/i.test(t)) { report.errors.push({ scene: current, kind: 'console', message: t.slice(0, 2500) }); save(); } else if (m.type() === 'error' && report.warnings.length < 60) report.warnings.push({ scene: current, message: t.slice(0, 600) }); });
     await p.addInitScript(({ quality, sun }) => {
       window.__flyGovPin = 'hold'; window.__flyVisualsOverride = 'enhanced'; window.__flyTitleBypass = true; window.__flyBoostInfinite = true;
-      window.__flySunOverride = sun; window.__flyWeatherOverride = 'baseline';
+      window.__flySunOverride = sun; window.__flyWeatherOverride = 'baseline'; window.__flyWorldPassCounters = true; // World Pass W0 arrival counters on engine stats (worldPassCounters)
       try {
         localStorage.setItem('fly-map-style-2', 'satellite'); localStorage.setItem('fly-quality-tier', quality); localStorage.setItem('fly-controls-seen', '1');
         localStorage.setItem('fly-sound-on', '0'); localStorage.setItem('fly-visuals', 'enhanced');

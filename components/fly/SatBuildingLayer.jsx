@@ -46,6 +46,8 @@ import { NIGHT_RHYTHM_ON, updateNightRhythm } from '@/lib/fly/night-rhythm';
 // LOOK PASS C (LOOK_FACADE): its terms run on desktop High/Ultra only.
 import { LOOK_FACADE_ON, setLookFacadeProfile, updateLookFacade } from '@/lib/fly/look-facade';
 import { cinemaProfile } from '@/lib/fly/cinema-policy';
+// WORLD PASS B (ARRIVAL): the building worker pool size (flag on only).
+import { worldPassOn, worldPassConfig } from '@/lib/fly/world-pass';
 
 const TIERS = ['low', 'medium', 'high']; // mirrors FlyCanvas's quality ladder
 const atLeastTier = (tier, min) => TIERS.indexOf(tier) >= TIERS.indexOf(min);
@@ -197,11 +199,21 @@ export function SatBuildingLayer({ runtime, flight }) {
       if (process.env.NODE_ENV === 'development')
         console.warn('[sat-buildings] TileJSON init failed:', err?.message ?? err);
     });
-    engine.setWorker(api);
+    // WORLD PASS B (ARRIVAL): extra building workers. Off: none, one worker as before.
+    const extra = [];
+    const poolSize = worldPassOn('arrival') ? Math.max(1, worldPassConfig('arrival').workers | 0) : 1;
+    for (let i = 1; i < poolSize; i++) {
+      const w = new Worker(new URL('../../lib/fly/toy-world/vector-tile.worker.js', import.meta.url), { type: 'module' });
+      const a = withRunwayGeometry(wrap(w));
+      a.init().catch(() => {});
+      extra.push({ w, a });
+    }
+    engine.setWorker(api, extra.length ? extra.map((e) => e.a) : null);
     if (process.env.NODE_ENV === 'development') window.__satBuildings = engine; // harness introspection
     return () => {
       engine.dispose();
       worker.terminate();
+      for (const e of extra) e.w.terminate(); // WORLD PASS B
       if (process.env.NODE_ENV === 'development') delete window.__satBuildings;
     };
   }, [engine, runtime]);
@@ -225,6 +237,7 @@ export function SatBuildingLayer({ runtime, flight }) {
     engine.setNightMix(runtime.sun?.frac);
     if (NIGHT_RHYTHM_ON) updateNightRhythm(runtime.sun, runtime.geo?.y); // SHIP PASS CITY (CT-5): one shared uniform
     if (LOOK_FACADE_ON) { setLookFacadeProfile(cinemaProfile()); updateLookFacade(runtime.sun); } // LOOK PASS C: the shared tier test (lib/fly/look-tier.js), twilight weight + sun direction
+    if (engine._arr.readiness) engine.setView(flight.heading); // WORLD PASS B (readiness)
     engine.update(clock.elapsedTime, flight.pos.x, flight.pos.z, eyeAgl);
     // PLAY PASS CITY: one region vote a second, a few uniform writes while easing.
     if (CITY_FACADES_ON) updateCityFacades(engine, clock.elapsedTime, runtime.origin?.anchor);

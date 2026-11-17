@@ -58,7 +58,7 @@ process.on('exit', releaseSlot);
     await p.addInitScript(({ quality, sun }) => {
       try { performance.setResourceTimingBufferSize(200000); } catch {}
       window.__flyGovPin = 'hold'; window.__flyVisualsOverride = 'enhanced'; window.__flyTitleBypass = true; window.__flyBoostInfinite = true;
-      window.__flySunOverride = sun; window.__flyWeatherOverride = 'baseline';
+      window.__flySunOverride = sun; window.__flyWeatherOverride = 'baseline'; window.__flyWorldPassCounters = true; // World Pass W0 arrival counters on engine stats (worldPassCounters)
       try {
         localStorage.setItem('fly-map-style-2', 'satellite'); localStorage.setItem('fly-quality-tier', quality); localStorage.setItem('fly-controls-seen', '1');
         localStorage.setItem('fly-sound-on', '0'); localStorage.setItem('fly-visuals', 'enhanced');

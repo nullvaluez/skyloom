@@ -134,3 +134,7 @@
 
 - Runway catalog: [OurAirports](https://ourairports.com/data/), public domain. The checked-in snapshot's source hashes and retrieval date are recorded in `public/data/runways/v1/manifest.json`.
 - Featured airport terminal/tower silhouettes: first-party Skyloom geometry, simplified and approximately placed for scenery.
+
+## Techniques from other projects
+
+- **FableFlight** — Copyright (c) 2026 Rolandjg · [MIT](https://github.com/Rolandjg/fableflight) · techniques from its Rust source re-implemented here for the World Pass, all behind flags that ship off: roof colour as a trimmed mean of the photo under the footprint with canopy and shadow rejected (`src/buildings.rs` `roof_colour()`; WORLD_LOOK); a per-frame upload byte budget (`src/world.rs`; WORLD_ARRIVAL); seating a building on the lowest ground under its outline (`src/buildings.rs` `site` and `base = gmin - 2`; WORLD_ARRIVAL footings); far buildings drawn tallest first with a distance-scaled draw prefix (`src/buildings.rs` HCLASS distance scale; WORLD_REACH); far buildings as fitted rectangles (`src/buildings.rs` `far_version`; WORLD_REACH stand-ins).
