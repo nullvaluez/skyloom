@@ -60,7 +60,7 @@ fs.mkdirSync(profileRoot, { recursive: true });
 let gitHead = null;
 try { gitHead = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim(); } catch {}
 const report = {
-  tool: 'world-pass-stalls', version: 3, started: new Date().toISOString(), mode, gitHead,
+  tool: 'world-pass-stalls', version: 5, started: new Date().toISOString(), mode, gitHead,
   serverRef: typeof args['server-ref'] === 'string' ? args['server-ref'] : null,
   url: baseUrl.origin, quality, seconds, poses: poseNames, arms, phases, pages,
   profiled: !!args.profile, plain: !!args.plain, review: !!args.review, automation: !!args.automation,
@@ -133,6 +133,10 @@ function installMonitor({ durationMs }) {
       proto[name] = function(...args) {
         const result = original.apply(this, args);
         if (this.canvas?.isConnected && this.canvas.width >= 300 && this.canvas.height >= 200 && this.getParameter(this.FRAMEBUFFER_BINDING) === null) {
+          m.firstAnyCanvasDrawMs ??= at();
+          // The title-bypass path can briefly mount the hangar before the
+          // fixed-pose warp. Its separate WebGL canvas is not a world frame.
+          if (!this.canvas.closest('[data-fly-root]') || this.canvas.closest('[data-overlay="hangar"],[data-testid="hangar"]')) return result;
           m.firstPresentedDrawMs = at();
           window.__worldStallGL = this;
           restoreDraws();
@@ -163,7 +167,7 @@ function installMonitor({ durationMs }) {
   const readiness = () => {
     const r = window.__fly;
     return { terrain: warmState(r?.criticalTerrain), clouds: warmState(r?.cloudWarm),
-      atmosphere: warmState(r?.physSky?.programWarm), composer: warmState(window.__flyStats?.composerWarm), gpuInfo: warmState(window.__flyStats?.gpuInfoProbe),
+      atmosphere: warmState(r?.physSky?.programWarm), environment: warmState(r?.cinemaIBL?.programWarm), composer: warmState(window.__flyStats?.composerWarm), gpuInfo: warmState(window.__flyStats?.gpuInfoProbe),
       worldProfiles: warmState(r?.prewarm?.worldProfiles), prewarm: warmState(r?.prewarm), arrival: warmState(r?.arrivalStats) };
   };
   const tick = (t) => {
@@ -249,11 +253,16 @@ function readEnd() {
   return {
     monitor: window.__worldStallMonitor, endPerfMs: performance.now(), gpu,
     boot: window.__flyBoot ?? null, worldPass: window.__flyStats?.worldPass?.state ?? null,
-    preset: state?.qualityPreset ?? null, tier: state?.qualityTier ?? null, phase: state?.phase ?? null,
+    preset: state?.qualityPreset ?? null, tier: state?.qualityTier ?? null, flightPhase: state?.phase ?? null,
     webdriver: navigator.webdriver,
     shaderErrorsChecked: renderer?.debug?.checkShaderErrors ?? null,
     programCensus: window.__flyStats?.census?.programs ?? null,
     composerWarm: numeric(window.__flyStats?.composerWarm), gpuInfoProbe: window.__flyStats?.gpuInfoProbe ?? null,
+    auxiliaryWarm: {
+      environment: numeric(r?.cinemaIBL?.programWarm),
+      reflection: numeric(r?.coastalReflection?.programWarm),
+      overlays: numeric(window.__flyComposer?.passes?.find(p => p.name === 'SkyOverlayPass')?.programWarm),
+    },
     programCoverage: renderer?.info?.programs?.map(p => ({ key: `${p.type ?? 'program'}${p.name ? ':' + p.name : ''}#${hash(p.cacheKey)}`, composerPrepared: warmKeys.has(p.cacheKey) })) ?? null,
     buildings: numeric(r?.satBuildings?.stats), skyline: numeric(r?.satSkyline?.stats), veg: numeric(r?.satVeg?.stats),
     draws: renderer?.info?.render?.calls ?? null, triangles: renderer?.info?.render?.triangles ?? null,
@@ -267,9 +276,17 @@ async function measure(context, page, arm, poseName, phase, pageNumber) {
   const id = `${mode}-${quality}-${arm}-${poseName}-${phase}-page${pageNumber}`;
   const row = { id, mode, quality, arm, pose: poseName, phase, page: pageNumber, profiled: !!args.profile, automation: !!args.automation,
     url: `${baseUrl.origin}/${args.review || arm === 'off' ? `?${[...(args.review ? ['graphicsReview=1'] : []), ...(arm === 'off' ? [`flags=${minusAll}`] : [])].join('&')}` : ''}`, errors: [], consoleErrors: [] };
-  page.on('pageerror', (e) => row.errors.push(e.message.slice(0, 500)));
+  page.on('pageerror', (e) => {
+    row.errors.push(e.message.slice(0, 500));
+    (row.pageErrors ??= []).push({ message: e.message, stack: e.stack });
+  });
   page.on('crash', () => row.errors.push('PAGE CRASH'));
-  page.on('console', (m) => { if (m.type() === 'error' && row.consoleErrors.length < 100) row.consoleErrors.push(m.text().slice(0, 500)); });
+  page.on('console', (m) => {
+    if (m.type() !== 'error') return;
+    const message = m.text().slice(0, 500), counts = (row.consoleErrorCounts ??= {});
+    if (counts[message]) { counts[message]++; return; }
+    if (row.consoleErrors.length < 100) { row.consoleErrors.push(message); counts[message] = 1; }
+  });
   await page.addInitScript(installMonitor, { durationMs: seconds * 1000 });
   if (args.plain) await page.addInitScript((automation) => Object.defineProperty(navigator, 'webdriver', { configurable: true, get: () => automation }), !!args.automation);
   if (!args.plain) await page.addInitScript(installPins, { quality, automation: !!args.automation,
@@ -303,6 +320,7 @@ async function measure(context, page, arm, poseName, phase, pageNumber) {
       firstWorldFrameMs: m.firstPresentedDrawMs ?? null,
       firstWorldFrameSource: 'first main-canvas default-framebuffer draw',
       firstPresentedDrawMs: m.firstPresentedDrawMs ?? null,
+      firstAnyCanvasDrawMs: m.firstAnyCanvasDrawMs ?? null,
       boot100Ms: m.boot100Ms, bootOverlayRemovedMs: m.bootOverlayRemovedMs,
       worstFrameGapMs: m.raf.length ? Math.max(...m.raf.map((f) => f.durationMs)) : null,
       worstLongTaskMs: m.longtasks.length ? Math.max(...m.longtasks.map((t) => t.durationMs)) : 0,
@@ -318,6 +336,7 @@ async function measure(context, page, arm, poseName, phase, pageNumber) {
     };
     if (!row.gpu || /swiftshader|llvmpipe|software|basic render/i.test(row.gpu)) row.errors.push(`Not a verified hardware renderer: ${row.gpu}`);
     if (row.composerWarm?.status === 'failed') row.errors.push(`Composer preparation failed: ${row.composerWarm.error}`);
+    for (const [name, state] of Object.entries(row.auxiliaryWarm ?? {})) if (state?.error || state?.status === 'failed') row.errors.push(`${name} preparation failed: ${state.error}`);
     if (row.programCensus?.linkFailures > 0) row.errors.push(`${row.programCensus.linkFailures} shader links failed`);
     if (row.summary.firstWorldFrameMs == null || !m.raf.length) row.errors.push('No world frame measured');
     if (seconds >= 90 && !row.summary.sampledFrames60to90) row.errors.push('No frames in the 60–90 second window');
