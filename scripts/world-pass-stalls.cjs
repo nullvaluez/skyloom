@@ -319,6 +319,15 @@ function readEnd() {
   const hash = value => { let h = 0x811c9dc5; for (const c of String(value ?? '')) { h ^= c.charCodeAt(0); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(16).padStart(8, '0'); };
   return {
     monitor: window.__worldStallMonitor, endPerfMs: performance.now(), gpu,
+    // Browser navigation/transfer timestamps remain available after the run.
+    // They distinguish waiting for HTML or a script from a visible renderer
+    // that stopped scheduling callbacks after the document already arrived.
+    timeOrigin: performance.timeOrigin,
+    navigation: performance.getEntriesByType('navigation')[0]?.toJSON() ?? null,
+    bootScripts: performance.getEntriesByType('resource')
+      .filter(entry => entry.name.startsWith(location.origin + '/_next/') && /\.js(?:\?|$)/.test(entry.name))
+      .map(entry => ({ path: new URL(entry.name).pathname, startMs: entry.startTime,
+        responseStartMs: entry.responseStart, responseEndMs: entry.responseEnd, transferBytes: entry.transferSize })),
     boot: window.__flyBoot ?? null, worldPass: window.__flyStats?.worldPass?.state ?? null,
     preset: state?.qualityPreset ?? window.__flyStats?.worldPass?.state?.preset ?? null, tier: state?.qualityTier ?? null, flightPhase: state?.phase ?? null,
     webdriver: navigator.webdriver,
@@ -426,12 +435,15 @@ async function measure(context, page, arm, poseName, phase, pageNumber) {
       firstPresentedDrawMs: m.firstPresentedDrawMs ?? null,
       firstAnyCanvasDrawMs: m.firstAnyCanvasDrawMs ?? null,
       boot100Ms: m.boot100Ms, bootOverlayRemovedMs: m.bootOverlayRemovedMs,
-      worstFrameGapMs: m.raf.length ? Math.max(...m.raf.map((f) => f.durationMs)) : null,
+      // A visible page may wait seconds for its very first callback. There
+      // is no preceding rAF interval to include that delay automatically.
+      firstRafMs: m.firstRafMs,
+      worstFrameGapMs: m.firstRafMs == null ? null : Math.max(m.firstRafMs, ...m.raf.map((f) => f.durationMs)),
       worstLongTaskMs: m.longtasks.length ? Math.max(...m.longtasks.map((t) => t.durationMs)) : 0,
       postRevealWorstTaskMs: m.bootOverlayRemovedMs == null ? null : Math.max(0, ...m.longtasks.filter((t) => t.startMs + t.durationMs > m.bootOverlayRemovedMs).map((t) => t.durationMs)),
       medianFrame60to90Ms: median(m.raf.filter((f) => f.startMs >= 60000 && f.startMs + f.durationMs <= 90000).map((f) => f.durationMs)),
       worstWorldFrameGapMs: m.worldFrames.length ? Math.max(...m.worldFrames.map(f => f.durationMs)) : null,
-      postRevealWorstWorldFrameGapMs: m.bootOverlayRemovedMs == null || !m.worldFrames.length ? null : Math.max(0, ...m.worldFrames.filter(f => f.startMs >= m.bootOverlayRemovedMs).map(f => f.durationMs)),
+      postRevealWorstWorldFrameGapMs: m.bootOverlayRemovedMs == null || !m.worldFrames.length ? null : Math.max(0, ...m.worldFrames.filter(f => f.startMs + f.durationMs > m.bootOverlayRemovedMs).map(f => f.durationMs)),
       medianWorldFrame60to90Ms: median(m.worldFrames.filter(f => f.startMs >= 60000 && f.startMs + f.durationMs <= 90000).map(f => f.durationMs)),
       sampledFrames60to90: m.raf.filter((f) => f.startMs >= 60000 && f.startMs + f.durationMs <= 90000).length,
       fullRingObservedNavMs: m.fullRingObservedMs,
