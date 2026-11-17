@@ -7,7 +7,8 @@ import { MAP_STYLE_KEY, MAP_STYLES } from '@/lib/fly/map-style';
 // Round 16: quality + sound persist — but ONLY from the click sites below. The
 // automatic quality ladder is a live response to this session's frame times
 // and must never be written to storage.
-import { crashStakesOn, saveCrashMode, saveQualityTier, saveSoundOn } from '@/lib/fly/fly-settings';
+import { crashStakesOn, saveCrashMode, saveQualityTier, saveSoundOn, QUALITY_TIER_KEY } from '@/lib/fly/fly-settings';
+import { worldPassPresetNeedsReload } from '@/lib/fly/world-pass';
 import { CRASH } from '@/lib/fly/fly-constants';
 // SHIP PASS RL-2 (CHALLENGE_LAYER): the stakes row becomes "Challenge mode".
 import { challengeLayerOn, challengeOn, saveChallenge } from '@/lib/fly/challenge';
@@ -50,7 +51,6 @@ const VISUALS_ROW = [
  * only when visualsAvailable()).
  */
 export function SettingsRows({ sheet = false, includeConditions = true }) {
-  const qualityTier = useFlyStore((s) => s.qualityTier);
   const qualityPreset = useFlyStore((s) => s.qualityPreset);
   const soundOn = useFlyStore((s) => s.soundOn);
   const mapStyle = useFlyStore((s) => s.mapStyle);
@@ -87,7 +87,8 @@ export function SettingsRows({ sheet = false, includeConditions = true }) {
     store.setQualityPreset(tier);
     saveQualityTier(tier); // a CLICKED tier is a choice — persist it
   };
-  const qualityOn = (tier) => (qualityPreset === 'ultra' ? tier === 'ultra' : qualityTier === tier);
+  // The selected button is the player's choice, not a governor reduction.
+  const qualityOn = (tier) => qualityPreset === tier;
   const flipSound = () => {
     // Keep the existing toggle as the single source of truth for the
     // flip, then persist whatever it landed on.
@@ -176,8 +177,17 @@ export function SettingsRows({ sheet = false, includeConditions = true }) {
   ));
 
   const ULTRA_NOTE = 'Ultra adds finer clouds for powerful desktops. Effects still adapt to keep flight smooth.';
+  let worldDetailNote = null;
+  if (worldPassPresetNeedsReload(qualityPreset)) {
+    let saved = false;
+    try { saved = window.localStorage.getItem(QUALITY_TIER_KEY) === qualityPreset; } catch { /* Storage may be blocked. */ }
+    worldDetailNote = saved
+      ? 'World detail updates the next time you load Skyloom.'
+      : 'World detail stays unchanged. This browser couldn’t save your quality choice.';
+  }
+  const qualityNote = [worldDetailNote, qualityPreset === 'ultra' ? ULTRA_NOTE : null].filter(Boolean).join(' ') || null;
   const qualityRow = GLASS_ON ? (
-    <GlassField key="quality" label="Quality" note={qualityPreset === 'ultra' ? ULTRA_NOTE : null}>
+    <GlassField key="quality" label="Quality" note={qualityNote}>
       <div className="lg-seg" role="group" aria-label="Quality">
         {TIERS.map((tier) => (
           <button
@@ -203,6 +213,7 @@ export function SettingsRows({ sheet = false, includeConditions = true }) {
           <button
             key={tier}
             data-testid={tid(`quality-${tier}`)}
+            aria-pressed={qualityOn(tier)}
             onClick={() => pickQuality(tier)}
             className={`rounded py-1 text-xs capitalize phone:min-h-11 ${
               qualityOn(tier)
@@ -214,7 +225,7 @@ export function SettingsRows({ sheet = false, includeConditions = true }) {
           </button>
         ))}
       </div>
-      {qualityPreset === 'ultra' && <p className="mt-2 text-xs text-zinc-400">{ULTRA_NOTE}</p>}
+      {qualityNote && <p className="mt-2 text-xs text-zinc-400">{qualityNote}</p>}
     </div>
   );
 
