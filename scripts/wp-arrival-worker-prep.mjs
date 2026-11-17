@@ -15,6 +15,10 @@
  *       compared on the 1/255 grid the ON colours are stored on);
  *   (d) runs tile the vertices with one anchor each; regions tile the body range;
  *   (e) result.wp carries the request key;
+ *   (f) r2, WORLD_ARRIVAL.worker.quantize: position (Int16 x4, 1/16 m), anchor (Int16 x2) and
+ *       uv (Int16 x2, 1/512) are the OFF values on their lattices; the ON triangles are the OFF
+ *       triangles with every vertex snapped to the lattices, minus the ones the snap collapses
+ *       (exactly degenerate on the lattice); no ON triangle is degenerate; runs still tile;
  *   and it reports bytes and vertices OFF against ON.
  */
 import fs from 'node:fs';
@@ -80,11 +84,11 @@ const RUNWAY = { airportLandmarks: false, operationsAirports: [] };
 const ENH = { visuals: true, trueAreas: true, sceneryForms: true, showcaseEarth: true, ...RUNWAY };
 const STREAMS = { truth: ['heights', 'typology', 'smallBand', 'roofs'], arrival: ['fastQuery', 'drapeCap', 'workerPrep', 'uploads', 'footings', 'readiness'], reach: ['standIns'], look: ['roofPhoto', 'walls', 'structures', 'authority'], ground: ['trees', 'bridges'] };
 const KEY = 'wp1-ultra-test-0';
-const request = (arrival) => {
+const request = (arrival, worker = {}) => {
   const req = { v: 1, key: arrival ? KEY : 'wp1-0', any: !!arrival, tier: arrival ? 'ultra' : null };
   for (const [s, subs] of Object.entries(STREAMS)) {
     const on = arrival && s === 'arrival';
-    req[s] = { on, ...Object.fromEntries(subs.map((k) => [k, on])), worker: on ? {} : null };
+    req[s] = { on, ...Object.fromEntries(subs.map((k) => [k, on])), worker: on ? worker : null };
   }
   return { worldPass: req };
 };
@@ -173,6 +177,58 @@ for (const [name, lat, lon] of PLACES) {
   for (let i = 0; i + 2 < A.idx.length; i += 3) if (degenerate(A.pos, A.idx[i], A.idx[i + 1], A.idx[i + 2])) degOff += 1;
   console.log(`${name.padEnd(15)} tris ${A.idx.length / 3} (${degOff} degenerate) -> ${B.idx.length / 3} (${deg}) | verts ${A.pos.length / 3} -> ${nV} | runs ${nR}, regions ${P.regions.length / 12} | ${(bo / 1048576).toFixed(2)} -> ${(bn / 1048576).toFixed(2)} MiB (-${(100 * (1 - bn / bo)).toFixed(1)} %) | col ${P.colNormalized ? 'u8' : 'f32'}, footing verts ${P.footBottom.length}, normal ${P.normalPacked ? 'i8' : 'f32'}`);
 }
+// --- (f) r2: the quantized arm ------------------------------------------------------
+const snapKey = (b, v, colScale, q) => {
+  const c = b.col, s = b.style, P = q ? 4 : 3, k = q ? 1 / 16 : 1, ku = q ? 1 / 512 : 1;
+  const r16 = (x) => Math.round(x * 16) / 16, r512 = (x) => Math.round(x * 512) / 512;
+  const px = q ? b.pos[v * P] * k : r16(b.pos[v * 3]), py = q ? b.pos[v * P + 1] * k : r16(b.pos[v * 3 + 1]), pz = q ? b.pos[v * P + 2] * k : r16(b.pos[v * 3 + 2]);
+  const ax = q ? b.anchor[v * 2] * k : r16(b.anchor[v * 2]), az = q ? b.anchor[v * 2 + 1] * k : r16(b.anchor[v * 2 + 1]);
+  const u = q ? b.uv[v * 2] * ku : r512(b.uv[v * 2]), w = q ? b.uv[v * 2 + 1] * ku : r512(b.uv[v * 2 + 1]);
+  const col = [0, 1, 2].map((j) => Math.round((c[v * 3 + j] / colScale) * 255));
+  return { key: `${px},${py},${pz}|${col}|${ax},${az}|${u},${w}|${s ? [s[v * 3], s[v * 3 + 1], s[v * 3 + 2]] : ''}`, p: [px, py, pz] };
+};
+const degP = (a, b, c) => { const abx = b[0] - a[0], aby = b[1] - a[1], abz = b[2] - a[2], acx = c[0] - a[0], acy = c[1] - a[1], acz = c[2] - a[2]; const nx = aby * acz - abz * acy, ny = abz * acx - abx * acz, nz = abx * acy - aby * acx; return nx * nx + ny * ny + nz * nz <= 0; };
+const trisQ = (b, from, to, colScale, q) => {
+  const out = [];
+  for (let i = from; i + 2 < to; i += 3) {
+    const A = snapKey(b, b.idx[i], colScale, q), B = snapKey(b, b.idx[i + 1], colScale, q), C = snapKey(b, b.idx[i + 2], colScale, q);
+    if (degP(A.p, B.p, C.p)) continue;
+    out.push(`${A.key}#${B.key}#${C.key}`);
+  }
+  return out.sort();
+};
+let qOff = 0, qOn = 0;
+for (const [name, lat, lon] of PLACES) {
+  const [x, y] = tileOf(lat, lon, 14);
+  const off = await api.buildTile(14, x, y, 'sat-buildings', { ...ENH, ...request(false) });
+  const on = await api.buildTile(14, x, y, 'sat-buildings', { ...ENH, ...request(true, { quantize: true }) });
+  const A = off.satBuilding, B = on.satBuilding;
+  if (!A || !B) { check(!A && !B, `${name} (q): empty in one arm only`); continue; }
+  const P = B.prep;
+  if (!P.posQ) { console.log(`${name.padEnd(15)} quantize: tile kept Float32 (extent outside the lattice)`); continue; }
+  check(B.pos instanceof Int16Array && B.pos.length === (B.anchor.length / 2) * 4 && B.anchor instanceof Int16Array && B.uv instanceof Int16Array && P.posQ === 16 && P.uvQ === 512, `${name} (q): layout`);
+  const nV = B.anchor.length / 2;
+  let deg = 0;
+  for (let i = 0; i + 2 < B.idx.length; i += 3) { const a = B.idx[i] * 4, b = B.idx[i + 1] * 4, c = B.idx[i + 2] * 4, p = B.pos; if (degP([p[a], p[a + 1], p[a + 2]], [p[b], p[b + 1], p[b + 2]], [p[c], p[c + 1], p[c + 2]])) deg++; }
+  check(deg === 0, `${name} (q): ${deg} degenerate triangles on the lattice`);
+  const used = new Uint8Array(nV);
+  for (const v of B.idx) if (v < nV) used[v] = 1;
+  check(used.every((u) => u === 1), `${name} (q): unreferenced vertices`);
+  const auxA = A.meta.auxiliaryIndexCount, auxB = B.meta.auxiliaryIndexCount, colScale = P.colNormalized ? 255 : 1;
+  const ob = trisQ(A, 0, auxA, 1, false), nb = trisQ(B, 0, auxB, colScale, true), od = trisQ(A, auxA, A.idx.length, 1, false), nd = trisQ(B, auxB, B.idx.length, colScale, true);
+  check(ob.length === nb.length && ob.every((t, i) => t === nb[i]), `${name} (q): body triangles differ (${ob.length} vs ${nb.length})`);
+  check(od.length === nd.length && od.every((t, i) => t === nd[i]), `${name} (q): detail triangles differ (${od.length} vs ${nd.length})`);
+  const rs = P.runStart, nR = rs.length - 1;
+  let runsOk = rs[0] === 0 && rs[nR] === nV;
+  for (let r = 0; r < nR && runsOk; r++) for (let v = rs[r]; v < rs[r + 1] && runsOk; v++) if (B.anchor[v * 2] / 16 !== P.runAnchor[r * 2] || B.anchor[v * 2 + 1] / 16 !== P.runAnchor[r * 2 + 1]) runsOk = false;
+  check(runsOk, `${name} (q): runs do not tile the vertices with one anchor each`);
+  const hp = B.housePts;
+  if (hp) { const set = new Set(); for (let r = 0; r < nR; r++) set.add(`${P.runAnchor[r * 2]},${P.runAnchor[r * 2 + 1]}`); let miss = 0; for (let i = 0; i < hp.length; i += 2) if (!set.has(`${hp[i]},${hp[i + 1]}`)) miss++; check(miss === 0, `${name} (q): ${miss} house anchors match no run`); }
+  const bo = bytesOf(A), bn = bytesOf(B);
+  qOff += bo; qOn += bn;
+  console.log(`${name.padEnd(15)} quantized: tris ${B.idx.length / 3} (lattice-collapsed vs prep: ${(ob.length + od.length) - (A.idx.length / 3)}) | verts ${nV} | ${(bo / 1048576).toFixed(2)} -> ${(bn / 1048576).toFixed(2)} MiB (-${(100 * (1 - bn / bo)).toFixed(1)} %)`);
+}
+console.log(`TOTAL quantized ${(qOff / 1048576).toFixed(1)} -> ${(qOn / 1048576).toFixed(1)} MiB (-${(100 * (1 - qOn / qOff)).toFixed(1)} %)`);
 console.log(`TOTAL ${(sumOff / 1048576).toFixed(1)} -> ${(sumOn / 1048576).toFixed(1)} MiB (-${(100 * (1 - sumOn / sumOff)).toFixed(1)} %), vertices ${vOff} -> ${vOn} (-${(100 * (1 - vOn / vOff)).toFixed(1)} %), triangles ${tOff} -> ${tOn}`);
-console.log(fail ? `FAIL ${fail}` : 'PASS worker prep: no degenerate triangles, the same triangles, runs and regions tile, wp stamped');
+console.log(fail ? `FAIL ${fail}` : 'PASS worker prep: no degenerate triangles, the same triangles, runs and regions tile, wp stamped; quantized: the same triangles on the lattice');
 process.exit(fail ? 1 : 0);
