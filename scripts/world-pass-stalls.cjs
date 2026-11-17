@@ -8,6 +8,8 @@
  * Default matrix: nyc-low,paris-mid × on,off × fresh,warm × pages 1,2.
  * --poses=nyc-low --arms=on --phases=fresh --pages=1 narrows a diagnostic run.
  * --profile records a CPU profile in a separate run (timings are marked profiled).
+ * --exceptions adds CDP exception details and non-pausing worker target logging
+ * for diagnostic retakes. Window/worker ErrorEvent locations are always recorded.
  * --plain omits flight/scene/quality pins and the warp, to check the actual front door.
  * --review explicitly adds graphicsReview=1. Production requires it for the
  * fixed-pose runtime handles; --plain can measure the literal production URL.
@@ -60,10 +62,10 @@ fs.mkdirSync(profileRoot, { recursive: true });
 let gitHead = null;
 try { gitHead = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim(); } catch {}
 const report = {
-  tool: 'world-pass-stalls', version: 6, started: new Date().toISOString(), mode, gitHead,
+  tool: 'world-pass-stalls', version: 7, started: new Date().toISOString(), mode, gitHead,
   serverRef: typeof args['server-ref'] === 'string' ? args['server-ref'] : null,
   url: baseUrl.origin, quality, seconds, poses: poseNames, arms, phases, pages,
-  profiled: !!args.profile, plain: !!args.plain, review: !!args.review, automation: !!args.automation,
+  profiled: !!args.profile, exceptions: !!args.exceptions, plain: !!args.plain, review: !!args.review, automation: !!args.automation,
   viewport: { width: 1600, height: 900 },
   venue: 'Headed installed Chrome, ANGLE D3D11, live providers, exclusive capture lock',
   pins: [...(args.plain ? [] : ['governor hold', 'Enhanced satellite', 'title bypass', 'sound off', 'tutorial done', 'fixed afternoon sun', 'baseline weather', 'arrival counters', 'fixed pose after runtime exists']),
@@ -118,6 +120,53 @@ function installMonitor({ durationMs }) {
     launchRemovedMs: null, warpMs: null, fullRingObservedMs: null, durationMs, visibilityChanges: [],
   };
   const at = () => +performance.now().toFixed(3);
+  // Parse errors often have no Error.stack. Preserve the browser's separate
+  // filename/line/column fields before page handlers or worker fallbacks run.
+  // These observers never preventDefault, pause a worker, or swallow an error.
+  m.windowErrors = []; m.workerErrors = []; m.workers = [];
+  const errorFields = (event) => ({ atMs: at(), message: String(event.message ?? ''),
+    filename: String(event.filename ?? ''), line: event.lineno ?? null, column: event.colno ?? null,
+    name: event.error?.name ?? null, stack: event.error?.stack ?? null });
+  window.addEventListener('error', (event) => {
+    if (m.windowErrors.length >= 100) return;
+    m.windowErrors.push({ ...errorFields(event), resource: event.target?.src ?? event.target?.href ?? null });
+  }, true);
+  // Keep only small JavaScript Blob references until their URL is revoked.
+  // Reading a worker's source happens only after its error event, not at boot.
+  const workerBlobs = new Map();
+  const createURL = URL.createObjectURL, revokeURL = URL.revokeObjectURL;
+  URL.createObjectURL = function(blob) {
+    const url = createURL.call(this, blob);
+    if (blob instanceof Blob && blob.size <= 524288 && /(?:java|ecma)script/i.test(blob.type)) workerBlobs.set(url, blob);
+    return url;
+  };
+  URL.revokeObjectURL = function(url) { workerBlobs.delete(String(url)); return revokeURL.call(this, url); };
+  if (typeof Worker === 'function') {
+    window.Worker = new Proxy(Worker, {
+      construct(target, constructorArgs, newTarget) {
+        const url = String(constructorArgs[0]), options = constructorArgs[1];
+        const record = { atMs: at(), url, type: options?.type ?? 'classic', name: options?.name ?? '', index: m.workers.length };
+        if (m.workers.length < 100) m.workers.push(record);
+        let worker;
+        try { worker = Reflect.construct(target, constructorArgs, newTarget); }
+        catch (error) {
+          if (m.workerErrors.length < 100) m.workerErrors.push({ ...record, stage: 'constructor', message: error.message, stack: error.stack });
+          throw error;
+        }
+        const blob = workerBlobs.get(url);
+        worker.addEventListener('error', (event) => {
+          if (m.workerErrors.length >= 100) return;
+          const failure = { ...errorFields(event), worker: record, stage: 'worker', blobBytes: blob?.size ?? null };
+          m.workerErrors.push(failure);
+          if (blob) blob.text().then((source) => {
+            failure.blobSource = source.slice(0, 131072);
+            failure.blobSourceTruncated = source.length > 131072;
+          }, () => {});
+        });
+        return worker;
+      },
+    });
+  }
   // A driver's first context may block without producing a Long Tasks API
   // entry. Measure the browser call itself on every new canvas, including
   // the benchmark and hangar. Each context is recorded once and never polled.
@@ -292,18 +341,26 @@ function readEnd() {
 const median = (values) => { if (!values.length) return null; const sorted = [...values].sort((a, b) => a - b); return sorted.length % 2 ? sorted[(sorted.length - 1) / 2] : (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2; };
 async function measure(context, page, arm, poseName, phase, pageNumber) {
   const id = `${mode}-${quality}-${arm}-${poseName}-${phase}-page${pageNumber}`;
-  const row = { id, mode, quality, arm, pose: poseName, phase, page: pageNumber, profiled: !!args.profile, automation: !!args.automation,
+  const row = { id, mode, quality, arm, pose: poseName, phase, page: pageNumber, profiled: !!args.profile, exceptions: !!args.exceptions, automation: !!args.automation,
     url: `${baseUrl.origin}/${args.review || arm === 'off' ? `?${[...(args.review ? ['graphicsReview=1'] : []), ...(arm === 'off' ? [`flags=${minusAll}`] : [])].join('&')}` : ''}`, errors: [], consoleErrors: [] };
   page.on('pageerror', (e) => {
     row.errors.push(e.message.slice(0, 500));
-    (row.pageErrors ??= []).push({ message: e.message, stack: e.stack });
+    (row.pageErrors ??= []).push({ receivedAtUnixMs: Date.now(), name: e.name, message: e.message, stack: e.stack });
+  });
+  page.on('worker', (worker) => {
+    const entry = { url: worker.url(), createdAtUnixMs: Date.now() };
+    (row.browserWorkers ??= []).push(entry);
+    worker.on('close', () => { entry.closedAtUnixMs = Date.now(); });
   });
   page.on('crash', () => row.errors.push('PAGE CRASH'));
   page.on('console', (m) => {
     if (m.type() !== 'error') return;
     const message = m.text().slice(0, 500), counts = (row.consoleErrorCounts ??= {});
     if (counts[message]) { counts[message]++; return; }
-    if (row.consoleErrors.length < 100) { row.consoleErrors.push(message); counts[message] = 1; }
+    if (row.consoleErrors.length < 100) {
+      row.consoleErrors.push(message); counts[message] = 1;
+      (row.consoleErrorLocations ??= []).push({ message, ...m.location() });
+    }
   });
   await page.addInitScript(installMonitor, { durationMs: seconds * 1000 });
   if (args.plain) await page.addInitScript((automation) => Object.defineProperty(navigator, 'webdriver', { configurable: true, get: () => automation }), !!args.automation);
@@ -312,8 +369,37 @@ async function measure(context, page, arm, poseName, phase, pageNumber) {
   let cdp;
   const wallStart = Date.now();
   try {
+    if (args.profile || args.exceptions) cdp = await context.newCDPSession(page);
+    if (args.exceptions) {
+      row.cdpExceptions = []; row.cdpWorkerTargets = []; row.cdpErrorLog = [];
+      const workerTargets = new Map();
+      const recordException = (details, target) => {
+        if (row.cdpExceptions.length < 100) row.cdpExceptions.push({ receivedAtUnixMs: Date.now(), target, ...details });
+      };
+      cdp.on('Runtime.exceptionThrown', ({ exceptionDetails }) => recordException(exceptionDetails, 'page'));
+      cdp.on('Log.entryAdded', ({ entry }) => { if (entry.level === 'error' && row.cdpErrorLog.length < 100) row.cdpErrorLog.push(entry); });
+      cdp.on('Target.attachedToTarget', ({ sessionId, targetInfo }) => {
+        if (targetInfo.type !== 'worker') return;
+        workerTargets.set(sessionId, targetInfo);
+        row.cdpWorkerTargets.push({ ...targetInfo, attachedAtUnixMs: Date.now() });
+        cdp.send('Target.sendMessageToTarget', { sessionId, message: JSON.stringify({ id: 1, method: 'Runtime.enable' }) })
+          .catch((error) => { (row.diagnosticWarnings ??= []).push(`Worker Runtime.enable: ${error.message}`); });
+      });
+      cdp.on('Target.receivedMessageFromTarget', ({ sessionId, message }) => {
+        try {
+          const event = JSON.parse(message);
+          if (event.method === 'Runtime.exceptionThrown') recordException(event.params.exceptionDetails, workerTargets.get(sessionId) ?? sessionId);
+        } catch { /* An unrelated protocol message must not interrupt the capture. */ }
+      });
+      await cdp.send('Runtime.enable');
+      await cdp.send('Log.enable');
+      // This is a second, observational CDP session. Do not pause new workers
+      // or modify Playwright's own attachment; ErrorEvents cover the start race.
+      await cdp.send('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: false, flatten: false,
+        filter: [{ type: 'worker', exclude: false }, { exclude: true }] })
+        .catch((error) => { (row.diagnosticWarnings ??= []).push(`Worker target inspection unavailable: ${error.message}`); });
+    }
     if (args.profile) {
-      cdp = await context.newCDPSession(page);
       await cdp.send('Profiler.enable');
       await cdp.send('Profiler.setSamplingInterval', { interval: 1000 });
       await cdp.send('Profiler.start');
@@ -369,10 +455,19 @@ async function measure(context, page, arm, poseName, phase, pageNumber) {
     if (m.visibilityChanges.some(v => v.atMs < seconds * 1000 && v.state !== 'visible')) row.errors.push('Page became hidden during timing; capture is not a foreground performance verdict');
     if (seconds >= 90 && row.summary.medianFrame60to90Ms > 200) row.errors.push('Anomalous steady cadence above 200 ms; inspect visibility and repeat before attribution');
     if (m.bootOverlayRemovedMs == null) row.errors.push('Boot overlay never removed within the measurement');
-  } catch (e) { row.errors.push(e.message); }
+  } catch (e) {
+    row.errors.push(e.message);
+    // A syntax error may prevent runtime handles from ever mounting. Preserve
+    // its pre-script ErrorEvents even when the ordinary readEnd path was skipped.
+    if (!row.monitor) {
+      try { row.monitor = await page.evaluate(() => window.__worldStallMonitor ?? null); } catch {}
+    }
+  }
   finally {
     if (cdp) {
-      try { const { profile } = await cdp.send('Profiler.stop'); fs.writeFileSync(path.join(out, `${id}.cpuprofile`), JSON.stringify(profile)); row.cpuProfile = `${id}.cpuprofile`; } catch (e) { row.errors.push(`Profile: ${e.message}`); }
+      if (args.profile) {
+        try { const { profile } = await cdp.send('Profiler.stop'); fs.writeFileSync(path.join(out, `${id}.cpuprofile`), JSON.stringify(profile)); row.cpuProfile = `${id}.cpuprofile`; } catch (e) { row.errors.push(`Profile: ${e.message}`); }
+      }
       await cdp.detach().catch(() => {});
     }
     row.wallMs = Date.now() - wallStart;
