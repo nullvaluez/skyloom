@@ -412,3 +412,750 @@ High's 375-draw row holds. Costs stated per the pass rule: Ultra and High
 both pay LESS geometry with the flag on (-33.5 to -35.6 % building bytes), one
 extra worker heap (the second building worker), and per resident tile about
 0.3 MB of main-thread footing and run data.
+
+## Round 2 (2026-11-17)
+
+Built on the integration head `d40dfd25` (merged first: TRUTH, LOOK, REACH,
+the two merge seams, WORKER_PROTOCOL 26). The flag still ships
+`enabled:false`. Same machine as round 1 (RTX 5080, installed Chrome, D3D11,
+live world, dev server :3322), shared with the other streams' captures: every
+capture waited for one of the three GPU slots, and the cold-boot numbers below
+are dominated by other systems' shader links. A fresh control (all flags off)
+was shot in the same session for every before / after; no old base frame was
+used. Evidence: `.graphics-review/world-pass/r2/arrival/` in this worktree;
+the frames for review are copied to
+`mystifying-curran-97a006/.graphics-review/world-pass/r2/arrival/`
+(`control/` flags off, `own/` WORLD_ARRIVAL, `all/` the four flags, plus
+`footing/`, `boost/`, `cmp/`).
+
+Commits: `f212f847` (quantized vertices, seams), `017cfb11` (ground memo, churn
+gate), `579954e6` (quantized finalize, repair and footing; build timeout and
+worker replacement; keep-behind; counters; probes), `70d91a57` (region-aware
+guard, finer slices, fallback counters, the first async compile),
+`cc55d506` (the compile under a bound render target, its probe), and this
+ledger.
+
+### 1. Geometry budget: quantized building vertices (`worker.quantize`)
+
+**What `world-pass-budget.cjs` counts:** the CPU typed arrays of every unique
+geometry (`attribute.array.byteLength` plus the index), never a GPU buffer;
+`lib/fly/cinema-resources.js` counts the same thing. It is a proxy for the GPU
+buffers, which hold the same bytes for every Float32 attribute. So I did NOT
+release CPU copies (that would lower the tool's number and leave the GPU
+unchanged). I made the vertex smaller on both sides:
+
+- **Position** Float32 x3 (12 B) -> normalized Int16 x4 (8 B): tile-local
+  metres on a fixed 1/16 m lattice (+-2,047 m; a z14 tile is 2,446 m across,
+  at Paris 1,600 m). Four components because D3D11 has no 3-component 16-bit
+  vertex format; the 4th is 0. The mesh sits at its tile's median ground
+  (`mesh.position.y`), so local Y holds any building on that ground (a run
+  more than about 1 km off the median would be clamped and counted,
+  `quantClamped`: 0 everywhere).
+- **Bend anchor** Float32 x2 (8 B) -> normalized Int16 x2 (4 B), same lattice.
+- **Facade uv** Float32 x2 (8 B) -> normalized Int16 x2 (4 B) on a 1/512
+  lattice (+-64 units = +-1.7 km of facade at 27 m a unit; 5 cm steps).
+- Colour, normal and style stay Uint8 / Int8 x3 (round 1).
+
+Where: the worker snaps position, anchor and uv to their lattices BEFORE its
+degenerate filter (`emit.js` `snapToLattice`, `toLattice`), so the filter, the
+runs, the footing data, the partition and the normals all see exactly the
+drawn coordinates, and a triangle the lattice collapses is dropped with the
+other exactly-degenerate ones (148 triangles over the nine places beyond
+round 1's filter; Paris 31 of 191,747). House
+anchors are snapped the same way and still match their runs exactly. A tile
+whose local extent does not fit keeps Float32 (none did). The main thread adds
+each run's ground in whole lattice steps; the contact repair, the footings and
+the facade-v shift write integer deltas from the run's record (`run.gq`,
+`run.footQ`), recomputed from the sample each time, so repeated repairs never
+accumulate rounding. `WpQuantAttribute` (`lib/fly/toy-world/wp-quant.js`)
+reads and writes metres through `getX/getY/setY`, so three's bounding volumes
+and raycasts and the night-light reader (`night-ground-sources.js`, `getY`)
+see what they saw before. The GPU decode is a macro block inserted just before
+`void main` of the vertex shader (position, uv, aBendAnchor) on the shared
+architecture material, its CHUNK_FADE twins and the mesh's
+`customDepthMaterial` (three's default depth material, decoded); the program
+key gains `|wpq1a`. Before `main`, not at the top: three's `common` chunk has a
+function parameter named `uv`, and a top-of-shader macro broke it (first smoke
+run, 15,781 shader errors, fixed before any measurement below); the edit
+refuses to build a program whose expanded main body declares a local named
+like a decoded attribute. The quantized program is compiled with
+`renderer.compileAsync` before its first mesh is shown (see 3), and the
+prewarm scene compiles it.
+
+Seams outside my files: `lib/fly/operations-scenery.js` (Gate to Gate's
+building retirement at the observed airport walked positions with a stride of
+3 and read anchors as metres: now `pos.itemSize` and `anchor.wpK`, marked
+`// WORLD PASS B x Gate to Gate seam`); `lib/fly/prewarm.js` (the decoded
+variant and its depth material in the warm scene when the flag, its sub and
+`quantize` are on, marked `// WORLD PASS B x prewarm seam`).
+
+Node: `scripts/wp-arrival-bytes.mjs` (per-attribute bytes on the recorded
+inputs) and `scripts/wp-arrival-worker-prep.mjs` gate (f), new: the quantized
+bundle is the OFF triangles with every vertex snapped to the lattices, minus
+those the snap collapses; no ON triangle is degenerate on the lattice; runs
+tile; house anchors match runs. **PASS; bundle bytes 98.0 -> 45.5 MiB over the
+nine places (-53.6 %; round 1 was 63.0).** Per vertex (midtown): 60.9 B off,
+43.2 B round 1, **31.2 B** now on the CPU; the GPU estimate (each 3-component
+byte attribute counted as 4) 61.9 / 46.2 / **34.2 B**. With all four flags
+LOOK's colour stays Float32 (its glass / opaque offsets put red above 1):
+40.2 B.
+
+Live, Ultra, `scripts/wp-arrival-r2-budget.cjs` (the budget tool's count, a
+GPU estimate, a frame per pose), one page per arm, same session, all settled
+except sf-hills (settle wait timed out in all three arms):
+
+| pose | off: total / buildings MiB | ARRIVAL | all four | GPU estimate total: off / ARRIVAL / all four | draws off / A / all | triangles M off / A / all |
+|---|---|---|---|---|---|---|
+| paris | 413.5 / 320.4 | **246.0 / 152.9** | **239.6 / 190.7** | 419.6 / 261.4 / 249.0 | 383 / 372 / 384 | 6.41 / 6.47 / 7.16 |
+| nyc-low | 309.0 / 210.7 | **196.3 / 98.0** | **190.8 / 122.8** | 313.3 / 206.5 / 197.2 | 386 / 384 / 384 | 4.54 / 4.48 / 5.46 |
+| tokyo | 311.5 / 216.8 | 198.7 / 104.0 | 189.1 / 129.5 | 315.9 / 209.5 / 195.6 | 399 / 402 / 403 | 4.91 / 5.02 / 5.95 |
+| phoenix-suburb | 250.6 / 168.4 | 161.1 / 78.9 | 121.7 / 67.3 | 253.9 / 169.3 / 127.4 | 369 / 548 / 370 | 2.71 / 3.06 / 3.14 |
+| hongkong | 287.1 / 231.6 | 166.6 / 111.1 | 174.5 / 136.1 | 291.2 / 177.6 / 182.5 | 348 / 350 / 352 | 3.31 / 3.50 / 3.62 |
+| sf-hills | 294.1 / 235.2 | 158.4 / 99.5 | 169.3 / 124.6 | 298.3 / 168.3 / 175.8 | 377 / 382 / 385 | 4.40 / 4.18 / 4.76 |
+| iowa-farm | 39.4 / 2.8 | 38.1 / 1.6 | 35.7 / 0.9 | 39.5 / 38.3 / 35.8 | 282 / 294 / 296 | 0.26 / 0.26 / 0.25 |
+
+High (`--quality=high`), same tool:
+
+| pose | off: total / buildings MiB | ARRIVAL | all four | GPU estimate total: off / ARRIVAL / all four | draws off / A / all | triangles M off / A / all |
+|---|---|---|---|---|---|---|
+| paris | 413.5 / 320.4 | **246.0 / 152.9** | **239.6 / 190.7** | 419.6 / 261.4 / 249.0 | 477 / 333 / 325 | 4.57 / 4.53 / 4.51 |
+| nyc-low | 309.0 / 210.7 | **196.3 / 98.0** | **190.8 / 122.8** | 313.3 / 206.5 / 197.2 | 326 / 329 / 321 | 3.50 / 3.51 / 3.46 |
+
+(High keeps the same building ring as Ultra, so the bytes match Ultra to the
+decimal; the horizon is smaller with REACH on.)
+
+By the budget's own count (CPU arrays), Paris and nyc-low are under 256 MiB at
+Ultra and High, flag alone and all four. **Stated plainly: by the GPU
+estimate, which counts each 3-component byte attribute (colour, normal,
+style) as 4 bytes because D3D11 has no 3-byte vertex format, Paris with the
+flag alone is 261.4 MiB, 5.4 over.** What ANGLE actually stores cannot be read
+from WebGL (see 8); if it pads, Paris ARRIVAL-alone is over the row on the GPU
+by that much. The next lever is the style attribute (3 B a vertex, read on the
+CPU by the night lights, so moving it into position.w needs a seam there). All
+16 resident tiles were quantized at every city pose, 0 clamps, 0 console
+errors, 0 page errors. Draws and triangles are unchanged by this stream
+(phoenix-suburb's 548 draws in the ARRIVAL arm is CHUNK_FADE / settle
+breathing, as round 1 noted; its triangles are higher because the ring held
+more tiles at that moment).
+
+The official tool (`world-pass-budget.cjs`, Ultra, paris and nyc-low):
+
+| arm | pose | total MiB | buildings | draws | triangles M | first tile / full ring s | stuck | ground ms |
+|---|---|---|---|---|---|---|---|---|
+| ARRIVAL | paris | **246.0** | 152.9 | 384 | 6.41 | 27.1 / 28.5 | 0 | 1.87 |
+| ARRIVAL | nyc-low | **196.3** | 98.0 | 535 | 4.80 | 4.1 / 6.3 | 0 | 1.97 |
+| all four | paris | **239.6** | 190.7 | 384 | 7.16 | 23.4 / 28.4 | 0 | 2.18 |
+| all four | nyc-low | **190.8** | 122.8 | 383 | 5.46 | 4.1 / 10.6 | 0 | 2.15 |
+
+(Paris is the tool's first pose, so its first tile waits behind the cold
+shader links of section 3; nyc-low is the warm arrival. 535 draws at nyc-low
+is fade breathing, under 900.)
+
+Look: off / ARRIVAL / all four side by side per pose (`cmp/<pose>-off-arrival-
+all4.png`) and full-resolution crops off over ARRIVAL
+(`cmp/{paris,nyc-low,hongkong}-crop-off-top-arrival-bottom.png`): the same
+buildings, the same window grid on the same floors, the same roofs; the
+visible differences are cloud shadows (running clock). Mean absolute pixel
+difference off against ARRIVAL over the lower frame 3.5 to 12.2 (Paris the
+largest, a cloud shadow over the Seine bank).
+
+### 2. Ground query: the memo outlives the batch
+
+`lib/fly/terrain-ground-query.js`. While armed, EVERY query (batched or not,
+from any caller: the building engine, `getGroundAt` for REACH / GROUND / the
+airport set, POI ground, terrain shadows) takes the memoised path. The walk
+depends only on the tree's topology and its tiles' world matrices (tile boxes
+are tested in X and Z only; a box's X/Z come from scale and matrixWorld); the
+triangle test on each reached mesh's geometry, index, draw range, groups,
+materials and their sides, bounding box and matrixWorld. So:
+
+- a generation counter, bumped by hooks installed (only while armed) on the
+  tile class (`add`, `remove`: every child-list change of the tree goes
+  through them), the tile-mesh class (`setGeometry`, `syncGroups`,
+  `syncMaterials`, `setMaterial`) and the root's `tile-loaded` /
+  `tile-unload` events. An added subtree's matrices are brought current in
+  the `add` itself (`updateMatrixWorld(true)`), so a tile never enters the
+  memo with the identity matrix it has until the next render (flag on only;
+  the value is the one the next render computes);
+- per query, the map's world matrix is brought current exactly as the
+  reference's `geo2world` does, and the root tile's matrixWorld, the root
+  object and the projection are compared with the memo's snapshot (a
+  floating-origin rebase moves the root);
+- per use, each mesh record re-checks its own inputs and is rebuilt on any
+  difference. Inside a batch these checks run once per batch.
+
+Exact under churn, two ways:
+
+- node, `scripts/wp-arrival-ground-churn.mjs`: the vendored three-tile and
+  real TileMesh geometry, the fast path never told about a change: refine,
+  merge, model replacement with a stale matrix, `setGeometry`, in-place height
+  edits (operations-terrain's airport flattening), material side flips and
+  swaps, groups resync, a full rebase, a map-only rebase with stale children,
+  random interleavings. **PASS: 60,900 unbatched + 60,900 batched comparisons,
+  0 differences.** Red check: with the memo never reset the gate fails at the
+  first refine.
+- live, `scripts/wp-arrival-r2-livediff.cjs`:
+  `TerrainGroundQuery.prototype.sample` wrapped in the page, so every query of
+  every instance during real arrivals (warp, 45 s, then 15 s of drift over
+  refining terrain) is re-asked of the reference in the same synchronous call.
+
+| run | place | live queries | differences | batched / unbatched calls | live us/call: batched / unbatched / reference | replay us/call: fast unbatched / fast batched / reference |
+|---|---|---|---|---|---|---|
+| 1 | sf | 339,118 | 0 | 173,119 / 165,999 | 2.31 / 4.45 / 13.43 | 1.91 / 1.19 / 11.99 |
+| 1 | hk | 617,323 | 0 | 171,711 / 445,612 | 3.12 / 3.79 / 13.10 | 1.82 / 1.41 / 13.10 |
+| 1 | nyc | 660,352 | 0 | 268,077 / 392,275 | 1.71 / 2.73 / 12.29 | 1.53 / 0.85 / 9.15 |
+| 1 | owens | 794,637 | 0 | 63,784 / 730,853 | 1.56 / 2.02 / 8.32 | 1.56 / 1.19 / 7.99 |
+| 2 | sf | 389,974 | 0 | 199,661 / 190,313 | 2.59 / 3.02 / 11.62 | 1.94 / 0.98 / 12.29 |
+| 2 | hk | 636,328 | 0 | 174,624 / 461,704 | 2.83 / 3.42 / 12.71 | 1.23 / 0.83 / 8.79 |
+| 2 | nyc | 667,014 | 0 | 267,050 / 399,964 | 2.11 / 2.39 / 11.90 | 1.77 / 1.24 / 11.66 |
+| 2 | owens | 662,712 | 0 | 56,828 / 605,884 | 1.45 / 2.37 / 9.45 | 1.48 / 1.04 / 7.40 |
+
+**Run 1: 2,411,430 live queries, 0 differences. Run 2: 2,356,028, 0
+differences.** Memo resets (generation changes) 404 to 1,587 per place, record rebuilds 1 to
+2 (run 1). Run 1 used the code at `579954e6`; run 2 the final code.
+
+Honest timing: "live" is per call with `performance.now` around each call
+(Chrome coarsens it; only means over hundreds of thousands of calls are
+reported) and includes the walks after every reset while tiles stream. The
+replay times the same recorded points in one synchronous loop on the settled
+tree. Over both runs the public, unbatched path is 1.2 to 1.9 us a call on
+replay (the reference: 7.4 to 13.1 us here, 16 to 21 us in round 1 under
+heavier load) and 2.0 to 4.5 us live; the batched path 0.83 to 1.41 us on
+replay and 1.4 to 3.1 us live. **The under-1-microsecond target is met for
+the batched path on replay in three of eight place-runs (nyc run 1 0.85, sf
+run 2 0.98, hk run 2 0.83) and missed in the other five (1.04 to 1.41); the
+unbatched path never meets it (1.2 to 1.9 on replay), and no path meets it
+live (1.4 to 4.5, with the walks after resets and timer cost included).** The
+extra unbatched cost is, per call, the
+map's world matrix update (as the reference does it), two 16-element matrix
+compares and the record checks. I kept each because each is what makes the
+answer provably the reference's; skipping the matrix update would be exact
+only if nothing ever moved the map without updating it, which I cannot prove.
+
+### 3. Frame pacing while the ring fills
+
+`scripts/wp-arrival-r2-pacing.cjs`: one fresh page per run, a cold warp (the
+page's first) to Midtown and then a warm warp to Paris; per warp, from the warp
+until the ring is full (or 45 s): longest frame, frames over 33 / 100 ms, the
+engine's worst finalize frame split into readiness checks / sliced walk and
+guard / finalize proper / rest, and every shader program linked in that window
+(`__flyStats.census.programs`, first use and ms). `--profile` adds a CPU
+profile and the functions in the longest busy stretch.
+
+Causes found:
+
+1. **The multi-second cold frames are shader links, in every arm.** Profiled
+   (`pacing-prof1`): the 10 to 11 s frame is `getProgramInfoLog` waiting on a
+   link inside the post-processing composer (`postprocessing` index.js:6952,
+   6.3 s) and the immersive cloud pass (3.7 s). The census names the same
+   programs in the OFF arm (`ShaderMaterial#4b11b774` 3.9 to 5.8 s,
+   `MeshStandardMaterial#b12bfbe9` 3.9 to 6.1 s). Not this stream's, not fixed
+   here. The verifier's 2,391 ms (on) against 1,121 ms (off) cold frame is
+   this class: which link lands in which frame moves from run to run.
+2. **ARRIVAL added one link of its own**: the quantized building program
+   (`MeshStandardMaterial#0e038cea`, 1.3 and 1.9 s in two of three cold
+   pairs; absent in OFF). First fix (`70d91a57`): `renderer.compileAsync`
+   before the first quantized mesh is shown (the mesh stays hidden until it
+   resolves; `quantCompileMs`), and the prewarm scene compiles it. **That
+   first fix did not work, and the pacing2 run showed it**: the two ARRIVAL
+   cold runs that drew a tile inside the window still had a 2,236 / 2,398 ms
+   frame. Cause (the trap `prewarm.js` documents): three keys a program on
+   the output colour space of the BOUND target; the game draws into the
+   composer's buffer (`srgb-linear`), while my compile ran against the canvas
+   (`srgb`), so it minted a variant nothing draws and the real one still
+   linked synchronously on the first frame. Fixed in `cc55d506`: the compile
+   runs with a 1x1 render target bound, as prewarm does. Proof,
+   `scripts/wp-arrival-r2-compilekey.cjs` (records the program three gives
+   the building material right after the compile call and the one it draws
+   with once shown): **old: different, key field 10 `srgb` vs `srgb-linear`
+   (FAIL); fixed: the same program (PASS)**, `compilekey/compilekey-{old,fixed}.json`.
+   The depth variant (`MeshDepthMaterial#06e8eeb6` / `#2d1350d1`) still links
+   on the first shadow pass: 6 to 23 ms measured, cold and warm.
+3. **The 41 to 76 ms finalize frames** (round 1's Paris 71.5 ms with all four;
+   here in about a third of the pages, ARRIVAL and all four): `partition` 41 to
+   60 ms, the main-thread re-partition of a dense tile, which ran whenever
+   FLASH_GUARD dropped even one triangle on the main thread
+   (`partitionFallbacks` 1). Fixed at the cost's cause: the sliced guard counts
+   the kept triangles per worker region (`flash-guard.js`, `st.bounds` /
+   `regionKept`), and the engine keeps the worker's partition with each region
+   shortened instead of re-partitioning (`guardDropsKeptPartition`). Why a
+   triangle can still drop on the main thread after the worker's filter: a
+   triangle whose vertices belong to two runs can become exactly flat once
+   each run gets its own ground. Any remaining fallback records its reason
+   (`partitionFallbackWhy`).
+4. One sliced run walk took 15.8 ms against the 3 ms slice: the deadline was
+   checked every 256 runs; now every 64.
+5. **All four flags, warm Paris: a 1.9 to 2.6 s frame in every pass-2 run**
+   (pacing2, 2,604 / 2,299 / 2,207 ms; absent with ARRIVAL alone and off).
+   Profiled (`pacing-prof2`, 1,943 ms): 1,878 ms in `getProgramInfoLog`
+   under `CoastalReflectionRig.useFrame` -> `coastal-reflection.js:62`, the
+   first-use link of the coastal water reflection program that one of the
+   other three flags turns on (the census misses it because it is drawn
+   outside the main render). The round-1 all-four "2.36 s first-use link"
+   is this same program. Not this stream's; not fixed here.
+6. Other streams' finalize: REACH's skyline engine finalizes up to 26 to 39 ms
+   a tile (round-1 combined captures). Both engines go through the shared R24
+   brake `mayFinalize` (`finalize-pace.js`), which admits at most
+   `maxPerFrame` finalizes a frame across engines and refuses after the shared
+   budget once one has run; the first admitted finalize of a frame is never
+   refused, so one 39 ms skyline tile can share a frame with my slices. I did
+   not slice REACH's finalize (their file; Open).
+
+Round-2 first pass (`pacing`, code at `579954e6`, before fixes 2 to 4), three
+interleaved pairs:
+
+| pair | arm | cold: longest ms / >33 / >100 | warm: longest ms / >33 / >100 | warm first tile s / honest ground s | finalize frame max ms (warm) |
+|---|---|---|---|---|---|
+| 0 | off | 10,677 / 76 / 9 | 156 / 106 / 4 | 8.7 / 6.2 | - |
+| 0 | ARRIVAL | 11,608 / 78 / 7 | 142 / 138 / 3 | 4.3 / 6.6 | 76.4 |
+| 0 | all four | 11,297 / 63 / 8 | 165 / 78 / 2 | 4.1 / 5.6 | 44.2 |
+| 1 | off | 12,259 / 74 / 8 | 186 / 129 / 4 | 7.9 / 5.2 | - |
+| 1 | ARRIVAL | 10,736 / 74 / 9 | 134 / 85 / 1 | 3.5 / 5.1 | 49.1 |
+| 1 | all four | 6,595 / 70 / 8 | 163 / 114 / 5 | 4.3 / 6.2 | 6.9 |
+| 2 | off | 8,103 / 66 / 4 | 184 / 47 / 6 | 6.8 / 4.7 | - |
+| 2 | ARRIVAL | 6,368 / 64 / 6 | 177 / 64 / 2 | 3.5 / 4.8 | 31.6 |
+| 2 | all four | 6,192 / 53 / 9 | 151 / 54 / 2 | 3.7 / 4.9 | 8.1 |
+
+(OFF has no `finalizeFrameMsMax`; its shipped per-tile finalize max was 99.5 /
+128.3 / 99.8 ms at Paris. In the cold window OFF drew no detailed tile within
+45 s in any pair.)
+
+Second pass (`pacing2`, `70d91a57`: region-aware guard, finer slices, the
+first, wrong-target compile), three interleaved pairs:
+
+| pair | arm | cold: longest ms (2nd) / >33 / >100 | cold first tile s | warm: longest ms / >33 / >100 | warm first tile s / honest ground s | finalize frame max ms (cold / warm) | partition fallbacks |
+|---|---|---|---|---|---|---|---|
+| 0 | off | 15,953 (302) / 68 / 4 | none | 276 / 156 / 10 | none / 8.3 | - | - |
+| 0 | ARRIVAL | 10,942 (**2,236**) / 83 / 6 | 17.8 | 164 / 155 / 4 | 4.6 / 6.8 | 18.4 / 4.8 | 0 |
+| 0 | all four | 15,300 (443) / 63 / 4 | none | **2,604** / 116 / 4 | 7.9 / 9.3 | 0.6 / 7.6 | 0 |
+| 1 | off | 17,733 (331) / 61 / 5 | none | 154 / 107 / 5 | 8.6 / 6.2 | - | - |
+| 1 | ARRIVAL | 14,251 (299) / 57 / 4 | none | 181 / 116 / 5 | 4.1 / 5.5 | 0.4 / 7.4 | 0 |
+| 1 | all four | 15,765 (295) / 77 / 11 | none | **2,299** / 127 / 8 | 6.6 / 8.6 | 0.7 / 7.2 | 0 |
+| 2 | off | 14,430 (233) / 91 / 7 | none | 144 / 128 / 5 | 8.4 / 6.2 | - | - |
+| 2 | ARRIVAL | 9,865 (**2,398**) / 92 / 6 | 17.2 | 119 / 79 / 1 | 3.3 / 4.9 | 8.5 / 4.0 | 0 |
+| 2 | all four | 14,398 (256) / 64 / 6 | none | **2,207** / 112 / 3 | 6.3 / 8.0 | 0.2 / 5.6 | 0 |
+
+The partition fallback is gone (0 in every run; the worst finalize frame
+4.0 to 18.4 ms, the 18.4 a `records` + `partition` frame in a cold run under
+the 10 s link). The bold frames are causes 2 (ARRIVAL cold) and 5 (all four
+warm) above. OFF's shipped per-tile finalize reached 111 to 117 ms.
+
+Final code (`pacing3`, `cc55d506`), three interleaved pairs:
+
+| pair | arm | cold: longest ms (2nd) / >33 / >100 | cold first tile s | warm: longest ms / >33 / >100 | warm first tile s / honest ground s | finalize frame max ms (cold / warm) | partition fallbacks |
+|---|---|---|---|---|---|---|---|
+| 0 | off | 10,942 (2,238) / 92 / 5 | none | 148 / 100 / 4 | 7.7 / 5.7 | - | - |
+| 0 | ARRIVAL | 8,617 (2,036) / 63 / 8 | 5.4 | 151 / 79 / 1 | 4.1 / 5.8 | 9.4 / 4.1 | 0 |
+| 0 | all four | 6,779 (1,949) / 65 / 8 | 5.2 | 136 / 44 / 1 | 3.5 / 5.0 | 5.5 / 3.6 | 0 |
+| 1 | off | 9,956 (2,844) / 96 / 7 | none | 141 / 79 / 6 | 7.4 / 5.3 | - | - |
+| 1 | ARRIVAL | 11,688 (2,638) / 84 / 8 | 19.2 | 445 / 166 / 7 | 5.1 / 8.4 | 10.0 / 31.9 | 0 |
+| 1 | all four | 15,061 (280) / 64 / 3 | none | 2,363 / 125 / 5 | 3.8 / 8.9 | 0.8 / 5.1 | 0 |
+| 2 | off | 9,206 (2,008) / 61 / 5 | none | 151 / 90 / 4 | 7.6 / 5.7 | - | - |
+| 2 | ARRIVAL | 17,740 (448) / 46 / 4 | none | 134 / 102 / 2 | 3.6 / 5.2 | 1.1 / 8.4 | 0 |
+| 2 | all four | 13,443 (2,640) / 75 / 6 | 3.5 | 165 / 114 / 5 | 4.6 / 6.6 | 6.8 / 4.1 | 0 |
+
+Read across the three passes:
+
+- **Cold (the page's first warp):** the longest frame is 6.8 to 17.7 s in
+  every arm, the OFF arm included (the shared links of cause 1; the census
+  names the same two programs in all nine runs). The second-longest cold
+  frame is now 2.0 to 2.8 s in the OFF arm too: the shared links land in two
+  frames in some runs. ARRIVAL's own link (0e038cea) is gone from the census
+  in all six on-arm cold runs, and ARRIVAL's second-longest cold frame (448 /
+  2,036 / 2,638 ms) is inside the OFF arm's range (2,008 to 2,844). The cold
+  rows are not a verdict on this stream either way: they are the composer and
+  cloud links, which the census attributes to OFF identically.
+- **Warm (Paris, second warp):** longest frame OFF 141 to 151 ms, ARRIVAL 134
+  to 151 ms in two runs and 445 ms in one (no program linked in that window;
+  the frame is not attributed), all four 136 to 165 ms in two runs and 2,363 ms
+  in one (cause 5, the coastal reflection link). Frames over 33 ms: OFF 79 to
+  100, ARRIVAL 79 to 166, all four 44 to 125: no difference I can claim from
+  three pairs.
+- **The engine's own finalize work in a frame** (`finalizeFrameMsMax`,
+  slices included): 3.6 to 10.0 ms in 11 of 12 on-arm windows, against the
+  OFF arm's shipped per-tile finalize of 106 to 116 ms at Paris. The 3 ms
+  slice covers the run walk and the guard; the finalize proper of one tile
+  (records, partition regions, attributes, mesh) is not sliced and measured
+  0.7 to 7.8 ms. One window (ARRIVAL pair 1, warm) read 31.9 ms, all of it in
+  the sliced `pre` phase, once in 18 windows; both sliced loops read the clock
+  every 64 runs / 8,192 triangles, so I attribute it to a pause outside the
+  loop's control (GC or preemption on a machine shared with other captures),
+  not proven.
+- **First detailed tile, warm:** ARRIVAL 3.6 to 5.1 s, all four 3.5 to 4.6 s,
+  OFF 7.4 to 7.7 s; honest ground under the aircraft 5.0 to 8.9 s; the first
+  tile lands before the terrain is honest in all six on-arm runs (section 7).
+
+### 4. Worker pool: a build can no longer wait forever
+
+`_guardBuild` races each pool build against `buildTimeoutSec` (20 s; dense
+tiles build in 0.6 to 2.4 s); a timeout rejects, so the ordinary error path
+re-queues the tile with its capped backoff, and the worker that owned it is
+pinged (a no-op `setDiag` message, `pingTimeoutSec` 5 s). A worker that does
+not answer is terminated and replaced (`SatBuildingLayer` hands the engine a
+spawner), and every build still waiting on it rejects at once. A worker's
+`error` event (a script that failed to load) triggers the same ping. With the
+flag off none of it exists (one worker, no listener).
+
+Proof, `scripts/wp-arrival-r2-killworker.cjs` (Paris, ARRIVAL, pool worker 1
+terminated 2 s after the warp with 3 builds in flight on it): timeouts at 20
+to 23 s, the ping failed and the worker was replaced at about 25 s, the three
+tiles re-queued and built, nothing left in flight, full ring at 30.5 s.
+**PASS** (`killworker/killworker.json`): `buildTimeouts` 3, `workerChecks` 1,
+`workersReplaced` 1, 0 page errors, 0 console errors.
+
+"Invalid or unexpected token": seen once (round-2 smoke 1, with React's
+"Should not already be working"), in a page booted while I was editing engine
+files: next dev rebuilt chunks under the running page, and a worker that
+fetches a half-written chunk dies with exactly that SyntaxError and never
+answers. That matches the verifier's run (3 builds stuck 184 s on a High
+page). Not reproduced on a quiet server; the timeout and the `error` listener
+cover it either way.
+
+### 5. Eviction at boost: the ring behind the aircraft stays
+
+The lead point moves the ring up to 0.8 r ahead at speed. Now (readiness on) a
+drawn tile outside the lead ring stays resident while any of it is within r of
+the AIRCRAFT and the resident building geometry stays under
+`buildingBudgetMB` (160; the ring is counted first, then the kept tiles
+nearest first; `behindKept`, `behindDropped`).
+
+`scripts/wp-arrival-r2-boost.cjs` (Midtown, full ring, then 750 m/s on heading
+220 for 10 s; the orbit camera turned 180 degrees through the input a
+right-mouse drag feeds, yaw -3.14 measured): tile deaths behind the aircraft
+while still within 4,400 m of it: **off 15, ARRIVAL 0, all four 0**; every
+death with the flag on was 4,410 to 4,610 m behind (just outside the ring);
+off's started at 3,256 m. Kept behind at the end: 9 (ARRIVAL), 7 (all four).
+Frames `boost2/lookback-0-{off,arrival,all4}-t{4,8}.png`, composite
+`cmp/boost-lookback-t8-off-arrival-all4.png` (looking back at Manhattan from
+the Jersey shore 8 s in: the on arms keep the near waterfront blocks the off
+arm has lost). Cost: up to +9 draws while kept; bytes bounded by the budget.
+
+### 6. Footings: insurance, not a visible fix
+
+`scripts/wp-arrival-r2-footing.cjs`: found the deepest footings live (ON) at
+hk-slope, sf-slope and nyc-harbor, put a camera 220 m from each, and shot the
+same pose off and on in the same session (`footing/*__{off,on}.png`,
+`cmp/*-off-left-on-right.png`).
+
+- The deepest footings (60 m, the cap) at Hong Kong and San Francisco were all
+  computed on a **z12** drawn mesh, far from the aircraft where three-tile
+  keeps the ground coarse; a z12 triangle spans hundreds of metres, so corners
+  and centroid differ by tens of metres on a hillside. They are correct
+  against the drawn ground and are recomputed when the mesh refines.
+  Waterfront (nyc-harbor) footings were 10 m on z14.
+- **No frame shows a gap in the control that the on frame closes**, at any of
+  the six poses, and no frame shows a plinth or a sunk wall in the on arm
+  (mean absolute difference 2.8 to 7.0, clouds). The footing is insurance: it
+  guarantees the downhill wall reaches the drawn ground, which the shipped 6 m
+  base sink already hides at every pose I found. Counters (on, cumulative):
+  `footGaps` HK 518, SF 2,754, NYC 4,116.
+
+### 7. First detailed tile, measured against the terrain's own arrival
+
+The pacing probe stamps the first moment the ground under the aircraft answers
+from a drawn mesh at z14 or finer (also engine counters `groundSec` /
+`firstTileAfterGroundSec` with counters on). Warm Paris, round-2 first pass:
+the honest ground arrives at 4.7 to 6.6 s in every arm, and with the flag on
+the first detailed tile is drawn at **3.5 to 4.3 s, i.e. 0.6 to 2.4 s BEFORE
+the terrain under the aircraft is honest** (it stands on the coarser drawn
+mesh and re-seats in place); off arm 6.8 to 8.7 s. The "3 s after terrain"
+target is met with margin. Cold: the honest ground under the aircraft was
+often not reached inside the 45 s window (the first frames go to the shader
+links above); the first tile landed at 3.9 to 5.6 s in four of six on-arm cold
+runs and at 18 to 20 s in two. Final code (pacing3): warm first tile 3.5 to
+5.1 s against honest ground 5.0 to 8.9 s, before the ground in all six
+on-arm runs; cold first tile 3.5 to 19.2 s in four of six on-arm runs, OFF
+none within 45 s in all three.
+
+### 8. Small things
+
+- `emit.js`: the comment now says colours pack as normalized Uint8 (3 B).
+- The heal-in-place / contact-repair coupling is commented where the arrival
+  chunk's records are made (`_finalizeArrival`): they never act on one chunk
+  only because the heal loop skips every chunk with `drapeRuns` in Enhanced; a
+  quantized chunk carries no `redrape` record, so a future caller degrades to
+  evict-and-rebuild instead of writing metres into lattice steps.
+- 3- versus 4-component layouts under ANGLE / D3D11
+  (`scripts/wp-arrival-r2-vfmt.cjs`, blank page, upload + first draw +
+  `gl.finish`, medians of 9, 4 M vertices): uint8 x3 0.9 ms / x4 1.2 ms, int8
+  x3 0.8 / x4 1.1, int16 x3 6.0 / x4 8.0, float32 x3 9.5 ms. **No conversion
+  cost is visible for the 3-component byte layouts: they are not slower than
+  4-component ones** (at 400 k vertices every layout was 0.2 to 0.5 ms, under
+  the timer's resolution). What ANGLE stores on the GPU cannot be read from
+  WebGL, so the GPU estimate in 1 assumes the worst (4 bytes). Colour, normal
+  and style stay 3-component (4 would add CPU bytes for no measured gain);
+  position is 4-component Int16 because that is native.
+
+### Gates at the final commit
+
+- Flags-off worker proof, `node scripts/world-pass-worker-proof.mjs --check
+  c2bf5c06 --ignore-protocol`: **IDENTICAL (top-level protocol field masked):
+  1062/1062 cases identical, 7308 buffers + 1062 meta objects compared
+  against 'c2bf5c06'; 28 stage cases (0 bad); 0 unrecorded inputs; 180.9 s.**
+  No worker file changed after this run.
+- Node: `graphics-unit` PASS; `verify-true-earth-flags` 11 passed, 0
+  failed; `verify-stylized-earth` PASS 22/22 (all worker consumers agree on
+  protocol 26); `verify-city-horizon` PASS; `verify-building-handoff` 4/4;
+  `verify-attribution` 4 passed, 0 failed; `verify-terrain-ground-query` PASS
+  875 real-mesh comparisons; `wp-look-shader` 17 passed; `wp-reach-node-bench`
+  PASS G1-G5; `wp-arrival-worker-prep` PASS (quantized 98.0 -> 45.5 MiB);
+  `wp-arrival-ground-churn` PASS 60,900 + 60,900 comparisons, 0 differences.
+- Browser, this session: `wp-arrival-r2-livediff` PASS twice (0 differences),
+  `wp-arrival-r2-killworker` PASS, `wp-arrival-r2-compilekey` PASS (fixed) /
+  FAIL (old), budgets and pacing as above, 0 page errors in every run.
+- `npx eslint` on every file changed since `d40dfd25`: clean.
+- `scripts/r24-b-prewarm-proof` fails at `d40dfd25` as well (pre-existing;
+  not caused by the prewarm seam).
+
+### Still open (round 2)
+
+- Paris ARRIVAL-alone by the GPU estimate (3-byte attributes padded to 4):
+  261.4 MiB, 5.4 over 256; within budget by the budget tool's CPU count.
+  Unknown whether ANGLE pads.
+- Ground query under 1 us: met only by the batched path on replay, in three of
+  eight place-runs (section 2); never unbatched, never live.
+- Cold first-use program links of shared passes (post-processing composer
+  `ShaderMaterial#4b11b774`, `MeshStandardMaterial#b12bfbe9`, immersive
+  clouds): 6.8 to 17.7 s frames in every arm, OFF included; not this
+  stream's.
+- The coastal reflection program's first-use link with all four flags
+  (1.9 to 2.6 s, warm Paris; `coastal-reflection.js:62`): another stream's.
+- One unattributed 31.9 ms finalize window (sliced `pre` phase, once in 18)
+  and one unattributed 445 ms warm frame (ARRIVAL pair 1, no link in the
+  window).
+- The finalize proper of one tile is not sliced (0.7 to 7.8 ms measured).
+- The quantized depth program still links on its first shadow pass (6 to
+  23 ms measured).
+- REACH's skyline finalize (26 to 39 ms a tile) is admitted by the shared
+  brake as a frame's first finalize; slicing it is REACH's.
+- The footing has no visible gap to close at any pose found (insurance).
+- The owner's RTX 5080 motion check.
+
+## Round 2b (2026-11-17, the second fix round)
+
+Built on `98efc3a4` (round 2). The verifier left two blocking items (eviction
+at boost at Paris; the 3 ms slice not covering every World Pass finalize) and
+non-blocking notes. Same machine and server (:3322), shared with the other
+streams' captures; every arm of every claim below was shot in the same
+session, interleaved, with a flags-off control. Evidence:
+`.graphics-review/world-pass/r2b/` in this worktree; frames and data for review
+in `mystifying-curran-97a006/.graphics-review/world-pass/r2/arrival/r2b/`
+(`control/` flags off, `own/` WORLD_ARRIVAL, `all/` the four flags, `cmp/`
+side by side, `data/` the probe JSON). The flag still ships `enabled:false`;
+WORKER_PROTOCOL is unchanged; no worker file changed.
+
+### 1. Eviction at boost at Paris (blocking)
+
+**Cause.** Round 2's keep-behind counted the lead ring first and kept tiles
+behind only with what was left of `buildingBudgetMB` (160). At Paris the lead
+ring alone is 152.9 MiB of buildings with this flag and 190.7 with all four,
+so almost nothing behind could stay: the verifier's 15 (ARRIVAL) and 14 (all
+four) deaths. The budget went to the far front of the lead ring (up to 1.8 r
+ahead) before the city right behind the aircraft.
+
+**Change** (`_budgetRing`, replacing `_keepBehind`; readiness only). The
+aircraft's OWN ring, its 16 (maxChunks) tiles nearest the aircraft, is the
+core and always stays while the lead moves the ring (more than a quarter tile).
+Everything the lead adds (the lead ring's other tiles) and any other drawn tile
+within r of the aircraft is an extra, admitted while the building bytes fit
+the cap, tiles with work already done first, then nearest the aircraft; a lead
+tile that does not fit is not requested yet. At rest the lead point is the
+aircraft and the old rule applies unchanged. The cap is no longer a fixed
+building number: it is what the 256 MiB geometry row leaves after every other
+system's geometry (`geometryRowMB: 256`), measured in the scene the way
+world-pass-budget counts it (unique geometries' arrays and indices plus
+instance buffers, CPU), at most every 2 s and only when the budget has a
+choice to make (`_otherGeometryBytes`). `buildingBudgetMB` (now 150) is the
+fallback when the row is unset.
+
+**Units (the verifier's note, and my own probe's flaw).** The engine's ring
+radius r is 4,400 world (Mercator) units: 2,896 true m at Paris, 3,334 at
+Midtown. The round-2 probe and the verifier's copy counted tiles whose CENTRE
+was within 4,400 TRUE metres, which at Paris reaches 1.5 r. The probe
+(`scripts/wp-arrival-r2-boost.cjs`, now with `--lat/--lon/--brg`) reports
+three counts per run: the verifier's (behind, centre within 4,400 true m),
+tiles that died while any of them was within r of the aircraft (the engine's
+own ring radius), and tiles of the aircraft's own ring (its 16 nearest tiles,
+the ring the engine holds at rest), plus holes (tiles touching r with nothing
+drawn and not empty), the geometry mid-boost (the budget tool's CPU count, a
+GPU estimate) and look-back frames.
+
+Final code, Paris (48.8606, 2.3376, 300 m, heading 290, 750 m/s, 10 s; the
+verifier's pose), two interleaved pairs, and Midtown (heading 220), one pair:
+
+| run | arm | ring before boost s | verifier's count | died within r | own ring died | holes ahead / behind (mean) | t4 total CPU / GPU est (buildings) MiB | t8 |
+|---|---|---|---|---|---|---|---|---|
+| paris 0 | off | 63 | 15 | 13 | 12 | 7.14 / 3.70 | 198.6 / 201.1 (99.8) | 149.4 / 151.1 (60.2) |
+| paris 0 | ARRIVAL | 36 | 14 | **5** | **0** | 2.84 / 0.82 | 231.8 / 244.9 (128.4) | 219.5 / 232.0 (123.2) |
+| paris 0 | all four | 36 | 15 | **4** | **0** | 3.66 / 0.76 | 218.4 / 227.5 (163.8) | 193.2 / 201.1 (134.9) |
+| paris 1 | off | 52 | 15 | 13 | 13 | 7.08 / 3.82 | 222.6 / 225.4 (122.6) | 149.0 / 150.8 (60.2) |
+| paris 1 | ARRIVAL | 30 | 12 | **4** | **0** | 2.87 / 0.84 | 234.5 / 248.5 (137.5) | 211.9 / 223.9 (117.1) |
+| paris 1 | all four | 33 | 15 | **2** | **0** | 4.34 / 1.00 | 225.5 / 234.9 (170.2) | 173.6 / 180.5 (119.2) |
+| midtown | off | 61 | 14 | 15 | 13 | 6.58 / 3.16 | 196.9 / 199.5 (104.8) | 136.1 / 137.8 (53.9) |
+| midtown | ARRIVAL | 35 | **0** | **0** | **0** | 0.69 / 0.46 | 194.1 / 205.5 (110.3) | 174.0 / 183.7 (91.8) |
+| midtown | all four | 37 | **0** | **0** | **0** | 0.97 / 0.85 | 177.7 / 184.1 (119.0) | 162.1 / 168.5 (110.7) |
+
+Read:
+
+- **No tile of the aircraft's own ring died with the flag on, at Paris or
+  Midtown, in any run** (off: 12 to 13). At Midtown nothing within r died at
+  all, and nothing even by the verifier's true-metre count.
+- **At Paris, 2 to 5 tiles still die within r**: every one is ring rank 16 to
+  20 (beyond the ring's 16 slots, at the disk's edge, 3,950 to 4,200 world
+  units out) and died while the cap was full, i.e. the row needed it. At
+  Paris the own ring alone is about the settled ring (153 MiB of buildings with
+  this flag, 191 with all four) and the other geometry is 50 to 105 MiB, so
+  the row leaves little. That is the item's "or the byte budget needs it";
+  keeping them broke the row (below).
+- The verifier's true-metre count at Paris stays 12 to 15 in every arm: it
+  counts tiles beyond the ring radius (2,896 true m there), which no arm keeps.
+- Holes around the aircraft while boosting: off 6.6 to 7.1 ahead and 3.2 to
+  3.8 behind on average, on arms 0.7 to 4.3 ahead and 0.5 to 1.0 behind.
+- **Geometry mid-boost stays under the 256 MiB row by the budget tool's count
+  in every on run (162.1 to 234.5 MiB at 4 and 8 s).** By the GPU estimate (3-byte
+  attributes padded to 4) the maximum is 248.5.
+- Look back at Paris 8 s into the boost (`cmp/cmp-lookback-paris-t8-off-arrival-all4.png`):
+  off has lost the near-left blocks (photo ground only); both on arms keep them.
+  Midtown: `cmp/cmp-lookback-midtown-t{4,8}-*.png`.
+
+How it got here (each version measured and replaced, `r2b/boost-paris{2,3,5,6}`):
+a core of every drawn tile within r (cap 160) gave 0 deaths within r in all
+four on runs, but ARRIVAL-alone mid-boost reached **263.4 MiB CPU (279.4 GPU
+estimate)**, over the row, so it went. An own-ring core with a fixed cap of 150
+gave own-ring 0 and 4 to 10 deaths at the edge. The paris5 and paris6 runs are
+void for all four (the ring never filled in 94 s): that was the frame-share
+livelock of section 2, found because of them.
+
+### 2. The 3 ms slice and every World Pass finalize (blocking)
+
+**ARRIVAL's own finalize is now sliced end to end.** The finalize is a chain of
+resumable steps under the frame's slice (`_prepArrival`): run walk (the clock
+read every 64 runs or 4,096 vertices), FLASH_GUARD scan (every 2,048
+triangles, `st.every`), records (collision columns as a resumable copy of
+`buildColumnGrid`, then the porch-light walk, resumable every 256 houses),
+partition, geometry. A step that cannot be cut is begun only if its expected
+cost (a decaying maximum of what it has cost) fits what is left of the slice,
+or if no slice work has run yet this frame, so it always progresses and a heavy
+step opens a frame instead of ending one. The commit that remains is a mesh,
+the scene add and the birth (0.3 to 0.6 ms measured), and it too waits for room
+in the slice. Node: `scripts/wp-arrival-r2b-colgrid.mjs` (the sliced column
+grid equals `buildColumnGrid` on 300 random tiles, sliced and whole: PASS).
+
+**Other streams' finalize.** REACH's stand-in group finalize cannot be sliced
+from here (their file, their round). `lib/fly/toy-world/wp-frame-slice.js`
+(new, mine) gives every World Pass finalize one allowance a frame: a finalize
+that cannot be sliced asks for a whole frame and gets it only if no ARRIVAL
+slice ran in it, and ARRIVAL does no slice work in a frame granted whole; each
+side is held back at most 3 frames in a row while the other has work. The frame
+is `document.timeline.currentTime` (constant through one frame's rAF
+callbacks); without a timeline every call grants. One seam line in REACH's
+file (`sat-skyline-engine.js`, `// WORLD PASS B x C seam`, plus its import),
+taken only when REACH is on.
+
+**A defect of my own, found and fixed in this round:** the first version
+alternated strictly (period 2). Against the shared R24 brake
+(`finalize-pace.js`, a queue of refused owners forgotten after two frames) it
+livelocked: each engine always found the other first in the brake's queue. The
+diagnostic (`scripts/wp-arrival-r2b-diag.cjs`, Paris, all four) showed a fully
+prepared tile waiting 60 s with 571 grants and 571 refusals, and the all-four
+boost runs (paris5, paris6) never filled the ring. The gate
+`scripts/wp-arrival-r2b-frameslice.mjs` models that brake: the shipped module
+never puts both in one frame (either engine order), the longest wait without an
+admission is 8 / 27 frames (building first) and 55 / 4 (skyline first) over 20
+seeds x 4,000 frames, and the RED check (the strict alternation) reproduces the
+livelock (4,000 frames) in both orders. PASS.
+
+Final code (`r2b/pacing6`), three interleaved pairs, cold Tokyo (the page's
+first warp) then warm London, 45 s windows (`wpFrames`: each animation frame's
+finalize time of the building engine and the skyline engine, keyed by the
+frame):
+
+| pair | arm | warm: building finalize frame max ms (next) | skyline frame max | frames both > 1 ms | whole granted / refused / slices yielded | warm first tile s / honest ground s | warm longest frame ms / >33 |
+|---|---|---|---|---|---|---|---|
+| 0 | off | 94.0 per tile (83.6) | 22.5 | 1 | - | 8.1 / 6.8 | 437 / 150 |
+| 0 | ARRIVAL | **3.8** (3.7) | 15.7 | 10 | - | 4.5 / 6.2 | 390 / 114 |
+| 0 | all four | **3.3** (3.2) | 14.9 | 1 | 12 / 21 / 7 | 7.3 / 9.4 | 2,782 / 98 |
+| 1 | off | 96.8 per tile (88.0) | 19.1 | 0 | - | 8.0 / 6.5 | 432 / 152 |
+| 1 | ARRIVAL | **3.4** (3.3) | 19.1 | 9 | - | 4.0 / 5.9 | 417 / 111 |
+| 1 | all four | **3.8** (3.5) | 14.1 | 1 | 9 / 9 / 3 | 7.9 / 9.4 | 2,876 / 108 |
+| 2 | off | 82.2 per tile (3.5) | 17.9 | 0 | - | 9.1 / 6.8 | 435 / 148 |
+| 2 | ARRIVAL | **37.8** (3.8) | 20.7 | 5 | - | 5.0 / 6.6 | 469 / 140 |
+| 2 | all four | **4.5** (4.2) | 13.8 | 0 | 11 / 20 / 5 | 7.6 / 9.0 | 2,630 / 98 |
+
+Per-step maxima (one call) in the on windows: run walk 2.6 to 3.1 ms (one
+37.4), guard 3.1 to 3.9, records 1.8 to 2.5, partition 0.7 to 1.3, geometry
+0.4 to 0.5, mesh 0.4 to 0.5, birth 0.3 to 0.4.
+
+Read:
+
+- **ARRIVAL's finalize work in a frame is 3.3 to 4.5 ms in 5 of 6 warm
+  windows**, against the verifier's 17.6 (cold, records 14.7) and the shipped
+  per-tile finalize of 82 to 97 ms. **One window (ARRIVAL pair 2) had one 37.8
+  ms frame, all of it inside one run-walk call** that reads the clock every 64
+  runs or 4,096 vertices; I cannot attribute it (a GC pause or preemption is my
+  guess, not proven; not reproduced in the other 5 windows or in pacing3/4).
+- **With all four, the building and skyline engines shared a frame (both over 1
+  ms) in 0 to 1 frames a window**; the skyline engine's own frame (REACH's
+  stand-in group, one at a time) is 13.8 to 14.9 ms and is REACH's to slice.
+  With ARRIVAL alone the shipped skyline (not a World Pass finalize, not in the
+  share) still meets ARRIVAL's slices in 5 to 10 frames.
+- **Cold windows do not exercise the finalize this time**: the first warp's
+  shader links took 16 to 22 s in every arm (the census names
+  `MeshStandardMaterial#b12bfbe9` and `ShaderMaterial#4b11b774` in all nine,
+  off included) and no arm drew a detailed tile within 45 s; finalize frames
+  there are under 1 ms (readiness only). Not this stream's, not fixed here.
+- All four, warm: first tile 7.3 to 7.9 s against 4.0 to 5.0 with ARRIVAL alone
+  (the verifier's all-four run: 3.6 to 3.7). Each all-four window holds one 2.6
+  to 2.9 s frame (round 2 profiled it as the coastal reflection program's link,
+  another stream's; not re-profiled here). The frame share yielded only 3 to 7
+  frames a window, so it is not the share; I have not separated the rest.
+
+### Non-blocking notes
+
+- **Settled bytes, unchanged** (`world-pass-budget.cjs`, Ultra, this session):
+  Paris 246.0 MiB with this flag (buildings 152.9), 239.6 with all four
+  (190.7); nyc-low 196.3 / 190.8. The GPU estimate for Paris with this flag
+  alone is still 261.4 (not changed this round; with all four 249.0).
+- **Ground query**: not changed this round; the verifier's figures stand
+  (exact; replay batched 0.86 to 1.42 us, unbatched 1.40 to 1.98, reference 9.9
+  to 13.5; live 2.1 to 2.6 / 3.3 to 5.0 / 12.4 to 15.0). Under 1 us is not met.
+- The round-2 "Still open" line on the ground query contradicted section 2; it
+  now says what section 2 says.
+- Turn bursts (ARRIVAL churns more tiles than off at nyc-low, no holes): not
+  re-measured this round.
+
+### Gates at the final commit (round 2b)
+
+- `node scripts/world-pass-worker-proof.mjs --check c2bf5c06 --ignore-protocol`:
+  **IDENTICAL (top-level protocol field masked): 1062/1062 cases identical,
+  7308 buffers + 1062 meta objects; 28 stage cases (0 bad); 0 unrecorded
+  inputs; 176.9 s.**
+- Node: `graphics-unit` PASS; `verify-true-earth-flags` 11/0; `verify-stylized-earth`
+  22/22 (protocol 26 everywhere); `verify-city-horizon` PASS; `verify-building-handoff`
+  4/4; `verify-attribution` 4/0; `verify-terrain-ground-query` PASS 875;
+  `wp-look-shader` 17; `wp-reach-node-bench` PASS G1-G5; `wp-arrival-worker-prep`
+  PASS; `wp-arrival-ground-churn` PASS 60,900 + 60,900, 0 differences; new
+  `wp-arrival-r2b-colgrid` PASS; new `wp-arrival-r2b-frameslice` PASS (RED
+  reproduced).
+- `npx eslint` on every changed file: clean; with `no-undef` forced on the
+  changed `lib/` files: clean.
+
+Seams outside my files: `lib/fly/toy-world/sat-skyline-engine.js` (REACH): one
+import line and one check line, `// WORLD PASS B x C seam`, only when REACH is
+on. `lib/fly/toy-world/flash-guard.js` (shared R24, only my engine calls the
+slice API): the clock interval is read from `st.every` (default 8,192, as
+before).
+
+### Still open (round 2b)
+
+- Paris, flag on, at boost: 2 to 5 tiles at the edge of the ring radius (ring
+  rank 16 to 20) still die when the 256 MiB row is full. Keeping them costs
+  the row (263 MiB measured with this flag alone).
+- One unattributed 37.8 ms run-walk frame (1 of 6 warm windows).
+- REACH's stand-in group finalize (13.8 to 14.9 ms a frame here) is REACH's to
+  slice; the share only stops it stacking with ARRIVAL's slices.
+- The all-four warm first tile (7.3 to 7.9 s) is not separated from the 2.6 to
+  2.9 s frame in the same windows.
+- GPU estimate for Paris with this flag alone (261.4) and the under-1 us ground
+  query: as in round 2.
+- The owner's RTX 5080 motion check.

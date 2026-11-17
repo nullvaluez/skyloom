@@ -4,7 +4,8 @@ import { immersiveOn } from '@/lib/fly/immersive';
 import { stylizedEarthOn } from '@/lib/fly/stylized-earth';
 
 import { useEffect, useMemo, useRef } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
+import { WebGLRenderTarget } from 'three';
 import { wrap } from 'comlink';
 import { SatBuildingEngine } from '@/lib/fly/toy-world/sat-building-engine';
 import {
@@ -67,6 +68,7 @@ const atLeastTier = (tier, min) => TIERS.indexOf(tier) >= TIERS.indexOf(min);
  * gate A asserts the toy pipeline is never built in satellite).
  */
 export function SatBuildingLayer({ runtime, flight }) {
+  const getThree = useThree((s) => s.get); // WORLD PASS B r2: compileAsync for the quantized building program (stable getter)
   const qualityTier = useFlyStore((s) => s.qualityTier);
   const engine = useMemo(
     () => new SatBuildingEngine({ groundAt: (lon, lat) => runtime.engine?.getGroundAt(lon, lat) }),
@@ -201,22 +203,53 @@ export function SatBuildingLayer({ runtime, flight }) {
     });
     // WORLD PASS B (ARRIVAL): extra building workers. Off: none, one worker as before.
     const extra = [];
-    const poolSize = worldPassOn('arrival') ? Math.max(1, worldPassConfig('arrival').workers | 0) : 1;
-    for (let i = 1; i < poolSize; i++) {
+    const arrival = worldPassOn('arrival');
+    const poolSize = arrival ? Math.max(1, worldPassConfig('arrival').workers | 0) : 1;
+    const live = new Set(); // r2: every worker this mount made (replacements included)
+    let disposeRt = null; // r2: the compile target (arrival only)
+    // r2: a building worker on demand (the pool's replacements too): its `error`
+    // event (a script that failed to load, an uncaught error) asks the engine to
+    // ping it; dispose terminates it.
+    const spawn = () => {
       const w = new Worker(new URL('../../lib/fly/toy-world/vector-tile.worker.js', import.meta.url), { type: 'module' });
       const a = withRunwayGeometry(wrap(w));
       a.init().catch(() => {});
-      extra.push({ w, a });
-    }
+      w.addEventListener('error', () => engine.onWorkerError(a));
+      live.add(w);
+      return { w, a, api: a, dispose: () => { w.terminate(); live.delete(w); } };
+    };
+    for (let i = 1; i < poolSize; i++) extra.push(spawn());
     engine.setWorker(api, extra.length ? extra.map((e) => e.a) : null);
+    if (arrival) {
+      // r2 (quantize): compile the decoded building program before its first mesh shows.
+      // Bound to a render target for the (synchronous) compile pass, as prewarm.js does:
+      // the scene is drawn into the composer's buffer, and three keys the program on the
+      // output colour space / tone mapping of the bound target. Compiled against the
+      // canvas, it minted a variant nothing draws and the real one still linked on the
+      // first frame (measured 2.2 to 2.4 s cold, 0e038cea in the census).
+      let rt = null;
+      engine.setCompiler((obj) => {
+        const { gl, camera, scene } = getThree();
+        if (!gl.compileAsync) return Promise.resolve();
+        rt ??= new WebGLRenderTarget(1, 1);
+        const prev = gl.getRenderTarget();
+        gl.setRenderTarget(rt);
+        try { return gl.compileAsync(obj, camera, scene); } finally { gl.setRenderTarget(prev); }
+      });
+      disposeRt = () => rt?.dispose();
+      worker.addEventListener('error', () => engine.onWorkerError(api));
+      engine.setWorkerSpawner(spawn, [() => worker.terminate(), ...extra.map((e) => e.dispose)]);
+    }
     if (process.env.NODE_ENV === 'development') window.__satBuildings = engine; // harness introspection
     return () => {
       engine.dispose();
+      disposeRt?.();
       worker.terminate();
       for (const e of extra) e.w.terminate(); // WORLD PASS B
+      for (const w of live) w.terminate(); // r2: replacements too
       if (process.env.NODE_ENV === 'development') delete window.__satBuildings;
     };
-  }, [engine, runtime]);
+  }, [engine, runtime, getThree]); // getThree: the store's stable getter
 
   // A warp opens the accept-coarse-fast window so the destination city pops in.
   useEffect(() => {
