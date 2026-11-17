@@ -234,8 +234,9 @@ does not: airport surfaces are not World Pass content.
 ```
 
 A sub-switch is true only while its stream is on. `worker` is null while
-off. With nothing on (every tier below High, every phone, and every session
-without a flag) the request is that exact all-off object.
+off. With nothing on (every tier below High, every phone, or all five streams
+explicitly disabled) the request is that exact all-off object. Desktop High
+and Ultra sessions without flag overrides use all five streams by default.
 
 **Worker side (the streams).** The worker reads only the request, through
 `tileCtx.worldPass` (`worker/tile-ctx.js` is the one place that touches
@@ -1048,9 +1049,12 @@ No assertion was deleted or loosened.
 - **Browser scripts that boot without `_boot.js`** (the `review-*` tools,
   `verify-look-*`, `verify-lounge-mobile.cjs`, `verify-earth-world.cjs` and
   others) also run the shipped default. None was re-run here.
-- **Production smokes** `beta-smoke.cjs` and `verify-ultra-terrain.cjs` boot
-  the shipped default at Ultra, on a production build. Not run here (no
-  `next build` in this tree).
+- **Production smokes:** at this decision `beta-smoke.cjs` actually pinned
+  Low and did not exercise the new world; `verify-ultra-terrain.cjs` selects
+  Ultra. The performance follow-up changes the desktop beta smoke default to
+  High (`BETA_QUALITY=ultra` also supported) and asserts the effective World
+  Pass request. The phone smoke retains Low. Neither smoke was run at the
+  default-on decision.
 - The Look Pass added no fleet pin to `scripts/_boot.js`; it re-pointed its
   gates one by one (FLY_LOOK_PASS.md rule 8: the old value with the flag off,
   the new value with it on). The World Pass needs the fleet pin because its
@@ -1121,3 +1125,229 @@ Not in this pass. Each needs the five streams first.
 - Facade v2.
 - Black Marble night lights into the lit window fraction and the far glow.
 - Speed-aware streaming once a coarse level exists.
+
+## Performance follow-up (2026-11-17, in progress)
+
+Work starts from `8c593924` on `codex/world-pass-performance`. All five
+World Pass defaults stay on. The parked visual branches remain unmerged.
+Baseline dev and production servers use detached, unchanged application
+trees; captures run one at a time on the RTX 5080. The owner's existing dev
+server is not used or stopped.
+
+### Instrument and baseline caveats
+
+`scripts/world-pass-stalls.cjs` records 90 seconds per row: long tasks over
+200 ms with timestamps, actual first canvas presentation, boot 100% and boot
+overlay removal separately, every rAF interval, the 60–90 second median,
+building-ring arrival, effective tier/flags and streaming counters. A blank
+keeper tab lets Chrome stay alive between page 1 and page 2; the previous
+world page is closed before the next one opens. Each pose/arm has an isolated
+persistent profile, reused after a browser restart for its warm rows. No
+network interception disables HTTP caching. Screenshots occur after timing.
+
+Fixed-pose production telemetry requires the explicitly recorded `--review`
+URL. Separate `--plain` rows use the literal URL and actual canvas draws,
+without relying on development-only runtime handles. The normal instrument
+sets `navigator.webdriver=false`, because automation otherwise deliberately
+keeps production shader diagnostics on and suppresses the desktop Ultra
+default. `--automation` is an explicit diagnostic arm. A fresh normal RTX
+5080 player should start at **Ultra**; the earlier automated High starts
+were the deliberate automation exception in `device-tiers.js`.
+
+Raw captures, profiles and stills live under the ignored
+`.graphics-review/world-performance/` directory. CPU-profile rows are causal
+evidence, kept separate from the unprofiled timing table. The first diagnostic
+profile also overlapped development route compilation and is not a quiet
+timing baseline. An interrupted initial production probe lacked the required
+review handle; it is not a measured row.
+
+### Causes and changes under verification
+
+- The content arrival cap released terrain/cloud programs before parallel
+  linking finished. Production still blocked with diagnostics disabled:
+  its CPU profile moved the wait into `WebGLUniforms` active-uniform queries.
+  The actual-player profile attributes the 9.662 s reveal task to about
+  5.763 s of scene first use and 3.611 s of cloud first use. Pending shader
+  publication now remains gated after the content timer expires.
+- Atmosphere LUT programs synchronously linked on their first draws (about
+  4.465 s in that production profile). Exact-program asynchronous preparation
+  now precedes the unchanged ordered LUT draws and texture publication.
+- StrictMode discarded a skyline constructor that had already allocated a
+  photo worker and 40 MiB atlas; replay then reused disposed photo resources.
+  Resources now belong to effect attachment and are recreated on reattachment.
+- Parking vegetation discarded sampling jobs while retaining their sampling
+  records. Those jobs now pause and resume with their resident records.
+- REACH group merge/photo/drape/bounds preparation now proceeds in bounded
+  batches under the existing shared frame allowance. Geometry and completed
+  photo patches publish atomically. `finalizeMsMax` remains total group CPU
+  time; new `finalizeSliceMsMax` measures per-frame cost. Temporary preparation
+  memory has separate counters.
+- The boost lead retained only finished own-ring tiles. The reproduction at
+  Paris lost 7 of 16 active residents and 4 of 8 drape jobs; bounded retention
+  now preserves both records and jobs (zero lost in the same test), accounting
+  their estimated bytes before admitting extra lead tiles.
+- `drapeNonFiniteRestarts` was not comparable across arms: ARRIVAL counted
+  retry batches of unavailable runs, including finite coarse samples; the
+  legacy arm counted full-tile restarts. The compatibility field remains,
+  with separate missing/nonfinite/coarse query and retry-run counters. No
+  drape behavior is changed merely to lower the misleading number.
+- Device reports read the latched effective World Pass flags, including tier,
+  without latching early. Before the latch those five values are unknown
+  (`null`). Desktop beta smoke now defaults to High and verifies its actual
+  World Pass request; `BETA_QUALITY=ultra` selects Ultra.
+
+The second actual-player production profile pair also isolates a separate
+**1.981 s** task: about **1.858 s** of first-use uniform introspection in
+the coastal reflection render. The earlier 9–14 s initialization outliers
+did not recur in that pair, so their precise stacks remain unconfirmed.
+GPU identity probing is now page-cached and prepared in an OffscreenCanvas
+worker before FlyMode imports; the real canvas becomes authoritative and
+releases that temporary context. This addresses measured synchronous probe
+cost, not a proven attribution of every early outlier.
+
+The observed 25 ms cadence was also present on a first page. Its profile
+spent most of the sample window in the render loop, while the next profile
+pair settled near 16.7 ms. There is no evidence of a second-page-only 40 Hz
+application timer. Raw rAF and completed-world-frame intervals are now both
+recorded, so asynchronous preparation cannot conceal a frozen world behind
+a responsive animation callback.
+
+Focused CPU regressions so far: lifecycle **14/14** (baseline **4/14**),
+stand-in byte/slice/publication equivalence **12/12**, terrain readiness
+**19/19**, atmosphere readiness **4/4**, composer readiness **10/10**, GPU
+identity lifecycle **12/12**, and boost retention/diagnostics green. The
+required worker proof is **IDENTICAL: 1062/1062 cases, 7308 buffers, 28 stage
+cases with zero bad, zero unrecorded inputs** against `c2bf5c06`, with only
+the pre-existing protocol 24→27 field masked. `npm run verify:beta` passes
+**34/34**. These are correctness checks, not a completed performance verdict.
+The complete before/after table, production still comparisons, tier proof
+and final branch commits remain pending.
+
+### Intermediate production profile, before auxiliary-pass fixes
+
+The `7dc2bdae` candidate at NYC, Ultra, all five flags on, fresh profile:
+
+| Page | Largest task | Largest task after overlay removal | Median rAF / world frame, 60–90 s | Full building ring, engine seconds |
+|---|---:|---:|---:|---:|
+| First | 2,388 ms | 212 ms | 16.7 / 16.7 ms | 11.6 |
+| Second | 1,906 ms | no task over 200 ms | 16.7 / 16.7 ms | 11.3 |
+
+These are **profiled intermediate rows**, not final acceptance. Both largest
+tasks are coastal reflection first use (about 2,159 / 1,826 ms sampled
+uniform introspection). A separate first-page 1,953 ms task includes about
+1,001 ms from the PMREM sky-environment bake and 661 ms from the temporary
+hangar's render and floor reflection. The coastal readiness change directly
+targets the two maxima. The environment change walks the installed PMREM
+generator with its render calls temporarily replaced by compile calls, then
+waits for those exact programs before performing the unchanged real bake.
+The scratch target is never published. No shader text, lighting constants,
+sample count or environment resolution changes.
+
+Inspection also found three readiness omissions: Bloom's down/up materials
+are selected inside its render and initially have no `fullscreenMaterial`;
+N8AO's six fullscreen meshes include an accumulation draw omitted by its old
+warm-up; and layer-29 sky overlays compiled and rendered in the same frame.
+Those paths now have explicit readiness, with local overlay holds. The
+main world continues rendering while a newly streamed object's program links.
+
+The first presentation instrument now excludes the temporary hangar canvas.
+Older rows retain their original first-canvas reading: all sixteen production
+baseline readings are within 6.1 ms of the old runtime's first-frame pulse,
+but the first candidate's hangar drew 1.5 seconds before its world did. That
+candidate number is not a valid first-world comparison. Version 4+ records
+the actual world canvas. Version 5 also preserves cache phase separately
+from final flight phase and retains page-error stacks and distinct console
+errors. Raw older records remain unmodified.
+
+ARRIVAL's 17.6 ms historical headline predates the records-slicing fix. The
+intermediate NYC candidate measures a 4.1 ms maximum finalize frame, no
+non-finite or missing drape queries, and 78,742 coarse queries. Its remaining
+single-run vertex walk now yields within oversized buildings; water-only
+commits join the shared admission/accounting. Water geometry construction
+itself is still atomic and explicitly measured, not claimed to be bounded.
+The first candidate/baseline NYC still comparison preserves visible building
+layout, materials and lighting; cloud positions and live traffic differ.
+
+### New York production comparison on the RTX 5080
+
+Application commit `f688965b`, Ultra, Enhanced Satellite. All eight
+90-second captures completed. Each row reports the largest main-thread
+task in milliseconds, followed by the largest task after the overlay lifted.
+Zero means the long-task observer saw no task above its 200 ms recording
+threshold. The ring time is wall time from the fixed-pose warp until the
+instrument observed a full building ring.
+
+| World Pass | Profile | Page | Baseline largest task | Candidate largest task | Candidate after reveal | Candidate steady frame | Candidate full ring |
+|---|---|---:|---:|---:|---:|---:|---:|
+| On | Fresh | 1 | 9,126 | 1,274 | 0 | 16.7 ms | 11.4 s |
+| On | Fresh | 2 | 9,287 | 370 | 0 | 16.7 ms | 10.8 s |
+| On | Warm | 1 | 867 | 286 | 0 | 16.6 ms | 10.0 s |
+| On | Warm | 2 | 14,689 | 244 | 0 | 16.6 ms | 10.2 s |
+| Off | Fresh | 1 | 6,990 | 1,249 | 0 | 16.7 ms | 25.9 s |
+| Off | Fresh | 2 | 551 | 390 | 0 | 16.7 ms | 24.1 s |
+| Off | Warm | 1 | 883 | 263 | 0 | 16.7 ms | 24.5 s |
+| Off | Warm | 2 | 404 | 247 | 0 | 16.7 ms | 23.7 s |
+
+The first On capture's longest shader first use was **11.6 ms**. Its
+environment, reflection, overlay and composer queues all drained. The
+largest completed-world-frame gap after reveal across the eight rows was
+**325.1 ms**. The first Off second-page capture nevertheless had a **6,975 ms**
+animation-frame gap beginning 171 ms after navigation. The page was visible,
+its GPU worker reported **6,984 ms** to obtain the renderer identity, and
+the next timer sample arrived at 7,165 ms. This startup gap motivates the
+returning-page GPU identity change. The earlier 390 ms long-task reading
+alone misses it.
+
+### Literal production front door after the GPU identity change
+
+At `8e3dfddb`, four uninterrupted 90-second loads on the RTX 5080 used the
+player URL, once with all five negative flags and once without query parameters.
+Each arm began with a separate fresh profile. The second page replaced the
+first in the same browser. Both fresh profiles selected **Ultra**. These
+pages stayed at the title, so the building-ring clock applies to the separate
+flight captures. All times below are milliseconds except the two navigation
+times marked in seconds. A zero in the post-reveal task column means that
+the browser recorded no task over 200 ms in that interval.
+
+| Flags | Page | First world (s) | Overlay removed (s) | Largest task | Largest rAF gap | Post-reveal task | Post-reveal world gap | Median frame, 60–90 s |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| On | 1 | 7.36 | 23.60 | 951 | 967 | 0 | 325 | 8.4 |
+| On | 2 | 2.38 | 9.03 | 392 | 458 | 0 | 108 | 8.4 |
+| Off | 1 | 7.04 | 23.56 | 993 | 1,017 | 280 | 275 | 16.6 |
+| Off | 2 | 2.34 | 9.10 | 448 | 450 | 0 | 142 | 16.6 |
+
+On the second default page the stored real-canvas GPU identity took 1 ms
+to read and the real flight canvas took 65 ms to acquire its context. The
+earlier seven-second gap did not recur in either returning title page.
+The cache accepts a real, identifiable Windows desktop RTX/GTX flight
+context, expires after ten minutes, and invalidates on context loss.
+The current flight context refreshes the stored identity.
+
+### Fixed-pose validation and remaining startup investigation
+
+All 16 candidate development rows at `8e3dfddb` completed. The largest
+post-reveal task was 418 ms and the largest post-reveal completed-world-frame
+gap was 425 ms. At cold Paris with all streams enabled, the largest boot
+task fell from 20,264 to 1,295 ms, the largest post-reveal task from 3,312
+to 259 ms, and the full-ring wait after warp from 43.1 to 13.5 seconds.
+At NYC, the all-on development rows measured at most 4.5 ms per skyline
+finalize slice, compared with 25–33 ms of work accumulated over an entire
+group. The building finalize peak was 1.6 ms. All four recorded zero
+non-finite drape queries.
+
+Two NYC development rows require follow-up. The cold first page reported
+two JavaScript syntax errors with empty stacks. An earlier dev tier proof
+and a baseline dev first page reported the same message. The second page
+used the GPU identity cache in under 1 ms, yet its first animation callback
+arrived at 6,207 ms. The independent timer jumped from 263 to 6,246 ms, and
+the real canvas acquired its context later at 8,653 ms. An aggregate that
+starts at the first callback misses this delay.
+
+The second fresh NYC production flight also reproduced an 11,392 ms task
+starting 1,371 ms after navigation. The HTML load event finished at 134 ms,
+the flight bundles had arrived around 210 ms, and the boot overlay mounted
+at 993 ms. The first traffic worker constructor began at 12,704 ms and the
+real canvas acquired its context at 12,969 ms. The cached GPU identity took
+1 ms. The remaining freeze can occur before either the flight WebGL renderer
+or terrain workers exist. The four literal production title captures above
+did not exercise this failing sequence. These rows remain in the evidence.
