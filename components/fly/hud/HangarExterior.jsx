@@ -4,12 +4,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { BufferGeometry, Float32BufferAttribute, SRGBColorSpace, TextureLoader } from 'three';
 import { airportFrame, airportLocal, airportPoint } from '@/lib/fly/operations-airports';
 import { createImagerySource } from '@/lib/fly/tile-sources';
+import { useHangarShaderChange } from './HangarPrewarm';
 
 // A bounded, geographic apron view, using the game's existing imagery provider.
 // The preview owns a coarse horizon and a small sharp apron patch; no live-world
 // objects are reparented, and every texture is disposed when leaving the hangar.
 function ImageryTile({tile,onLoaded}){
   const [texture,setTexture]=useState(null);
+  useHangarShaderChange(texture);
   useEffect(()=>{
     let active=true,loaded;
     new TextureLoader().load(tile.url,t=>{

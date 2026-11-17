@@ -1,5 +1,5 @@
 'use client';
-import { Component, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { Component, Suspense, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { ContactShadows, Environment, MeshReflectorMaterial, OrbitControls, useGLTF } from '@react-three/drei';
 import { Vector3 } from 'three';
@@ -17,6 +17,7 @@ import { attachVectorControls, fleetAnimator, applyFleetLivery, disposeFleetGeom
 import { useAdventureStore } from '@/stores/adventure-store';
 import { applyAirframeDetail } from '@/lib/fly/airframe-detail';
 import { applyShaderErrorPolicy } from '@/lib/fly/shader-ready';
+import { createHangarWarmSignal, HangarEnvironment, HangarPrewarm, HangarWarmContext } from './HangarPrewarm';
 class ModelBoundary extends Component {
   state={error:false};
   static getDerivedStateFromError(){return {error:true};}
@@ -24,14 +25,15 @@ class ModelBoundary extends Component {
   render(){return this.state.error?null:this.props.children;}
 }
 function Aircraft({aircraft,onReady,earnedPreview=false,onLuma}){
+  const warm=useContext(HangarWarmContext);
   const {scene}=useGLTF(aircraft.entry.url);
   const clone=useMemo(()=>{const object=scene.clone(true);if(aircraft.id==='fighter'&&aircraft.entry.parts)attachVectorControls(object);object.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;const copy=m=>{const c=m.clone();c.vertexColors=!!o.geometry.attributes.color;return c;};o.material=Array.isArray(o.material)?o.material.map(copy):copy(o.material);}});
     return object;},[scene,aircraft.id,aircraft.entry.parts]);
   const livery=useAdventureStore(s=>s.progress.liveries[aircraft.id]);
-  useEffect(()=>{applyFleetLivery(clone,aircraft.id,earnedPreview?'earned':livery);onLuma?.(liveryLuminance(clone));},[clone,aircraft.id,livery,earnedPreview,onLuma]);
+  useEffect(()=>{applyFleetLivery(clone,aircraft.id,earnedPreview?'earned':livery);onLuma?.(liveryLuminance(clone));warm?.invalidate();},[clone,aircraft.id,livery,earnedPreview,onLuma,warm]);
   // LIVING WORLD AIRFRAME_DETAIL: the flight model's panel lines, glass and pilot on the display model.
   // After the paint, so a livery change re-applies it; materials here are per-mount copies. Null on Neon, Classic, Low and phone.
-  useEffect(()=>{const finish=applyAirframeDetail(clone,aircraft.id,{mode:'hangar',canopyMaterial:aircraft.entry.canopyMaterial});return()=>finish?.dispose();},[clone,aircraft.id,aircraft.entry.canopyMaterial,livery,earnedPreview]);
+  useEffect(()=>{const finish=applyAirframeDetail(clone,aircraft.id,{mode:'hangar',canopyMaterial:aircraft.entry.canopyMaterial});warm?.invalidate();return()=>finish?.dispose();},[clone,aircraft.id,aircraft.entry.canopyMaterial,livery,earnedPreview,warm]);
   const animate=useMemo(()=>fleetAnimator(clone,aircraft.entry.parts),[clone,aircraft.entry.parts]);
   useFrame((_,dt)=>animate(null,dt,true));
   useEffect(()=>()=>disposeFleetGeometry(clone),[clone]);
@@ -44,7 +46,7 @@ function Aircraft({aircraft,onReady,earnedPreview=false,onLuma}){
     <LandingGear flight={{speed:0}} aircraftId={aircraft.id} preview/>
   </group>;
 }
-function Bay({aircraft,airport,onReady,onError,onExteriorReady,view}){
+function Bay({aircraft,airport,onReady,onError,onExteriorReady,view,preparing=false}){
   // A flying wing is far wider than it is long: frame (and house) its span too.
   // For every other airframe span*.7 stays below its length or the 15/28 m floors,
   // so their framing is unchanged.
@@ -71,7 +73,7 @@ function Bay({aircraft,airport,onReady,onError,onExteriorReady,view}){
   return <>
     <color attach="background" args={['#7d9fb4']}/>
     <fog attach="fog" args={['#a6bbc6',900,4000]}/>
-    <Suspense fallback={null}><Environment files="/hdri/kloofendal_48d_partly_cloudy_puresky_2k.hdr" background backgroundRotation={[0,2.6,0]} environmentIntensity={.65}/></Suspense>
+    <Suspense fallback={null}><HangarEnvironment files="/hdri/kloofendal_48d_partly_cloudy_puresky_2k.hdr" background backgroundRotation={[0,2.6,0]} environmentIntensity={.65}/></Suspense>
     <hemisphereLight args={['#d6edff','#17212e',.65]}/>
     <directionalLight position={[width*.6,height*1.4,depth*1.5]} intensity={3} color="#ffe6bb" castShadow shadow-mapSize={[1024,1024]} shadow-camera-left={-width} shadow-camera-right={width} shadow-camera-top={width} shadow-camera-bottom={-width} shadow-camera-far={length*6} shadow-normalBias={.025} shadow-bias={-.0001}/>
     <directionalLight position={[-width,height,-depth]} intensity={.8} color="#9aeaff"/>
@@ -103,7 +105,7 @@ function Bay({aircraft,airport,onReady,onError,onExteriorReady,view}){
     </group>
     <ModelBoundary key={aircraft.id} onError={onError}><Suspense fallback={null}>
       <Aircraft aircraft={aircraft} onReady={onReady}/>
-      <ContactShadows position={[0,.004,0]} opacity={.8} scale={width} blur={1.8} far={Math.min(height,viewLength*.25)} resolution={512} frames={1} color="#020713"/>
+      <ContactShadows position={[0,.004,0]} opacity={.8} scale={width} blur={1.8} far={Math.min(height,viewLength*.25)} resolution={512} frames={preparing?Infinity:1} color="#020713"/>
     </Suspense></ModelBoundary>
     <OrbitControls ref={controls} target={[0,viewLength*.07,0]} minDistance={viewLength*.8} maxDistance={length*2.5} maxPolarAngle={Math.PI*.485} minPolarAngle={.25} enablePan={false} enableDamping dampingFactor={.1}/>
   </>;
@@ -132,7 +134,7 @@ function StageSpot({aim,...props}){
 const _goal = new Vector3();
 const _goalTarget = new Vector3();
 const _revealFrom = new Vector3();
-function StageBay({aircraft,airport,onReady,onError,onExteriorReady,view}){
+function StageBay({aircraft,airport,onReady,onError,onExteriorReady,view,preparing=false}){
   const tier=useFlyStore(s=>s.qualityTier);
   const cheap=isPhoneClass()||tier==='low';
   const reach=Math.max(aircraft.entry.targetLenM,(aircraft.entry.span||0)*.7);
@@ -232,7 +234,7 @@ function StageBay({aircraft,airport,onReady,onError,onExteriorReady,view}){
   return <>
     <color attach="background" args={['#7d9fb4']}/>
     <fog attach="fog" args={['#a6bbc6',900,4000]}/>
-    <Suspense fallback={null}><Environment files="/hdri/kloofendal_48d_partly_cloudy_puresky_2k.hdr" background backgroundRotation={[0,2.6,0]} environmentIntensity={L.env??.5}/></Suspense>
+    <Suspense fallback={null}><HangarEnvironment files="/hdri/kloofendal_48d_partly_cloudy_puresky_2k.hdr" background backgroundRotation={[0,2.6,0]} environmentIntensity={L.env??.5}/></Suspense>
     <hemisphereLight args={['#d6edff','#17212e',L.hemi??.3]}/>
     {/* Sun through the open door (the shadow caster), and the classic cool fill. */}
     <directionalLight name="hangar-stage-sun" position={haze.sun} intensity={(L.sun??3.6)*exposure} color="#ffe3b8" castShadow shadow-mapSize={[1024,1024]} shadow-camera-left={-width} shadow-camera-right={width} shadow-camera-top={width} shadow-camera-bottom={-width} shadow-camera-far={length*7} shadow-normalBias={.025} shadow-bias={-.0001}/>
@@ -276,7 +278,7 @@ function StageBay({aircraft,airport,onReady,onError,onExteriorReady,view}){
     <group ref={turntable} name="hangar-stage-turntable">
       <ModelBoundary key={aircraft.id} onError={onError}><Suspense fallback={null}>
         <Aircraft aircraft={aircraft} onReady={onReady} onLuma={EXPOSURE?setLiveryLuma:undefined}/>
-        <ContactShadows position={[0,.004,0]} opacity={.85} scale={width} blur={1.8} far={Math.min(height,viewLength*.25)} resolution={512} frames={1} color="#020713"/>
+        <ContactShadows position={[0,.004,0]} opacity={.85} scale={width} blur={1.8} far={Math.min(height,viewLength*.25)} resolution={512} frames={preparing?Infinity:1} color="#020713"/>
       </Suspense></ModelBoundary>
     </group>
     <OrbitControls ref={controls} target={[0,viewLength*.07,0]} minDistance={viewLength*.8} maxDistance={length*2.5} maxPolarAngle={Math.PI*.485} minPolarAngle={.25} enablePan={false} enableDamping dampingFactor={.1}
@@ -284,11 +286,20 @@ function StageBay({aircraft,airport,onReady,onError,onExteriorReady,view}){
   </>;
 }
 export function HangarScene({aircraft,airport,onReady,onError,onExteriorReady,view}){
+  const [prepared,setPrepared]=useState(false),[loadedId,setLoadedId]=useState(null);
+  const tier=useFlyStore(s=>s.qualityTier);
+  const signal=useMemo(()=>createHangarWarmSignal(),[]),readyCallback=useRef(onReady);
+  useLayoutEffect(()=>{readyCallback.current=onReady;},[onReady]);
+  const modelReady=useCallback(id=>{setLoadedId(id);readyCallback.current?.(id);},[]);
+  const changeKey=`${aircraft.id}|${airport.id}|${tier}|${view??'quarter'}`;
   return <ModelBoundary onError={onError}>
-    <Canvas shadows dpr={[1,1.5]} camera={{fov:42,near:.1,far:6000}} onCreated={({gl})=>applyShaderErrorPolicy(gl)} aria-label={`${aircraft.entry.name} in the open hangar at ${airport.id}; drag to inspect`}>
+    <Canvas shadows frameloop={prepared?'always':'never'} dpr={[1,1.5]} camera={{fov:42,near:.1,far:6000}} onCreated={({gl})=>applyShaderErrorPolicy(gl)} aria-label={`${aircraft.entry.name} in the open hangar at ${airport.id}; drag to inspect`}>
+      <HangarWarmContext.Provider value={signal}>
       {STAGE
-        ?<StageBay aircraft={aircraft} airport={airport} onReady={onReady} onError={onError} onExteriorReady={onExteriorReady} view={view}/>
-        :<Bay aircraft={aircraft} airport={airport} onReady={onReady} onError={onError} onExteriorReady={onExteriorReady} view={view}/>}
+        ?<StageBay aircraft={aircraft} airport={airport} onReady={modelReady} onError={onError} onExteriorReady={onExteriorReady} view={view} preparing={!prepared}/>
+        :<Bay aircraft={aircraft} airport={airport} onReady={modelReady} onError={onError} onExteriorReady={onExteriorReady} view={view} preparing={!prepared}/>}
+      <HangarPrewarm signal={signal} preparing={!prepared} modelReady={loadedId===aircraft.id} changeKey={changeKey} onPrepared={setPrepared}/>
+      </HangarWarmContext.Provider>
     </Canvas>
   </ModelBoundary>;
 }
