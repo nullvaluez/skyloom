@@ -27,6 +27,8 @@ import { useFlyStore } from '@/stores/fly-store';
 import { eyeAglVis } from '@/lib/fly/ground-vis';
 import { getTrueScaleK } from '@/lib/fly/true-scale';
 import { airfieldSuppressions, subscribeAirfieldSuppression } from '@/lib/fly/airfield/airfield-suppression';
+import { worldPassOn } from '@/lib/fly/world-pass'; // WORLD PASS E (GROUND)
+import { WpBridgeLayer } from './WpBridgeLayer';
 
 const TIERS = ['low', 'medium', 'high']; // mirrors FlyCanvas's quality ladder
 const atLeastTier = (tier, min) => TIERS.indexOf(tier) >= TIERS.indexOf(min);
@@ -61,6 +63,8 @@ const BEACON_POOL = SAT_AIRPORT_BEACONS.pool;
  */
 export function SatRoadLayer({ runtime, flight }) {
   const qualityTier = useFlyStore((s) => s.qualityTier);
+  // WORLD PASS E (GROUND), M2: bridge decks, latched once (off: never mounted).
+  const wpBridges = useMemo(() => worldPassOn('ground', 'bridges'), []);
   const engine = useMemo(
     () => new SatRoadEngine({ groundAt: (lon, lat) => runtime.engine?.getGroundAt(lon, lat) }),
     [runtime]
@@ -288,6 +292,7 @@ export function SatRoadLayer({ runtime, flight }) {
   return (
     <>
       <primitive object={engine.object} />
+      {wpBridges && <WpBridgeLayer engine={engine} runtime={runtime} flight={flight} />}
       {beaconsOn && (
         <instancedMesh
           ref={(m) => {

@@ -47,6 +47,8 @@ import { SatParcelHomes } from './SatParcelHomes';
 import { SatTintLayer } from './SatTintLayer';
 import { stylizedEarthOn } from '@/lib/fly/stylized-earth';
 import { trueHorizontalK } from '@/lib/fly/true-scale';
+import { worldPassOn } from '@/lib/fly/world-pass'; // WORLD PASS E (GROUND)
+import { WpCanopyLayer } from './WpCanopyLayer';
 
 // --- Round 24 — C MOTION's spec, B's call sites -----------------------------
 // settle.js through a NAMESPACE import: `groundElevVis`/`motionSubOn` are C's
@@ -180,6 +182,10 @@ export function SatVegLayer({ runtime, flight }) {
       ? SAT_GROUND_LIFE.poolHigh
       : basePool;
   const maxChunks = SAT_VEG.maxChunksByTier[poolTier] ?? 0;
+  // WORLD PASS E (GROUND), M1: latched once. On, WpCanopyLayer is the one tree
+  // placer and the legacy canopy pool below is never mounted (LivingForest
+  // stands down in the same session). Off: this file's legacy path, unchanged.
+  const wpTrees = useMemo(() => worldPassOn('ground', 'trees'), []);
   // maxChunks × perChunkCap ≤ pool BY CONSTRUCTION: the pool can therefore
   // never bind, which makes a pool cut (a hard radius that pops as the player
   // moves) impossible rather than merely unlikely.
@@ -208,11 +214,11 @@ export function SatVegLayer({ runtime, flight }) {
   // engine itself: nothing outside this file should be able to steer it.
   const bus = useMemo(
     () => ({
-      nearest: (x, z) => engine.nearest(x, z),
-      groundAtLocal: (chunk, x, z) => engine.groundAtLocal(chunk, x, z),
-      groundAtNear: (x, z, fallbackY) => engine.groundAtNear(x, z, fallbackY, 'detail'),
+      nearest: (x, z) => engine.legacy.nearest(x, z), // WORLD PASS E: the legacy ring (the engine itself, flag off)
+      groundAtLocal: (chunk, x, z) => engine.legacy.groundAtLocal(chunk, x, z),
+      groundAtNear: (x, z, fallbackY) => engine.legacy.groundAtNear(x, z, fallbackY, 'detail'),
       get stats() {
-        return engine.stats;
+        return engine.legacy.stats;
       },
     }),
     [engine]
@@ -431,7 +437,8 @@ export function SatVegLayer({ runtime, flight }) {
 
   return (
     <>
-      {pool > 0 && (
+      {wpTrees && <WpCanopyLayer engine={engine} runtime={runtime} flight={flight} tier={tier} />}
+      {pool > 0 && !wpTrees && (
         <instancedMesh
           ref={(m) => {
             meshRef.current = m;
@@ -483,7 +490,7 @@ export function SatVegLayer({ runtime, flight }) {
         />
       )}
       {SAT_AMBIENT.enabled && (
-        <SatAmbientLife engine={engine} flight={flight} tier={tier} />
+        <SatAmbientLife engine={engine.legacy} flight={flight} tier={tier} />
       )}
       {/* Round 19 (C "GROUNDTRUTH") — the other two consumers of THIS engine's
           chunks. Mounted here rather than from SatBuildingLayer because both
@@ -494,9 +501,9 @@ export function SatVegLayer({ runtime, flight }) {
           cross-component contract for data that is already right here. Each is
           its own +1 draw, each parks itself (visible=false / count=0) when its
           scene has nothing to show, and each is one flag from gone. */}
-      {!stylizedEarthOn() && SAT_TINT.enabled && <SatTintLayer engine={engine} flight={flight} />}
+      {!stylizedEarthOn() && SAT_TINT.enabled && <SatTintLayer engine={engine.legacy} flight={flight} />}
       {SUBURB_NIGHT.enabled && (
-        <SatHouseLights engine={engine} runtime={runtime} flight={flight} />
+        <SatHouseLights engine={engine.legacy} runtime={runtime} flight={flight} />
       )}
       {/* Round 20 (B "HOMES") — procedural suburbia off the worker's dedicated
           residential parcel anchors, which ride THIS engine's chunks for the
@@ -509,7 +516,7 @@ export function SatVegLayer({ runtime, flight }) {
           FlyScene gets a mount line from C ICONS this round and this one would
           collide with it for no benefit. */}
       {PARCEL_HOMES.enabled && (
-        <SatParcelHomes engine={engine} runtime={runtime} flight={flight} tier={tier} />
+        <SatParcelHomes engine={engine.legacy} runtime={runtime} flight={flight} tier={tier} />
       )}
     </>
   );

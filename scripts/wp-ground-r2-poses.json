@@ -1,0 +1,170 @@
+{
+ "nyc-low": {
+  "lat": 40.748,
+  "lon": -73.994,
+  "altM": 230,
+  "headingDeg": 40,
+  "note": "Midtown from just above the roofs: facades, roof detail, street canyons"
+ },
+ "nyc-mid": {
+  "lat": 40.7,
+  "lon": -74.02,
+  "altM": 1500,
+  "headingDeg": 25,
+  "note": "Manhattan from 1,500 m: near ring to far mass handoff"
+ },
+ "nyc-high": {
+  "lat": 40.65,
+  "lon": -74.05,
+  "altM": 3500,
+  "headingDeg": 25,
+  "note": "Manhattan from 3,500 m: does the whole island still read as a city"
+ },
+ "nyc-top": {
+  "lat": 40.754,
+  "lon": -73.984,
+  "altM": 900,
+  "headingDeg": 0,
+  "note": "Looking across Midtown: 3D buildings against the roofs baked into the photo"
+ },
+ "brooklyn": {
+  "lat": 40.678,
+  "lon": -73.97,
+  "altM": 420,
+  "headingDeg": 300,
+  "note": "Brownstone low-rise density, Manhattan on the horizon"
+ },
+ "paris": {
+  "lat": 48.853,
+  "lon": 2.33,
+  "altM": 480,
+  "headingDeg": 300,
+  "note": "Haussmann blocks, uniform 6-storey height, the Eiffel Tower ahead"
+ },
+ "tokyo": {
+  "lat": 35.67,
+  "lon": 139.735,
+  "altM": 520,
+  "headingDeg": 330,
+  "note": "Dense fine-grain mid-rise with tower clusters (Shinjuku ahead)"
+ },
+ "london": {
+  "lat": 51.502,
+  "lon": -0.1,
+  "altM": 450,
+  "headingDeg": 40,
+  "note": "The City cluster across the Thames"
+ },
+ "dubai": {
+  "lat": 25.185,
+  "lon": 55.26,
+  "altM": 600,
+  "headingDeg": 40,
+  "note": "Supertall cluster on desert, sparse map data"
+ },
+ "lagos": {
+  "lat": 6.45,
+  "lon": 3.39,
+  "altM": 450,
+  "headingDeg": 20,
+  "note": "Dense city where the map has few building footprints"
+ },
+ "phoenix-suburb": {
+  "lat": 33.38,
+  "lon": -111.84,
+  "altM": 450,
+  "headingDeg": 0,
+  "note": "Grid suburb, single-storey houses, pools"
+ },
+ "iowa-farm": {
+  "lat": 41.95,
+  "lon": -93.7,
+  "altM": 600,
+  "headingDeg": 90,
+  "note": "Farmland: fields, farmsteads, almost no map buildings"
+ },
+ "sf-hills": {
+  "lat": 37.79,
+  "lon": -122.42,
+  "altM": 420,
+  "headingDeg": 60,
+  "note": "Buildings on steep streets: foundations on slopes"
+ },
+ "hongkong": {
+  "lat": 22.29,
+  "lon": 114.165,
+  "altM": 500,
+  "headingDeg": 150,
+  "note": "Tower wall against mountains and harbour"
+ },
+ "central-park": {
+  "lat": 40.769,
+  "lon": -73.976,
+  "altM": 300,
+  "headingDeg": 25,
+  "note": "Up Central Park from the south end: tree canopy against the real park"
+ },
+ "nyc-bay": {
+  "lat": 40.7,
+  "lon": -74.03,
+  "altM": 950,
+  "headingDeg": 25,
+  "note": "The Manhattan title stop: skyline across the Upper Bay at 2 to 6 km"
+ },
+ "tokyo-bay": {
+  "lat": 35.625,
+  "lon": 139.785,
+  "altM": 900,
+  "headingDeg": 315,
+  "note": "The Tokyo title stop: Rainbow Bridge, Shiodome and Tokyo Tower across the bay"
+ },
+ "dubai-bay": {
+  "lat": 25.215,
+  "lon": 55.235,
+  "altM": 1250,
+  "headingDeg": 105,
+  "note": "The Dubai title stop, turned 12 degrees so the Burj is clear of the aircraft"
+ },
+ "paris-mid": {
+  "lat": 48.835,
+  "lon": 2.305,
+  "altM": 1500,
+  "headingDeg": 35,
+  "note": "Paris from 1,500 m: does the Haussmann fabric continue past the near ring"
+ },
+ "tokyo-mid": {
+  "lat": 35.645,
+  "lon": 139.75,
+  "altM": 1500,
+  "headingDeg": 335,
+  "note": "Tokyo from 1,500 m: fine grain to the horizon"
+ },
+ "phoenix-mid": {
+  "lat": 33.355,
+  "lon": -111.84,
+  "altM": 1500,
+  "headingDeg": 0,
+  "note": "Phoenix suburb from 1,500 m: single-storey grid to the horizon"
+ },
+ "lagos-mid": {
+  "lat": 6.43,
+  "lon": 3.385,
+  "altM": 1500,
+  "headingDeg": 10,
+  "note": "Lagos from 1,500 m: mainland city beyond the near ring"
+ },
+ "tijuca": {
+  "lat": -22.955,
+  "lon": -43.245,
+  "altM": 900,
+  "headingDeg": 300,
+  "note": "Tijuca forest from 900 m (the stream E dense-forest pose)"
+ },
+ "powell": {
+  "lat": 40.199,
+  "lon": -83.0811,
+  "altM": 630,
+  "headingDeg": 339,
+  "note": "suburb, vegetation (look-pass pose)"
+ }
+}
