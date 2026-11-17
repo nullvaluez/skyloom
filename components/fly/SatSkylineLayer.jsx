@@ -106,6 +106,17 @@ export function SatSkylineLayer({ runtime, flight }) {
     }
     if (extra.length) engine.setWorker(api, extra.map((e) => e.a));
     else engine.setWorker(api);
+    // WORLD PASS C (round 2b): the far ring's ground photos load only once the
+    // rest of the world has settled too (the near buildings and the terrain),
+    // so they never take bandwidth from the world arriving. Read every 0.5 s
+    // by the engine while it is idle; stream off: never set, never read.
+    if (engine.standInsOn) {
+      engine.setPhotoGate(() => {
+        if (runtime.worldLoading) return false;
+        const s = runtime.satBuildings?.stats;
+        return !s || !(Number(s.queued || 0) + Number(s.building || 0) + Number(s.draping || 0) > 0);
+      });
+    }
     if (process.env.NODE_ENV === 'development') window.__satSkyline = engine; // harness introspection
     return () => {
       engine.dispose();
