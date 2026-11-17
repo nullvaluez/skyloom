@@ -385,5 +385,386 @@ was taken before the ring had arrived.
    with the flag on (its rows feed house lights and parcel homes): about
    0.45 s per Tokyo tile in node. Dropping it when the canopy is on needs the
    two consumers moved to the lattice first.
-9. **Stream B seam**: `result.wp` is not stamped on sat-veg and sat-roads
+9. **Stream B seam** (resolved in round 2: ARRIVAL's wrapper stamps them): `result.wp` is not stamped on sat-veg and sat-roads
    bundles (request above).
+
+## Round 2
+
+2026-11-17. Built on the wave-1 integration head (`git merge d40dfd25`,
+protocol 26, ARRIVAL's ground-query batch). `WORLD_GROUND` stays
+`enabled:false`. Every live number below is this machine's RTX 5080, Ultra,
+1600 x 900, through the stream's own dev server (:3325), on the live world as
+OpenFreeMap serves it after its 2026-11-15 planet update; every before/after
+has its own control shot in the same session from the same server. The GPU
+was shared with other streams' captures the whole time (three-slot lock
+always full), so every timing number is noisy; all runs are reported.
+Frames: `.graphics-review/world-pass/r2/ground/` in this worktree, copied to
+`mystifying-curran-97a006/.graphics-review/world-pass/r2/ground/`
+(`control/`, `own-flag/`, `all-flags/`, plus `look-a/` with the round-1 arm
+`*-r1.png`, the arrival and motion runs, and the montages `m-*.png`).
+
+Instruments (committed):
+- `scripts/wp-ground-verify-look.cjs` (new): per pose and time, three frames
+  from one held pose a few frames apart: as drawn (A), every tree mesh hidden
+  (B, the photo the trees cover), every tree drawn flat magenta (M, their
+  mask). Over the mask: coverage, mean sRGB distance |A - B|, mean CIE76
+  delta E, and the luma ratio crowns / photo. Flag off it hides and masks the
+  legacy SatVeg pool and every LivingForest stand instead.
+- `scripts/wp-ground-verify-arrival.cjs` (the verifier's, extended): one page
+  per arm, Paris then Powell then Central Park, every second for 60 s: the
+  building ring's first tile and full ring (W0 counters pinned on in both
+  arms), parcel homes, house lights, tint, and the legacy ring's own stats.
+- The wave-1 verifier's probes, copied: `wp-ground-verify-live.cjs` (now also
+  names the drawn mesh a crown stands in), `-motion.cjs` (now also the
+  placement-slice histogram over the flight window), `-tier.cjs`,
+  `-cover.mjs`, `-joints-osm.mjs` (the raw OpenFreeMap joint count).
+- `scripts/wp-ground-bridges-node.mjs` grew an independent joint count: for
+  every end the worker marks LANDING it re-reads the tile's raw bridge ways
+  and asks whether a way that is not part of that chain has an in-tile vertex
+  within 2 m (a way "is part of" a chain when it runs on along the chain from
+  that vertex). Also the `result.wp` stamp count and the longest chain.
+- `scripts/wp-ground-unit.mjs`: 9 gates (was 6): the view cone, sigma and the
+  dissolving edge.
+- `scripts/wp-ground-r2-poses.json`: world-pass-poses.json plus `tijuca` and
+  `powell`.
+
+### 1. Night bridge lights (blocking) - FIXED
+
+Was: a sodium "light pool" term in the deck shader, full deck width every
+42 m: cream and black zebra stripes at Tokyo bay and Midtown at night. And
+the flat glow ribbon of EVERY bridge way was dropped from flag-on 'sat-roads'
+builds, though decks are drawn only to 4 km (7 km at 10 m clearance) and
+under a vertex ceiling, so far bridges went dark (landmark bridges too: their
+ribbon was dropped and they get no deck).
+
+Now:
+- The pool term is gone (deck program key `-wp-bridge-deck-v2`).
+- The deck carries the flat road's own night ribbon: a second merged mesh
+  (`wp-bridge-glow`, +1 draw) on the ROAD ENGINE'S SHARED MATERIAL (same
+  program, same uniforms: the same glow, lamp dots and traffic as the road it
+  continues), one ribbon per deck whose way has a ribbon on the ground (class
+  1 to 6; service roads, rail and transit have none on the ground either),
+  0.3 m above the deck top, narrowed to the deck width, the worker's quad
+  layout (so the R23 lane side attribute is derived the same way).
+- The worker no longer drops bridge ribbons. With the flag on it records each
+  bridge way's index range and three probe points in the road chunk
+  (`wpBridges.ribbon`, stride 8). After each deck rebuild the layer blanks the
+  ranges whose probes all lie within 12 m of a drawn deck station in that
+  chunk's own index buffer (keeping a pristine copy) and restores them when
+  the deck goes; a road chunk rebuilt since is re-checked once a second. A
+  bridge beyond the deck range or over the vertex ceiling keeps its flat glow.
+  Node, 9 tiles a place: flag-on ribbon vertices now equal flag-off (Tokyo bay
+  82,492 = 82,492; was 74,616), 667 ribbon rows at Tokyo bay.
+- Frames (same session, same server): `m-r1-on-off.png` top row: round 1
+  zebra deck, round 2 lit road on its deck, control flat glow. `m-night.png`:
+  Tokyo bay and Midtown at night, own flag against control. Full frames
+  `own-flag/tokyo-bay__night-on.png`, `control/tokyo-bay__night-off.png`,
+  `own-flag/nyc-mid__night-on.png`, `control/nyc-mid__night-off.png`, and
+  `own-flag/*-final.png` on the final code.
+- Not measured: a numeric "stripe" metric; the claim rests on the frames.
+
+### 2. Powell parcel homes (blocking) - FIXED
+
+Cause, confirmed in code: with the canopy on, the veg engine (a) widened the
+ring every consumer reads from 16 to 25 chunks (High 16), (b) drew every
+chunk on a 33 x 33 grid of the drawn mesh instead of 5 x 5 (1,089 samples
+instead of 25 inside the same 0.8 ms/frame sampling budget, so the legacy
+chunks became ready much later), and (c) under the hold left the outer chunks
+unrequested so the settled fraction lagged. SatParcelHomes' settle gate reads
+that ring's stats.
+
+Now the engine is the legacy engine for everyone but the canopy:
+- the legacy grid (`gridSegments` 4), its heal and its commit are untouched;
+  the canopy's fine grid is a separate per-chunk `wpGrid`, its own budgeted
+  jobs after the legacy samples (no fine sampling during the arrival hold);
+- `engine.legacy` is a view of the legacy ring computed exactly as the
+  flag-off engine computes its whole ring (its own lead centre, radius
+  SAT_VEG.ring.r, maxChunks, ring-hold and residency rules): `nearest()`
+  filtered to it, its own `stats` (chunks, ready, queued, building, sampling,
+  settled fraction, its own supportRevision), `groundAtLocal`, `groundAtNear`,
+  `maxChunks`. SatParcelHomes, SatTintLayer, SatHouseLights, SatAmbientLife
+  and the runtime bus (`runtime.satVeg`, read by SatGroundDetailLayer and
+  world readiness) get the view; only WpCanopyLayer gets the engine;
+- the legacy ring is requested first, and is always kept by the wide ring.
+Flag off, `legacy` is the engine itself.
+
+Measured, Paris to Powell to Central Park in one page per run, interleaved
+(on,off / off,on ...), 8 pairs before the stricter hold of item 7 plus 4
+pairs after it (12 pairs, 24 pages):
+
+| arm | Powell homes at 15 / 30 / 45 s | first home (s) | legacy ring ready / chunks at 30 s |
+|---|---|---|---|
+| on (12 runs) | 97 to 98 in 12 of 12 | 8 to 12 | 9 / 9 |
+| off (12 runs) | 97 to 98 in 12 of 12 | 8 to 10 | 9 / 9 |
+
+Montage `montage-powell-arrivals-t30.png` (left on, right off, runs 1 to 8,
+30 s after the warp): the subdivision is there in all 16. The wave-1
+verifier's 1 of 5 used the old engine; it was not re-run on that code here.
+What the other consumers see: the legacy ring is 9 ready of 9 in both arms at
+every arrival (the full engine holds 16 to 19 chunks with the flag on). House
+lights read 0 in both arms (noon), tint verts 0 in both arms (SatTintLayer is
+not mounted under stylized earth); the ambient movers were not compared.
+Their ground heights come from the same legacy grid in both arms by
+construction. Not measured: house lights at night, ambient life counts.
+
+### 3. Bridge landings - FIXED (and the credit corrected)
+
+Was: an end was a LANDING whenever it lay inside the tile, so the joint
+between two OSM bridge ways was eased toward the ground (or the water).
+
+Now (worker, `ground-bridges.js`):
+- runs of one class that meet end to end, and only each other, are MERGED
+  into one chain before the ramps are computed;
+- any other end within 2.5 m of another bridge run's end or vertex
+  (including a landmark bridge's run, kept for this test only) is OPEN;
+- each OSM way keeps its own clearance target (round 1's rule, per way),
+  carried per station (`wpBridges.clr`), with the change between two ways
+  ramped at the deck grade (6 %) on the lower side, so a water span's
+  approach viaduct climbs to it and the merged crossing never steps (the
+  first merge gave the whole 7.8 km Yurikamome loop the water clearance;
+  per-way targets fixed that before anything shipped).
+
+Node, 3 x 3 z13 tiles a place, the replayed inputs (independent count, see
+Instruments):
+
+| place | landing ends that are joints, before | after | chains before -> after | ways merged | longest chain before -> after (m) |
+|---|---|---|---|---|---|
+| tokyo-bay | 725 of 2,215 (32.7 %) | 0 of 1,469 | 1,183 -> 976 | 209 | 4,918 -> 7,848 |
+| nyc-mid | 435 of 1,040 (41.8 %) | 0 of 594 | 552 -> 435 | 120 | 2,489 -> 2,947 |
+| paris | 174 of 707 (24.6 %) | 0 of 534 | 370 -> 334 | 40 | 1,008 -> 1,008 |
+| brooklyn | 192 of 494 (38.9 %) | 0 of 306 | 263 -> 221 | 46 | 2,399 -> 2,399 |
+| nyc-bay | 234 of 681 (34.4 %) | 0 of 437 | 366 -> 321 | 50 | 2,399 -> 2,399 |
+
+The "before" figures match the verifier's raw count (753 of 2,267, 456 of
+1,051, 190 of 733 on the newer planet). A long multi-way crossing: Tokyo
+bay's longest chain is the Yurikamome transit line over the Rainbow Bridge
+approach loop, 7,848 m, 442 stations, both ends open (cut at the tile edge),
+clearance 13.7 to 30.3 m with the largest change between two stations
+1.19 m (20 m apart, the 6 % grade); Midtown's is a 2,947 m rail crossing
+(both ends real landings), 5.5 to 11.3 m, largest step 1.14 m. Frames:
+`own-flag/tokyo-bay__noon-final.png`. Not measured live: the drawn deck
+height profile along a chain (the node clearance profile and the frames
+are the evidence).
+
+Credit: round 1 credited FableFlight `src/roads.rs` 189 to 235 (`bridge_end`)
+without implementing it. The "Ported techniques" list above is corrected:
+round 2 implements only its idea (the `near` test), written new; the merge
+and the per-way ramps are this pass's own.
+
+### 4. Crown look - FIXED by measure, with one visible residue
+
+Was (round 1): broadleaf crowns drew as the shared 3-layer leaf-card crown
+(a cone in silhouette); leaf-off crowns were solid brown; leaf-on crowns kept
+the species colour (FableFlight's tint), lime at Tijuca.
+
+Now:
+- FORM: one instanced attribute (`aWpDens`: density, conifer) bends the
+  crown in the vertex shader: broadleaf crowns get a wider rounded top (top
+  layer x 1.3), conifers taper to a cone; cones only where the species table
+  says conifer.
+- COLOUR: each crown takes the linear mean of the photo around it (3 x 3
+  pixels of the 128 x 128 chunk photo for crowns, 5 x 5 for L2 and L3
+  patches), pulled 15 % toward its species' hue at the photo's brightness
+  (leaf-on only), conifers 12 % darker, +-7 % per-tree jitter, times
+  `PHOTO_GAIN` 1.1 (measured: at 1.0 the noon crown/photo luma was 0.77 to
+  1.02, mean 0.89, over five places).
+- LEAF-OFF: density 0.42 (rising to 1 with leafiness): fragments are
+  dithered out (interleaved gradient noise, a per-instance phase), so a bare
+  crown is a twig haze over the ground photo. The shadow pass dithers the
+  same.
+
+Crowns against the photo they cover, same frame (look probe; delta E76 over
+the tree mask, and luma crowns / photo). Control = today's trees (legacy
+SatVeg + LivingForest); round 1 = this stream's wave-1 code, captured in the
+same session by checking out its files on the same server; round 2 = the
+final code (PHOTO_GAIN 1.1):
+
+| shot | control dE / luma | round 1 dE / luma | round 2 dE / luma | round 2, all five flags |
+|---|---|---|---|---|
+| central-park noon | 22.8 / 0.27 | 15.1 / 0.86 | 10.8 / 0.91 | 10.5 / 0.89 |
+| central-park golden | 8.2 / 0.57 | 13.1 / 1.50 | 9.6 / 1.30 | 9.5 / 1.35 |
+| central-park night | 5.6 / 0.22 | 5.0 / 0.70 | 3.9 / 0.76 | 3.8 / 0.80 |
+| tijuca noon | 13.6 / 0.55 | 15.3 / 1.03 | 10.3 / 1.01 | 10.3 / 1.00 |
+| powell noon | 30.6 / 0.35 | (no mask: not measured) | 13.3 / 0.99 | 13.3 / 0.99 |
+| paris noon | 13.5 / 0.54 | 17.4 / 0.71 | 14.4 / 0.82 | 14.8 / 0.81 |
+| paris night | 7.9 / 0.26 | 7.4 / 0.51 | 5.8 / 0.61 | 5.8 / 0.60 |
+| brooklyn noon | 31.6 / 0.27 | 18.8 / 0.91 | 15.6 / 1.11 | 16.0 / 1.13 |
+| phoenix-suburb noon | 28.6 / 0.39 | - | 23.2 / 0.64 | 20.0 / 0.79 |
+| iowa-farm noon | 47.5 / 0.13 | - | 13.5 / 0.90 | 13.5 / 0.91 |
+| sf-hills noon | 20.5 / 0.48 | - | 16.5 / 0.95 | 16.2 / 1.03 |
+
+Read with care: the mask is a different set of pixels in each arm (round 2
+covers 10 % of the Central Park frame, round 1 16 %, control 4 %; a leaf-off
+round-2 crown is 42 % of its pixels), so dE compares how well each arm's own
+trees sit in the photo, not the same pixels. Golden hour stays brighter
+than the photo (1.30). Paris noon is the least improved (14.4 against 13.5 for
+the control's few trees). Frames: `m-r1-on-off.png` rows 2 and 3 (round 1 /
+round 2 / control at Central Park and Tijuca), `m-look-a.png`.
+Visible residue: at 900 m the leaf-off dither reads as a fine screen-door
+grain in the Central Park frames, and Tijuca's far L3 patches show a faint
+regular dot pattern (reduced by a 0.3-radius position and +-12 % size jitter
+on L2/L3 patches, not removed).
+
+### 5. Dense forest - FIXED at Tijuca (static)
+
+Now: the plan skips L3 cells outside the camera's view cone (horizontal half
+field of view + 0.6 rad) beyond `keep` (max(1.25 d0, 900 m)) and re-plans on
+a 15-degree camera turn; distances d0 to d2 scale by a screen-size factor
+sigma that drops (x 0.85, floor 0.3) after a pass that ran out of pool and
+recovers (x 1.06) when both pools have 20 % room; the outer edge dissolves
+by dithered density over the last 14 % of d3, or of the farthest planned
+distance when a pool ran out, with per-cell jitter so it is no circle.
+
+Tijuca noon, live: round 1 crowns 8,500 / patches 14,000, 6,819 cells cut,
+farthest tree 1,614 m; round 2 8,500 / 13,869, 0 cut, farthest 4,236 m
+(the d3 of 4,200 m plus a patch radius), sigma 1 (the cone alone made room).
+Frame `m-r1-on-off.png` row 3, `own-flag/tijuca__noon-on.png`. Not measured:
+a flight over Tijuca (the edge in motion), and sigma below 1 live (the unit
+gate covers it).
+
+### 6. Motion cost - FIXED
+
+The placement pass is a job: plan (generator, yields on a deadline) ->
+instance writes into staging arrays -> one swap. 1.2 ms deadline, checked
+every 16 writes, every 8 L3 cells in the walk and every 128 in the distance
+pass. Crown exact samples and the writes run inside ARRIVAL's
+`beginGroundBatch` / `endGroundBatch` (a no-op unless WORLD_ARRIVAL arms it).
+
+Straight line at 120 m/s for 24 s, Ultra (`wp-ground-verify-motion.cjs`),
+every run (frame ms p50 / p95 / p99; frames over 50 ms):
+
+| run | central-park on | central-park off | powell on | powell off |
+|---|---|---|---|---|
+| A1 (slices at 1.5 ms/64 writes) | 23.5 / 51.4 / 111.8; 64 | 21.1 / 45.7 / 105.2; 57 | 12.2 / 23.1 / 47.4; 21 | 14.7 / 25.9 / 65.3; 29 |
+| A2 | 19.5 / 43.7 / 100.3; 50 | 21.8 / 51.9 / 110.7; 71 | 16.4 / 36.5 / 84.9; 44 | 15.4 / 29.2 / 64.8; 35 |
+| A3 | 24.1 / 53.1 / 105.7; 66 | 19.3 / 40.2 / 96.0; 49 | 12.9 / 23.6 / 45.7; 19 | 12.1 / 23.9 / 48.9; 22 |
+| B1 (stricter hold, yields) | 18.8 / 41.5 / 88.1; 53 | 17.3 / 41.4 / 82.3; 50 | 11.3 / 22.5 / 49.3; 23 | 11.2 / 22.4 / 41.6; 15 |
+| B2 | 20.7 / 44.4 / 104.0; 58 | 20.3 / 45.3 / 113.6; 58 | 13.7 / 26.6 / 58.8; 27 | 11.8 / 25.4 / 47.3; 20 |
+| B3 | 22.5 / 53.3 / 121.6; 67 | 23.1 / 47.4 / 116.4; 57 | 12.8 / 27.2 / 53.9; 27 | 17.0 / 31.3 / 72.0; 28 |
+| C1 (final slices) | 27.9 / 69.8 / 141.0; 84 | 24.2 / 53.7 / 116.0; 64 | 18.3 / 37.1 / 79.0; 38 | 18.5 / 36.6 / 82.3; 40 |
+
+(Arms ran on, off / off, on / on, off in A and B.) C1 ran while another probe of this
+stream was capturing, so its on arm shared the GPU with it. The frame times
+are dominated by the shared machine; no run separates on from off beyond
+that spread. The PLACEMENT slices, in the flight window only: B runs 77 to
+105 slices <= 1.5 ms and 284 to 353 between 1.5 and 3 ms a run, one 3-6 ms
+and one > 6 ms in all six; C1 (final) Central Park 527 <= 1.5 ms and 4 of
+1.5 to 3 ms, Powell 691 and 1. Wave 1: one pass up to 11.6 ms (Central Park)
+and 15 ms (Powell) in one frame.
+
+### 7. Arrival - FIXED
+
+The hold now stops photo looks (was one at a time) and every fine-grid job
+(was: first fine grids still sampled), on top of round 1's (no exact samples,
+no ring growth, no deck rebuilds).
+
+| pairs | Central Park first tile on / off (s), mean | full ring on / off, mean | Powell first on / off | Powell full on / off |
+|---|---|---|---|---|
+| 8, before the stricter hold | 7, 6.2, 7.7, 5.5, 6.7, 7.7, 4.9, 5.9 / 8.8, 7.5, 9.5, 5.9, 6.2, 8.4, 6.2, 7.8; 6.5 / 7.5 | 27.2, 24, 23.5, 24.3, 17.4, 29, 29.3, 29.1 / 26.7, 27.7, 21.7, 21.9, 24.1, 25.8, 18.4, 20.7; 25.5 / 23.4 | 4.7 / 4.6 | 12.6 / 11.5 |
+| 4, final hold | 4.9, 5, 5, 5 / 9, 6.6, 8.7, 8.3; 5.0 / 8.1 | 23, 19.1, 16.7, 17.8 / 21.8, 18.8, 25.7, 24.5; 19.1 / 22.7 | 4.2 / 4.3 | 9.8 / 10.6 |
+
+With the final hold the flag delays neither the first tile nor the full ring
+at either place in these 4 pairs; before it, the full ring was about 1 to 2 s
+later on average (within the spread). Wave 1's +6 s first tile at Central
+Park did not reproduce in any of the 12 pairs.
+
+### 8. Keep-outs - NOT FIXED (cause found for one of the six)
+
+Added in the worker: the marquee monument models' exclusion discs and every
+procedural landmark monument (25 to 120 m discs by height) are painted into
+the footprint raster (so the wall clearance applies). Re-measured live
+against DRAWN buildings (`wp-ground-verify-live.cjs`, now naming the mesh):
+crowns standing more than 3 m under a drawn roof: Brooklyn 1, Paris 5,
+Central Park 0, Powell 0 (wave 1: 1 / 5); crowns with at least 2 of 8 edge
+points under a roof: 13 / 30 / 2 / 4 (wave 1: 13 / 30 / 2 / 5). Every one of
+the six is under a `sat-buildings` mesh, not a monument:
+- Brooklyn (-73.96785, 40.67456): the crown is in a courtyard (inside an outer
+  ring, inside a hole) of a 43-ring, 22 m OpenFreeMap building; the drawn
+  roof covers the courtyard at 26 m. The building engine fills that hole
+  (stream A/B's files), so the canopy is right to put a tree there.
+- Paris (2.3364, 48.8508 and 2.3324, 48.8547): not inside any z14 building
+  ring on the live planet, 1.8 to 3.8 m from the nearest footprint (5 m and
+  26 m tall), yet a drawn roof 28 to 34 m up covers them. Source not
+  identified this round.
+What would fix it: the canopy taking its building keep-out from what the
+building worker draws (its admitted footprints after hole handling and
+TRUTH's typology) rather than the raw layer, or the building engine
+respecting inner rings. Neither is in E's files.
+
+### 9. Paris night specks - FIXED by measure
+
+The crowns take 30 % of the ground lamp pools (night-ground.js's receiver,
+string-patched in the canopy's own program); at 100 % every crown near a
+street lamp lit up cream. Warm-bright pixels (luma > 110, red > blue + 20)
+inside the tree mask, Paris night: round 1 232 (0.45 % of the mask), round 2
+51 (0.15 %), control 36 (0.21 %). Crop `m-paris-night.png` (round 1 / round
+2 / control): a few remain.
+
+### 10. Budget - HOLDS on draws and triangles, geometry over at Paris (not E)
+
+All five flags, Ultra, `world-pass-budget.cjs` (one run each):
+
+| pose | draws | triangles (tool) | + canopy cascade-0 shadow | geometry MiB (E: trees / decks) |
+|---|---|---|---|---|
+| central-park | 383 | 6.03 M | 4,419 x 34 = 0.150 M -> 6.18 M | 235.4 (1.9 / 2.1) |
+| tijuca | 332 | 2.16 M | 8,500 x 34 = 0.289 M -> 2.45 M | 114.1 (1.9 / -) |
+| paris | 372 | 7.19 M | 796 x 34 = 0.027 M -> 7.22 M | 298.2 (1.9 / 0.6) |
+| nyc-low | 372 | 5.58 M | at most 0.289 M -> <= 5.87 M | 231.0 (1.9 / -) |
+
+Draws <= 900 and triangles <= 8 M everywhere, counting the shadow
+submission explicitly (whether the tool's renderer total already includes
+the shadow pass was not checked, so it may be counted twice). Geometry: Paris
+is over 256 MiB with buildings alone (247.4 MiB); this stream's share is
+about 2.5 MiB there. The canopy now publishes `triangles` and
+`shadowTriangles` in its stats; its hard bound is Ultra 8,500 x 34 x 2 +
+14,000 x 10 = 0.718 M (High 0.369 M), plus the decks' vertex ceiling (200 k
+vertices Ultra, deck + glow together).
+
+### 11. Seams
+
+- `result.wp`: ARRIVAL's wrapper (`// WORLD PASS B`) stamps every result of a
+  request with any stream on, so the stamp is already there: node, flag on,
+  97 of 97 'sat-veg' canopy bundles and 9 of 9 'sat-roads' bundles a place
+  carry the request key; flag off 0. Both engines drop a mismatched bundle
+  (`worldPassMatch`). No seam edit was needed.
+- The bridge's photo on the water under each deck: not fixed. What would:
+  an earth-surface repaint under mapped decks, i.e. the terrain shader
+  taking a "covered by a deck" mask (the deck chains rasterised into the
+  ground-plan raster the second wave proposes) and drawing water colour
+  there; `earth-surface-mask.js` keeps roads photographic on purpose and has
+  no owner in this pass. Not cheap or safe inside this round.
+
+### 12. The verifier's probes - DONE
+
+Copied as `scripts/wp-ground-verify-{live,motion,tier,arrival}.cjs`,
+`-cover.mjs` and `-joints-osm.mjs` (paths made relative), and extended as
+noted above.
+
+### Gates (final commit)
+
+- `node scripts/world-pass-worker-proof.mjs --check c2bf5c06 --ignore-protocol`:
+  IDENTICAL, 1062/1062 cases, 7308 buffers + 1062 meta objects, 28 stage
+  cases (0 bad), 0 unrecorded inputs.
+- `graphics-unit.mjs` PASS, `verify-true-earth-flags.mjs` 11/11,
+  `verify-stylized-earth.mjs` 22/22, `verify-city-horizon.mjs` PASS,
+  `verify-building-handoff.mjs` 4/4, `wp-ground-unit.mjs` 9/9.
+- eslint on every changed file: no new errors (`SatVegLayer.jsx` keeps its
+  5 react-hooks/immutability errors, the same 5 at `c2bf5c06`).
+- WORKER_PROTOCOL unchanged (26). The worker reads only the request.
+- Flag off, nothing new runs per frame: SatVegLayer passes `engine.legacy`,
+  which is the engine; the engine's only new work is behind `wpTrees` /
+  empty `wpPending`; SatRoadLayer still mounts no WpBridgeLayer.
+
+### Open after round 2
+
+1. Item 8 (six crowns under drawn roofs; a building-engine hole fill at
+   Brooklyn, an unidentified drawn roof at Paris).
+2. The owner's 5080 motion check: crowns standing up as exact samples land,
+   the patch fade, the dithered edge in flight, the leaf-off screen-door
+   grain at distance, deck rebuild swaps.
+3. Golden hour crowns are brighter than the photo (luma 1.30).
+4. The bridge photo under decks (item 11).
+5. Not measured: house lights at night and ambient movers with the flag on
+   against off; the deck height profile live; sigma < 1 live; a Tijuca flight.
+6. Round 1's Open 5 (approach roads stay on the ground), 6 (season per
+   chunk) and 8 (the legacy scatter's surface mask cost) stand.
