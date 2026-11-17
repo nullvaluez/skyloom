@@ -1,7 +1,7 @@
 'use client';
 import { SessionRecovery } from './SessionRecovery';
 
-import { Suspense, useEffect, useState, useSyncExternalStore } from 'react';
+import { Suspense, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { PerformanceMonitor } from '@react-three/drei';
 import { FlyScene } from './FlyScene';
@@ -28,6 +28,7 @@ import { frameloopFor, noteStagePump, stagePumpHz, stagePumpWanted } from '@/lib
 import { cinemaOn } from '@/lib/fly/cinema-policy';
 import { createFrameCadence } from '@/lib/fly/frame-cadence.mjs';
 import { isMobileGraphicsClass } from '@/lib/fly/device-class';
+import { adoptGpuContext } from '@/lib/fly/gpu-info-prewarm';
 import { initialRenderDpr } from '@/lib/fly/render-resolution';
 import { configureCinemaAssets } from '@/lib/fly/cinema-material-assets';
 import { installContextResourceLifetime } from '@/lib/fly/context-resource-lifetime';
@@ -101,12 +102,20 @@ function StagePump({ runtime }) {
 
 /**
  * R9-1 boot gate (c): counts rendered frames AFTER Suspense resolved (it
- * mounts beside FlyScene, so its useFrame only runs once the scene — and
- * its compiled shaders — actually draw). The BootScreen overlay polls
- * runtime.framesRendered from the DOM.
+ * mounts beside FlyScene). Shader preparation can keep simulation ticks
+ * running without a draw, so use the composer's completed-frame counter.
+ * The BootScreen overlay polls runtime.framesRendered from the DOM.
  */
 function BootFramePulse({ runtime }) {
+  const gl = useThree(s => s.gl);
+  const previous = useRef(null);
   useFrame(() => {
+    // A simulation tick may intentionally retain the previous canvas while
+    // exact live programs link. Count completed main draws, not those ticks.
+    const main = gl.__flyMainDraw;
+    const frame = main?.enabled ? main.frames : gl.info.render.frame;
+    if (!frame || previous.current === frame) return;
+    previous.current = frame;
     // eslint-disable-next-line react-hooks/immutability -- runtime is the imperative simulation handle, not React state.
     runtime.framesRendered = (runtime.framesRendered ?? 0) + 1;
   });
@@ -211,6 +220,7 @@ export function FlyCanvas({ runtime }) {
         reversedDepthBuffer: true,
       }}
       onCreated={({ gl, camera }) => {
+        adoptGpuContext(gl.getContext());
         // SHIP PASS FRAME (FR-1, FR-2, FR-4): lib/fly/census.js installFrameRenderer.
         installFrameRenderer(gl);
         // eslint-disable-next-line react-hooks/immutability -- Renderer-owned diagnostics live on the mutable simulation handle.

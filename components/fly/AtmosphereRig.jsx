@@ -28,12 +28,9 @@ export function AtmosphereRig({ runtime }) {
   useEffect(() => {
     const luts = new AtmosphereLuts(atmosphereParams(PHYS_SKY_ACTIVE.grade));
     ref.current = luts;
-    PSKY_UNIFORMS.uPskyView.value = luts.sky.texture;
-    PSKY_UNIFORMS.uPskyApScatter.value = luts.aerial.textures[0];
-    PSKY_UNIFORMS.uPskyApTrans.value = luts.aerial.textures[1];
     const release = registerCinemaResources('atmosphere', () => ({ trans: luts.trans, ms: luts.ms, sky: luts.sky, aerial: luts.aerial }));
     // Render targets lose their contents with the context; draw them again.
-    const restored = () => luts.invalidate();
+    const restored = () => luts.invalidatePrograms();
     gl.domElement.addEventListener('webglcontextrestored', restored);
     return () => {
       release();
@@ -58,13 +55,20 @@ export function AtmosphereRig({ runtime }) {
     // Scene y is metres above sea level (origin rebasing moves x/z only).
     const h = Math.min(80, Math.max(0.001, camera.position.y / 1000));
     luts.update(gl, { h, muS: sun.y, maxKm: tier.aerialKm, nowSec: clock.elapsedTime, aerialHz: tier.aerialHz, skyHz: tier.skyHz });
+    runtime.physSky = { ...luts.stats, eyeKm: h, aerialKm: tier.aerialKm, programWarm: luts.programWarm };
+    // Publish neither empty textures nor NaN lookup coordinates while their
+    // first programs link. Both tables have been rendered before consumers
+    // receive the textures; medium changes keep the prior complete tables.
+    if (!Number.isFinite(luts.skyState.h) || !Number.isFinite(luts.aerialState.h)) return;
+    PSKY_UNIFORMS.uPskyView.value = luts.sky.texture;
+    PSKY_UNIFORMS.uPskyApScatter.value = luts.aerial.textures[0];
+    PSKY_UNIFORMS.uPskyApTrans.value = luts.aerial.textures[1];
     // Consumers look up with what each table holds, not with this frame's eye.
     const hl = Math.hypot(sun.x, sun.z);
     PSKY_UNIFORMS.uPskyEye.value.set(luts.skyState.h, luts.skyState.muS, hl > 1e-6 ? sun.x / hl : 1, hl > 1e-6 ? sun.z / hl : 0);
     // .z: SKY_LITE continues the aerial volume past its reach (0 = the clamp,
     // which High and every flag-off session keep).
     PSKY_UNIFORMS.uPskyAp.value.set(luts.aerialState.maxKm, luts.aerialState.h, skyLiteAerialSwitch(qt), 0);
-    runtime.physSky = { ...luts.stats, eyeKm: h, aerialKm: tier.aerialKm };
     updateLookAtmos(runtime.cinemaEnvironment, cinemaProfile()); // LOOK PASS: the shared tier test (lib/fly/look-tier.js)
   }, -20);
   return null;

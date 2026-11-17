@@ -41,9 +41,9 @@ const SLICE_BAR = (base) => sliceBarSec(base, cadenceState().targetFps);
  * material (179 uses) and every traffic model. A warm that lands one field off
  * is not a warm; it is a second program.
  *
- * The critical publication latch only applies under an arrival curtain; its
- * existing time cap / explicit reduced entry releases the latch and records
- * a bypass. Unsupported parallel drivers retain the original rendering path.
+ * The content time cap / explicit reduced entry settles the arrival wait and
+ * records a bypass, but pending shader publication stays held until the driver
+ * finishes. Unsupported parallel drivers retain the original rendering path.
  * The compile competes with the GPU but not with the network, so it overlaps
  * the tile stream that dominates boot instead of extending it — and
  * BootScreen's shaders gate only WAITS for it up to PREWARM.maxMs, after which

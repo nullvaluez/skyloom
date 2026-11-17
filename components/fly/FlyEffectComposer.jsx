@@ -23,6 +23,7 @@ import { FX_STABILITY } from '@/lib/fly/fly-constants';
 import { registerComposer, resolveStepSafe } from '@/lib/fly/step-safe';
 // SHIP PASS SKY: the live merged aerial pass, for the prewarm registry's SKY entry.
 import { provideSkyPrewarm } from '@/lib/fly/sky-prewarm';
+import { createComposerPreflight } from '@/lib/fly/composer-preflight';
 
 /**
  * ROUND 21 (A GOVERNOR, S2 + S3) — a vendored fork of
@@ -148,6 +149,7 @@ const StableEffectComposer = /* @__PURE__ */ memo(
     const dpr = useThree((s) => s.viewport.dpr);
     const scene = _scene || defaultScene;
     const camera = _camera || defaultCamera;
+    const preflight = useRef(null);
 
     const [composer, normalPass, downSamplingPass] = useMemo(() => {
       const effectComposer = new EffectComposerImpl(gl, {
@@ -200,6 +202,20 @@ const StableEffectComposer = /* @__PURE__ */ memo(
         if (window.__flyComposer === composer) delete window.__flyComposer;
       };
     }, [composer]);
+
+    useLayoutEffect(() => {
+      const warm = createComposerPreflight(gl, scene, camera, composer);
+      preflight.current = warm;
+      const presented = { owner: composer, frames: 0, enabled };
+      gl.__flyMainDraw = presented;
+      if (typeof window !== 'undefined') (window.__flyStats ??= {}).composerWarm = warm.state;
+      return () => {
+        warm.dispose();
+        if (preflight.current === warm) preflight.current = null;
+        if (gl.__flyMainDraw === presented) delete gl.__flyMainDraw;
+        if (typeof window !== 'undefined' && window.__flyStats?.composerWarm === warm.state) delete window.__flyStats.composerWarm;
+      };
+    }, [gl, scene, camera, composer, enabled]);
 
     // R24 A (STEP_SAFE): hand the LIVE composer to the -99 DPR rig, from a
     // keyed effect with an OWNER-CHECKED disposer. Owner-checked because React
@@ -288,11 +304,23 @@ const StableEffectComposer = /* @__PURE__ */ memo(
               });
             }
           }
+          // Compile exact live color/depth/post variants before first use.
+          // Returning keeps the last completed canvas; no buffer is cleared,
+          // swapped or counted as a rendered frame while the driver links.
+          if (!preflight.current?.prepare()) return;
           const currentAutoClear = gl.autoClear;
           gl.autoClear = autoClear;
-          if (stencilBuffer && !autoClear) gl.clearStencil();
-          composer.render(delta);
-          gl.autoClear = currentAutoClear;
+          const warm = preflight.current;
+          warm?.beforeRender();
+          try {
+            if (stencilBuffer && !autoClear) gl.clearStencil();
+            composer.render(delta);
+            warm?.didRender();
+            if (gl.__flyMainDraw?.owner === composer) gl.__flyMainDraw.frames++;
+          } finally {
+            warm?.afterRender();
+            gl.autoClear = currentAutoClear;
+          }
         }
       },
       enabled ? renderPriority : 0
@@ -371,6 +399,7 @@ const StableEffectComposer = /* @__PURE__ */ memo(
       if (downSamplingPass) downSamplingPass.enabled = true;
 
       built.current = { objects, passes, owned, composer, camera };
+      preflight.current?.invalidatePosts();
       // SHIP PASS SKY (prewarm registry, 'SKY:sky-lite-aerial'): the merged
       // pass(es) carrying the aerial effect, read at call time so a rebuild or
       // teardown never hands out a disposed material.

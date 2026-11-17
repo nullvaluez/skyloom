@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic';
 import { installUrlFlags } from '@/lib/fly/fly-pins';
 import { prepareSceneryWorkers } from '@/lib/fly/worker-cache-guard';
+import { prepareGpuInfo } from '@/lib/fly/gpu-info-prewarm';
 import { LaunchScreen } from '@/components/LaunchScreen';
 
 // TRUE EARTH: `?flags=` must become pins before any Fly module reads one, and
@@ -18,6 +19,9 @@ const FlyMode = dynamic(
     // Retire a stale shell before it can give terrain workers the traffic API.
     // The usual idle registration happens too late to protect this page load.
     await prepareSceneryWorkers();
+    // Keep driver context initialization off the UI thread, and prime the
+    // GPU identity before any flight import/render can latch its tier.
+    await prepareGpuInfo();
     return import('@/components/fly/FlyMode').then((mod) => mod.FlyMode);
   },
   {

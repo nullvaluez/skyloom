@@ -77,9 +77,9 @@ await check('streamed, already-hidden and evicted materials keep their own visib
   gate.hold(visible); gate.hold(visible); gate.hold(hidden); gate.hold(evicted);
   assert.equal(gate.state.held, 3);
   evicted.dispose(); assert.equal(gate.state.held, 2);
-  gate.bypass('time-cap');
+  gate.dispose();
   assert.equal(visible.visible, true); assert.equal(hidden.visible, false); assert.equal(gate.state.held, 0);
-  assert.equal(criticalTerrainReady(gate.state), false, 'Bypass is not proof of a completed program');
+  assert.equal(criticalTerrainReady(gate.state), false, 'Disposal is not proof of a completed program');
   visible.dispose(); hidden.dispose();
 });
 
@@ -122,34 +122,49 @@ await check('an explicit retry re-arms a failed critical program without publish
   assert.equal(m.visible, true); assert.equal(gate.state.attempts, 2); assert.equal(gate.retry(), false); m.dispose();
 });
 
-await check('explicit reduced entry and time caps preserve their reasons even when compile resolves later', async () => {
+await check('reduced entry and time caps never publish a pending program, even after the curtain lifts', async () => {
   for (const reason of ['explicit-reduced', 'time-cap']) {
     const gate = createCriticalTerrainGate(), m = new MeshStandardMaterial(), driver = deferred(); gate.hold(m);
     step(gate, () => driver.promise); gate.bypass(reason);
-    assert.equal(m.visible, true); assert.equal((await gate.wait()).reason, reason);
+    assert.equal(m.visible, false); assert.equal((await gate.wait()).reason, reason);
     assert.equal(criticalTerrainReady(gate.state), false, 'A cap is not proof of readiness');
+    const later = new MeshStandardMaterial(); gate.hold(later);
+    for (let i = 0; i < 20; i++) step(gate, () => assert.fail('pending key must not redispatch'), { covered: false });
+    assert.equal(m.visible, false); assert.equal(later.visible, false);
     driver.resolve(); await driver.promise; await Promise.resolve();
     assert.equal(gate.state.status, 'bypassed', 'Completion must still wait for a matching frame');
     step(gate, () => assert.fail('must not redispatch'), { covered: false });
     assert.equal(gate.state.status, 'ready'); assert.equal(gate.state.bypassReason, reason);
-    assert.ok(gate.state.readyAt != null); assert.equal(criticalTerrainReady(gate.state), true); m.dispose();
+    assert.equal(m.visible, true); assert.equal(later.visible, true);
+    assert.ok(gate.state.readyAt != null); assert.equal(criticalTerrainReady(gate.state), true); m.dispose(); later.dispose();
   }
 });
 
-await check('uncovered flight never holds terrain and readiness distinguishes required work from a fallback', () => {
+await check('uncovered flight still dispatches readiness work and distinguishes a content fallback from shader completion', async () => {
   assert.equal(terrainArrivalCovered({}, { pct: 100 }, 'playing'), false);
   assert.equal(terrainArrivalCovered({}, { pct: 10 }, 'playing'), true);
   assert.equal(terrainArrivalCovered({ worldLoading: true }, { pct: 100 }, 'playing'), true);
   assert.equal(terrainArrivalCovered({}, null, 'boot'), true);
   assert.equal(terrainArrivalCovered({}, { pct: 100 }, 'boot'), false);
   const gate = createCriticalTerrainGate(), m = new MeshStandardMaterial(); gate.hold(m);
-  step(gate, () => assert.fail('no curtain'), { covered: false });
-  assert.equal(m.visible, true); assert.equal(gate.state.status, 'bypassed');
+  const driver = deferred(); let dispatches = 0;
+  step(gate, () => { dispatches++; return driver.promise; }, { covered: false });
+  assert.equal(m.visible, false); assert.equal(gate.state.status, 'compiling'); assert.equal(dispatches, 1);
+  assert.equal(gate.state.bypassReason, 'arrival-already-revealed');
   const rt = { prewarm: { done: true }, criticalTerrain: gate.state };
   assert.equal(worldReadiness(rt).parts.shaders, false);
   rt.criticalTerrain = { required: true, status: 'ready' }; assert.equal(worldReadiness(rt).parts.shaders, true);
   rt.criticalTerrain = { required: false, status: 'unsupported' }; assert.equal(worldReadiness(rt).parts.shaders, true);
-  rt.prewarm.done = false; assert.equal(worldReadiness(rt).parts.shaders, false); m.dispose();
+  rt.prewarm.done = false; assert.equal(worldReadiness(rt).parts.shaders, false);
+  driver.resolve(); await driver.promise; await Promise.resolve(); step(gate, () => assert.fail('already ready'), { covered: false });
+  assert.equal(m.visible, true); m.dispose();
+});
+
+await check('a dispatch failing after a reduced entry cannot leave terrain hidden forever', async () => {
+  const gate = createCriticalTerrainGate(), m = new MeshStandardMaterial(), driver = deferred();
+  gate.hold(m); step(gate, () => driver.promise); gate.bypass('time-cap'); assert.equal(m.visible, false);
+  driver.reject(Error('link failed')); await Promise.resolve(); await Promise.resolve();
+  assert.equal(gate.state.status, 'failed'); assert.equal(m.visible, true); m.dispose();
 });
 
 await check('room profiles remain mandatory until compiled and share explicit retry actions', () => {
