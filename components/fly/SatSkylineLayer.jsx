@@ -19,6 +19,7 @@ import {
 } from '@/lib/fly/settle';
 import { satelliteVisualsOn, satelliteVisualProfile } from '@/lib/fly/satellite-visuals';
 import { useFlyStore } from '@/stores/fly-store';
+import { worldPassConfig } from '@/lib/fly/world-pass'; // WORLD PASS C (round 2): the skyline worker pool size
 // SHIP PASS CITY (CT-2): CITY_RANGE resolved per tier through the device policy.
 import { cityRangeFor } from '@/lib/fly/city-range';
 // SHIP PASS CITY (CT-5): NIGHT_RHYTHM's occupancy / twilight uniform.
@@ -90,11 +91,37 @@ export function SatSkylineLayer({ runtime, flight }) {
       if (process.env.NODE_ENV === 'development')
         console.warn('[sat-skyline] TileJSON init failed:', err?.message ?? err);
     });
-    engine.setWorker(api);
+    // WORLD PASS C (round 2): the stand-in far ring builds every admitted
+    // building of 384 tiles; a small pool of skyline workers keeps its arrival
+    // at or ahead of the shipped mass. Stream off: one worker, as before.
+    const extra = [];
+    if (engine.standInsOn) {
+      const n = Math.max(1, Math.min(4, worldPassConfig('reach').workers ?? 1));
+      for (let i = 1; i < n; i++) {
+        const w = new Worker(new URL('../../lib/fly/toy-world/vector-tile.worker.js', import.meta.url), { type: 'module' });
+        const a = withRunwayGeometry(wrap(w));
+        a.init().catch(() => {});
+        extra.push({ w, a });
+      }
+    }
+    if (extra.length) engine.setWorker(api, extra.map((e) => e.a));
+    else engine.setWorker(api);
+    // WORLD PASS C (round 2b): the far ring's ground photos load only once the
+    // rest of the world has settled too (the near buildings and the terrain),
+    // so they never take bandwidth from the world arriving. Read every 0.5 s
+    // by the engine while it is idle; stream off: never set, never read.
+    if (engine.standInsOn) {
+      engine.setPhotoGate(() => {
+        if (runtime.worldLoading) return false;
+        const s = runtime.satBuildings?.stats;
+        return !s || !(Number(s.queued || 0) + Number(s.building || 0) + Number(s.draping || 0) > 0);
+      });
+    }
     if (process.env.NODE_ENV === 'development') window.__satSkyline = engine; // harness introspection
     return () => {
       engine.dispose();
       worker.terminate();
+      for (const e of extra) e.w.terminate();
       if (runtime.satSkyline === engine) runtime.satSkyline = null;
       if (process.env.NODE_ENV === 'development') delete window.__satSkyline;
     };
@@ -115,8 +142,9 @@ export function SatSkylineLayer({ runtime, flight }) {
 
   useFrame(({ clock, camera, size }) => {
     const t = clock.elapsedTime;
-    // WORLD PASS C (REACH): the camera's focal length in CSS px (a no-op with the stream off).
-    if (camera?.isPerspectiveCamera) engine.setStandInView(size.height / (2 * Math.tan((camera.fov * Math.PI) / 360)), runtime.origin?.anchor, size.height);
+    // WORLD PASS C (REACH): the camera's focal length in CSS px and the coastal
+    // reflection's target (stream off: one latched boolean read, nothing else).
+    if (engine.standInsOn && camera?.isPerspectiveCamera) engine.setStandInView(size.height / (2 * Math.tan((camera.fov * Math.PI) / 360)), runtime.origin?.anchor, size.height, runtime.coastalReflection);
     nowRef.current = t;
     const eyeAgl = eyeAglVis(runtime, flight); // R24 B (GROUND_VIS)
     const gVis = groundElevVis(runtime, flight);
