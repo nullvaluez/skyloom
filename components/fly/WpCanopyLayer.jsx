@@ -66,7 +66,7 @@ import { groundArrivalHeld } from '@/lib/fly/ground-arrival';
 import { beginGroundBatch, endGroundBatch } from '@/lib/fly/terrain-ground-query';
 
 const PHOTO_ACTIVE = 3; // photo looks in flight at once (1 during the arrival hold)
-const SLICE_MS = 1.5; // placement work per frame
+const SLICE_MS = 1.2; // placement work per frame (checked every 16 writes, so a slice ends near 1.5 ms)
 const LAMP_K = 0.3; // the crowns' share of the ground lamp pools
 const CONE_MARGIN = 0.6; // radians beyond the horizontal half field of view
 const TURN_RAD = 0.26; // a camera turn this large re-plans
@@ -420,7 +420,7 @@ function stepJob(s, meshes, engine, tc, cfg, k) {
     try {
       while (j.q < j.plan.n) {
         writeOp(j, s, meshes, engine, tc, cfg, j.q++);
-        if ((j.q & 63) === 0 && performance.now() - t0 > SLICE_MS) { finish(); return; }
+        if ((j.q & 15) === 0 && performance.now() - t0 > SLICE_MS) { finish(); return; }
       }
     } finally {
       endGroundBatch();

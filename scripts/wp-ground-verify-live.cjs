@@ -81,7 +81,8 @@ process.on('exit', release);
           tris++;
           for (let gx = x0; gx <= x1; gx++) for (let gz = z0; gz <= z1; gz++) { const key = gx * 100003 + gz; let b = grid.get(key); if (!b) grid.set(key, b = []); b.push(t); }
         };
-        for (const mesh of bMeshes) {
+        let curMesh = null, hitMesh = null; // round 2: which drawn mesh a crown stands in
+        for (const mesh of bMeshes) { curMesh = mesh;
           const geo = mesh.geometry, pos = geo.attributes.position; if (!pos) continue;
           const idx = geo.index; const nT = idx ? idx.count / 3 : pos.count / 3;
           const reps = mesh.isInstancedMesh ? mesh.count : 1;
@@ -94,11 +95,11 @@ process.on('exit', release);
               const i0 = idx ? idx.getX(t * 3) : t * 3, i1 = idx ? idx.getX(t * 3 + 1) : t * 3 + 1, i2 = idx ? idx.getX(t * 3 + 2) : t * 3 + 2;
               const A = tx(i0); if (Math.hypot(A[0] - ppx, A[2] - ppz) > lim + 300) continue;
               const B = tx(i1), C = tx(i2);
-              addTri([A[0], A[1], A[2], B[0], B[1], B[2], C[0], C[1], C[2]]);
+              const T = [A[0], A[1], A[2], B[0], B[1], B[2], C[0], C[1], C[2]]; T.mesh = curMesh; addTri(T);
             }
           }
         }
-        const roofAt = (x, z) => { const b = grid.get(Math.floor(x / CELL) * 100003 + Math.floor(z / CELL)); if (!b) return null; let best = null; for (const t of b) { const [ax, ay, az, bx, by, bz, cx, cy, cz] = t; const d = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz); if (Math.abs(d) < 1e-9) continue; const l1 = ((bz - cz) * (x - cx) + (cx - bx) * (z - cz)) / d, l2 = ((cz - az) * (x - cx) + (ax - cx) * (z - cz)) / d, l3 = 1 - l1 - l2; if (l1 < -1e-6 || l2 < -1e-6 || l3 < -1e-6) continue; const y = l1 * ay + l2 * by + l3 * cy; if (best === null || y > best) best = y; } return best; };
+        const roofAt = (x, z) => { const b = grid.get(Math.floor(x / CELL) * 100003 + Math.floor(z / CELL)); if (!b) return null; let best = null; for (const t of b) { const [ax, ay, az, bx, by, bz, cx, cy, cz] = t; const d = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz); if (Math.abs(d) < 1e-9) continue; const l1 = ((bz - cz) * (x - cx) + (cx - bx) * (z - cz)) / d, l2 = ((cz - az) * (x - cx) + (ax - cx) * (z - cz)) / d, l3 = 1 - l1 - l2; if (l1 < -1e-6 || l2 < -1e-6 || l3 < -1e-6) continue; const y = l1 * ay + l2 * by + l3 * cy; if (best === null || y > best) { best = y; hitMesh = t.mesh; } } return best; };
         const outC = [];
         let underRoof = 0, crownOverRoof = 0, buried = 0, floating = 0, samples = 0;
         for (const [x, y, z, rT] of crowns) {
@@ -109,7 +110,8 @@ process.on('exit', release);
           let edge = 0; const re = Math.max(0, rT - 1.5) * k; if (re > 0) for (let a = 0; a < 8; a++) { const ry = roofAt(x + Math.cos(a * Math.PI / 4) * re, z + Math.sin(a * Math.PI / 4) * re); if (ry !== null && ry > y + 3) edge++; }
           if (edge >= 2) crownOverRoof++;
           let gd = null; if (ground && Number.isFinite(ground.elev)) { samples++; gd = +(y - ground.elev).toFixed(2); if (gd < -1.5) buried++; if (gd > 1.0) floating++; }
-          outC.push([+g[0].toFixed(7), +g[1].toFixed(7), +rT.toFixed(2), gd, rr, edge]);
+          const who = rr !== null ? (roofAt(x, z), anc(hitMesh) + "#" + (hitMesh?.name || hitMesh?.type)) : null;
+          outC.push([+g[0].toFixed(7), +g[1].toFixed(7), +rT.toFixed(2), gd, rr, edge, who]);
         }
         const meshInfo = (n) => { if (!n || !n.geometry?.attributes?.position) return n ? { visible: n.visible, count: 0, triangles: 0, bytes: 0 } : null; const g = n.geometry; const tri = (g.index ? g.index.count : g.attributes.position.count) / 3; let bytes = 0; for (const a of Object.values(g.attributes)) bytes += a.array?.byteLength ?? 0; if (g.index) bytes += g.index.array.byteLength; if (n.isInstancedMesh) bytes += n.instanceMatrix.array.byteLength + (n.instanceColor?.array.byteLength ?? 0); return { visible: n.visible, count: n.isInstancedMesh ? n.count : 1, triangles: tri * (n.isInstancedMesh ? n.count : 1), capacityTriangles: n.isInstancedMesh ? tri * n.instanceMatrix.count : tri, bytes, castShadow: n.castShadow }; };
         const topList = Object.entries(tops).sort((a, b) => b[1] - a[1]).slice(0, 25).map(([a, t]) => [a, Math.round(t)]);
