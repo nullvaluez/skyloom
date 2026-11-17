@@ -18,6 +18,10 @@ const { cinemaProfile } = await import('../lib/fly/cinema-policy.js');
 const { reachableCinemaCascades } = await import('../lib/fly/cinema-profile-prewarm.js');
 const { worldReadiness, retryWorldContent } = await import('../lib/fly/world-readiness.js');
 useFlyStore.setState({ mapStyle: 'satellite', visuals: 'enhanced', qualityPreset: 'high', qualityTier: 'high' });
+// The captured19-variant inventory predates World Pass. Keep its original
+// 38-key comparison and lifetime checks on that explicit historical arm;
+// verify-standin-lighting.mjs covers the active20-variant required batch.
+await (await import('./_world-pass-off.mjs')).latchWorldPassOff();
 const evidence = JSON.parse(fs.readFileSync(new URL('./fixtures/measured-world-profile-keys.json', import.meta.url)));
 const camera = new PerspectiveCamera(60, 16 / 9, .08, 20000), scene = new Scene();
 scene.environment = new Texture({ height: 1024 }); scene.environment.mapping = CubeUVReflectionMapping;

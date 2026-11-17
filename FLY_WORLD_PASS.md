@@ -1443,3 +1443,50 @@ active-uniform queries on that hangar canvas, including 3,033 ms through
 the reflective floor's render. The largest task after the subsequent world
 reveal was 86 ms in the clean run. Hangar UI readiness and its first
 completed 3D frame are distinct events.
+
+### Hangar shader key and canopy ownership
+
+On `6d87a81c` the hangar UI appeared 57 ms after the Free Flight click. A
+3,734 ms task still occurred before the first usable hangar view. The native
+capture identified nine expensive active-uniform reads after preparation had
+reported ready. Each program was missing from the prepared set. The affected
+materials included aircraft paint, titanium, intake, canopy glass and the
+reflective floor, across the reflection target and the screen.
+
+R3F mapped `shadows={true}` to PCFSoft. Installed Three r185 converted it to
+PCF on the first real shadow draw. Compilation had used the original setting,
+which changed the program keys for the whole lit scene at first use. The
+hangar now requests the effective PCF mode up front. A separate frame gate
+drains pending R3F invalidations while a new model or environment prepares.
+The installed-renderer regression reproduces all nine cache-key changes and
+passes 11/11 on the repair. The original and first preparation-only hangar
+stills differed in four of 837,000 pixels by at most one display level.
+
+### Dublin and Dubai reports
+
+The Dublin red buildings reproduced on production `8c593924` at 40.0708° N,
+83.1309° W, 3,060 ft MSL and heading 055°. The sun was 0.11° above the
+horizon at the capture time. The page had booted at Ultra and was drawing at
+Low. In a fixed region of 212,000 pixels, hiding detailed building meshes
+removed 77.6% of the red pixels. Removing directional light lowered the red
+count from 45,857 to 16,140. Disabling window light changed that count by
+1.2%. The directional light had linear RGB `[1, 0.124, 0.0015]`. Those
+figures locate most of the visible red on sunlit building faces.
+
+Dubai reproduced at 25.2055° N, 55.2523° E, 2,990 ft MSL and heading 118°,
+with the local sun 60° below the horizon and live quality Medium. The flat
+towers appeared after a warp and on a direct start through the public `at`
+link. The direct start had settled. Both paths had at least 12 ready detailed
+building tiles. In a region of 396,550 pixels, disabling window lighting
+changed 169,018 pixels. Both directional lights were already off. The material
+was averaging unresolved night windows across whole faces at this quality.
+
+The Dublin tree screenshot had a separate cause. Seasonal leaf loss applied
+a screen-space discard to every fragment of each affected tree, including
+the trunk. The World Ground tree material now thins whole leaves in its
+filtered texture. The visible and shadow materials share the same coverage.
+The original full-leaf mask is byte-identical, and the cutout survives through
+the coarse texture mips. A live quality step retains the instance buffers
+and the canopy photo loader. Previously, changing shadow quality disposed the
+shared loader and later tiles could never finish their canopy look. The photo
+loader also restarts correctly during React development effect replay.
