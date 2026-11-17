@@ -22,7 +22,7 @@ registerHooks({ resolve(spec, ctx, next) {
 } });
 const { paintSurfacePolygon } = await import(pathToFileURL(path.join(ROOT, 'lib/fly/earth-surface-mask.js')).href);
 const { fillPolygonFast } = await import(pathToFileURL(path.join(ROOT, 'lib/fly/toy-world/worker/ground-canopy.js')).href);
-const { selectCanopy } = await import(pathToFileURL(path.join(ROOT, 'lib/fly/ground-canopy-select.js')).href);
+const { selectCanopy, planCanopy, edgeDensity } = await import(pathToFileURL(path.join(ROOT, 'lib/fly/ground-canopy-select.js')).href);
 let pass = 0, fail = 0;
 const gate = (ok, name, detail = '') => { (ok ? pass++ : fail++); console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? '  -- ' + detail : ''}`); };
 
@@ -76,5 +76,42 @@ gate(seen.every((v) => v === 1) && r.near <= 40, '(2c) a full near pool degrades
 gate(r.far <= 5 && r.cut > 0, '(2d) the far cap stops the walk', `far ${r.far} cut ${r.cut}`);
 r = selectCanopy([], 0, 0, { k: 1, nearCap: 10, farCap: 10, d0: 1, d1: 2, d2: 3, d3: 4 }, () => {}, () => {});
 gate(r.near === 0 && r.far === 0, '(3) no chunk, no instance');
+
+// (4) round 2: the view cone. Beyond `keep` only L3 cells in front of the camera are planned; each planned
+// tree still once; within `keep` everything is planned all round.
+{
+  const big = synthChunk(0, 0, 64, 10);
+  const seen = new Uint8Array(big.canopy.l0.length / 5);
+  const mark = (lvl, i) => { if (lvl === 0) { seen[i]++; return; } const a = big.canopy['l' + lvl]; for (let c = a[i * 7 + 5], e = c + a[i * 7 + 6]; c < e; c++) mark(lvl - 1, c); };
+  const cone = { x: 1, z: 0, cos: Math.cos(Math.PI / 4), keep: 120 };
+  selectCanopy([big], 0, 0, { k: 1, nearCap: 1e6, farCap: 1e6, d0: 60, d1: 120, d2: 200, d3: 1e6, cone }, (ch, i) => mark(0, i), (ch, lvl, i) => mark(lvl, i));
+  let behind = 0, nearMissing = 0, twice = 0;
+  const l0 = big.canopy.l0;
+  for (let i = 0; i < seen.length; i++) {
+    const x = l0[i * 5], z = l0[i * 5 + 1], d = Math.hypot(x, z);
+    if (seen[i] > 1) twice++;
+    if (d < 60 && !seen[i]) nearMissing++;
+    if (seen[i] && d > 300 && x / d < Math.cos(Math.PI / 4) - 0.35) behind++;
+  }
+  gate(twice === 0 && nearMissing === 0 && behind === 0, '(4) view cone: in front beyond keep, all round within it, once each', `twice ${twice} nearMissing ${nearMissing} behind ${behind}`);
+}
+// (5) round 2: sigma (screen size) moves crowns into patches, never drops or doubles a tree.
+{
+  const runs = [1, 0.5].map((sigma) => {
+    const seen = new Uint8Array(chunk.canopy.l0.length / 5);
+    const mark = (lvl, i) => { if (lvl === 0) { seen[i]++; return; } const a = chunk.canopy['l' + lvl]; for (let c = a[i * 7 + 5], e = c + a[i * 7 + 6]; c < e; c++) mark(lvl - 1, c); };
+    const res = selectCanopy([chunk], 0, 0, { k: 1, nearCap: 1e6, farCap: 1e6, d0: 60, d1: 120, d2: 200, d3: 1e6, sigma }, (ch, i) => mark(0, i), (ch, lvl, i) => mark(lvl, i));
+    return { res, once: seen.every((v) => v === 1) };
+  });
+  gate(runs.every((q) => q.once) && runs[1].res.near < runs[0].res.near && runs[1].res.near + runs[1].res.far < runs[0].res.near + runs[0].res.far, '(5) sigma < 1: fewer crowns, fewer instances, every tree once', `sigma 1: ${runs[0].res.near}+${runs[0].res.far}, sigma 0.5: ${runs[1].res.near}+${runs[1].res.far}`);
+}
+// (6) round 2: the edge band dissolves from 1 to 0, and a cut plan moves the band to the cut.
+{
+  const s = {};
+  const it = planCanopy([chunk], 0, 0, { k: 1, nearCap: 1e6, farCap: 6, d0: 0, d1: 0, d2: 0, d3: 1e6 }, s);
+  let q = it.next(); while (!q.done) q = it.next();
+  const p = q.value;
+  gate(p.cut > 0 && Math.abs(p.edgeB - p.farthest) < 1e-6 && edgeDensity(p, p.edgeA - 1) === 1 && edgeDensity(p, p.edgeB) === 0, '(6) edge band at the cut, density 1 inside to 0 at its end', `edge ${p.edgeA.toFixed(1)}..${p.edgeB.toFixed(1)}`);
+}
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

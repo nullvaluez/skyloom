@@ -108,11 +108,13 @@ const tileOfWorld = (wx, wz) => [Math.floor((wx + WORLD / 2) / SPAN), Math.floor
 const ROAD_HALF = { motorway: 11, trunk: 9, primary: 7, secondary: 6, tertiary: 5, minor: 4, service: 2.5, track: 1.5, raceway: 5, busway: 4, rail: 3, transit: 2.5 };
 
 const tileCache = new Map();
+const stampCount = { n: 0, canopy: 0, stamped: 0 }; // round 2: every canopy bundle carries the request key (result.wp)
 async function buildTile(x, y) {
   const key = `${x}/${y}`;
   if (tileCache.has(key)) return tileCache.get(key);
   seen.length = 0;
   const r = await api.buildTile(Z, x, y, 'sat-veg', OPTS);
+  stampCount.n++; if (r && r.wpCanopy && r.wp === wp.key) stampCount.stamped++; if (r && r.wpCanopy) stampCount.canopy++;
   const mvtUrl = seen.find((u) => u.includes(`/${Z}/${x}/${y}.pbf`));
   const wcUrl = seen.find((u) => u.includes('worldcover'));
   let vt = null, wc = null;
@@ -236,5 +238,6 @@ for (const name of poseNames) {
   report.poses[name] = out;
   console.log(name, JSON.stringify({ sel: out.sel, r600: out.r600, r900: { real: out.r900.realCanopyKm2, before: out.r900.before, after: out.r900.after }, workerMs: out.workerMsP50, msBy: out.msBy, buildMs: out.buildMs, tiles: out.tiles, worker: out.worker, rejected: out.workerRejected }));
 }
+console.log('stamp', JSON.stringify(stampCount));
 if (typeof args.out === 'string') fs.writeFileSync(path.resolve(args.out), JSON.stringify(report, null, 1));
 process.exit(0);
