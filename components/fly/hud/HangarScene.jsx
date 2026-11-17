@@ -293,7 +293,9 @@ export function HangarScene({aircraft,airport,onReady,onError,onExteriorReady,vi
   const modelReady=useCallback(id=>{setLoadedId(id);readyCallback.current?.(id);},[]);
   const changeKey=`${aircraft.id}|${airport.id}|${tier}|${view??'quarter'}`;
   return <ModelBoundary onError={onError}>
-    <Canvas shadows frameloop={prepared?'always':'never'} dpr={[1,1.5]} camera={{fov:42,near:.1,far:6000}} onCreated={({gl})=>applyShaderErrorPolicy(gl)} aria-label={`${aircraft.entry.name} in the open hangar at ${airport.id}; drag to inspect`}>
+    {/* r185 renders deprecated PCFSoft as PCF. Select that effective type before
+        compile, so the first shadow draw cannot rekey every lit material. */}
+    <Canvas shadows="percentage" frameloop={prepared?'always':'never'} dpr={[1,1.5]} camera={{fov:42,near:.1,far:6000}} onCreated={({gl})=>applyShaderErrorPolicy(gl)} aria-label={`${aircraft.entry.name} in the open hangar at ${airport.id}; drag to inspect`}>
       <HangarWarmContext.Provider value={signal}>
       {STAGE
         ?<StageBay aircraft={aircraft} airport={airport} onReady={modelReady} onError={onError} onExteriorReady={onExteriorReady} view={view} preparing={!prepared}/>

@@ -2,7 +2,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import { Scene, Mesh, BoxGeometry, MeshStandardMaterial, MeshDepthMaterial, ShaderMaterial, PerspectiveCamera, OrthographicCamera,
-  DirectionalLight, WebGLRenderTarget, DataTexture, EquirectangularReflectionMapping, FloatType, RGBAFormat, WebGLCoordinateSystem } from 'three';
+  DirectionalLight, WebGLRenderTarget, DataTexture, EquirectangularReflectionMapping, FloatType, RGBAFormat, WebGLCoordinateSystem,
+  PCFShadowMap, PCFSoftShadowMap, CubeUVReflectionMapping, Fog, Texture } from 'three';
+import { WebGLPrograms } from 'three/src/renderers/webgl/WebGLPrograms.js';
+import { WebGLShadowMap } from 'three/src/renderers/webgl/WebGLShadowMap.js';
+import { MeshReflectorMaterial } from '@react-three/drei/materials/MeshReflectorMaterial.js';
 import { createHangarPrewarm } from '../lib/fly/hangar-prewarm.js';
 import { createHangarFrameGate } from '../lib/fly/hangar-frame-gate.js';
 
@@ -174,5 +178,53 @@ check('held root-local advance preserves zero delta and leaves other roots/globa
   hangar.store.getState().setFrameloop('always');f.loop.loop(1000);
   assert.equal(hangar.callbacks(),1,'StrictMode replacement owner retains the hold');
   replay.dispose();
+});
+check('installed r185 shadow setup reproduces the nine native misses and explicit PCF keeps their exact keys',()=>{
+  const source=fs.readFileSync(new URL('../components/fly/hud/HangarScene.jsx',import.meta.url),'utf8');
+  const directory=new URL('../node_modules/@react-three/fiber/dist/',import.meta.url);
+  const fiber=fs.readFileSync(new URL(fs.readdirSync(directory).find(name=>/^events-.*\.esm\.js$/.test(name)),directory),'utf8');
+  assert.match(source,/<Canvas shadows="percentage"/);
+  assert.match(fiber,/if \(is\.boo\(shadows\)\) \{\s*gl\.shadowMap\.type = THREE\.PCFSoftShadowMap/);
+  assert.match(fiber,/percentage: THREE\.PCFShadowMap/);
+  const scene=new Scene(),geometry=new BoxGeometry(),camera=new PerspectiveCamera();
+  scene.fog=new Fog(0xa6bbc6,900,4000);scene.environment=new Texture({height:2048});scene.environment.mapping=CubeUVReflectionMapping;
+  let target=null;const stop=Error('stop before GPU allocation'),warnings=[];
+  const renderer={getRenderTarget:()=>target,outputColorSpace:'srgb',toneMapping:4,state:{buffers:{depth:{getReversed:()=>false}}}};
+  const shadow=new WebGLShadowMap({getRenderTarget(){throw stop;}},{},{maxTextureSize:4096});renderer.shadowMap=shadow;shadow.enabled=true;
+  const programs=WebGLPrograms(renderer,{get:texture=>texture},{has:()=>true},{precision:'highp',logarithmicDepthBuffer:false},null,{numPlanes:0,numIntersection:0});
+  const lights={directional:[{},{}],point:[],spot:[{},{},{},{}],spotLightMap:[],hemi:[{}],rectArea:[],
+    directionalShadowMap:[{}],pointShadowMap:[],spotShadowMap:[],numSpotLightShadowsWithMaps:0,numLightProbes:0};
+  const materials=[['Painted pearl alloy',true,false,0,'|lw-panels-v1'],['Exposed titanium nozzle',true,false,0,''],
+    ['Intake interior',false,false,0,''],['Canopy glass',false,true,1,'|lw-glass-v1']].map(([name,vertexColors,transparent,clearcoat,suffix])=>{
+      const m=new MeshStandardMaterial({name,vertexColors,transparent});m.clearcoat=clearcoat;m.customProgramCacheKey=()=>`native-hook${suffix}`;return m;
+    });
+  const floor=new MeshReflectorMaterial();floor.defines={...floor.defines,USE_BLUR:'',USE_DEPTH:'',USE_UV:''};floor.customProgramCacheKey=()=> 'native-reflector-hook';materials.push(floor);
+  const offscreen=new WebGLRenderTarget(1024,1024),light=new DirectionalLight();light.castShadow=true;
+  const makeKey=material=>programs.getProgramCacheKey(programs.getParameters(material,lights,[light],scene,new Mesh(geometry,material),[]));
+  const firstShadowSetup=()=>{
+    const warn=console.warn;console.warn=message=>warnings.push(message);
+    try{assert.throws(()=>shadow.render([light],scene,camera),error=>error===stop);}finally{console.warn=warn;}
+  };
+  for(const output of [offscreen,null]){
+    target=output;
+    for(const material of materials){
+      if(output&&material===floor)continue; // The reflector itself is hidden in its reflected camera.
+      shadow.type=PCFSoftShadowMap;const oldPrepared=makeKey(material);
+      firstShadowSetup();assert.equal(shadow.type,PCFShadowMap);const firstDraw=makeKey(material);
+      assert.notEqual(oldPrepared,firstDraw,`${material.name||'reflector'}: old preflight misses the first draw`);
+      const before=oldPrepared.split(','),after=firstDraw.split(',');
+      const differences=before.map((value,index)=>value===after[index]?null:[value,after[index]]).filter(Boolean);
+      assert.deepEqual(differences,[[String(PCFSoftShadowMap),String(PCFShadowMap)]],'Only the shadow-type key field changes');
+      shadow.type=PCFShadowMap;const prepared=makeKey(material);firstShadowSetup();assert.equal(makeKey(material),prepared);
+      // Recorded native prefixes: HDR cube-UV height, live light counts, fog,
+      // opacity/vertex-color/clearcoat bits and output target all agree.
+      const opaque=material.transparent?8389635:8520707,flags=material.clearcoat?8388752:material.vertexColors?8389648:8388624;
+      const defines=material===floor?'STANDARD,,USE_BLUR,,USE_DEPTH,,USE_UV,':'STANDARD,';
+      const expected=`physical,${defines},highp,${output?'srgb-linear':'srgb'},306,2048,${Array(23).fill('false').join(',')},,,false,0,,2,0,4,0,1,0,1,0,0,0,0,1,${output?0:4},0,0,0,${flags},${opaque},srgb,`;
+      assert.equal(prepared,expected+material.customProgramCacheKey());
+    }
+  }
+  assert.equal(warnings.length,9,'All nine old variants undergo the same installed renderer fallback');
+  programs.dispose();offscreen.dispose();scene.environment.dispose();geometry.dispose();for(const material of materials)material.dispose();
 });
 console.log(`HANGAR PREWARM: ${count}/${count}`);
