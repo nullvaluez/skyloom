@@ -1490,3 +1490,31 @@ the coarse texture mips. A live quality step retains the instance buffers
 and the canopy photo loader. Previously, changing shadow quality disposed the
 shared loader and later tiles could never finish their canopy look. The photo
 loader also restarts correctly during React development effect replay.
+
+### Player checks on `9050b1a3`
+
+On the RTX 5080, entering Free Flight from the production title screen opened
+the hangar UI in 85 ms. The longest task between opening the hangar and
+deploying fell from 3,734 ms on the previous preparation-only build to 240 ms.
+The clean run deployed before the first completed hangar view. A second run
+that waited for the actual hangar renderer observed its first advancing frame
+4.33 s after the click, with a 202 ms maximum preparation task. In the matched
+fighter view all 837,000 pixels outside the destination panel matched the
+original, including the aircraft, its reflection and the floor contact.
+
+At Dubai, the Medium night material now lights discrete rooms across dark
+facades. The direct-start comparison also reproduced on a warp from a
+revealed source. During an early diagnostic warp, a screenshot that forced
+the loading UI invisible captured a gray sky. A paired screenshot with the
+actual UI showed the opaque 80% loader at the same stage. One earlier capture
+also recorded a black rectangle. The rectangle did not repeat in three later
+runs and its cause is unconfirmed. Use `--revealed` in the look harness to
+measure buildings that a player can see after a quality change or warp.
+
+The all-off worker output on this build matched the original across 1,062
+cases and 7,308 buffers, including all 28 stage checks. The beta regression
+suite passed all 34 checks. A separate NYC development diagnostic overlapped
+the initial webpack route compilation. The server took 66 s to return the
+first HTML byte. That row is retained separately from the warmed-server
+flight timings. Its vegetation engine completed all nine sampling tiles and
+all 17 canopy photo requests. The observed flight lasted 79 s after its warp.

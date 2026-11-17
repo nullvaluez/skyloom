@@ -7,6 +7,8 @@
  *            --flags=-LOOK_ATMOS,-LOOK_GRADE  --quality=ultra  --settle=7000  --slots=3
  *            --width=1600 --height=900  --out=<absolute dir>  --list
  *            --headed  --live-tier=low|medium|high  --direct (one pose via the public ?at= link)
+ *            --revealed  change live quality and warp only after the player can see the source world;
+ *                        capture the destination after its boot/warp cover is gone
  *            --utc=<ISO timestamp> to replay the light at the time of a report (use one --times label)
  *            --burst   after each still, 7 frames while the pose creeps forward 1.5 units a frame;
  *                      reports the share of pixels whose luma jumps > 30 between frames (shimmer proxy)
@@ -92,6 +94,7 @@ fs.mkdirSync(out, { recursive: true });
 const report = { label, url, flags, quality, date, viewport, venue: 'Installed Chrome / D3D11 / live world; fixed pose, real solar ephemeris, running clock', captures: [], errors: [], warnings: [] };
 report.liveTier = liveTier ?? null;
 report.entry = args.direct ? 'location link' : 'warp';
+report.revealed = !!args.revealed;
 try { report.captures = JSON.parse(fs.readFileSync(path.join(out, 'manifest.json'), 'utf8')).captures || []; } catch {}
 const save = () => fs.writeFileSync(path.join(out, 'manifest.json'), JSON.stringify(report, null, 2));
 let captured = 0;
@@ -175,6 +178,12 @@ async function waitWorld(page, timeout) {
   return { settled, ms: Date.now() - t0 };
 }
 
+function playerCanSeeWorld() {
+  const r = window.__fly;
+  return window.__flyBoot?.pct === 100 && r?.worldLoading !== true && r?.framesRendered > 0
+    && !document.querySelector('[data-testid="boot-screen"],[data-testid="boot-strip"],[data-testid="warp-hold"]');
+}
+
 (async () => {
   register('./_node-resolve.mjs', pathToFileURL(__filename));
   const { computeSun } = await import('../lib/fly/sun-model.js');
@@ -223,7 +232,7 @@ async function waitWorld(page, timeout) {
     report.gpu = await p.evaluate(() => { let scene = window.__fly.engine.object; while (scene.parent) scene = scene.parent; const g = scene.__r3f.root.getState().gl.getContext(), e = g.getExtension('WEBGL_debug_renderer_info'); return e ? g.getParameter(e.UNMASKED_RENDERER_WEBGL) : null; });
     if (!report.gpu || /swiftshader|llvmpipe|software|basic render/i.test(report.gpu)) throw Error(`Hardware renderer could not be verified: ${report.gpu}`);
     console.log(`BOOT ${label} ${report.gpu}`);
-    await p.evaluate(({ liveTier, direct, initial }) => {
+    await p.evaluate(({ direct, initial }) => {
       const r = window.__fly, s = window.__flyStore.getState();
       if (direct && (!s.spawn || Math.abs(s.spawn.lat - initial.lat) > 0.0001 || Math.abs(s.spawn.lon - initial.lon) > 0.0001)) throw Error('Location link did not place the initial world at the requested pose');
       r.operations.phase = 'airborne'; r.operations.profile = null; r.operations.warp(r.flight); s.setHangarOpen(false); s.setPhase('flying');
@@ -237,8 +246,9 @@ async function waitWorld(page, timeout) {
       scene.__r3f.root.getState().gl.domElement.setAttribute('data-look-canvas', '');
       Object.defineProperty(r.camera, 'fov', { configurable: true, get: () => 60, set: () => {} }); r.camera.updateProjectionMatrix();
       window.__lookSession = { flight: f, step: f.step };
-      if (liveTier) s.setQualityTier(liveTier);
-    }, { liveTier, direct: !!args.direct, initial });
+    }, { direct: !!args.direct, initial });
+    if (args.revealed) await p.waitForFunction(playerCanSeeWorld, undefined, { timeout: 180000 });
+    if (liveTier) await p.evaluate(tier => window.__flyStore.getState().setQualityTier(tier), liveTier);
     return p;
   }
 
@@ -276,6 +286,7 @@ async function waitWorld(page, timeout) {
     await p.evaluate(v => { window.__flySunOverride = v; }, utc);
     await p.waitForFunction(el => Math.abs(Math.asin(window.__fly.sun.sinEl) * 180 / Math.PI - el) < 0.05, want, { timeout: 15000, polling: 250 }).catch(() => report.warnings.push({ scene: current, message: 'sun did not converge' }));
     await p.waitForTimeout(Number(args.settle || 7000));
+    if (args.revealed) await p.waitForFunction(playerCanSeeWorld, undefined, { timeout: 180000 });
     if (args['test-reload'] && attempt === 1) await p.reload({ waitUntil: 'domcontentloaded' });
     let why = await alive(p), png = null, metrics = null;
     if (!why) {
@@ -290,6 +301,9 @@ async function waitWorld(page, timeout) {
       const r = window.__fly, s = window.__flyStore.getState(); let scene = r.engine.object; while (scene.parent) scene = scene.parent;
       const gl = scene.__r3f?.root?.getState()?.gl;
       return { sunElevation: Math.asin(r.sun?.sinEl) * 180 / Math.PI, quality: s.qualityTier, preset: s.qualityPreset, worldPass: window.__flyStats?.worldPass?.state?.key, visuals: s.visuals, aglM: r.flight.pos.y - r.flight.groundElev,
+        presentation: { bootPct: window.__flyBoot?.pct ?? null, worldLoading: r.worldLoading,
+          bootCover: !!document.querySelector('[data-testid="boot-screen"],[data-testid="boot-strip"]'), warpCover: !!document.querySelector('[data-testid="warp-hold"]'),
+          worldFrames: gl?.__flyMainDraw?.frames ?? r.framesRendered ?? null },
         render: gl ? { calls: gl.info.render.calls, triangles: gl.info.render.triangles, programs: gl.info.programs.length, textures: gl.info.memory.textures } : null,
         world: Object.fromEntries(['satBuildings', 'satSkyline', 'satRoads', 'satVeg', 'satClutter', 'parcelHomes'].map(k => [k, r[k]?.stats ? Object.fromEntries(Object.entries(r[k].stats).filter(([, v]) => typeof v === 'number' || typeof v === 'string' || typeof v === 'boolean')) : null])),
         fps: window.__flyStats?.fps ?? null, urlFlags: window.__flyUrlFlags ?? null };
