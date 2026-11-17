@@ -27,15 +27,22 @@ export function Minimap({ runtime }) {
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
+    let ctx = null;
     const size = MINIMAP.sizePx;
     const dpr = Math.min(2, window.devicePixelRatio || 1);
-    canvas.width = size * dpr;
-    canvas.height = size * dpr;
 
     const draw = () => {
       if(runtime.airportWatch?.active)return;
       const { traffic, flight } = runtime;
+      if (!flight) return;
+      if (!ctx) {
+        // The first draw of this small 5 Hz dial blocked returning flights
+        // for over ten seconds. Allocate its CPU surface once flight exists.
+        ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (!ctx) return;
+        canvas.width = size * dpr;
+        canvas.height = size * dpr;
+      }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, size, size);
       const c = size / 2;
@@ -63,7 +70,7 @@ export function Minimap({ runtime }) {
       ctx.textAlign = 'center';
       ctx.fillText('N', c, 11);
 
-      if (!traffic || !flight) return;
+      if (!traffic) return;
       const k = mercatorScale(flight.latDeg);
       const lockedHex = useFlyStore.getState().lockedHex;
 
