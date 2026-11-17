@@ -552,8 +552,10 @@ shader errors, the box-corner float metric, the budget state and `--dwell`),
 
 ### Proofs at the round-2 commit
 
-- `node scripts/world-pass-worker-proof.mjs --check c2bf5c06 --ignore-protocol`:
-  see the commit's result line below.
+- `node scripts/world-pass-worker-proof.mjs --check c2bf5c06 --ignore-protocol`
+  at `4f4fe71b`: "IDENTICAL (top-level protocol field masked): 1062/1062 cases
+  identical, 7308 buffers + 1062 meta objects compared against 'c2bf5c06'; 28
+  stage cases (0 bad); 0 unrecorded inputs; 163.4 s".
 - Node gates: `graphics-unit.mjs`, `verify-true-earth-flags` (11/11),
   `verify-stylized-earth` (22/22), `verify-city-horizon`,
   `verify-building-handoff`, `verify-attribution` (4/4),
