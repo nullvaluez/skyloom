@@ -11,7 +11,7 @@
  * monuments, and three levels of merged canopy patches. Colour, season and
  * density come from the ground photo, once per chunk
  * (lib/fly/ground-canopy-photo.js): each crown takes the photo under it, and a
- * leaf-off deciduous crown is drawn as an open, dithered twig haze.
+ * leaf-off deciduous crown keeps fewer whole leaves in the leaf atlas.
  *
  * Draws, at most three: crowns (the cinematic tree geometry and material,
  * 34 triangles, one instanced draw), canopy patches (10 triangles of crossed
@@ -22,14 +22,13 @@
  * High 4,400 x 34 x 2 + 7,000 x 10 = 0.369 M.
  *
  * Round 2, on the material (one wrapper, its own program key, flag on only):
- *   - FORM: one instanced attribute (aWpDens: density, conifer) bends the
+ *   - FORM: one instanced attribute (aWpDens: density, conifer, fade) bends the
  *     shared crown in the vertex shader: broadleaf crowns get a rounded, wider
  *     top; conifers taper to a cone. Cones only where the species table says
  *     conifer.
- *   - DENSITY: fragments are dithered out (interleaved gradient noise, a
- *     per-instance phase) below the instance density: leaf-off crowns, and the
- *     outer edge of the canopy, which dissolves over the last 14 % of its
- *     reach instead of ending on a line. The shadow pass dithers the same.
+ *   - DENSITY: seasonal thinning follows filtered leaf silhouettes; trunks
+ *     stay solid. Only the outer edge dissolves over the last 14 % of its
+ *     reach instead of ending on a line. The shadow pass uses the same masks.
  *   - NIGHT: the crowns take 30 % of the ground lamp pools (night-ground.js);
  *     at 100 % every crown near a street lamp lit up as a cream speck.
  *
@@ -57,6 +56,7 @@ import { buildCinematicTreeGeometry, createCinematicTreeMaterial, canopyForm } f
 import { worldPassConfig, worldPassRequest } from '@/lib/fly/world-pass';
 import { planCanopy, edgeDensity, SPECIES_FORM } from '@/lib/fly/ground-canopy-select';
 import { CanopyPhoto } from '@/lib/fly/ground-canopy-photo';
+import { patchCanopyMaterial } from '@/lib/fly/ground-canopy-material';
 import { NEAR_SUPPORT, updateNearContactMatrices } from '@/lib/fly/near-ground-support';
 import { SAT_SHADOWS, SAT_VEG, SETTLE_CALM } from '@/lib/fly/fly-constants';
 import { immersiveOn } from '@/lib/fly/immersive';
@@ -67,7 +67,6 @@ import { beginGroundBatch, endGroundBatch } from '@/lib/fly/terrain-ground-query
 
 const PHOTO_ACTIVE = 3; // photo looks in flight at once (1 during the arrival hold)
 const SLICE_MS = 1.2; // placement work per frame (checked every 16 writes, so a slice ends near 1.5 ms)
-const LAMP_K = 0.3; // the crowns' share of the ground lamp pools
 const CONE_MARGIN = 0.6; // radians beyond the horizontal half field of view
 const TURN_RAD = 0.26; // a camera turn this large re-plans
 const CROWN_TRIS = 34, PATCH_TRIS = 10;
@@ -116,37 +115,6 @@ export function buildCanopyPatchGeometry(pool) {
   g.setAttribute('aCanopyPhase', new InstancedBufferAttribute(new Float32Array(pool), 1));
   g.setIndex(idx);
   return g;
-}
-
-/** Round 2: crown form, dithered density and the lamp share, on the shared tree material (see the header). */
-function patchCanopyMaterial(m, depth) {
-  const prev = m.onBeforeCompile, key = m.customProgramCacheKey();
-  m.onBeforeCompile = (shader, renderer) => {
-    prev(shader, renderer);
-    shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nattribute vec2 aWpDens;\nvarying float vWpDens;\nvarying float vWpSeed;')
-      .replace('#include <begin_vertex>', `#include <begin_vertex>
-{
-  float wpB = mix(1.0, 1.3, smoothstep(0.55, 0.75, position.y));
-  float wpC = clamp(1.16 - 0.92 * position.y, 0.16, 1.0);
-  transformed.xz *= mix(wpB, wpC, aWpDens.y);
-}
-vWpDens = aWpDens.x;
-vWpSeed = 0.0;
-#ifdef USE_INSTANCING
-vWpSeed = fract(instanceMatrix[3].x * 0.1371 + instanceMatrix[3].z * 0.3113);
-#endif`);
-    shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying float vWpDens;\nvarying float vWpSeed;')
-      .replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
-if (vWpDens < 0.995) {
-  float wpN = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))) + vWpSeed);
-  if (wpN >= vWpDens) discard;
-}`);
-    if (!depth) shader.fragmentShader = shader.fragmentShader.replace('reflectedLight.indirectDiffuse += (ngLight + ', `reflectedLight.indirectDiffuse += (ngLight * ${LAMP_K.toFixed(2)} + `);
-  };
-  m.customProgramCacheKey = () => `${key}-wp-canopy-v2`;
-  return m;
 }
 
 /** Column-major TRS with a Y rotation, straight into a matrix array. */
@@ -198,8 +166,8 @@ export function WpCanopyLayer({ engine, runtime, flight, tier }) {
     const depth = patchCanopyMaterial(createCinematicTreeMaterial(applyBendAnchor, { depth: true }), true);
     const nearGeo = buildCinematicTreeGeometry(tc.nearCap);
     const farGeo = buildCanopyPatchGeometry(tc.farCap);
-    nearGeo.setAttribute('aWpDens', new InstancedBufferAttribute(new Float32Array(tc.nearCap * 2), 2));
-    farGeo.setAttribute('aWpDens', new InstancedBufferAttribute(new Float32Array(tc.farCap * 2), 2));
+    nearGeo.setAttribute('aWpDens', new InstancedBufferAttribute(new Float32Array(tc.nearCap * 3), 3));
+    farGeo.setAttribute('aWpDens', new InstancedBufferAttribute(new Float32Array(tc.farCap * 3), 3));
     const near = new InstancedMesh(nearGeo, material, tc.nearCap);
     const far = new InstancedMesh(farGeo, material, tc.farCap);
     near.name = 'wp-canopy-near';
@@ -224,8 +192,8 @@ export function WpCanopyLayer({ engine, runtime, flight, tier }) {
     far.castShadow = false;
     // staging: a pass writes here over several frames, then swaps in one
     const stage = {
-      nm: new Float32Array(tc.nearCap * 16), nc: new Float32Array(tc.nearCap * 3), np: new Float32Array(tc.nearCap), nd: new Float32Array(tc.nearCap * 2),
-      fm: new Float32Array(tc.farCap * 16), fc: new Float32Array(tc.farCap * 3), fp: new Float32Array(tc.farCap), fd: new Float32Array(tc.farCap * 2),
+      nm: new Float32Array(tc.nearCap * 16), nc: new Float32Array(tc.nearCap * 3), np: new Float32Array(tc.nearCap), nd: new Float32Array(tc.nearCap * 3),
+      fm: new Float32Array(tc.farCap * 16), fc: new Float32Array(tc.farCap * 3), fp: new Float32Array(tc.farCap), fd: new Float32Array(tc.farCap * 3),
     };
     // the instance colour divides by the material's base colour, read once (never the live value)
     const base = material.color, inv = [1 / (base.r * 0.86), 1 / (base.g * 0.86), 1 / (base.b * 0.86)];
@@ -261,7 +229,7 @@ export function WpCanopyLayer({ engine, runtime, flight, tier }) {
             const wx = m.position.x + a[i * 16 + 12], wz = m.position.z + a[i * 16 + 14];
             if (Math.hypot(wx - px, wz - pz) > maxM * k) continue;
             const r = Math.hypot(a[i * 16], a[i * 16 + 2]) / k;
-            out.push([wx / R * D, (2 * Math.atan(Math.exp(-wz / R)) - Math.PI / 2) * D, +r.toFixed(2), lvl, +dn[i * 2].toFixed(2)]);
+            out.push([wx / R * D, (2 * Math.atan(Math.exp(-wz / R)) - Math.PI / 2) * D, +r.toFixed(2), lvl, +(dn[i * 3] * dn[i * 3 + 2]).toFixed(2)]);
           }
         }
         return out;
@@ -471,8 +439,9 @@ function writeOp(j, s, meshes, engine, tc, cfg, q) {
     writeMatrix(st.nm, n * 16, wx - j.ox, gy - sink, wz - j.oz, r * k * sc * form.width, h * k * sc * form.height, hashF(lx, lz) * Math.PI * 2);
     st.nc[n * 3] = look.l0[i * 3] * invR; st.nc[n * 3 + 1] = look.l0[i * 3 + 1] * invG; st.nc[n * 3 + 2] = look.l0[i * 3 + 2] * invB;
     st.np[n] = hashF(wx * 0.71, wz * 0.53) * Math.PI * 2;
-    st.nd[n * 2] = look.d0 ? look.d0[i] : 1;
-    st.nd[n * 2 + 1] = conifer ? 1 : 0;
+    st.nd[n * 3] = look.d0 ? look.d0[i] : 1;
+    st.nd[n * 3 + 1] = conifer ? 1 : 0;
+    st.nd[n * 3 + 2] = 1;
     j.nN++;
     return;
   }
@@ -486,7 +455,9 @@ function writeOp(j, s, meshes, engine, tc, cfg, q) {
   const jz = lvl >= 2 ? (hashF(a[o + 1] * 0.23, a[o] * 0.17) - 0.5) * 0.6 * r0 * k : 0;
   const lx = a[o] + jx, lz = a[o + 1] + jz, r = r0 * (lvl >= 2 ? 0.88 + 0.24 * hashF(a[o] * 0.07, a[o + 1] * 0.05) : 1);
   // the outer edge dissolves (dithered), with a little per-cell jitter so it is no circle
-  const dens = (look['d' + lvl] ? look['d' + lvl][i] : 1) * edgeDensity(j.plan, op.d[q] * (0.97 + 0.06 * hashF(lz, lx)));
+  const season = look['d' + lvl] ? look['d' + lvl][i] : 1;
+  const edge = edgeDensity(j.plan, op.d[q] * (0.97 + 0.06 * hashF(lz, lx)));
+  const dens = season * edge;
   if (dens < 0.02) return;
   const gy = engine.wpGroundAtLocal(ch, lx, lz);
   const sc = j.altK * ch._wpBk;
@@ -494,8 +465,9 @@ function writeOp(j, s, meshes, engine, tc, cfg, q) {
   const col = look['l' + lvl];
   st.fc[n * 3] = col[i * 3] * invR; st.fc[n * 3 + 1] = col[i * 3 + 1] * invG; st.fc[n * 3 + 2] = col[i * 3 + 2] * invB;
   st.fp[n] = 0;
-  st.fd[n * 2] = dens;
-  st.fd[n * 2 + 1] = SPECIES_FORM[sp] === 1 ? 1 : 0;
+  st.fd[n * 3] = season;
+  st.fd[n * 3 + 1] = SPECIES_FORM[sp] === 1 ? 1 : 0;
+  st.fd[n * 3 + 2] = edge;
   j.nF++;
 }
 
@@ -510,17 +482,17 @@ function swapJob(s, meshes, tc) {
   nm.set(stage.nm.subarray(0, nN * 16));
   near.instanceColor.array.set(stage.nc.subarray(0, nN * 3));
   near.geometry.attributes.aCanopyPhase.array.set(stage.np.subarray(0, nN));
-  near.geometry.attributes.aWpDens.array.set(stage.nd.subarray(0, nN * 2));
+  near.geometry.attributes.aWpDens.array.set(stage.nd.subarray(0, nN * 3));
   fm.set(stage.fm.subarray(0, nF * 16));
   far.instanceColor.array.set(stage.fc.subarray(0, nF * 3));
   far.geometry.attributes.aCanopyPhase.array.set(stage.fp.subarray(0, nF));
-  far.geometry.attributes.aWpDens.array.set(stage.fd.subarray(0, nF * 2));
+  far.geometry.attributes.aWpDens.array.set(stage.fd.subarray(0, nF * 3));
   // Park the tail the previous pass drew (outside `count`, never drawn; zeroed for safety).
   if (s.prevNear > nN) nm.fill(0, nN * 16, s.prevNear * 16);
   if (s.prevFar > nF) fm.fill(0, nF * 16, s.prevFar * 16);
   const tn = Math.max(nN, s.prevNear), tf = Math.max(nF, s.prevFar);
-  rangeUpload(near.instanceMatrix, tn * 16); rangeUpload(near.instanceColor, tn * 3); rangeUpload(near.geometry.attributes.aCanopyPhase, tn); rangeUpload(near.geometry.attributes.aWpDens, tn * 2);
-  rangeUpload(far.instanceMatrix, tf * 16); rangeUpload(far.instanceColor, tf * 3); rangeUpload(far.geometry.attributes.aCanopyPhase, tf); rangeUpload(far.geometry.attributes.aWpDens, tf * 2);
+  rangeUpload(near.instanceMatrix, tn * 16); rangeUpload(near.instanceColor, tn * 3); rangeUpload(near.geometry.attributes.aCanopyPhase, tn); rangeUpload(near.geometry.attributes.aWpDens, tn * 3);
+  rangeUpload(far.instanceMatrix, tf * 16); rangeUpload(far.instanceColor, tf * 3); rangeUpload(far.geometry.attributes.aCanopyPhase, tf); rangeUpload(far.geometry.attributes.aWpDens, tf * 3);
   near.count = nN; near.visible = nN > 0;
   far.count = nF; far.visible = nF > 0;
   s.prevNear = nN; s.prevFar = nF;
