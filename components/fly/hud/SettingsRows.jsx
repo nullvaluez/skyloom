@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { reviewSurfaceOn } from '@/lib/fly/player-surface';
 import { useFlyStore } from '@/stores/fly-store';
+import { hasPilotSeat, pilotSeatSelected } from '@/lib/fly/pilot-seat';
+import { useIsTouch } from '@/hooks/use-is-touch';
 import { MAP_STYLE_KEY, MAP_STYLES } from '@/lib/fly/map-style';
 // Round 16: quality + sound persist — but ONLY from the click sites below. The
 // automatic quality ladder is a live response to this session's frame times
@@ -56,6 +58,9 @@ export function SettingsRows({ sheet = false, includeConditions = true }) {
   const mapStyle = useFlyStore((s) => s.mapStyle);
   const visuals = useFlyStore((s) => s.visuals);
   const chaseFraming = useFlyStore(s => s.chaseFraming);
+  const seatAvailable = useFlyStore(hasPilotSeat);
+  const pilotSelected = useFlyStore(pilotSeatSelected);
+  const isTouch = useIsTouch();
   const encountersEnabled = useFlyStore(s => s.encountersEnabled);
   const hudMode = useFlyStore((s) => s.hudMode);
   // Round 18: the stakes pick lives in a fly-settings module cache, not the
@@ -116,6 +121,8 @@ export function SettingsRows({ sheet = false, includeConditions = true }) {
     setStakes(next);
   };
   const pickChase = (value) => {
+    if (seatAvailable) useFlyStore.setState({ f35PilotSeat: value === 'pilot', cameraMode: 'chase' });
+    if (value === 'pilot') return;
     useFlyStore.setState({ chaseFraming: value });
     try {
       localStorage.setItem('fly-chase-framing', value);
@@ -340,24 +347,32 @@ export function SettingsRows({ sheet = false, includeConditions = true }) {
     </MenuButton>
   ));
 
+  const views = seatAvailable ? ['world', 'close', 'pilot'] : ['world', 'close'];
+  const viewLabel = seatAvailable ? 'Flight view' : 'Chase view';
+  const selectedView = pilotSelected ? 'pilot' : chaseFraming;
+  const viewNames = { world: 'World', close: 'Close', pilot: 'Pilot' };
+  const seatHint = pilotSelected && <p className="mt-2 text-xs text-zinc-400">{isTouch
+    ? 'Drag the window to look around. Lift your finger to face forward.'
+    : 'Drag to look around. Hold [ or ] to glance sideways, or Page Up / Down to look up or down. Press 4 to switch views.'}</p>;
   const flightViewRows = GLASS_ON ? (
     <>
-      <GlassField label="Chase view">
-        <div className="lg-seg" role="group" aria-label="Chase view">
-          {['world', 'close'].map((value) => (
+      <GlassField label={viewLabel}>
+        <div className="lg-seg" role="group" aria-label={viewLabel}>
+          {views.map((value) => (
             <button
               key={value}
               type="button"
               data-testid={`settings-chase-${value}`}
-              aria-pressed={chaseFraming === value}
-              data-on={seg(chaseFraming === value)}
+              aria-pressed={selectedView === value}
+              data-on={seg(selectedView === value)}
               onClick={() => pickChase(value)}
             >
-              {value === 'world' ? 'World' : 'Close'}
+              {viewNames[value]}
             </button>
           ))}
         </div>
       </GlassField>
+      {seatHint}
       <GlassToggle
         label="Nearby invitations"
         value={onOff(encountersEnabled)}
@@ -368,10 +383,11 @@ export function SettingsRows({ sheet = false, includeConditions = true }) {
     </>
   ) : (
       <div className="rounded-md border border-zinc-700/60 p-2">
-        <div className="mb-2 text-xs text-zinc-300">Chase view</div>
-        <div className="grid grid-cols-2 gap-1">
-          {['world','close'].map(value=><button key={value} data-testid={`settings-chase-${value}`} aria-pressed={chaseFraming===value} className="min-h-11 rounded bg-zinc-800 text-sm aria-pressed:bg-zinc-100 aria-pressed:text-zinc-900" onClick={()=>pickChase(value)}>{value==='world'?'World':'Close'}</button>)}
+        <div className="mb-2 text-xs text-zinc-300">{viewLabel}</div>
+        <div className={`grid ${seatAvailable ? 'grid-cols-3' : 'grid-cols-2'} gap-1`}>
+          {views.map(value=><button key={value} data-testid={`settings-chase-${value}`} aria-pressed={selectedView===value} className="min-h-11 rounded bg-zinc-800 text-sm aria-pressed:bg-zinc-100 aria-pressed:text-zinc-900" onClick={()=>pickChase(value)}>{viewNames[value]}</button>)}
         </div>
+        {seatHint}
         <button className="mt-2 min-h-11 w-full rounded bg-zinc-800 text-sm" aria-pressed={encountersEnabled} onClick={flipEncounters}>Nearby invitations: {encountersEnabled?'On':'Off'}</button>
       </div>
   );

@@ -57,6 +57,7 @@ const initialState = {
   // auto-revert is scoped to 'cinema' on purpose and cannot eat 'photo'.
   cameraMode: 'chase',
   chaseFraming: 'world',
+  f35PilotSeat: true,
   encountersEnabled: true,
 
   // Overlays

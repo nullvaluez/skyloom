@@ -5,6 +5,7 @@ import { cinemaOn } from '@/lib/fly/cinema-policy';
 import { CinemaReviewDock } from './CinemaReviewDock';
 import { CinemaBars, EscortHud } from './EscortHud';
 import { FlightInstruments } from './FlightInstruments';
+import { pilotSeatSelected } from '@/lib/fly/pilot-seat';
 import { livingWorldOn } from '@/lib/fly/living-world';
 import { CALM, CALM_CFG } from './calm-hud';
 import { CalmHud } from './CalmHud';
@@ -44,7 +45,8 @@ export function FlyHUD({ runtime }) {
   const { isTouch } = useDeviceLayout();
   const hudMode = useFlyStore((s) => s.hudMode);
   const mode = CALM ? hudMode : null;
-  const instrumentsUp = INSTRUMENTS && (!CALM || mode === 'instruments');
+  const pilotSelected = useFlyStore(pilotSeatSelected);
+  const instrumentsUp = !pilotSelected && INSTRUMENTS && (!CALM || mode === 'instruments');
   const modeRef = useRef(mode);
   useEffect(() => {
     modeRef.current = mode;
@@ -184,7 +186,7 @@ export function FlyHUD({ runtime }) {
           re-read the framebuffer every frame. Desktop keeps blur-sm and
           bg-zinc-950/60 exactly. */}
       {newEarth&&(!CALM||isTouch)&&<button type="button" className="cinema-spotting" aria-pressed={spotting} onClick={()=>useFlyStore.getState().setSpotting(!spotting)}>{spotting?'Spotting · On':'Spotting · Off'}</button>}
-      <div data-testid="flight-stats-strip" data-earth={newEarth?'cinematic':undefined} data-spotting={spotting?'1':'0'} data-cinematic={cinema ? '1' : '0'} data-instruments={instrumentsUp ? '1' : undefined} data-calm={CALM ? mode : undefined} className="hud-flat-phone pointer-events-none absolute left-1/2 top-4 z-10 flex -translate-x-1/2 divide-x divide-zinc-700 rounded-lg bg-zinc-950/60 py-1.5 backdrop-blur-sm max-sm:top-[calc(env(safe-area-inset-top)+0.375rem)] phone:top-[calc(env(safe-area-inset-top)+0.375rem)] phone-land:top-[calc(env(safe-area-inset-top)+0.25rem)] phone:bg-zinc-950/85 phone:py-1">
+      <div data-testid="flight-stats-strip" style={pilotSelected ? {display:'none'} : undefined} data-earth={newEarth?'cinematic':undefined} data-spotting={spotting?'1':'0'} data-cinematic={cinema ? '1' : '0'} data-instruments={instrumentsUp ? '1' : undefined} data-calm={CALM ? mode : undefined} className="hud-flat-phone pointer-events-none absolute left-1/2 top-4 z-10 flex -translate-x-1/2 divide-x divide-zinc-700 rounded-lg bg-zinc-950/60 py-1.5 backdrop-blur-sm max-sm:top-[calc(env(safe-area-inset-top)+0.375rem)] phone:top-[calc(env(safe-area-inset-top)+0.375rem)] phone-land:top-[calc(env(safe-area-inset-top)+0.25rem)] phone:bg-zinc-950/85 phone:py-1">
         <div className={cell}>
           <span className={label}>SPD KT</span>
           <span className={value} ref={spdRef}>—</span>

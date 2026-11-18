@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { Clapperboard, Video, X } from 'lucide-react';
 import { useFlyStore } from '@/stores/fly-store';
+import { pilotSeatSelected } from '@/lib/fly/pilot-seat';
 import { useEncounterStore } from '@/stores/encounter-store';
 import { useDeviceLayout } from '@/hooks/use-device-layout';
 import { releaseEscort, toggleEscortCamera } from '@/lib/fly/escort';
@@ -26,6 +27,8 @@ import { EscortCard } from './EscortCard';
  * and closing-rate line is written through a ref at 4 Hz, never per frame.
  */
 export function EscortHud({ runtime, cinematic }) {
+  const soloPilot = useFlyStore(s => pilotSeatSelected(s) && s.lockState !== 'intercepting' && s.lockState !== 'formation');
+  if (soloPilot) return null;
   // PLAY PASS (ENCOUNTER_FEEL): ONE escort card — identity, the memory, the
   // actions — in the lock card's slot. Flag off: the pill, exactly as it was.
   return ENCOUNTER_FEEL_ACTIVE.enabled === true ? (

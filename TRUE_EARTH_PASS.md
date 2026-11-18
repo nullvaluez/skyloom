@@ -25,6 +25,65 @@ release instruction is recorded separately from the measurements it authorizes.
 
 ## Status
 
+### 2026-11-18 — Flight clarity and the F-35 pilot seat
+
+`?flags=FLIGHT_CLARITY,F35_COCKPIT` previews both changes for one load.
+Each can also be evaluated independently. Both default off.
+
+The clearest parts of the Paris flight are the Seine, recognizable street
+layout, changing daylight and ability to fly straight to a place. At city
+scale, moving screen-space grain and small buildings competing for the same
+pixel made those geographic cues harder to read. Three changes address that
+directly.
+
+- Enhanced flight omits the animated film grain. Output dithering still
+  protects gradients.
+- The distant building groups now sample a worker-built, linear-light photo
+  pyramid with a footprint measured before fragment discards. The rooftop,
+  wall and terrain material scans also use explicit gradients across material
+  boundaries. At the existing 40 × 512-pixel configuration the extended
+  photo atlas costs an additional 20 MiB of GPU texture storage. Each of
+  the CPU atlas and a completely full decoded-photo cache can also grow by
+  20 MiB. Groups still upload one slice at a time.
+- Buildings in the existing 0.8–1.6 CSS-pixel visibility band grow in projected
+  area as they approach. This removes their extra screen-door pattern. On
+  desktop High and Ultra the cloud bank contour also uses broader, filtered
+  billows that survive the ray-march spacing at shallow angles.
+
+The F-35 has an original, flight-only interior with a pilot-eye camera,
+canopy frame, cambered wings, live combiner and instrument display. The
+navigation display reads the game's places and traffic. Press **4** to
+switch between seat and chase. Drag to look, then release to face forward.
+Brackets glance sideways, and Page Up / Page Down tilt the head. On touch,
+use **Flight actions → Pilot view**. Settings also offers **Flight view →
+Pilot**. Other aircraft retain their existing views.
+
+The comparison procedure is in [the flight capture script](scripts/review-flight-clarity.cjs).
+[The moving-texture GPU check](scripts/verify-world-clarity.mjs) and
+[the camera checks](scripts/verify-f35-cockpit.mjs) isolate filtering and
+pilot-eye projection. The renderer still uses simplified distant buildings.
+Cloud banks and the transition into horizon haze remain visibly softer than
+the supplied photographic reference. Desktop evidence and Chrome touch
+emulation do not establish physical iPhone Safari appearance or performance.
+
+**Measured in the production build.** Chrome used ANGLE D3D11 on the local
+RTX 5080. Both Paris captures ran at High, 1600 × 900 native pixels, with the
+same sun, pose, 16 near building groups and 24 skyline groups with all 24
+photos loaded. Over eight fixed-camera frames, the mean absolute change in
+8-bit luma in a 240 × 40 rooftop region was 2.252 with the defaults and 0.047
+with clarity enabled. A second, 12-step camera turn gave 6.65 and 5.66 in a
+600 × 252 city region. The turn includes ordinary motion across roof edges
+as well as shimmer. In the isolated GPU check, an unresolved black/white
+stripe changed from 0–255 across camera phases to a constant 128. The
+resolved close-up stripe retained its original 0–255 range.
+
+All 34 beta checks passed. The seat's dedicated checks covered camera
+ownership, 81 attitude/latitude/head-turn combinations, head recentering
+and exterior-camera transitions. The running game also passed seat/chase,
+photo entry/exit and touch action switching. Captures and the motion
+comparison are written under `.graphics-review/cockpit-grain/` by the
+flight capture script (`before`, `after`, then `compare`).
+
 ### 2026-11-01 — Building surface and streaming follow-up
 
 [Building stutter](FLY_BUILDING_STUTTER.md) records overlapping wall/trim

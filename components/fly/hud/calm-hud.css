@@ -112,6 +112,17 @@
   align-items: center;
   gap: 14px;
 }
+.calm-dock[data-pilot='1'] {
+  top: 16px;
+  left: 18px;
+  bottom: auto;
+  transform: none;
+  align-items: flex-start;
+}
+.calm-dock[data-pilot='1'] .calm-cluster,
+.calm-dock[data-pilot='1'] .calm-keys {
+  display: none;
+}
 .calm-cluster {
   position: relative;
   display: flex;

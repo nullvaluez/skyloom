@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useFlyStore, inFlight } from '@/stores/fly-store';
+import { pilotSeatSelected } from '@/lib/fly/pilot-seat';
 import { useFlyContractsStore } from '@/stores/fly-contracts-store';
 import { usePassportStore } from '@/stores/passport-store';
 import { useEncounterStore } from '@/stores/encounter-store';
@@ -60,6 +61,7 @@ const LEGEND = [
 
 export function CalmHud({ runtime, mode, isTouch, newEarth, spotting }) {
   const cinema = useFlyStore((s) => s.cameraMode === 'cinema');
+  const pilotSelected = useFlyStore(pilotSeatSelected);
   const qualityTier = useFlyStore((s) => s.qualityTier);
   const qualityPreset = useFlyStore((s) => s.qualityPreset);
   const totalScore = useFlyContractsStore((s) => s.totalScore);
@@ -340,7 +342,7 @@ export function CalmHud({ runtime, mode, isTouch, newEarth, spotting }) {
               <i className="calm-cue-ring" />
               <i className="calm-cue-needle" />
             </div>
-            <div ref={dockRef} className="calm-dock" data-testid="hud-dock">
+            <div ref={dockRef} className="calm-dock" data-testid="hud-dock" data-pilot={pilotSelected ? '1' : undefined}>
               {noticeEl}
               <div className="calm-keys" data-legend={legend}>
                 {legend === 'full'

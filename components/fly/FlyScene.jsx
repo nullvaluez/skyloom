@@ -3,7 +3,7 @@ import { CameraTransition } from '@/lib/fly/camera-transition';
 import { earthHorizonOn, earthBend, earthFade } from '@/lib/fly/earth-horizon';
 import { connectFlightOperations } from '@/lib/fly/operations-runtime';
 import { reviewSurfaceOn } from '@/lib/fly/player-surface';
-import { setTrueScaleK, toSceneDir } from '@/lib/fly/true-scale';
+import { getTrueScaleK, setTrueScaleK, toSceneDir } from '@/lib/fly/true-scale';
 import { conditionsOn, conditionsSunTime, publishConditions, solarHour } from '@/lib/fly/player-conditions';
 import { cloudCalmOn, hazeGroundY, stepHazeGround } from '@/lib/fly/cloud-calm';
 import { FlightOperations } from '@/lib/fly/flight-operations';
@@ -11,6 +11,8 @@ import { createSimHold } from '@/lib/fly/sim-hold';
 import { installReviewPoses } from '@/lib/fly/airport-service/review-poses';
 import { connectGateToGate } from '@/lib/fly/gate-to-gate-runtime';
 import { cameraOwner, transitionMode } from '@/lib/fly/camera-mode';
+import { hasPilotSeat, pilotSeatSelected } from '@/lib/fly/pilot-seat';
+import { PilotCamera } from '@/lib/fly/pilot-camera';
 import { cameraDirector, opsFeel } from '@/lib/fly/ops-flags';
 import { renderView } from '@/lib/fly/render-view';
 import { AirportAreas } from './airport/AirportAreas';
@@ -42,7 +44,7 @@ import { IMMERSIVE, immersiveOn, immersiveLighting, immersiveProfile } from '@/l
 import { livingAirProfile } from '@/lib/fly/living-atmosphere';
 
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Color, Object3D, ShadowMaterial, Vector3, SRGBColorSpace } from 'three';
 import { NeonEnvironment } from './NeonEnvironment';
@@ -257,6 +259,7 @@ import { NIGHT_LITE_ON } from '@/lib/fly/night-lite';
 import { TerrainShadowRig } from './TerrainShadowRig';
 import { shipPassOn as lightPassOn } from '@/lib/fly/ship-light';
 // TERRAIN_SHADOW: the rig exists only with the flag on (FLY_SHIP_PASS.md LT-2).
+const F35Interior = lazy(() => import('./F35Interior').then(m => ({ default: m.F35Interior })));
 const TERRAIN_SHADOW_RIG = lightPassOn('TERRAIN_SHADOW');
 // SHIP PASS LIGHT imports end
 
@@ -1156,6 +1159,9 @@ export function FlyScene({ runtime }) {
   // value is discrete, so this memo changes only on a hangar pick.
   const aircraftId = useFlyStore((s) => s.aircraftId);
   const aircraft = useMemo(() => resolveAircraft(aircraftId), [aircraftId]);
+  const pilotAvailable = hasPilotSeat({ aircraftId });
+  const pilotExterior = useRef(null);
+  const pilot = useMemo(() => new PilotCamera(), []);
   // Built ONCE with the pick that was resolved pre-mount (FlyMode resolves the
   // saved aircraft before the canvas exists, exactly like the map style/tier).
   const flight = useMemo(
@@ -2165,6 +2171,9 @@ export function FlyScene({ runtime }) {
     )
       input.neutralize();
     const cmd = input.read();
+    if (!paused && pilotAvailable && input.consumePress('4')) {
+      useFlyStore.setState({ f35PilotSeat: !pilotSeatSelected(flyState), cameraMode: 'chase' });
+    }
     cmd.toggleParkingBrake = !paused && input.consumePress('b');
     // GATE TO GATE: gear (G), reverse (R) and the camera cycle (V) exist only behind their flags.
     cmd.gearToggle = !paused && opsFeel().enabled === true && input.consumePress('g');
@@ -2571,6 +2580,16 @@ export function FlyScene({ runtime }) {
     }
     // GATE TO GATE: one precedence for who drives the camera (lib/fly/camera-mode.js).
     const owner = cameraOwner(runtime, flyState, { photoMode, photoExit: () => photo.handoff(), hasTarget: !!targeting.target, ops: operations });
+    const pilotNow = owner === 'pilot';
+    const seatCut = pilot.active !== pilotNow;
+    if (seatCut) {
+      pilot.reset();
+      if (!pilotNow) chase.snap();
+      cameraTransition.cut();
+    }
+    pilot.active = pilotNow;
+    input.setPilotLook(pilotNow);
+    if (pilotExterior.current) pilotExterior.current.visible = !pilotNow;
     if (owner === 'lounge') {
       runtime.airportWatch.updateCamera(dt, camera);
     } else if (owner === 'photo') {
@@ -2588,6 +2607,8 @@ export function FlyScene({ runtime }) {
     } else if (owner === 'director') {
       // CAMERA_DIRECTOR (W2 F): shots, beats and cuts.
       runtime.director.update(dt, renderView(flight), camera, { cmd, k: mercatorScale(flight.latDeg), chase, flyState, ops: operations });
+    } else if (pilotNow) {
+      pilot.update(dt, flight, camera, input, getTrueScaleK());
     } else if (owner === 'cinema') {
       cinema.update(
         dt,
@@ -2600,7 +2621,7 @@ export function FlyScene({ runtime }) {
     } else {
       chase.update(dt, flight, camera, cmd.freeLook, mercatorScale(flight.latDeg), runtime.groundImmersion);
     }
-    cameraTransition.update(camera,transitionMode(runtime, flyState),flyState.warpEpoch,dt,reduceCameraMotion);
+    cameraTransition.update(camera,pilotNow ? 'pilot' : transitionMode(runtime, flyState),flyState.warpEpoch,dt,reduceCameraMotion);
     camera.position.x -= origin.anchor.x;
     camera.position.z -= origin.anchor.z;
 
@@ -3759,8 +3780,10 @@ export function FlyScene({ runtime }) {
         )}
         {/* Round 17: keyed on the pick so a hangar swap is a clean remount —
             the old clone's graded materials dispose, the new GLB mounts. */}
-        <PlayerPlane key={aircraftId} flight={flight} aircraft={aircraft} />
+        {pilotAvailable ? <group ref={pilotExterior}><PlayerPlane key={aircraftId} flight={flight} aircraft={aircraft} /></group>
+          : <PlayerPlane key={aircraftId} flight={flight} aircraft={aircraft} />}
       </group>
+      {pilotAvailable && <Suspense fallback={null}><F35Interior runtime={runtime} pilot={pilot} /></Suspense>}
 
       {/* Traffic writes rebased instance matrices — must stay OUTSIDE worldRoot */}
       <TrafficLayer runtime={runtime} flight={flight} origin={origin} />

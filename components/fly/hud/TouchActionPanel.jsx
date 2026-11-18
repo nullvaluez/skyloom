@@ -94,7 +94,7 @@ function Action({ id, label, Icon, active, disabled, onClick }) {
   );
 }
 
-export function TouchActionPanel({ runtime, speedPreset, actions, lookMode, locked, chasing, cinema, hangar, canHideInfo, reducedMotion }) {
+export function TouchActionPanel({ runtime, speedPreset, actions, lookMode, locked, chasing, cinema, hangar, canHideInfo, reducedMotion, seatAvailable, pilotSelected }) {
   const panel = useRef(null);
   // Nearby lives here on touch: a closed touch HUD keeps one gameplay button.
   const nearby = useNearbyEntry();
@@ -124,6 +124,7 @@ export function TouchActionPanel({ runtime, speedPreset, actions, lookMode, lock
         </fieldset>
         {!runtime.operations?.lowSpeed && <TouchBoost runtime={runtime} />}
         <div className="touch-actions-grid">
+          {seatAvailable && <Action id="seat" label="Pilot view" Icon={Plane} active={pilotSelected} onClick={actions.seat} />}
           {ACTIONS.filter(([id]) => (id !== 'hangar' || hangar) && (id !== 'nearby' || nearby.available)).map(([id, label, Icon]) => (
             <Action key={id} id={id} label={id === 'nearby' && nearby.count ? `${label} · ${nearby.count}` : label}
               Icon={Icon} onClick={actions[id]} active={id === 'look' ? lookMode : undefined} />

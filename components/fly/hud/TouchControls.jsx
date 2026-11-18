@@ -8,6 +8,7 @@ import { readReducedMotion } from '@/lib/fly/immersive';
 import { useOverlayBack, anyOverlayOpen } from '@/hooks/use-overlay-back';
 import { dismissTouchInfo, readTouchSurface, setTouchSurface, useTouchSurface } from '@/hooks/use-touch-actions';
 import { useFlyStore } from '@/stores/fly-store';
+import { hasPilotSeat, pilotSeatSelected } from '@/lib/fly/pilot-seat';
 import { useEncounterStore } from '@/stores/encounter-store';
 import { TouchActionPanel } from './TouchActionPanel';
 
@@ -90,6 +91,8 @@ export function TouchControls({ runtime }) {
   const infoCardHex = useFlyStore((s) => s.infoCardHex);
   const lockState = useFlyStore((s) => s.lockState);
   const cameraMode = useFlyStore((s) => s.cameraMode);
+  const seatAvailable = useFlyStore(hasPilotSeat);
+  const pilotSelected = useFlyStore(pilotSeatSelected);
   const surface = useTouchSurface();
   const [lookMode, setLookMode] = useState(false);
   const [inputEpoch, setInputEpoch] = useState(0);
@@ -178,6 +181,7 @@ export function TouchControls({ runtime }) {
     contracts: () => { neutralize(); setTouchSurface('contracts'); },
     nearby: () => navigate(() => { if (!useEncounterStore.getState().nearbyOpen) runtime.encounters?.nearby(); }),
     photo: () => navigate(() => press('p')),
+    seat: () => navigate(() => press('4')),
     pause: () => navigate(() => useFlyStore.getState().setPhase('paused')),
     inspect: () => navigate(() => { useFlyStore.getState().setInspectHex(lockedHex); stampPress('t'); }),
     dismiss: dismissTouchInfo,
@@ -200,7 +204,7 @@ export function TouchControls({ runtime }) {
         </button>
       </Zone>
       {surface === 'actions' && <TouchActionPanel runtime={runtime} speedPreset={speedPreset}
-        actions={actions} lookMode={lookMode} locked={locked} chasing={chasing}
+        actions={actions} lookMode={lookMode} locked={locked} chasing={chasing} seatAvailable={seatAvailable} pilotSelected={pilotSelected}
         cinema={cameraMode === 'cinema'} hangar={HANGAR.enabled} canHideInfo={!!infoCardHex} reducedMotion={reducedMotion} />}
     </>
   );
