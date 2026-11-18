@@ -106,6 +106,143 @@ const wpReq = (standIns) => {
 await import(pathToFileURL(path.join(ROOT, 'lib/fly/toy-world/vector-tile.worker.js')).href);
 const api = globalThis.__wpReachApi;
 
+if (argv.includes('--continuity')) {
+  const { default: assert } = await import('node:assert/strict');
+  globalThis.window = {
+    location: { search: '' },
+    __flyCityContinuityOverride: { enabled: true },
+    __flyWorldPassTierOverride: false,
+  };
+  const WORLD_SIZE = 2 * Math.PI * 6378137;
+  const { cityHorizonFor, cityHorizonRequest } = await import('../lib/fly/city-horizon.js');
+  const { SatSkylineEngine } = await import('../lib/fly/toy-world/sat-skyline-engine.js');
+  const { createStandInGeometry, countAtLeast, STAND_IN_TRIANGLES } = await import('../lib/fly/toy-world/sat-stand-ins.js');
+  const { Mesh, ShaderLib } = await import('three');
+  const profile = cityHorizonFor('medium');
+  const options = cityHorizonRequest({ ...HIGH, worldPass: wpReq(false) }, profile);
+  options.worldPass.reach = { on: false, standIns: false, worker: null };
+  options.cityHorizon.compact = true;
+  const [x, y] = tileOf(40.7549, -73.984, 14);
+  const build = () => api.buildTile(14, x, y, 'sat-skyline', options);
+  const first = (await build()).satStandIns;
+  const second = (await build()).satStandIns;
+  assert.ok(first?.n > profile.maxBodies, 'recorded Midtown tile reaches the denser compact footprint path');
+  assert.ok(first.n * STAND_IN_TRIANGLES <= profile.maxTriangles, 'worker keeps each tile within its main-pass triangle share');
+  for (const field of ['size', 'pos', 'dim', 'col']) assert.deepEqual(first[field], second[field]);
+  for (let i = 1; i < first.n; i++) assert.ok(first.size[i] <= first.size[i - 1], 'descending footprint rank');
+  const tileSpan = WORLD_SIZE / 2 ** 14;
+  const octant = coordinate => Math.max(0, Math.min(7, Math.floor((coordinate / tileSpan + .5) * 8)));
+  const blocks = new Set();
+  let maxH = 0;
+  for (let i = 0; i < first.n; i++) {
+    blocks.add(octant(first.pos[i * 2]) + 8 * octant(first.pos[i * 2 + 1]));
+    maxH = Math.max(maxH, first.dim[i * 4 + 2]);
+  }
+  assert.ok(blocks.size >= 32, 'mapped Midtown sample covers at least half its 8-by-8 grid');
+
+  const engine = new SatSkylineEngine({ groundAt: () => ({ elev: 0, tileZ: 16 }) });
+  engine.setHorizonTier('medium');
+  assert.ok(engine._compact);
+  assert.equal(engine.workerCount, 1);
+  assert.equal(engine._reachCfg.photo.enabled, false);
+  const shader = { ...ShaderLib.standard, uniforms: {} };
+  engine.material.onBeforeCompile(shader);
+  assert.ok(shader.vertexShader.includes('float rimDistance = distance(sCentre.xz, uBendCenter);'));
+  assert.ok(!shader.fragmentShader.includes('skyA *= 1.0-smoothstep(uCityHorizonBand'));
+  assert.ok(shader.fragmentShader.includes('uArchitectureNearFade * vArchitectureCovered'));
+  const groupSpan = tileSpan * profile.groupN;
+  const group = { z: 14, gx: Math.floor(x / profile.groupN), gy: Math.floor(y / profile.groupN) };
+  const key = `${group.z}/${group.gx}/${group.gy}`;
+  const cx = (group.gx + .5) * groupSpan - WORLD_SIZE / 2;
+  const cz = (group.gy + .5) * groupSpan - WORLD_SIZE / 2;
+  const n = first.n * profile.groupN ** 2;
+  const size = Float32Array.from({ length: n }, (_, index) => first.size[0] * (1 - index / (n * 2)));
+  const bundle = { n, size, maxH, ax: new Float32Array(n), az: new Float32Array(n),
+    dim: new Uint16Array(n * 4), wall: new Uint8Array(n * 4), roof: new Uint8Array(n * 4), gnd: new Uint8Array(n * 4) };
+  const geometry = createStandInGeometry(bundle, new Float32Array(n), groupSpan);
+  assert.equal(geometry.getAttribute('aCityRank').array, size, 'CPU prefix and GPU attribute share the same rank buffer');
+  const oldMesh = new Mesh(geometry, engine.material);
+  engine.object.add(oldMesh);
+  const chunk = { group, cx, cz, mesh: oldMesh, sourceMask: 1, state: 'building', gen: 1,
+    pending: 2, failed: 0, parts: [], retryAt: Infinity, standIns: { n, size, yLo: 0, yHi: 1, maxH } };
+  engine.chunks.set(key, chunk);
+  engine._now = 10;
+  engine.building = 2;
+  const offset = -(profile.groupN - 1) / 2 * tileSpan;
+  engine._childDone(key, 1, { satStandIns: first }, offset, offset);
+  engine._childDone(key, 1, { empty: true, reason: 'no-data' }, offset + tileSpan, offset);
+  assert.equal(chunk.state, 'ready');
+  assert.ok(chunk.mesh === oldMesh, 'a repeated no-data child leaves the ready mesh attached');
+  assert.ok(Number.isFinite(chunk.retryAt));
+  assert.equal(engine.pendingFinalize.length, 0);
+
+  engine._horizonRadius = profile.reachM;
+  engine.maxChunks = profile.maxChunks;
+  engine._refreshDesired(cx, cz, 0, chunk.retryAt + 1);
+  assert.ok(chunk.mesh === oldMesh);
+  assert.equal(chunk.repairQueued, true);
+  assert.ok(engine.queue.some(e => e.gx === group.gx && e.gy === group.gy));
+
+  Object.assign(chunk, { state: 'building', gen: 2, pending: 2, failed: 0, sawNoData: false, parts: [] });
+  engine.building = 2;
+  engine._childDone(key, 2, { satStandIns: first }, offset + tileSpan, offset);
+  engine._childDone(key, 2, null, offset, offset, true);
+  assert.ok(chunk.mesh === oldMesh, 'mixed recovery must retain the old coverage when a different child fails');
+  assert.equal(chunk.sourceMask, 1);
+  assert.equal(engine.pendingFinalize.length, 0);
+
+  const cap = profile.maxTriangles * profile.groupN ** 2 * profile.maxChunks;
+  // Stress the allocator using multiple equally near copies of the recorded
+  // candidate count. Playback uses the same prefix for CPU culling and GPU
+  // instancing, including the separate reflection target.
+  const stressCount = profile.maxChunks; // The reflection pass pushes these full groups over budget.
+  const copies = [{ entry: chunk, mesh: oldMesh }];
+  for (let index = 1; index < stressCount; index++) {
+    const mesh = new Mesh(geometry.clone(), engine.material);
+    const entry = { ...chunk, mesh };
+    copies.push({ entry, mesh });
+    engine.object.add(mesh);
+    engine.chunks.set('budget-' + index, entry);
+  }
+  const outgoing = copies.at(-1);
+  engine._evict('budget-' + (stressCount - 1), outgoing.entry);
+  assert.ok(engine._dying.some(fade => fade.chunk === outgoing.entry && fade.mesh === outgoing.mesh));
+  engine._standInView.reflH = engine._standInView.H;
+  engine._updateVisibility(cx, cz, 0, 1, 20);
+  engine._updateStandInCounts(20, cx, cz, 0);
+  assert.ok(engine._standInMinPx > engine._reachCfg.minPx, 'compact governor engages under triangle pressure');
+  let submitted = 0;
+  for (const { entry, mesh } of copies) {
+    const geo = mesh.geometry;
+    if (!mesh.visible) continue;
+    engine._standInPass({ getRenderTarget: () => ({ texture: { name: 'coastal-city-reflection' }, height: engine._standInView.H }) }, entry, geo);
+    submitted += geo.instanceCount;
+    engine._standInPass({ getRenderTarget: () => null }, entry, geo);
+    submitted += geo.instanceCount;
+  }
+  assert.ok(outgoing.mesh.visible && outgoing.mesh.geometry.instanceCount > 0, 'the outgoing draw is exercised');
+  assert.ok(submitted > 0 && submitted * STAND_IN_TRIANGLES <= cap,
+    `main and reflection share the compact cap (submitted ${submitted * STAND_IN_TRIANGLES}, cap ${cap}, threshold ${engine._standInMinPx}, distance ${chunk.standInD}, rank ${size[0]})`);
+  assert.equal(geometry.instanceCount, countAtLeast(size, n, engine._standInMinPx * chunk.standInD / engine._standInView.K));
+
+  Object.assign(chunk, { state: 'building', gen: 3, pending: 2, failed: 0, sawNoData: false, parts: [] });
+  engine.building = 2;
+  engine._childDone(key, 3, { satStandIns: first }, offset, offset);
+  engine._childDone(key, 3, { satStandIns: first }, offset + tileSpan, offset);
+  assert.equal(chunk.state, 'draping');
+  assert.ok(chunk.mesh === oldMesh, 'a larger replacement waits for draping before publication');
+  assert.equal(engine.pendingFinalize.length, 1);
+  engine.notifyWarp(21);
+  engine._refreshDesired(cx + 100000, cz, 0, 21);
+  assert.equal(engine.pendingFinalize.length, 0);
+  engine.dispose();
+  engine._childDone(key, 3, { satStandIns: first }, offset, offset);
+  assert.equal(engine.chunks.size, 0, 'late replies cannot resurrect a disposed engine');
+  assert.equal(engine.object.children.length, 0);
+  console.log(`PASS continuity: ${first.n} compact tile footprints, matching CPU/GPU ranks, bounded draws, partial retry and warp cleanup`);
+  process.exit(0);
+}
+
 // Test the actual far worker and the street mask against recorded city blocks.
 if (argv.includes('--relief')) {
   const { WORLD_REACH } = await import('../lib/fly/fly-constants.js');

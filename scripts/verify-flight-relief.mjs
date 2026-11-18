@@ -9,6 +9,29 @@ const { steppedBuildingLevels } = await import('../lib/fly/living-architecture.j
 const ring = points => points.map(([x,y])=>({x,y}));
 const square = (lo,hi) => ring([[lo,lo],[hi,lo],[hi,hi],[lo,hi]]);
 
+test('the High cloud material composes its lighting once under cascaded shadows', async () => {
+  const { PerspectiveCamera, Scene, ShaderLib } = await import('three');
+  const { makeLitCloudMaterial } = await import('../lib/fly/cloud-material.js');
+  const { CinemaShadows } = await import('../lib/fly/cinema-shadows.js');
+  const rig = new CinemaShadows(new PerspectiveCamera(), new Scene(),
+    { cascades: 2, shadowSize: 1024, shadowRangeM: 3000 });
+  const Cloud = makeLitCloudMaterial();
+  const cloud = new Cloud();
+  cloud.onBeforeCompile = shader => {
+    shader.fragmentShader = shader.fragmentShader.replace('#include <opaque_fragment>',
+      'gl_FragColor = vec4(outgoingLight, diffuseColor.a * vOpacity);');
+  };
+  rig.setupMaterial(cloud);
+  const shader = { ...ShaderLib.lambert, uniforms: {} };
+  cloud.onBeforeCompile(shader);
+  assert.equal(shader.vertexShader.match(/varying vec2 vR24CloudP;/g)?.length, 1);
+  assert.equal(shader.fragmentShader.match(/vec3 r24CloudShade\(/g)?.length, 1);
+  assert.ok(shader.fragmentShader.includes('r24CloudShade(outgoingLight)'));
+  assert.ok(shader.uniforms.CSM_cascades && shader.uniforms.uCloudSun);
+  cloud.dispose();
+  rig.dispose();
+});
+
 test('upper storeys respect the measured roof height and leave courtyard volumes intact',() => {
   const polygon={outer:square(0,80),holes:[]};
   for (const seed of [4,5,8,11,14,79]) {

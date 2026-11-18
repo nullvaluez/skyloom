@@ -8,6 +8,9 @@ import { EarthSurfaceEngine, publishEarthSurface, removeEarthSurface } from '@/l
 import { EarthScenery } from '@/lib/fly/earth-scenery';
 import { LivingForest } from '@/lib/fly/living-forest';
 import { LivingAirports } from '@/lib/fly/living-airports';
+import { CityContinuity } from '@/lib/fly/city-continuity';
+import { CITY_CONTINUITY_ON } from '@/lib/fly/world-clarity';
+import { useFlyStore } from '@/stores/fly-store';
 
 export function EarthSurfaceLayer({ runtime }) {
   const ref=useRef(null);
@@ -15,6 +18,10 @@ export function EarthSurfaceLayer({ runtime }) {
   useEffect(()=>{
     const worker=new Worker(new URL('../../lib/fly/toy-world/vector-tile.worker.js',import.meta.url),{type:'module'});
     const api=withRunwayGeometry(wrap(worker)),engine=new EarthSurfaceEngine(api);
+    if(CITY_CONTINUITY_ON) {
+      engine.cityContinuity=new CityContinuity();
+      runtime.cityContinuity=engine.cityContinuity.stats;
+    }
     engine.scenery=new EarthScenery();
     engine.forest=new LivingForest();
     engine.airports=new LivingAirports();group.current?.add(engine.airports.group);
@@ -23,7 +30,10 @@ export function EarthSurfaceLayer({ runtime }) {
     ref.current=engine;
     runtime.retryEarthSurface=()=>{for(const band of engine.bands)for(const slot of band.slots)if(['error','no-data'].includes(slot.state)){slot.state='error';slot.retryAt=0;}engine.lastUpdate=-Infinity;};
     api.init().catch(()=>{engine.stats.failed++;});
-    return()=>{ref.current=null;delete runtime.retryEarthSurface;removeEarthSurface(runtime,engine.stats);engine.airports.dispose();engine.forest.dispose();engine.scenery.dispose();engine.dispose();worker.terminate();};
+    return()=>{ref.current=null;delete runtime.retryEarthSurface;removeEarthSurface(runtime,engine.stats);
+      engine.cityContinuity?.dispose();
+      if(runtime.cityContinuity===engine.cityContinuity?.stats) delete runtime.cityContinuity;
+      engine.airports.dispose();engine.forest.dispose();engine.scenery.dispose();engine.dispose();worker.terminate();};
   },[runtime]);
   useFrame(({gl})=>{
     const engine=ref.current;
@@ -33,6 +43,10 @@ export function EarthSurfaceLayer({ runtime }) {
     // FlyScene's cleanup nulls runtime.flight while this layer can still tick
     // (a remount, a dev hot reload); scenery, forest and airports read it unguarded.
     if(!runtime.flight?.pos)return;
+    if(engine.cityContinuity) {
+      engine.cityContinuity.update(engine,runtime,gl,performance.now()/1000,useFlyStore.getState().qualityTier);
+      if(typeof window!=='undefined'&&window.__flyStats)window.__flyStats.cityContinuity=engine.cityContinuity.stats;
+    }
     engine.scenery.update(engine,runtime,performance.now()/1000);
     engine.forest.update(engine,runtime,performance.now()/1000);
     engine.airports.update(engine,runtime);

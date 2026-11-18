@@ -19,7 +19,6 @@ import {
 } from '@/lib/fly/settle';
 import { satelliteVisualsOn, satelliteVisualProfile } from '@/lib/fly/satellite-visuals';
 import { useFlyStore } from '@/stores/fly-store';
-import { worldPassConfig } from '@/lib/fly/world-pass'; // WORLD PASS C (round 2): the skyline worker pool size
 // SHIP PASS CITY (CT-2): CITY_RANGE resolved per tier through the device policy.
 import { cityRangeFor } from '@/lib/fly/city-range';
 // SHIP PASS CITY (CT-5): NIGHT_RHYTHM's occupancy / twilight uniform.
@@ -79,9 +78,10 @@ export function SatSkylineLayer({ runtime, flight }) {
     engine.setCityRange(cityRangeFor(qualityTier)); // SHIP PASS CITY (CT-2)
   }, [engine, qualityTier]);
 
+  /* eslint-disable react-hooks/immutability -- publish the engine on the shared imperative scene runtime */
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/immutability -- shared imperative runtime bus, matching building/road layers
     runtime.satSkyline = engine;
+    /* eslint-enable react-hooks/immutability */
     const worker = new Worker(
       new URL('../../lib/fly/toy-world/vector-tile.worker.js', import.meta.url),
       { type: 'module' }
@@ -96,7 +96,7 @@ export function SatSkylineLayer({ runtime, flight }) {
     // at or ahead of the shipped mass. Stream off: one worker, as before.
     const extra = [];
     if (engine.standInsOn) {
-      const n = Math.max(1, Math.min(4, worldPassConfig('reach').workers ?? 1));
+      const n = Math.max(1, Math.min(4, engine.workerCount));
       for (let i = 1; i < n; i++) {
         const w = new Worker(new URL('../../lib/fly/toy-world/vector-tile.worker.js', import.meta.url), { type: 'module' });
         const a = withRunwayGeometry(wrap(w));
@@ -144,7 +144,7 @@ export function SatSkylineLayer({ runtime, flight }) {
     const t = clock.elapsedTime;
     // WORLD PASS C (REACH): the camera's focal length in CSS px and the coastal
     // reflection's target (stream off: one latched boolean read, nothing else).
-    if (engine.standInsOn && camera?.isPerspectiveCamera) engine.setStandInView(size.height / (2 * Math.tan((camera.fov * Math.PI) / 360)), runtime.origin?.anchor, size.height, runtime.coastalReflection);
+    if (engine.standInsOn && camera?.isPerspectiveCamera) engine.setStandInView(size.height / (2 * Math.tan((camera.fov * Math.PI) / 360)), runtime.origin?.anchor, size.height, runtime.coastalReflection, camera);
     nowRef.current = t;
     const eyeAgl = eyeAglVis(runtime, flight); // R24 B (GROUND_VIS)
     const gVis = groundElevVis(runtime, flight);

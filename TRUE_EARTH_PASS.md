@@ -25,6 +25,43 @@ release instruction is recorded separately from the measurements it authorizes.
 
 ## Status
 
+### 2026-11-18 — Distant neighborhoods in flight
+
+Preview with `?flags=CITY_CONTINUITY,FLIGHT_RELIEF,FLIGHT_CLARITY,F35_COCKPIT`.
+`CITY_CONTINUITY` defaults off. Over Queens, even a fully loaded High skyline
+had an abrupt boundary. The geometry budget culled similar low-rise buildings
+at the same distance, and shading turned their remaining walls toward the sky.
+Medium and Low used a sparse extruded skyline beyond the detailed tiles.
+
+High and Ultra now keep a repeatable sample of mapped buildings at each distance.
+Visible walls retain directional lighting. On Medium and Low, the worker reserves
+space for prominent buildings and samples neighborhoods across each tile. The
+main view, water reflections and outgoing geometry share the tier's triangle
+budget. At the outer boundary, each remaining building tapers into the
+surface. This removes the screen-space checkerboard on its walls. A tile
+group retains its existing buildings while it retries missing data.
+
+Beyond individually resolved roofs, the terrain blends in average building
+height and directional relief from the European Commission's 2018 GHSL survey.
+It uses a 1.03 MiB texture on the existing terrain draw. A failed height request
+leaves the satellite surface available. [GHS-BUILT-H data and attribution](https://registry.opendata.aws/ghs-built-h/)
+
+The comparison route in `scripts/review-manhattan-continuity.cjs` starts at
+40.7692° N, 73.9810° W, 1,931 ft and looks across the East River. It records
+the same view after travelling 1.8 km towards Queens. A separate Paris
+comparison reuses the banked Seine cockpit pose. On the RTX 5080 the High
+and Medium captures matched in pose, light and resident detailed tiles at
+both ends. On High, 282 low-rise footprints at 8–12 km passed the fade
+cutoff at the endpoint, up from 97. The measurement covers the 48° view
+towards Queens. A separate flight used normal banking and pointer look.
+Physical iPhone testing remains open.
+
+GPU verification also found that the High cloud material could add its GLSL
+declarations three times when cascaded shadows installed their shader hook.
+That variant failed to link during warmup. The cloud material now applies
+its lighting once per shader, with a regression check in
+`scripts/verify-flight-relief.mjs`.
+
 ### 2026-11-18 — Paris cockpit, skyline and horizon
 
 Preview with `?flags=FLIGHT_RELIEF,FLIGHT_CLARITY,F35_COCKPIT`. The new
