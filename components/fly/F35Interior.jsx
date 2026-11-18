@@ -5,6 +5,7 @@ import { addAfterEffect, useFrame, useThree } from '@react-three/fiber';
 import { DirectionalLight, HemisphereLight, MathUtils, PerspectiveCamera, Quaternion, Scene } from 'three';
 import { buildF35Interior } from '@/lib/fly/f35-interior';
 import { createPilotDisplays } from '@/lib/fly/pilot-displays';
+import { FLIGHT_RELIEF_ON } from '@/lib/fly/world-clarity';
 
 /** A second depth range on the existing canvas. Only the centimetre-scale
  * interior uses it. World depth, postprocessing, and terrain LOD keep using
@@ -48,6 +49,10 @@ export function F35Interior({ runtime, pilot }) {
       sun.intensity = .12 + 2.38 * day;
       fill.intensity = .27 + 1.45 * day;
       bounce.intensity = .23 + .42 * day;
+      if (FLIGHT_RELIEF_ON) {
+        fill.intensity *= .76;
+        bounce.intensity *= .70;
+      }
       scene.environment = outside.environment;
       scene.environmentIntensity = (.20 + .90 * day) * Math.min(2, outside.environmentIntensity ?? 1);
       scene.environmentRotation.setFromQuaternion(inverse.copy(pilot.body).invert());

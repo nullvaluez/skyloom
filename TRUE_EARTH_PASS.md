@@ -25,6 +25,44 @@ release instruction is recorded separately from the measurements it authorizes.
 
 ## Status
 
+### 2026-11-18 — Paris cockpit, skyline and horizon
+
+Preview with `?flags=FLIGHT_RELIEF,FLIGHT_CLARITY,F35_COCKPIT`. The new
+`FLIGHT_RELIEF` flag defaults off. In daylight the distant cloud layer uses
+coverage and lighting extracted from Greg Zaal’s CC0 Kloofendal sky. The
+live sun orients the cloud light, the local volume still handles fly-throughs,
+and the aerial perspective follows the visible terrain’s curved horizon.
+Night, dense fog, overcast and flight above the layer hand back to the
+existing weather model.
+
+Desktop High resolves four facade materials on the building’s existing
+window coordinates. Each elevation covers four bays and four floors. The
+textures use independent mip chains, and the wall returns to filtered
+architectural bands at range. Nearby ungrouped convex towers can use an
+offset upper floor inside their mapped height. Large far buildings can
+retain wings and courtyard openings as up to four sections that share a
+ground elevation. Each tile may use up to 24 spare instances. The F-35 uses
+a shaped leather coaming and scuffed paint around fittings and canopy hardware.
+
+The two Paris comparison positions are in `scripts/review-paris-relief.cjs`.
+In a matched RTX 5080 capture, disabling building shadow reception removed
+the diagonal bands on the tower walls. Restoring it brought the bands back.
+The city cascade covered about 10 m per shadow texel on this approach. Wall
+receivers now offset their shadow lookup by up to half a texel in this
+preview. Fine cascades retain their original bias.
+
+The capture pins the view, flight attitude, sun, baseline weather and cloud
+advection. Traffic is held empty for the comparison and imagery streams live.
+The low approach uses the owner’s heading of 339°, altitude of 1,103 ft and
+airspeed of 126 kt. The banked Seine view is at 3,806 ft. Physical iPhone
+appearance and performance remain open for owner review.
+
+The beta suite passed all 34 checks. The recorded Paris worker tiles
+used 16 and 15 additional sections respectively. The fixture checks also
+covered shape fitting, shared roof elevation across a batched terrain
+update, and preserved roof height. Two historical R25 sky assertions,
+4h and 4i, also fail against the preceding commit.
+
 ### 2026-11-18 — Flight clarity and the F-35 pilot seat
 
 `?flags=FLIGHT_CLARITY,F35_COCKPIT` previews both changes for one load.

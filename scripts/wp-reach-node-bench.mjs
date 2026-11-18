@@ -106,6 +106,34 @@ const wpReq = (standIns) => {
 await import(pathToFileURL(path.join(ROOT, 'lib/fly/toy-world/vector-tile.worker.js')).href);
 const api = globalThis.__wpReachApi;
 
+// Test the actual far worker and the street mask against recorded city blocks.
+if (argv.includes('--relief')) {
+  const { WORLD_REACH } = await import('../lib/fly/fly-constants.js');
+  let additions = 0;
+  for (const [name,lat,lon,extra] of PLACES) {
+    if (only && !name.includes(only)) continue;
+    const [x,y] = tileOf(lat,lon,14);
+    for (const [dx,dy] of [[0,0],...extra]) {
+      const bundles = [];
+      for (const enabled of [false,true]) {
+        const req = wpReq(true);
+        req.reach.worker = {...WORLD_REACH.worker,footprintRelief:enabled};
+        req.key += '-relief-' + Number(enabled);
+        const result = await api.buildTile(14,x+dx,y+dy,'sat-skyline',{...HIGH,worldPass:req});
+        bundles.push(result.satStandIns);
+      }
+      const [before,after] = bundles;
+      const delta = (after?.n ?? 0) - (before?.n ?? 0);
+      if (delta < 0 || delta > 24 || after?.n > WORLD_REACH.worker.maxPerTile) throw Error(name+' instance budget');
+      for (let i=1; i<(after?.n ?? 0); i++) if(after.size[i]>after.size[i-1]) throw Error(name+' size order');
+      console.log(name,x+dx,y+dy,'extra sections',delta);
+      additions += delta;
+    }
+  }
+  if (!additions) throw Error('No recorded footprint exercised section fitting');
+  process.exit(0);
+}
+
 // --time: worker build ms per tile, median of 3, for the shipped horizon (base),
 // reach alone, the other three wave-1 streams (three) and all four on (truth,
 // arrival, reach, look) with their shipped worker tunables. The browser's far

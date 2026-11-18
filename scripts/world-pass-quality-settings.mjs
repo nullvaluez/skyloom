@@ -30,6 +30,8 @@ const empty = () => null, no = () => false;
 const modules = {
   react: React, 'react/jsx-runtime': require('react/jsx-runtime'),
   '@/stores/fly-store': { useFlyStore }, '@/lib/fly/world-pass': W, '@/lib/fly/fly-settings': settings,
+  '@/lib/fly/pilot-seat': await import('../lib/fly/pilot-seat.js'),
+  '@/hooks/use-is-touch': {useIsTouch: no},
   '@/lib/fly/player-surface': { reviewSurfaceOn: no }, '@/lib/fly/map-style': { MAP_STYLES: [] },
   '@/lib/fly/fly-constants': { CRASH: { enabled: false } },
   '@/lib/fly/challenge': { challengeLayerOn: no, challengeOn: no },
