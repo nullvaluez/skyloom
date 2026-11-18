@@ -25,6 +25,22 @@ release instruction is recorded separately from the measurements it authorizes.
 
 ## Status
 
+### 2026-11-18 — Missing water and terrain on Ultra
+
+An external-camera flight over the Hudson reproduced the missing river and
+streets with `CITY_CONTINUITY` enabled. Satellite images were present on
+all 164 attached terrain tiles. The Ultra terrain shader requested 17
+fragment texture units on an RTX 5080 driver that supports 16. The GPU
+rejected the program. Buildings and clouds use different programs and
+remained visible. Turning off just `CITY_CONTINUITY` restored the surface.
+
+City height tiles now occupy two additional rows in the terrain appearance
+texture. Surface classifications retain their original dimensions. This
+preserves the water, satellite imagery, city relief and three shadow
+cascades within the 16-unit budget. Run
+`node scripts/verify-ultra-terrain.cjs --city-continuity` to exercise a
+saved Ultra boot and return to Ultra through High, Medium and Low.
+
 ### 2026-11-18 — Distant neighborhoods in flight
 
 Preview with `?flags=CITY_CONTINUITY,FLIGHT_RELIEF,FLIGHT_CLARITY,F35_COCKPIT`.
@@ -43,7 +59,8 @@ group retains its existing buildings while it retries missing data.
 
 Beyond individually resolved roofs, the terrain blends in average building
 height and directional relief from the European Commission's 2018 GHSL survey.
-It uses a 1.03 MiB texture on the existing terrain draw. A failed height request
+The packed layout adds 1.13 MiB to the terrain appearance texture on the
+existing terrain draw. A failed height request
 leaves the satellite surface available. [GHS-BUILT-H data and attribution](https://registry.opendata.aws/ghs-built-h/)
 
 The comparison route in `scripts/review-manhattan-continuity.cjs` starts at

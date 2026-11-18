@@ -170,11 +170,16 @@ check('cloud banks preserve periodicity, open sky, volume and weather coverage',
  assert.ok(empty>full&&full>100);assert.equal(cinemaCloudDensity(100,1499,100,{},noise),0);
 });
 const {EarthSurfaceEngine}=await import('../lib/fly/earth-surface-engine.js');
-const {EARTH_CLASS_LAYOUT}=await import('../lib/fly/earth-surface-material.js');
-check('packed terrain atlas retains every classification and appearance byte',()=>{
+const {EARTH_CLASS_LAYOUT,makeEarthAtlas,makeEarthClassAtlas}=await import('../lib/fly/earth-surface-material.js');
+const {CITY_HEIGHT_LAYOUT}=await import('../lib/fly/city-height-grid.mjs');
+for (const appearance of [EARTH_CLASS_LAYOUT, CITY_HEIGHT_LAYOUT]) {
+check(`packed ${appearance.width}×${appearance.height} atlas retains every terrain byte`,()=>{
  const engine=Object.create(EarthSurfaceEngine.prototype),layout=EARTH_CLASS_LAYOUT;
- engine.classAtlas={image:{data:new Uint8Array(layout.width*layout.height)}};
- engine.appearanceAtlas={image:{data:new Uint8Array(layout.width*layout.height*4)}};
+ engine.classAtlas=makeEarthClassAtlas(layout.width,layout.height);
+ engine.appearanceAtlas=makeEarthAtlas(appearance.width,appearance.height);
+ const cityStart=appearance.width*layout.height*4;
+ const cityRows=engine.appearanceAtlas.image.data.subarray(cityStart);
+ cityRows.fill(197);
  for(const [i,[ox,oy]]of layout.bands.entries()){
    const size=layout.bands[i][2]/4,width=size*4;
    const data=Uint8Array.from({length:width*width*4},(_,j)=>(j*13+i*29)%256);
@@ -182,9 +187,14 @@ check('packed terrain atlas retains every classification and appearance byte',()
    const b={i,size,texture:{image:{data}},classTexture:{image:{data:classes}}};
    for(let slot=0;slot<16;slot++)engine._packClassSlot(b,slot);
    for(let row=0;row<width;row++){
-     assert.deepEqual(engine.appearanceAtlas.image.data.subarray(((oy+row)*layout.width+ox)*4,((oy+row)*layout.width+ox+width)*4),data.subarray(row*width*4,(row+1)*width*4));
+     const start=((oy+row)*appearance.width+ox)*4;
+     assert.deepEqual(engine.appearanceAtlas.image.data.subarray(start,start+width*4),data.subarray(row*width*4,(row+1)*width*4));
      assert.deepEqual(engine.classAtlas.image.data.subarray((oy+row)*layout.width+ox,(oy+row)*layout.width+ox+width),classes.subarray(row*width,(row+1)*width));
    }
  }
+ assert.ok(cityRows.every(value=>value===197),'surface writes must preserve all city-height rows');
+ engine.appearanceAtlas.dispose();
+ engine.classAtlas.dispose();
 });
+}
 console.log(`CINEMA OVERHAUL: ${checks}/${checks}`);

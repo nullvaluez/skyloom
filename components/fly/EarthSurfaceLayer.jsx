@@ -19,7 +19,7 @@ export function EarthSurfaceLayer({ runtime }) {
     const worker=new Worker(new URL('../../lib/fly/toy-world/vector-tile.worker.js',import.meta.url),{type:'module'});
     const api=withRunwayGeometry(wrap(worker)),engine=new EarthSurfaceEngine(api);
     if(CITY_CONTINUITY_ON) {
-      engine.cityContinuity=new CityContinuity();
+      engine.cityContinuity=new CityContinuity(engine.appearanceAtlas);
       runtime.cityContinuity=engine.cityContinuity.stats;
     }
     engine.scenery=new EarthScenery();
