@@ -5,7 +5,7 @@ const { chromium } = require('playwright');
 const sharp = require('sharp');
 const { enterFlight } = require('./_skip-menus');
 
-const [origin, arm, mode = 'on', tier = 'auto', aircraft = 'fighter'] = process.argv.slice(2);
+const [origin, arm, mode = 'on', tier = 'auto', aircraft = 'fighter', governor = 'live'] = process.argv.slice(2);
 // The user screenshot puts the Manhattan label 2.6 NM behind the aircraft.
 // Latitude/longitude and exact angles are the reviewer's closest match.
 const pose = { lat: 40.798, lon: -73.985, altM: 1930 * .3048, headingDeg: 25,
@@ -19,12 +19,17 @@ async function compare() {
   const paths = [arm ?? 'before-matched', mode === 'on' ? 'after-matched' : mode]
     .map(label => path.join(work,label,'on-ultra'));
   const reports = paths.map(dir => JSON.parse(fs.readFileSync(path.join(dir,'report.json'))));
+  const [beforeImage,afterImage] = paths.map(dir => path.join(dir,'settled.png'));
+  const { width,height } = await sharp(beforeImage).metadata();
+  const size = await sharp(afterImage).metadata();
+  assert.equal(size.width,width);
+  assert.equal(size.height,height);
   assert.deepEqual(reports[0].pose, reports[1].pose);
   assert.ok(reports.every(report => report.stage === 'complete'));
   const proof = [];
   for (const shot of ['settled','endpoint']) {
     const [before, after] = reports.map(report => report[shot]);
-    for (const key of ['pos','camera','cameraPos','bank','pitch','heading','speed','fov','dpr']) {
+    for (const key of ['pos','camera','cameraPos','bank','pitch','heading','speed','dpr']) {
       const left = [].concat(before[key]), right = [].concat(after[key]);
       assert.equal(left.length,right.length);
       assert.ok(left.every((value,i) => Math.abs(value-right[i]) < .001), shot + ': matched ' + key);
@@ -39,6 +44,11 @@ async function compare() {
     }
     assert.deepEqual(before.flags,after.flags);
     assert.equal(before.tier,after.tier);
+    // A small FOV delta scales the perspective image about its center. At
+    // the farthest corner this is still below one third of a native pixel.
+    const fovScale = Math.tan(before.fov*Math.PI/360)/Math.tan(after.fov*Math.PI/360);
+    const projectionDeltaPx = Math.abs(fovScale-1)*Math.hypot(width/2,height/2);
+    assert.ok(projectionDeltaPx < .33,shot + ': subpixel projected FOV difference');
     const failed = before.programs.find(program => program.city && !program.linked && program.draws > 0);
     const working = after.programs.find(program => program.city && program.linked && program.draws > 0 &&
       program.passes.some(pass => pass.grade && pass.sharedAtlas));
@@ -47,22 +57,18 @@ async function compare() {
     assert.ok(working,shot + ': after links and draws the shared-atlas terrain program');
     assert.ok(!after.programs.some(program => program.city && !program.linked && program.draws > 0));
     proof.push({ shot, beforeAttempts:failed.draws, afterDraws:working.draws,
+      projectionDeltaPx, renderDpr:[before.dpr,after.dpr],
       imagery:[before.terrain.imagery,after.terrain.imagery] });
   }
   assert.ok(!reports[1].console.some(error => /shader|glsl|webglprogram/i.test(error)));
-  const [before,after] = paths.map(dir => path.join(dir,'settled.png'));
-  const { width,height } = await sharp(before).metadata();
-  const size = await sharp(after).metadata();
-  assert.equal(size.width,width);
-  assert.equal(size.height,height);
   const gap = 8, bar = 36;
   const labels = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${width * 2 + gap}" height="${bar}">
     <g font-family="Arial" font-size="20" fill="#ffffff"><text x="18" y="25">Before · Ultra</text>
     <text x="${width + gap + 18}" y="25">After · Ultra</text></g></svg>`);
   const comparison = path.join(work,'ultra-terrain-comparison.png');
   await sharp({create:{width:width * 2 + gap,height:height + bar,channels:3,background:'#172028'}})
-    .composite([{input:labels,left:0,top:0},{input:before,left:0,top:bar},
-      {input:after,left:width + gap,top:bar}]).png().toFile(comparison);
+    .composite([{input:labels,left:0,top:0},{input:beforeImage,left:0,top:bar},
+      {input:afterImage,left:width + gap,top:bar}]).png().toFile(comparison);
   console.log(JSON.stringify({ comparison, matched:proof },null,2));
 }
 
@@ -71,7 +77,7 @@ async function main() {
   fs.mkdirSync(output, { recursive: true });
   const browser = await chromium.launch({ channel: 'chrome', args: ['--use-angle=d3d11','--ignore-gpu-blocklist'] });
   const page = await browser.newPage({ viewport: { width: 1672, height: 1000 }, deviceScaleFactor: 1 });
-  const report = { origin, arm, flags, tier, aircraft, pose, samples: [], console: [], sourceFailures: [] };
+  const report = { origin, arm, flags, tier, aircraft, governor, pose, samples: [], console: [], sourceFailures: [] };
   page.on('pageerror', error => report.console.push(error.message));
   page.on('console', message => {
     if (message.type() === 'error' && /shader|GLSL|WebGLProgram|validate_status/i.test(message.text())) {
@@ -87,8 +93,9 @@ async function main() {
     if (response.status() >= 400 && /arcgisonline|worldcover|city-height/.test(response.url()) && report.sourceFailures.length < 60)
       report.sourceFailures.push({ url: response.url(), status: response.status() });
   });
-  await page.addInitScript(selected => {
+  await page.addInitScript(({ selected, hold }) => {
     if (selected !== 'auto') localStorage.setItem('fly-quality-tier', selected);
+    if (hold) window.__flyGovPin = 'hold';
     localStorage.setItem('fly-controls-seen', '1');
     localStorage.setItem('fly-sound-on', '0');
     const audit = window.__terrainProgramAudit = { records: [] };
@@ -135,7 +142,7 @@ async function main() {
         ok: ctx.getShaderParameter(shader, ctx.COMPILE_STATUS), log: ctx.getShaderInfoLog(shader)
       }))
     }));
-  }, tier);
+  }, { selected:tier, hold:governor === 'hold' });
   const target = new URL(origin);
   target.search = new URLSearchParams({ graphicsReview: '1', at: [pose.lat, pose.lon, 1930].join(','),
     aircraft, flags, sunUtc: '2026-06-21T16:00:00Z', weather: 'baseline' });
