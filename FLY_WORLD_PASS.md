@@ -1518,3 +1518,40 @@ the initial webpack route compilation. The server took 66 s to return the
 first HTML byte. That row is retained separately from the warmed-server
 flight timings. Its vegetation engine completed all nine sampling tiles and
 all 17 canopy photo requests. The observed flight lasted 79 s after its warp.
+
+### Desktop High checks on `4d6a29c3`
+
+On 2026-11-18, headed Chrome on the RTX 5080 ran eight 90-second flights at
+1600 × 900 with Enhanced and all five World Pass defaults. Each city started
+with a fresh browser profile. Page 2 reused that browser after the first
+page closed. Both the webpack development server and the production build
+served `4d6a29c3`. These checks used the same fixed review poses and
+screenshot sequence as the High baseline on `8c593924`.
+
+| Build and pose | Baseline longest task, pages 1 / 2 | Current longest task, pages 1 / 2 | Worst world-frame gap after reveal | All 16 building tiles ready after warp, pages 1 / 2 |
+|---|---:|---:|---:|---:|
+| Development, New York low | 9,306 / 1,994 ms | 679 / 848 ms | 250 ms | 11.25 / 10.31 s |
+| Development, Paris mid | 8,343 / 2,038 ms | 683 / 847 ms | 250 ms | 13.65 / 11.50 s |
+| Production, New York low | 8,324 / 1,888 ms | 635 / 364 ms | 342 ms | 11.07 / 10.95 s |
+| Production, Paris mid | 6,523 / 1,906 ms | 634 / 362 ms | 217 ms | 13.13 / 12.82 s |
+
+All eight current flights met the startup and post-reveal timing limits.
+The longest startup frame gap was 1.36 s. The longest task after reveal
+was 343 ms. On the two first production pages the loading screen lifted
+23.20 and 23.25 s after navigation. Every flight loaded all 16 requested
+building tiles with zero retries, shader link failures or uncaught browser
+or worker errors. The original Paris development page 1 had a worker syntax
+error and remains marked invalid in the comparison.
+
+Median frame intervals over seconds 60–90 ranged from 8.4 to 16.6 ms.
+Two repeat pages ran slower than their baselines during that window.
+Production New York went from 8.4 to 16.6 ms, and development Paris went
+from 8.3 to 16.5 ms. Each comparison has one capture per build and pose.
+
+All five features reached all 49 observed development worker requests and
+all 51 production requests. All 13 quality-settings checks and all 28
+production gameplay smoke checks passed. The smoke used fixture data with
+trusted input on the RTX 5080, exercised High on desktop, exported a PNG,
+and recovered from a lost graphics context. The local evidence directory
+`.graphics-review/world-performance/main-high-4d6a29c3/` contains the
+matched timing report, per-flight screenshots, worker proofs and smoke results.
