@@ -171,7 +171,7 @@ export function FlyMode({ onClose }) {
     };
   }, []);
 
-  // Pre-mount beat: style, settings, aircraft, visuals, then the opening
+  // Pre-mount beat: style, aircraft, settings, visuals, then the opening
   // screen and the spawn (R25: title when the front door ships).
   useEffect(() => {
     let cancelled = false;
@@ -180,10 +180,6 @@ export function FlyMode({ onClose }) {
     // final style. Kills the round-10 boot hot-swap where an unsaved player
     // built the toy vector world and then swapped to satellite post-mount.
     resolveInitialMapStyle();
-    // Round 16: quality tier + sound resolve on the SAME pre-mount beat and
-    // for the same reason — the scene should be built at the tier the player
-    // chose rather than built at 'high' and degraded afterwards.
-    resolveInitialSettings();
     // Round 17: the saved AIRCRAFT resolves on that same pre-mount beat and for
     // the same round-11 reason — FlyScene builds its FlightModel from
     // aircraftId once, so the pick must be in the store before the canvas
@@ -192,6 +188,8 @@ export function FlyMode({ onClose }) {
     // and pop in a second later (the fighter is preloaded at import time by
     // PlayerPlane, so only NON-default picks need this).
     resolveInitialAircraft();
+    // Restore the view for the initial airframe along with quality and sound.
+    resolveInitialSettings();
     // R25 W0: the Visuals profile resolves on the same pre-mount beat (C/D
     // build their materials from it), then the opening screen and the spawn.
     // W0 stubs = today (mandatory hangar, KOSU, SPAWN_ALT_M).

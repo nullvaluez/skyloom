@@ -259,7 +259,7 @@ import { NIGHT_LITE_ON } from '@/lib/fly/night-lite';
 import { TerrainShadowRig } from './TerrainShadowRig';
 import { shipPassOn as lightPassOn } from '@/lib/fly/ship-light';
 // TERRAIN_SHADOW: the rig exists only with the flag on (FLY_SHIP_PASS.md LT-2).
-const F35Interior = lazy(() => import('./F35Interior').then(m => ({ default: m.F35Interior })));
+const PilotInterior = lazy(() => import('./PilotInterior').then(m => ({ default: m.PilotInterior })));
 const TERRAIN_SHADOW_RIG = lightPassOn('TERRAIN_SHADOW');
 // SHIP PASS LIGHT imports end
 
@@ -1161,7 +1161,7 @@ export function FlyScene({ runtime }) {
   const aircraft = useMemo(() => resolveAircraft(aircraftId), [aircraftId]);
   const pilotAvailable = hasPilotSeat({ aircraftId });
   const pilotExterior = useRef(null);
-  const pilot = useMemo(() => new PilotCamera(), []);
+  const pilot = useMemo(() => new PilotCamera(aircraftId), [aircraftId]);
   // Built ONCE with the pick that was resolved pre-mount (FlyMode resolves the
   // saved aircraft before the canvas exists, exactly like the map style/tier).
   const flight = useMemo(
@@ -3783,7 +3783,7 @@ export function FlyScene({ runtime }) {
         {pilotAvailable ? <group ref={pilotExterior}><PlayerPlane key={aircraftId} flight={flight} aircraft={aircraft} /></group>
           : <PlayerPlane key={aircraftId} flight={flight} aircraft={aircraft} />}
       </group>
-      {pilotAvailable && <Suspense fallback={null}><F35Interior runtime={runtime} pilot={pilot} /></Suspense>}
+      {pilotAvailable && <Suspense fallback={null}><PilotInterior key={aircraftId} aircraftId={aircraftId} runtime={runtime} pilot={pilot} /></Suspense>}
 
       {/* Traffic writes rebased instance matrices — must stay OUTSIDE worldRoot */}
       <TrafficLayer runtime={runtime} flight={flight} origin={origin} />

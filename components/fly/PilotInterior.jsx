@@ -5,15 +5,18 @@ import { addAfterEffect, useFrame, useThree } from '@react-three/fiber';
 import { DirectionalLight, HemisphereLight, MathUtils, Mesh, MeshBasicMaterial, PerspectiveCamera, PlaneGeometry, Quaternion, Scene, Vector3 } from 'three';
 import { buildF35Interior } from '@/lib/fly/f35-interior';
 import { createPilotDisplays } from '@/lib/fly/pilot-displays';
+import { buildFleetInterior } from '@/lib/fly/fleet-interior';
 import { useFlyStore } from '@/stores/fly-store';
 
-export function F35Interior(props) {
+const inCockpit = s => s.f35PilotSeat && s.screen === 'flight';
+
+export function PilotInterior(props) {
   // Outside-only flights do not allocate the panel, textures or geometry.
   // Keep a visited cockpit warm for subsequent cuts within this airframe.
-  const [visited, setVisited] = useState(() => useFlyStore.getState().f35PilotSeat);
+  const [visited, setVisited] = useState(() => inCockpit(useFlyStore.getState()));
   useEffect(() => {
     if (visited) return;
-    return useFlyStore.subscribe(s => s.f35PilotSeat, selected => {
+    return useFlyStore.subscribe(inCockpit, selected => {
       if (selected) setVisited(true);
     }, { fireImmediately: true });
   }, [visited]);
@@ -23,7 +26,7 @@ export function F35Interior(props) {
 /** A second depth range on the existing canvas. Only the centimetre-scale
  * interior uses it. World depth, postprocessing, and terrain LOD keep using
  * the normal flight projection on both conventional and reversed depth. */
-function PilotInteriorPass({ runtime, pilot }) {
+function PilotInteriorPass({ runtime, pilot, aircraftId }) {
   const gl = useThree(s => s.gl);
   const camera = useThree(s => s.camera);
   const outside = useThree(s => s.scene);
@@ -38,8 +41,9 @@ function PilotInteriorPass({ runtime, pilot }) {
     bounce.position.set(-.4,.8,1);
     scene.add(fill,sun,bounce);
     const compact = Math.min(gl.domElement.clientWidth, gl.domElement.clientHeight) < 600;
-    const displays = createPilotDisplays(compact);
-    const interior = buildF35Interior(scene, displays);
+    const displays = aircraftId === 'f35' ? createPilotDisplays(compact) : null;
+    const interior = displays ? buildF35Interior(scene, displays) : buildFleetInterior(aircraftId, scene, compact);
+    const controls = interior.controls ?? {stick:[interior.stick], throttle:[interior.throttle], yoke:[], plunger:[]};
     // The bow casts across the instrument tray as the aircraft turns. Its
     // shadow fits this one-metre space and is reused between lighting changes.
     sun.castShadow = !compact;
@@ -56,12 +60,16 @@ function PilotInteriorPass({ runtime, pilot }) {
       object.receiveShadow = true;
       object.castShadow = object.material !== interior.panel && !object.material.alphaTest;
     });
-    const visor = new Mesh(new PlaneGeometry(1,206/520), new MeshBasicMaterial({
-      map:displays.hud.texture, transparent:true, depthTest:false, depthWrite:false, toneMapped:false,
-    }));
-    visor.renderOrder=3;
-    visor.position.set(0,.18,-1);
-    optical.add(visor); scene.add(optical);
+    let visor;
+    if (displays) {
+      visor = new Mesh(new PlaneGeometry(1,206/520), new MeshBasicMaterial({
+        map:displays.hud.texture, transparent:true, depthTest:false, depthWrite:false, toneMapped:false,
+      }));
+      visor.renderOrder=3;
+      visor.position.set(0,.18,-1);
+      optical.add(visor);
+    }
+    scene.add(optical);
     pilot.setInteriorReady(true);
     const inverse = new Quaternion();
     let lastDraw = -1, nextDisplay = -1;
@@ -75,10 +83,15 @@ function PilotInteriorPass({ runtime, pilot }) {
         optical.aspect = camera.aspect; optical.fov = camera.fov;
         optical.updateProjectionMatrix();
       }
-      const visorWidth = MathUtils.clamp(2*Math.tan(camera.fov*Math.PI/360)*camera.aspect*.62,.67,compact ? .90 : .68);
-      visor.scale.setScalar(visorWidth);
+      const cmd = pilot.command;
+      const ops = runtime.operations;
+      const thrust = ops?.lowSpeed ? ops.throttle : cmd?.boost || cmd?.speedPreset === 'boost' ? 1 : cmd?.speedPreset === 'slow' ? .15 : .55;
       if (now >= nextDisplay) {
-        displays.update(runtime,pilot.world,visorWidth,visor.position.y);
+        if (visor) {
+          const width = MathUtils.clamp(2*Math.tan(camera.fov*Math.PI/360)*camera.aspect*.62,.67,compact ? .90 : .68);
+          visor.scale.setScalar(width);
+          displays.update(runtime,pilot.world,width,visor.position.y);
+        } else interior.update(runtime, thrust);
         nextDisplay = now + (compact ? 100 : 65);
       }
       optical.quaternion.copy(pilot.head);
@@ -98,14 +111,18 @@ function PilotInteriorPass({ runtime, pilot }) {
       fill.intensity = .24 + 1.30 * day;
       bounce.color.setRGB(.36+.32*day,.62+.16*day,.56+.30*day);
       bounce.intensity = .30 + .32 * day;
-      interior.panel.emissiveIntensity = .39 + .57 * day;
-      visor.material.opacity = .52 + .46 * day;
-      const cmd = pilot.command;
+      if (visor) {
+        interior.panel.emissiveIntensity = .39 + .57 * day;
+        visor.material.opacity = .52 + .46 * day;
+      } else interior.illumination(day);
       if (cmd) {
-        interior.stick.rotation.set((cmd.pitch ?? 0)*.14,0,-(cmd.turn ?? 0)*.14);
-        const ops = runtime.operations;
-        const thrust = ops?.lowSpeed ? ops.throttle : cmd.boost || cmd.speedPreset === 'boost' ? 1 : cmd.speedPreset === 'slow' ? .15 : .55;
-        interior.throttle.rotation.x = .39 - .72*thrust;
+        for (const stick of controls.stick) stick.rotation.set((cmd.pitch ?? 0)*.14,0,-(cmd.turn ?? 0)*.14);
+        for (const throttle of controls.throttle) throttle.rotation.x = .39 - .72*thrust;
+        for (const yoke of controls.yoke) {
+          yoke.rotation.z = -(cmd.turn ?? 0)*.56;
+          yoke.position.z = (cmd.pitch ?? 0)*.055;
+        }
+        for (const plunger of controls.plunger) plunger.position.z = (1-thrust)*.038;
       }
       scene.environment = outside.environment;
       scene.environmentIntensity = (.20 + .90 * day) * Math.min(2, outside.environmentIntensity ?? 1);
@@ -127,7 +144,7 @@ function PilotInteriorPass({ runtime, pilot }) {
     return () => {
       pilot.setInteriorReady(false);
       paint();
-      displays.dispose();
+      displays?.dispose();
       sun.shadow.dispose();
       for (const map of interior.maps) map.dispose();
       const materials = new Set();
@@ -135,6 +152,6 @@ function PilotInteriorPass({ runtime, pilot }) {
       for (const material of materials) material.dispose();
       scene.clear();
     };
-  }, [camera, gl, outside, pilot, runtime]);
+  }, [aircraftId, camera, gl, outside, pilot, runtime]);
   return null;
 }

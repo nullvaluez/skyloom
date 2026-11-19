@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
-import { F35_VIEW_KEY, hasPilotSeat, pilotSeatSelected } from '../lib/fly/pilot-seat.js';
+import { F35_VIEW_KEY, hasPilotSeat, initialPilotSeat, pilotSeatOverride, pilotSeatSelected } from '../lib/fly/pilot-seat.js';
 
 const initialState = {
   // Lifecycle: 'boot' | 'loading-terrain' | 'flying' | 'paused'
@@ -209,7 +209,15 @@ export const useFlyStore = create(
     // Round 17 hangar. setAircraftId does NOT persist — lib/fly/player-aircraft
     // saveAircraft() is the only writer, called from the "Fly this" click site
     // (same split as quality/sound: a choice is persisted, a state change is not).
-    setAircraftId: (aircraftId) => set({ aircraftId }),
+    setAircraftId: (aircraftId) => set(state => {
+      if (aircraftId === state.aircraftId) return state;
+      // Entry links and hangar picks can change aircraft after preferences
+      // hydrate. Apply each family's review pin only when crossing between them.
+      if (pilotSeatOverride(aircraftId) !== pilotSeatOverride(state.aircraftId)) {
+        return { aircraftId, f35PilotSeat: initialPilotSeat(aircraftId) };
+      }
+      return { aircraftId };
+    }),
     selectF35View: (cockpit) => set(state => {
       if (!hasPilotSeat(state)) return state;
       const selected = cockpit ?? !pilotSeatSelected(state);

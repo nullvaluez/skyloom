@@ -101,11 +101,11 @@ async function main() {
     if (valley) {
       await page.waitForFunction(() => window.__fly.terraStats?.sharp && !window.__fly.worldLoading);
       const selection = await page.evaluate(() => window.__flyStore.getState().f35PilotSeat);
-      await page.keyboard.press('4'); await delay(500);
-      assert.equal(await page.evaluate(() => window.__flyStore.getState().f35PilotSeat), selection);
+      await page.keyboard.press('4');
+      await page.waitForFunction(previous => window.__flyStore.getState().f35PilotSeat !== previous, selection);
       assert.equal(await page.evaluate(() => window.__flyStore.getState().cameraMode), 'chase');
       await shot('yosemite-glider.png');
-      report.checks.push('Public Yosemite entry selects the glider and 4 leaves its chase view active');
+      report.checks.push('Public Yosemite entry selects the glider and 4 toggles its seat');
       assert.deepEqual(report.errors, []);
       return;
     }
