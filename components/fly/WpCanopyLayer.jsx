@@ -57,7 +57,8 @@ import { worldPassConfig, worldPassRequest } from '@/lib/fly/world-pass';
 import { planCanopy, edgeDensity, SPECIES_FORM } from '@/lib/fly/ground-canopy-select';
 import { CanopyPhoto } from '@/lib/fly/ground-canopy-photo';
 import { canopyColorReference } from '@/lib/fly/r25-ground';
-import { SCENERY_COLOR_ON } from '@/lib/fly/world-clarity';
+import { CANOPY_VIEW_LOD_ON, SCENERY_COLOR_ON } from '@/lib/fly/world-clarity';
+import { canopyViewChanged, captureCanopyView } from '@/lib/fly/canopy-view';
 import { createCanopyMaterials } from '@/lib/fly/ground-canopy-material';
 import { NEAR_SUPPORT, updateNearContactMatrices } from '@/lib/fly/near-ground-support';
 import { SAT_SHADOWS, SAT_VEG, SETTLE_CALM } from '@/lib/fly/fly-constants';
@@ -176,7 +177,7 @@ export function WpCanopyLayer({ engine, runtime, flight, tier }) {
   }, [runtime, engine, cfg, flight]);
   const meshes = useMemo(() => {
     const { material, depth, seasonTexture } = createCanopyMaterials(applyBendAnchor);
-    const nearGeo = buildCinematicTreeGeometry(tc.nearCap);
+    const nearGeo = buildCinematicTreeGeometry(tc.nearCap, CANOPY_VIEW_LOD_ON);
     const farGeo = buildCanopyPatchGeometry(tc.farCap);
     nearGeo.setAttribute('aWpDens', new InstancedBufferAttribute(new Float32Array(tc.nearCap * 3), 3));
     farGeo.setAttribute('aWpDens', new InstancedBufferAttribute(new Float32Array(tc.farCap * 3), 3));
@@ -275,7 +276,9 @@ export function WpCanopyLayer({ engine, runtime, flight, tier }) {
       if (dyaw > Math.PI) dyaw = 2 * Math.PI - dyaw;
       const moved2 = (flight.pos.x - s.atX) ** 2 + (flight.pos.z - s.atZ) ** 2;
       const moveStep = tc.d0 * 0.08 * k;
-      const due = t - s.t >= SAT_VEG.placeCadenceSec || ((moved2 >= moveStep * moveStep || dyaw > TURN_RAD) && t - s.t >= 0.25) || (s.ramping && t - s.t >= 0.1);
+      const anchor = runtime.origin?.anchor;
+      const viewChanged = CANOPY_VIEW_LOD_ON && anchor && canopyViewChanged(camera, anchor, s.view, moveStep);
+      const due = t - s.t >= SAT_VEG.placeCadenceSec || ((moved2 >= moveStep * moveStep || dyaw > TURN_RAD || viewChanged) && t - s.t >= 0.25) || (s.ramping && t - s.t >= 0.1);
       if (due) {
         const eyeAgl = eyeAglVis(runtime, flight);
         const altK = 1 - smooth(SAT_VEG.altFade.onM, SAT_VEG.altFade.offM, eyeAgl);
@@ -299,7 +302,7 @@ export function WpCanopyLayer({ engine, runtime, flight, tier }) {
         }
         const sig = `${ready.length}|${all}|${altK.toFixed(3)}|${engine.wpRevision}|${photo.revision}|${s.sigma.toFixed(3)}`;
         s.t = t;
-        if (sig !== s.sig || moved2 >= 100 || dyaw > TURN_RAD || s.ramping) {
+        if (sig !== s.sig || moved2 >= 100 || dyaw > TURN_RAD || viewChanged || s.ramping) {
           s.sig = sig;
           s.atX = flight.pos.x;
           s.atZ = flight.pos.z;
@@ -308,6 +311,9 @@ export function WpCanopyLayer({ engine, runtime, flight, tier }) {
           s.stats.looks = ready.length;
           const hfov = Math.atan(Math.tan(((camera.fov ?? 60) * Math.PI) / 360) * (camera.aspect ?? 1.8));
           const cone = { x: fx / fl, z: fz / fl, cos: Math.cos(Math.min(Math.PI, hfov + CONE_MARGIN)), keep: Math.max(tc.d0 * k * 1.25, 900 * k) };
+          if (CANOPY_VIEW_LOD_ON && anchor) {
+            s.view = captureCanopyView(camera, anchor, CONE_MARGIN, (ch, x, z) => engine.wpGroundAtLocal(ch, x, z));
+          }
           startJob(s, ready, flight, tc, altK, k, t, cone);
           stepJob(s, meshes, engine, tc, cfg, k);
         }
@@ -373,7 +379,7 @@ function startJob(s, chunks, flight, tc, altK, k, now, cone) {
   }
   const seen = new Set(chunks.map((c) => c.key));
   for (const key of s.born.keys()) if (!seen.has(key)) s.born.delete(key);
-  const o = { k, nearCap: tc.nearCap, farCap: tc.farCap, d0: tc.d0, d1: tc.d1, d2: tc.d2, d3: tc.d3, sigma: s.sigma, cone };
+  const o = { k, nearCap: tc.nearCap, farCap: tc.farCap, d0: tc.d0, d1: tc.d1, d2: tc.d2, d3: tc.d3, sigma: s.sigma, cone, view: s.view };
   const live = altK > 0.001 && chunks.length > 0;
   s.job = {
     it: live ? planCanopy(chunks, px, pz, o, s.scratch, () => performance.now() - s.sliceT0 > SLICE_MS) : null,

@@ -25,6 +25,55 @@ release instruction is recorded separately from the measurements it authorizes.
 
 ## Status
 
+### 2026-11-19 — Forest crowns from the air and distant road lights
+
+Fableflight represents trees from multiple directions over the upper hemisphere,
+staggers detail changes between trees, and uses the width of a screen pixel on
+the road when shading its markings. In Skyloom the near crown had twelve vertical
+leaf cards. From directly overhead every leaf triangle was edge-on. Selecting
+detail by horizontal range still put those trees in the most expensive pool.
+The road lights also sampled a single point in each repeating pattern, even when
+one pixel covered multiple lamps or moving dashes. [Fableflight tree impostors](https://github.com/Rolandjg/fableflight/blob/d91a7c09154268f85635c412c5ffc607ad2ad951/src/impostor.rs) · [tree detail selection](https://github.com/Rolandjg/fableflight/blob/d91a7c09154268f85635c412c5ffc607ad2ad951/src/shaders/trees.wgsl) · [road shader](https://github.com/Rolandjg/fableflight/blob/d91a7c09154268f85635c412c5ffc607ad2ad951/src/shaders/roads.wgsl)
+
+**Forest preview.** `CANOPY_VIEW_LOD` slopes four of the twelve leaf cards
+across the crown. The visible tree and its shadow use the same 34 triangles.
+The forest chooses its detail using the camera, local terrain height and zoom.
+Banking widens the planning cone to include the corners of the picture, and a
+view straight down can include every bearing. Nearby groups change detail at
+slightly different distances. In a fixed 80 × 80 top-down cutout test, the
+leaf-covered sample count rose from 0 to 2,227. At the same side angle it went
+from 869 to 803.
+
+On four 10 km Powell flights at 215 m/s in Chrome on the RTX 5080, alternating
+off/on/on/off, the mean canopy triangle count at the ten distance checkpoints
+went from 113,306 to 63,139 (44% lower, main pass only). Trees were present in
+the same forward strip at every checkpoint in all four flights. Median frame
+time was 33.3 ms in each flight and p95 ranged from 74.9 to 75.1 ms.
+
+**Road preview.** `ROAD_LIGHT_FILTER` integrates each moving dash and streetlamp
+across the length of road covered by a pixel. A distant unresolved pattern
+tends toward its mean brightness. On the RTX 5080, the 512-phase shader sweep
+kept the resolved pattern byte-identical. At 0.24 cycles per pixel the 8-bit
+dash range fell from 255 to 31, and at 0.7 cycles per pixel both dash and lamp
+ranges fell to zero while mean brightness stayed within one 8-bit level.
+
+With both flags active, a 10 km night flight over Powell at 215 m/s loaded
+trees 1–2.5 km ahead and buildings at 3 km at all ten checkpoints. The game
+reported the filtered road program at the end of the flight. Chrome recorded
+no page or shader errors. The production build and all 40 beta checks passed.
+
+**Default performance change.** Dense forest tiles now reuse rectangular sums
+when sampling the satellite photo. Sparse tiles read the few source pixels
+they need. On nine Powell vegetation tiles (83,990 crowns) with a fixed
+full-range RGB input, all output colours, densities and season decisions
+matched the previous build. Across 90 paired samples, median colour preparation
+went from 2.32 to 2.10 ms per tile and p95 from 3.50 to 3.44 ms. Reproduce with
+`node scripts/benchmark-powell-clearance.mjs --canopy-photo`.
+
+Both appearance flags ship off. Preview together with
+`?flags=CANOPY_VIEW_LOD,ROAD_LIGHT_FILTER`. The canopy preview uses the desktop
+High/Ultra World Ground producer. Physical iPhone verification remains open.
+
 ### 2026-11-19 — Scenery ahead of a moving aircraft
 
 The canopy used to wait for the building arrival hold, its vegetation tile,

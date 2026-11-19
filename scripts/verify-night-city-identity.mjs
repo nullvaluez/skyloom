@@ -38,7 +38,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -101,8 +101,8 @@ const { register } = await import('node:module');
 register('./_node-resolve.mjs', import.meta.url);
 
 const [{ applyBendRoadSat, applyBendAnchorSat }, constants] = await Promise.all([
-  import(path.join(ROOT, 'lib/fly/toy-world/world-bend.js')),
-  import(path.join(ROOT, 'lib/fly/fly-constants.js')),
+  import('../lib/fly/toy-world/world-bend.js'),
+  import('../lib/fly/fly-constants.js'),
 ]);
 const { SAT_ROADS, SUBURB_NIGHT, SAT_BUILDINGS, NIGHT_CITY_R23 } = constants;
 
@@ -114,7 +114,7 @@ const cur = {
 };
 
 if (BASE_PATH) {
-  const base = await import(BASE_PATH);
+  const base = await import(path.isAbsolute(BASE_PATH) ? pathToFileURL(BASE_PATH).href : BASE_PATH);
   const baseRoad = generate(base.applyBendRoadSat, [SAT_ROADS, SUBURB_NIGHT]);
   const baseBldg = generate(base.applyBendAnchorSat, []);
   const same = (a, b) => a.v === b.v && a.f === b.f;

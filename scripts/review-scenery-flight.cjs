@@ -20,10 +20,14 @@ async function run() {
   assert.ok(Object.hasOwn(routes, route), 'Select the Powell or Melton route');
   const pose = { ...routes[route], name: null };
   const url = new URL(origin);
-  url.search = new URLSearchParams({ at: '40.689,-74.044,2500', aircraft: 'airliner', graphicsReview: '1',
-    sunUtc: route === 'melton' ? '2026-06-21T02:00:00Z' : '2026-06-21T15:00:00Z', weather: 'baseline' });
+  // Carry preview flags and an optional pinned night into matched A/B flights.
+  for (const [key, value] of Object.entries({ at: '40.689,-74.044,2500', aircraft: 'airliner', graphicsReview: '1',
+    sunUtc: route === 'melton' ? '2026-06-21T02:00:00Z' : '2026-06-21T15:00:00Z', weather: 'baseline' })) {
+    if ((key === 'sunUtc' || key === 'weather') && url.searchParams.has(key)) continue;
+    url.searchParams.set(key, value);
+  }
   const browser = await chromium.launch({ channel: 'chrome', args: ['--use-angle=d3d11', '--ignore-gpu-blocklist'] });
-  const report = { pose, speedMps, errors: [], samples: [] };
+  const report = { pose, speedMps, flags: url.searchParams.get('flags'), sunUtc: url.searchParams.get('sunUtc'), errors: [], samples: [] };
   try {
     const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 });
     page.on('pageerror', err => report.errors.push(err.message));
@@ -82,10 +86,15 @@ async function run() {
           buildingsHere: !!tileAt(0)?.mesh, aheadState: ahead?.state ?? 'absent', distantState: distant?.state ?? 'absent', treesAhead,
           homesAhead: countAhead(homes), placedHomes: homes?.count ?? 0, localGapPlaced: rt.parcelSettle?.localGapPlaced,
           held: c?.stats.held, near: b?.stats.ready, far: rt.satSkyline?.stats.ready,
-          crowns: c?.meshes.near.count, patches: c?.meshes.far.count };
+          crowns: c?.meshes.near.count, patches: c?.meshes.far.count,
+          canopyTriangles: c?.stats.triangles, canopyShadowTriangles: c?.stats.shadowTriangles };
       };
       const bins = window.__approachBins = [];
-      const record = () => {
+      let lastFrame = 0;
+      const frames = window.__approachFrameMs = [];
+      const record = now => {
+        if (along > 0 && lastFrame) frames.push(now - lastFrame);
+        lastFrame = now;
         if (along >= 500 + bins.length * 1000) bins.push(window.__sampleApproach());
         requestAnimationFrame(record);
       };
@@ -103,11 +112,17 @@ async function run() {
       if (sample.metres >= distance) break;
     }
     assert.ok(report.samples.at(-1).metres >= distance, 'Flight must complete the ground track');
+    report.active = await page.evaluate(() => ({flags: window.__flyUrlFlags, roadProgram: window.__fly.satRoads?.material.customProgramCacheKey()}));
+    if (report.flags?.split(',').includes('ROAD_LIGHT_FILTER')) assert.match(report.active.roadProgram, /cinematic-filter/);
     await page.screenshot({ path: path.join(out, 'approach.jpg'), type: 'jpeg', quality: 82, timeout: 15000 });
     const moving = report.samples.filter(s => s.metres > 0);
     const bins = await page.evaluate(() => window.__approachBins);
+    const frames = await page.evaluate(() => window.__approachFrameMs);
+    frames.sort((a, b) => a - b);
+    const percentile = p => frames[Math.floor((frames.length - 1) * p)];
     assert.ok(bins.length >= distance / 1000, 'Flight crossed each distance marker');
     report.summary = {
+      frameMs: { median: percentile(0.5), p95: percentile(0.95), frames: frames.length },
       firstTreesAheadM: moving.find(s => s.treesAhead > 0)?.metres ?? null,
       firstBuildingsAheadM: moving.find(s => s.buildingsAhead)?.metres ?? null,
       // Equal-distance bins give every part of the flight equal weight.
