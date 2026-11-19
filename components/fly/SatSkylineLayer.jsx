@@ -1,4 +1,5 @@
 'use client';
+import { terrainArrivalCovered } from '@/lib/fly/critical-terrain-prewarm.mjs';
 import { withRunwayGeometry } from '@/lib/fly/runway-worker';
 
 import { useEffect, useMemo, useRef } from 'react';
@@ -106,15 +107,13 @@ export function SatSkylineLayer({ runtime, flight }) {
     }
     if (extra.length) engine.setWorker(api, extra.map((e) => e.a));
     else engine.setWorker(api);
-    // WORLD PASS C (round 2b): the far ring's ground photos load only once the
-    // rest of the world has settled too (the near buildings and the terrain),
-    // so they never take bandwidth from the world arriving. Read every 0.5 s
-    // by the engine while it is idle; stream off: never set, never read.
+    // Boot and warp reserve imagery bandwidth. Moving rings keep a small
+    // background allowance so their distant buildings eventually get photos.
     if (engine.standInsOn) {
       engine.setPhotoGate(() => {
-        if (runtime.worldLoading) return false;
+        if (terrainArrivalCovered(runtime, window.__flyBoot, useFlyStore.getState().phase)) return false;
         const s = runtime.satBuildings?.stats;
-        return !s || !(Number(s.queued || 0) + Number(s.building || 0) + Number(s.draping || 0) > 0);
+        return s && (s.queued || s.building || s.draping) ? 'busy' : true;
       });
     }
     if (process.env.NODE_ENV === 'development') window.__satSkyline = engine; // harness introspection

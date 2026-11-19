@@ -20,8 +20,9 @@ globalThis.window = { location: { search: '' }, matchMedia: () => ({ matches: fa
   __flyWorldPassTierOverride: { preset: 'ultra', mobile: false }, __flyFinalizePaceOverride: { enabled: false } };
 const { createStandInPreparation, advanceStandInPreparation } = await import('../lib/fly/toy-world/sat-stand-in-prep.js');
 const { mergeStandInParts, drapeStandIns, createStandInGeometry } = await import('../lib/fly/toy-world/sat-stand-ins.js');
-const { applyPhoto } = await import('../lib/fly/toy-world/sat-stand-in-photo-core.js');
+const { applyPhoto, loadPhoto } = await import('../lib/fly/toy-world/sat-stand-in-photo-core.js');
 const { SatSkylineEngine } = await import('../lib/fly/toy-world/sat-skyline-engine.js');
+const { createStandInPhotos, createPhotoAtlas } = await import('../lib/fly/toy-world/sat-stand-in-photo.js');
 const { SAT_SKYLINE } = await import('../lib/fly/fly-constants.js');
 const { resetWpFrameSlice, wpSliceMayRun, wpSliceSpend } = await import('../lib/fly/toy-world/wp-frame-slice.js');
 const { noteFinalizeFrame } = await import('../lib/fly/finalize-pace.js');
@@ -200,5 +201,97 @@ try {
 } finally {
   Object.defineProperty(globalThis, 'performance', { configurable: true, value: originalPerformance });
   delete globalThis.document;
+}
+// Drive the real store without a provider, and count admissions across ticks.
+{
+  const requests = [], ready = [];
+  let now = 0;
+  const savedWorker = globalThis.Worker;
+  globalThis.Worker = class {
+    postMessage(message) { requests.push({ owner: this, message }); }
+    terminate() { this.terminated = true; }
+  };
+  Object.defineProperty(globalThis, 'performance', { configurable: true, value: { now: () => now } });
+  const photos = createStandInPhotos({ maxInFlight: 1 }, key => ready.push(key));
+  const entry = key => ({ key, pz: 12, px: 1, py: 2 });
+  const answer = async (r, alb) => {
+    r.owner.onmessage?.({ data: { id: r.message.id, n: 1, alb } });
+    await new Promise(resolve => setImmediate(resolve));
+  };
+  try {
+    photos.want([entry('a'), entry('stale')]);
+    await answer(requests[0], null);
+    photos.want([entry('a')]);
+    assert.equal(requests.length, 1);
+    now = 5001;
+    photos.want([entry('a')]);assert.equal(requests[1].message.cfg.retry, true);
+    await answer(requests[1], new Uint8Array(4));
+    photos.want([entry('a'), entry('old')]);
+    photos.cancel();
+    assert.ok(requests[2].owner.terminated);
+    photos.want([entry('destination')]);
+    await answer(requests[2], new Uint8Array(4));
+    await answer(requests[3], new Uint8Array(4));
+    assert.deepEqual(ready, ['a', 'destination']);
+    assert.equal(photos.stat.failed, 1);
+    check('failed photos retry with backoff, completion starts no stale work, and warps cancel old requests', () => {
+      assert.ok(photos.get('a'));assert.equal(photos.get('old'), null);
+    });
+
+    const engine = new SatSkylineEngine({ groundAt: () => null });
+    const atlas = createPhotoAtlas(1, 1, 4000);
+    const cached = { n: 1, alb: new Uint8Array(4) };
+    const slot = atlas.alloc(cached);
+    const S = { n: 1, slot: -1, gnd: { array: new Uint8Array(4) } };
+    engine.chunks.set('a', { group: { z: 14, gx: 0, gy: 0 }, standIns: S });
+    const admissions = [];
+    engine._photos = { get: () => cached, want: (list, budget) => admissions.push([list[0].key, budget]), cancel() {}, dispose() {} };
+    engine._atlas = atlas;engine.building = 2;
+    engine.setPhotoGate(() => false);engine._pumpPhotos(0);
+    assert.equal(admissions.length, 0);
+    engine.setPhotoGate(() => 'busy');
+    engine._photoArrived.push('a');engine._patchPhotos(1);
+    assert.equal(S.slot, -1);
+    atlas.free(slot);
+    now += 3999;engine._pumpPhotos(2);assert.equal(admissions.length, 0);
+    now += 2;engine._pumpPhotos(4);engine._pumpPhotos(4.5);
+    assert.deepEqual(admissions, [['a', 1]]);assert.deepEqual(engine._photoArrived, ['a']);
+    engine._patchPhotos(5);
+    check('boot holds all requests, streaming admits one group, and a cached photo attaches after quarantine', () => {
+      assert.equal(S.slot, 0);assert.equal(S.gnd.array[3], 1);
+    });
+    let disposedTextures = 0;
+    atlas.texture.addEventListener('dispose', () => { disposedTextures++; });
+    engine.dispose();
+    assert.equal(disposedTextures, 1);
+  } finally {
+    photos.dispose();
+    globalThis.Worker = savedWorker;
+    Object.defineProperty(globalThis, 'performance', { configurable: true, value: originalPerformance });
+  }
+}
+{
+  const saved = { fetch: globalThis.fetch, OffscreenCanvas: globalThis.OffscreenCanvas, createImageBitmap: globalThis.createImageBitmap };
+  const controller = new AbortController();
+  const e = { pz: 12, px: 1, py: 1 };
+  let aborted = 0, closed = 0;
+  try {
+    globalThis.fetch = async (_url, { signal }) => ({
+      ok: true, blob: () => new Promise((_resolve, reject) => {
+        signal.addEventListener('abort', () => { aborted++; reject(signal.reason); }, { once: true });
+      }),
+    });
+    const pending = loadPhoto(e, 1, {}, controller.signal);
+    await new Promise(resolve => setImmediate(resolve));
+    controller.abort();
+    assert.equal(await pending, null);assert.equal(aborted, 4);
+    globalThis.fetch = async () => new Response(new Uint8Array(3072));
+    globalThis.createImageBitmap = async () => ({ close() { closed++; } });
+    globalThis.OffscreenCanvas = class { getContext() { throw Error('context lost'); } };
+    await assert.rejects(loadPhoto(e, 1), /context lost/);
+    check('cancellation aborts four pending bodies and a canvas failure releases every decoded bitmap', () => {
+      assert.equal(closed, 4);
+    });
+  } finally { Object.assign(globalThis, saved); }
 }
 console.log(`\n${pass} passed`);

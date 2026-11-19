@@ -25,6 +25,71 @@ release instruction is recorded separately from the measurements it authorizes.
 
 ## Status
 
+### 2026-11-19 — Powell seasonal imagery and scenery streaming
+
+The pale band visible on the Powell approach survived a stationary wait with
+z18 terrain, sharp imagery and all 20 distant building photos loaded. The live
+Esri images themselves carry a seasonal boundary through the neighborhood, even
+within a single detailed tile. The z11 regional image is green on both sides.
+The previous low-altitude terrain correction had zero weight, and the tree
+crowns derived their color and leaf density from the detailed image alone.
+
+`SCENERY_COLOR` extends regional color balancing down to the cockpit
+approach. Terrain retains high-resolution photographic detail and preserves
+neutral roof and pavement hues. New reference tiles fade in over 1.2 seconds,
+and both sides of a terrain LOD transition use the same correction. The tree
+crowns take their local color and season from the same regional reference.
+The owner authorized enabling it by default on November 19. Use
+`?flags=-SCENERY_COLOR` to disable it for one flight. Physical iPhone
+verification remains open.
+
+The streaming repairs apply in ordinary flights. Stalled response bodies
+release their download slots. The terrain reference and trees retry while the
+aircraft is stationary. Building photos make bounded progress while geometry
+is busy, and near roofs keep their strongest evidence through partial outages.
+Roof colors and walls can also recover if only the regional image failed.
+Warped-away requests cannot recolor a replacement chunk. Elevation backfill
+skips background geometry below the provider's minimum zoom.
+
+Trees and roadside infill share a land and exclusion mask. On nine z14
+OpenFreeMap tiles from this approach, the two previous mask preparations took
+9.91 ms median and 28.39 ms p95. The shared preparation took 2.29 ms median
+and 11.30 ms p95 over 90 paired samples. Class and exclusion bytes matched on
+every tile. The complete vegetation build on the same nine tiles with live
+ESA WorldCover data went from 65.45 to 54.48 ms median and from 107.76 to
+84.02 ms p95. All geometry arrays and placement counters matched, including
+83,990 tree crowns. These timings cover worker CPU time.
+
+The production build and all 36 source, gameplay, world and shader checks
+passed. The combined city and scenery preview linked on an RTX 5080 in Chrome
+through Ultra, High, Medium, Low and back to Ultra, with zero shader or page
+errors. Ultra retained three shadow cascades and stayed within 16 texture
+units. Targeted regressions cover stationary retries, a stalled HTTP 200
+body, late regional imagery, warp cancellation, roof and wall recovery, and
+matching canopy supports.
+
+In the two live High cockpit captures, both flights reached z18 with all 64
+regional tiles, 20 distant photos, 15 near building groups and 1,500 near
+crowns. The camera and sun matched exactly. Distant canopy counts were
+4,663 and 4,668. The tan woodland band was visibly reduced, the roads and
+roof detail remained legible, and both flights resumed for over 1.3 km.
+Neither flight recorded a failed relief backfill. The paired screenshots
+and telemetry are written under `.graphics-review/powell-color/`.
+
+Reproduce the live cockpit comparison with
+`node scripts/review-powell-color.cjs <production-url> before`, repeat with
+`after`, then run `node scripts/review-powell-color.cjs compare`.
+The replay pins the aircraft and sunlight, waits for photos and canopy
+placement, saves each view and resumes flight. The mask benchmark is
+`node scripts/benchmark-powell-clearance.mjs`. Its `--full` option compares
+complete vegetation bundles against the pre-pass revision on the same vector
+and land-cover data.
+
+The historical R25 ground suite still reports its two insert-only vendor
+checks against earlier tags. The living-ground suite still reports two
+atmospheric shader-text assertions. Its actual shader compilation passes
+with the feature on and off.
+
 ### 2026-11-18 — F-35 cockpit and outside view
 
 An ordinary F-35 flight now offers **Cockpit view** and **Outside view**.

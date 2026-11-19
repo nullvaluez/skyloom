@@ -8,7 +8,8 @@ const {chromium}=require('playwright');
 const {attachFixture,fixturePin}=require('./_fixture');
 const out='.graphics-review/beta',port=Number(process.env.PORT||3094),base=`http://127.0.0.1:${port}`;
 const cityPreview=process.argv.includes('--city-continuity');
-const name=cityPreview?'ultra-terrain-city':'ultra-terrain';
+const sceneryPreview=process.argv.includes('--scenery-color');
+const name=(cityPreview?'ultra-terrain-city':'ultra-terrain')+(sceneryPreview?'-color':'');
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
 (async()=>{
  let server,browser,fixture,page;
@@ -31,7 +32,9 @@ const delay=ms=>new Promise(r=>setTimeout(r,ms));
   page.on('console',m=>{if(m.type()==='error'&&/WebGLProgram|shader error|too many.*texture|MAX_TEXTURE_IMAGE_UNITS/i.test(m.text()))report.shaderErrors.push(m.text());});
   const url=new URL('/',base);
   url.searchParams.set('graphicsReview','1');
-  if(cityPreview)url.searchParams.set('flags','CITY_CONTINUITY,FLIGHT_RELIEF,FLIGHT_CLARITY,F35_COCKPIT');
+  const flags=cityPreview?['CITY_CONTINUITY','FLIGHT_RELIEF','FLIGHT_CLARITY','F35_COCKPIT']:[];
+  if(sceneryPreview)flags.push('SCENERY_COLOR');
+  if(flags.length)url.searchParams.set('flags',flags.join(','));
   await page.goto(url.href,{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>window.__fly?.engine&&window.__flyComposer?.renderer,{},{timeout:90000,polling:1000});
   // Test both a saved-Ultra boot and returning to it after lower presets.
@@ -61,6 +64,7 @@ const delay=ms=>new Promise(r=>setTimeout(r,ms));
        return { linked, log: gl.getProgramInfoLog(program), samplers,
          count: samplers.reduce((total, u) => total + u.size, 0),
          cityRelief: uniforms.some(u => u.name === 'uCityGrid'),
+         scenerySlots: uniforms.find(u => u.name === 'uSceneryBorn[0]')?.size ?? 0,
          dfgUniforms: uniforms.find(u => u.name === 'uEarthDfg[0]')?.size ?? 0 };
      }) };
    });
@@ -69,6 +73,7 @@ const delay=ms=>new Promise(r=>setTimeout(r,ms));
    assert(state.physicalSky,'Physical atmosphere must be active');
    assert(state.terrain.length>0,'At least one real terrain program must be inspected');
    assert(state.terrain.every(p=>p.linked&&p.count<=Math.min(16,state.limit)),'Every active terrain program must link within the portable 16-texture limit, even when the test GPU exposes more');
+   assert(state.terrain.some(p=>p.scenerySlots===64),'The renderer must link the regional color transition');
    if(preset==='ultra'){
     assert.equal(state.cascades,3,'Ultra must retain all three cascades');
     const required = ['map','uEarthAppearance','uCoastReflection','uPskyView','uR25Relief','uR25Ref','uLodFadeMap','uNGMap','uTsMap'];

@@ -22,6 +22,7 @@ const {inferBuildingStyle}=await import('../lib/fly/building-profiles.js');
 const {localRingReadiness,worldReadiness}=await import('../lib/fly/world-readiness.js');const {noDataCountsReady}=await import('../lib/fly/load-guard.js');
 const {steppedBuildingLevels,emitSteppedBuilding}=await import('../lib/fly/living-architecture.js');
 const {buildRoadsideInfill}=await import('../lib/fly/settlement-infill.js');
+const {buildSceneryClearance,buildEarthSurfaceMask}=await import('../lib/fly/earth-surface-mask.js');
 const {buildAirportSurfaces}=await import('../lib/fly/airport-surfaces.js');
 const {LivingAirports}=await import('../lib/fly/living-airports.js');
 const {DetailedTraffic}=await import('../lib/fly/detailed-traffic.js');
@@ -202,6 +203,12 @@ const roadLayer={extent:4096,features:[{id:31,type:2,props:{class:'minor'},rings
 check('infill requires settlement and roads, and never fills an airfield or unclassified desert',()=>{
   const vt=decode({transportation:roadLayer}),cover=new Uint8Array(65536).fill(50);
   const a=buildRoadsideInfill(vt,cover,2446);assert.ok(a.length>20);assert.deepEqual(a,buildRoadsideInfill(vt,cover,2446));
+  const shared=buildSceneryClearance(vt),rendered=buildEarthSurfaceMask(vt);
+  assert.deepEqual(shared.classes,rendered.classes);assert.deepEqual(shared.exclusion,rendered.exclusion);
+  assert.deepEqual(a,buildRoadsideInfill(vt,cover,2446,384,shared));
+  const highway=decode({transportation:{...roadLayer,features:[{...roadLayer.features[0],props:{class:'motorway'}}]}});
+  Object.defineProperty(highway.layers,'building',{get(){throw Error('unexpected clearance rasterization');}});
+  assert.deepEqual(buildRoadsideInfill(highway,cover,2446),[]);
   assert.equal(buildRoadsideInfill(vt,null,2446).length,0);
   assert.equal(buildRoadsideInfill(decode({}),cover,2446).length,0);
   const airport=decode({transportation:roadLayer,aeroway:{features:[{type:3,props:{class:'apron'},rings:[fixture.rect(0,0,4096,4096,false)]}]}});
@@ -256,6 +263,6 @@ const restore=fixture.installFetchStub(()=>fixture.encodeTile({building:building
 try{
   await import('../lib/fly/toy-world/vector-tile.worker.js');
   const result=await globalThis.__livingWorker.buildTile(14,7000,7000,'sat-buildings',{visuals:true});
-  check('actual worker retains every mapped body after the detailed-building budget fills',()=>{assert.equal(result.v,23);assert.equal(result.satBuilding.meta.kept,625);assert.ok(result.satBuilding.meta.provenance.detailedBodies<625);assert.ok(result.satBuilding.meta.provenance.reliefBodies<=160);assert.ok(result.satBuilding.meta.provenance.detailedBodies>result.satBuilding.meta.provenance.reliefBodies,'Roof variety survives the smaller facade-relief budget');assert.ok(result.satBuilding.pos.length<625*400*3);});
+  check('actual worker retains every mapped body after the detailed-building budget fills',()=>{assert.equal(result.v,27);assert.equal(result.satBuilding.meta.kept,625);assert.ok(result.satBuilding.meta.provenance.detailedBodies<625);assert.ok(result.satBuilding.meta.provenance.reliefBodies<=160);assert.ok(result.satBuilding.meta.provenance.detailedBodies>result.satBuilding.meta.provenance.reliefBodies,'Roof variety survives the smaller facade-relief budget');assert.ok(result.satBuilding.pos.length<625*400*3);});
 }finally{restore();}
 console.log(`Living Earth: ${checks} checks passed`);

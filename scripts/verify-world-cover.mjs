@@ -51,6 +51,48 @@ globalThis.caches=undefined;
 const fetchCover=async()=>{calls++;active++;peak=Math.max(peak,active);await new Promise(r=>setTimeout(r,2));active--;return new Response(new Uint8Array([1,2,3]),{status:fail?503:200,headers:{'content-type':'image/png'}});};
 globalThis.fetch=fetchCover;paint(0x006400);
 try{
+  await check('vector worker shares TileJSON initialization, limits full body downloads and recovers a stalled body',async()=>{
+    const {TILE_PIPELINE}=await import('../lib/fly/fly-constants.js');
+    const timeout=TILE_PIPELINE.fetchTimeoutMs;
+    const source=globalThis.fetch;
+    try {
+      await import('../lib/fly/toy-world/vector-tile.worker.js?stream-scheduling');
+      const worker=globalThis.__coverWorker;
+      let manifests=0;
+      globalThis.fetch=async()=>{ manifests++; return new Response(null,{status:503}); };
+      const failed=await Promise.allSettled([worker.init(),worker.init(),worker.init()]);
+      assert.ok(failed.every(r=>r.status==='rejected'));assert.equal(manifests,1);
+      globalThis.fetch=async()=>{ manifests++; return Response.json({tiles:['https://fixture/{z}/{x}/{y}.pbf']}); };
+      await Promise.all([worker.init(),worker.init()]);assert.equal(manifests,2);
+      const slots=TILE_PIPELINE.maxConcurrentFetches;
+      let transfers=0,peak=0,requests=0;
+      globalThis.fetch=async()=>({
+        ok:true,status:200,arrayBuffer:async()=>{
+          requests++;peak=Math.max(peak,++transfers);
+          await new Promise(resolve=>setTimeout(resolve,3));transfers--;
+          return new ArrayBuffer(0);
+        }
+      });
+      const build=x=>worker.buildTile(14,x,6500,'sat-roads');
+      await Promise.all([...Array.from({length:slots*3},(_,i)=>build(i)),build(0)]);
+      assert.equal(peak,slots);assert.equal(requests,slots*3);
+      TILE_PIPELINE.fetchTimeoutMs=20;
+      globalThis.fetch=async(_url,{signal})=>({
+        ok:true,status:200,arrayBuffer:()=>new Promise((_resolve,reject)=>{
+          signal.addEventListener('abort',()=>reject(signal.reason),{once:true});
+        })
+      });
+      // Keep a broken deadline from hanging this regression indefinitely.
+      let guard;
+      try {
+        await assert.rejects(Promise.race([build(89),new Promise((_,reject)=>{
+          guard=setTimeout(()=>reject(Error('worker deadline missing')),500);
+        })]),/http-timeout/);
+      } finally {clearTimeout(guard);}
+      globalThis.fetch=async()=>new Response(null,{status:404});
+      assert.equal((await build(89)).empty,true);
+    } finally { TILE_PIPELINE.fetchTimeoutMs=timeout;globalThis.fetch=source; }
+  });
   await check('requests coalesce, concurrency stays at two, decoded memory has an LRU bound',async()=>{
     const [a,b]=await Promise.all([loadWorldCover(14,7000,7000),loadWorldCover(14,7000,7000)]);
     assert.equal(calls,1);assert.equal(a,b);assert.equal(a[0],10);
@@ -89,6 +131,106 @@ try{
     globalThis.fetch=(url,options)=>String(url).includes('wmts.terrascope.be')?fetchCover(url,options):vectorFetch(url,options);
     try{const result=await globalThis.__coverWorker.buildTile(14,8200,6500,'sat-veg');assert.ok(result.satVeg.length>0);}
     finally{restore();}
+  });
+  await check('resident roof photos recover after outages and complementary partial mosaics',async()=>{
+    const {WORLD_LOOK}=await import('../lib/fly/fly-constants.js');
+    const {requestLookRoofPatch,pumpLookRoofRetries,cancelLookRoofPatch,disposeLookRoofPatches}=await import('../lib/fly/look-roof-patch.js');
+    const {lookRoofState}=await import('../lib/fly/toy-world/worker/look-roofs.js');
+    const worker=globalThis.__coverWorker, x=6500,y=6500,key=`14/${x}/${y}`;
+    const req={any:true,v:1,key:'roof-retry-fixture',tier:'ultra',truth:{},arrival:{},reach:{},ground:{},
+      look:{on:true,roofPhoto:true,walls:true,authority:true,structures:true,worker:{...WORLD_LOOK.worker,
+        photo:{...WORLD_LOOK.worker.photo,zoom:15,refZoom:14,retries:0}}}};
+    const restore=fixture.installFetchStub(()=>fixture.encodeTile(fixture.scene('suburb')));
+    const vectorFetch=globalThis.fetch,clock=globalThis.performance;
+    const chunk={state:'draping'},engine={chunks:new Map([[key,chunk]]),pendingFinalize:[]};
+    const doneBefore=lookRoofState().done;
+    const seen=[0,0,0,0],answers=[];
+    let stage=0,time=100;
+    const api={async lookRoofPatch(...args){const patch=await worker.lookRoofPatch(...args);answers.push(patch);return patch;}};
+    try {
+      Object.defineProperty(globalThis,'performance',{configurable:true,value:{now:()=>time}});
+      paint(0x998877);
+      globalThis.fetch=async(url,opts)=>{
+        const match=String(url).match(/\/tile\/15\/(\d+)\/(\d+)/);
+        if(!match)return vectorFetch(url,opts);
+        const i=(Number(match[1])-2*y)*2+Number(match[2])-2*x;seen[i]++;
+        const status=i===3?404:stage===0||stage===1&&i===1||stage===2&&i===0?503:200;
+        return new Response(status===200?new Uint8Array(3000):null,{status});
+      };
+      const result=await worker.buildTile(14,x,y,'sat-buildings',{visuals:true,worldPass:req});
+      assert.ok(result.lookPatch);
+      engine.pendingFinalize.push({key,result});
+      requestLookRoofPatch(engine,api,key,result);
+      const wait=async n=>{
+        for(let i=0;i<100&&answers.length<n;i++)await new Promise(r=>setImmediate(r));
+        assert.equal(answers.length,n);
+      };
+      await wait(1);
+      assert.equal(answers[0].retry,true);assert.equal(answers[0].verts,null);
+      time+=4900;pumpLookRoofRetries(engine);assert.equal(answers.length,1);
+      for(stage=1;stage<=3;stage++){
+        time+=60000;pumpLookRoofRetries(engine);await wait(stage+1);
+        assert.equal(answers[stage].retry,stage<3);
+        assert.ok(answers[stage].counts.photo>0);
+        if(stage>1)assert.ok(answers[stage].counts.photo>=answers[stage-1].counts.photo);
+        assert.equal(lookRoofState().done,doneBefore+Number(stage===3));
+      }
+      assert.deepEqual(seen,[4,4,4,1]);assert.equal(engine._lookRoofJobs.size,0);
+      const next=await worker.buildTile(14,x,y,'sat-buildings',{visuals:true,worldPass:req});
+      assert.equal(next.lookPatch,undefined);assert.equal(next.lookRoofs.cached,1);
+      const regionalRequest={...req,key:'roof-regional-fixture',look:{...req.look,worker:{...req.look.worker,
+        photo:{...req.look.worker.photo,zoom:16,refZoom:11}}}};
+      const savedCanvas=globalThis.OffscreenCanvas,savedBitmap=globalThis.createImageBitmap;
+      try {
+        let regionalStatus=503,regionalCalls=0,localCalls=0;
+        globalThis.fetch=async(url,opts)=>{
+          const m=String(url).match(/\/tile\/(11|16)\/(\d+)\/(\d+)/);
+          if(!m)return vectorFetch(url,opts);
+          if(m[1]==='11'){
+            regionalCalls++;
+            return new Response(regionalStatus===200?new Uint8Array(4001):null,{status:regionalStatus});
+          }
+          localCalls++;return new Response(new Uint8Array(4000));
+        };
+        globalThis.createImageBitmap=async blob=>({shade:blob.size===4001?160:100,close(){}});
+        globalThis.OffscreenCanvas=class {
+          constructor(w,h){this.w=w;this.h=h;}
+          getContext(){let shade=0;return {drawImage(b){shade=b.shade;},getImageData:()=>({data:new Uint8ClampedArray(this.w*this.h*4).fill(shade)})};}
+        };
+        const near=await worker.buildTile(14,x+32,y,'sat-buildings',{visuals:true,worldPass:regionalRequest});
+        const provisional=await worker.lookRoofPatch(near.lookPatch);
+        assert.equal(provisional.photoTiles,16);assert.equal(provisional.retry,true);
+        const waiting=await worker.lookRoofPatch(near.lookPatch);
+        assert.equal(waiting.retry,true);assert.equal(localCalls,16);
+        time+=16000;regionalStatus=200;
+        const balanced=await worker.lookRoofPatch(near.lookPatch);
+        assert.equal(balanced.retry,false);assert.equal(balanced.counts.photo,provisional.counts.photo);
+        assert.ok(balanced.wallVerts>0);
+        const old=new Map(Array.from(provisional.verts,(v,i)=>[v,provisional.col[i*3]]));
+        assert.ok(balanced.verts.some((v,i)=>old.has(v)&&balanced.col[i*3]>old.get(v)),'same roof source must acquire the brighter regional exposure');
+        assert.equal(regionalCalls,2);
+        regionalStatus=404;
+        const absent=await worker.buildTile(14,x+96,y,'sat-buildings',{visuals:true,worldPass:regionalRequest});
+        assert.equal((await worker.lookRoofPatch(absent.lookPatch)).retry,false);
+        time+=65000;
+        const neighbour=await worker.buildTile(14,x+97,y,'sat-buildings',{visuals:true,worldPass:regionalRequest});
+        assert.equal((await worker.lookRoofPatch(neighbour.lookPatch)).retry,false);
+        assert.equal(regionalCalls,3,'same terminal regional miss must be shared across neighbouring buildings');
+      } finally {globalThis.OffscreenCanvas=savedCanvas;globalThis.createImageBitmap=savedBitmap;}
+      // A stale reply to the same coordinates must never reach a replacement.
+      let reply;
+      const oldColor=result.satBuilding.col.slice();
+      const delayed={lookRoofPatch:(_id,action)=>action==='cancel'?null:new Promise(r=>{reply=r;})};
+      requestLookRoofPatch(engine,delayed,key,result);await Promise.resolve();
+      cancelLookRoofPatch(engine,key);
+      engine.chunks.set(key,{state:'draping'});
+      reply({verts:new Uint32Array([0]),col:new Uint8Array([255,0,255]),retry:true});
+      await new Promise(r=>setImmediate(r));
+      assert.deepEqual(result.satBuilding.col,oldColor);assert.equal(engine._lookRoofJobs.size,0);
+    } finally {
+      disposeLookRoofPatches(engine);restore();
+      Object.defineProperty(globalThis,'performance',{configurable:true,value:clock});
+    }
   });
 }finally{Object.assign(globalThis,saved);delete globalThis.__coverWorker;}
 console.log(`WORLD COVER: ${checks}/${checks}`);

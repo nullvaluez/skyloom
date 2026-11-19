@@ -56,6 +56,8 @@ import { buildCinematicTreeGeometry, canopyForm } from '@/lib/fly/cinematic-grou
 import { worldPassConfig, worldPassRequest } from '@/lib/fly/world-pass';
 import { planCanopy, edgeDensity, SPECIES_FORM } from '@/lib/fly/ground-canopy-select';
 import { CanopyPhoto } from '@/lib/fly/ground-canopy-photo';
+import { canopyColorReference } from '@/lib/fly/r25-ground';
+import { SCENERY_COLOR_ON } from '@/lib/fly/world-clarity';
 import { createCanopyMaterials } from '@/lib/fly/ground-canopy-material';
 import { NEAR_SUPPORT, updateNearContactMatrices } from '@/lib/fly/near-ground-support';
 import { SAT_SHADOWS, SAT_VEG, SETTLE_CALM } from '@/lib/fly/fly-constants';
@@ -162,10 +164,14 @@ export function WpCanopyLayer({ engine, runtime, flight, tier }) {
   const { cfg, tc } = setup;
   const photoRef = useRef(null);
   useLayoutEffect(() => {
-    const photo = new CanopyPhoto(() => runtime.engine?.imagerySource, { zoom: cfg.photoZoom, leafRatio: cfg.leafRatio, maxActive: PHOTO_ACTIVE });
+    const photo = new CanopyPhoto(() => runtime.engine?.imagerySource, {
+      zoom: cfg.photoZoom, leafRatio: cfg.leafRatio, maxActive: PHOTO_ACTIVE,
+      isResident: chunk => engine.chunks.get(chunk.key) === chunk,
+      getReference: SCENERY_COLOR_ON ? canopyColorReference : null,
+    });
     photoRef.current = photo;
     return () => { photoRef.current = null; photo.dispose(); };
-  }, [runtime, cfg]);
+  }, [runtime, engine, cfg]);
   const meshes = useMemo(() => {
     const { material, depth, seasonTexture } = createCanopyMaterials(applyBendAnchor);
     const nearGeo = buildCinematicTreeGeometry(tc.nearCap);
@@ -215,11 +221,13 @@ export function WpCanopyLayer({ engine, runtime, flight, tier }) {
   });
 
   useEffect(() => {
-    if (process.env.NODE_ENV !== 'development' || typeof window === 'undefined') return undefined;
+    if (typeof window === 'undefined' || (process.env.NODE_ENV !== 'development' &&
+        !new URLSearchParams(window.location.search).has('graphicsReview'))) return undefined;
     const photo = photoRef.current;
     const handle = {
       meshes,
       photo,
+      get ring() { return engine.stats; },
       get stats() { return { ...st.current.stats, sliceHist: [...st.current.stats.sliceHist], photo: { ...photo.stats }, seasons: { ...photo.seasons } }; },
       /** Every drawn crown and patch as [lon, lat, radiusM(true), level, density] (probes only). */
       dump(px, pz, maxM = 1200) {
@@ -239,7 +247,7 @@ export function WpCanopyLayer({ engine, runtime, flight, tier }) {
     };
     window.__wpCanopy = handle;
     return () => { if (window.__wpCanopy === handle) delete window.__wpCanopy; };
-  }, [meshes, runtime, cfg, flight]);
+  }, [meshes, engine, runtime, cfg, flight]);
 
   useFrame(({ clock, camera }) => {
     const photo = photoRef.current;
@@ -273,14 +281,16 @@ export function WpCanopyLayer({ engine, runtime, flight, tier }) {
         // Ready chunks with their photo look and fine grid; ask for the look of the rest.
         const ready = [];
         let all = 0;
+        for (const key of Object.keys(photo.seasons)) if (!engine.chunks.has(key)) delete photo.seasons[key];
         for (const ch of engine.nearest(flight.pos.x, flight.pos.z)) {
           if (!ch.canopy) continue;
           all++;
-          if (!ch.canopyLook) { photo.request(ch); continue; }
+          photo.request(ch);
+          if (!ch.canopyLook) continue;
           if (!ch.wpGrid) continue;
           ready.push(ch);
         }
-        const sig = `${ready.length}|${all}|${altK.toFixed(3)}|${engine.wpRevision}|${s.sigma.toFixed(3)}`;
+        const sig = `${ready.length}|${all}|${altK.toFixed(3)}|${engine.wpRevision}|${photo.revision}|${s.sigma.toFixed(3)}`;
         s.t = t;
         if (sig !== s.sig || moved2 >= 100 || dyaw > TURN_RAD || s.ramping) {
           s.sig = sig;

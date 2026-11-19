@@ -46,7 +46,8 @@ const place = (born = null, now = 10) => context.placeCanopy(mesh, engine, fligh
 const sig = () => context.canopyPlacementSignature(engine.stats, 1, 1);
 const y = () => { mesh.getMatrixAt(0, matrix); return matrix.elements[13]; };
 const original = sig();
-const request = { key: chunk.key, chunk, regrid: true, grid: new Float32Array(n).fill(273), gi: 0, miss: 0, coarse: 0 };
+const request = { key: chunk.key, chunk, regrid: true, grid: new Float32Array(n).fill(273),
+  gridZoom: new Uint8Array(n).fill(15), gi: 0, miss: 0, coarse: 0 };
 
 check('fixture places a real instance at its initial coarse support height', () => {
   assert.equal(place(), 1); assert.equal(y(), 120); assert.equal(mesh.visible, true);
