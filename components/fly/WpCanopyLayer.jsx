@@ -167,11 +167,13 @@ export function WpCanopyLayer({ engine, runtime, flight, tier }) {
     const photo = new CanopyPhoto(() => runtime.engine?.imagerySource, {
       zoom: cfg.photoZoom, leafRatio: cfg.leafRatio, maxActive: PHOTO_ACTIVE,
       isResident: chunk => engine.chunks.get(chunk.key) === chunk,
+      priority: chunk => engine.flightPath?.rank(chunk.tile.x, chunk.tile.y) ??
+        (chunk.cx - flight.pos.x) ** 2 + (chunk.cz - flight.pos.z) ** 2,
       getReference: SCENERY_COLOR_ON ? canopyColorReference : null,
     });
     photoRef.current = photo;
     return () => { photoRef.current = null; photo.dispose(); };
-  }, [runtime, engine, cfg]);
+  }, [runtime, engine, cfg, flight]);
   const meshes = useMemo(() => {
     const { material, depth, seasonTexture } = createCanopyMaterials(applyBendAnchor);
     const nearGeo = buildCinematicTreeGeometry(tc.nearCap);
@@ -254,12 +256,11 @@ export function WpCanopyLayer({ engine, runtime, flight, tier }) {
     if (!photo) return;
     const t = clock.elapsedTime;
     const s = st.current;
-    // The arrival hold: no photo looks, no exact re-samples, no fine grids or
-    // re-grids and no ring growth until the buildings have arrived (round 2:
-    // round 1 still fetched one look at a time and sampled first fine grids).
+    // During arrival, prepare one photo and the first fine support grid in
+    // parallel with buildings. Higher-density work still waits for release.
     const held = groundArrivalHeld(runtime, t);
     engine.setArrivalHold(held);
-    photo.setMaxActive(held ? 0 : PHOTO_ACTIVE);
+    photo.setMaxActive(held ? 1 : PHOTO_ACTIVE);
     s.stats.held = held;
     const k = mercatorScale(flight.latDeg ?? 0);
     s.contacts.radius2 = engine.nearSupport.active ? (NEAR_SUPPORT.radiusM * k) ** 2 : 0;
@@ -282,10 +283,16 @@ export function WpCanopyLayer({ engine, runtime, flight, tier }) {
         const ready = [];
         let all = 0;
         for (const key of Object.keys(photo.seasons)) if (!engine.chunks.has(key)) delete photo.seasons[key];
-        for (const ch of engine.nearest(flight.pos.x, flight.pos.z)) {
+        // Image and terrain preparation have independent inputs. Start the
+        // image as soon as the worker has put trees in this resident tile.
+        if (engine.ringOn) {
+          for (const ch of engine.chunks.values()) {
+            if (ch.canopy && (ch.state === 'sampling' || ch.state === 'ready')) photo.request(ch);
+          }
+        }
+        for (const ch of engine.nearest(flight.pos.x, flight.pos.z, true)) {
           if (!ch.canopy) continue;
           all++;
-          photo.request(ch);
           if (!ch.canopyLook) continue;
           if (!ch.wpGrid) continue;
           ready.push(ch);
@@ -436,6 +443,7 @@ function writeOp(j, s, meshes, engine, tc, cfg, q) {
     if (!ch._wpY) { const n0 = l0.length / 5; ch._wpY = new Float32Array(n0).fill(NaN); ch._wpZ = new Uint8Array(n0); ch._wpT = new Float32Array(n0); }
     const exact = ch._wpY[i];
     const coarse = Number.isFinite(exact) ? exact : engine.wpGroundAtLocal(ch, lx, lz);
+    if (!Number.isFinite(coarse)) return;
     if (Number.isFinite(exact)) j.exactN++;
     // Queue a fresh sample when there is none, or the mesh may have refined since.
     if ((!Number.isFinite(exact) || (j.now - ch._wpT[i] > 5 && ch._wpZ[i] < 17)) && j.want.length < 3 * 6000) j.want.push(ch, i, n);
@@ -474,6 +482,7 @@ function writeOp(j, s, meshes, engine, tc, cfg, q) {
   const dens = season * edge;
   if (dens < 0.02) return;
   const gy = engine.wpGroundAtLocal(ch, lx, lz);
+  if (!Number.isFinite(gy)) return;
   const sc = j.altK * ch._wpBk;
   writeMatrix(st.fm, n * 16, ch.cx + lx - j.ox, gy - sink * 2, ch.cz + lz - j.oz, r * k * sc, h * k * sc, hashF(lz, lx) * Math.PI * 2);
   const col = look['l' + lvl];

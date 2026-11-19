@@ -36,7 +36,7 @@ import { useFlyStore } from '@/stores/fly-store';
 import { satelliteVisualsOn, satelliteVisualProfile } from '@/lib/fly/satellite-visuals';
 import { createCinematicHomeMaterial, createCinematicHomeDepthMaterial } from '@/lib/fly/cinematic-ground';
 import { nearGroundOn } from '@/lib/fly/near-ground';
-import { parcelGapDecision, parcelGapSourceReady, parcelGapSupported } from '@/lib/fly/parcel-gap';
+import { parcelGapDecision, parcelGapSourceReady, parcelGapSupported, parcelPlacementDue } from '@/lib/fly/parcel-gap';
 import { parcelRoadDistance, parcelRoadScan, stepParcelRoadScan } from '@/lib/fly/parcel-roads';
 import { lookShadowHomesCast } from '@/lib/fly/look-shadow';
 
@@ -146,6 +146,8 @@ export function SatParcelHomes({ engine, runtime, flight, tier }) {
   const pool = PARCEL_HOMES.poolByTier[cinematic ? 'high' : tier] ?? 0;
   const stateRef = useRef({
     t: -Infinity,
+    scanX: 0,
+    scanZ: 0,
     placed: 0,
     anchors: 0,
     suppressed: 0,
@@ -283,11 +285,13 @@ export function SatParcelHomes({ engine, runtime, flight, tier }) {
       st.roadScan = null;
       st.sig = ''; // the new source evidence earns one placement pass
     }
-    if (t - st.t >= 2) {
+    if (parcelPlacementDue(t - st.t, flight.pos.x - st.scanX, flight.pos.z - st.scanZ, mercatorScale(flight.latDeg))) {
       // Round 21 (C, S6): one-time phase nudge; the first pass stays immediate.
       const U = SURFACE_CALM.enabled ? SURFACE_CALM.uploads : null;
       st.t = st.first && U ? t + U.stagger[3] * 2 : t;
       st.first = false;
+      st.scanX = flight.pos.x;
+      st.scanZ = flight.pos.z;
       const H = SUBURB_NIGHT.houseLights;
       // The EXACT SatHouseLights γ ramp — the windows and the porch lights are
       // the same dusk, so they must be the same curve.
@@ -1139,19 +1143,19 @@ function placeHomes(mesh, engine, runtime, flight, st, pool, now) {
           // anchors, then place at under half the existing fallback density.
           const key = `${wx.toFixed(2)},${wz.toFixed(2)}`;
           const radius = 600 * mercK;
-          const columns = runtime.satBuildings?.queryColumns?.(wx, wz, radius)?.length ?? 1;
-          const ready = settled && !st.stale &&
-            bs.queued === 0 && bs.building === 0 && bs.draping === 0 &&
-            vs.queued === 0 && vs.building === 0 && vs.sampling === 0 &&
-            parcelGapSourceReady(runtime.satBuildings.chunks, wx, wz, radius, now);
           const previous = st.localGaps.get(key);
-          localGap = parcelGapDecision(previous, {
-            ready, columns, supported: parcelGapSupported(localAnchors, wx, wz, mercK),
-          });
-          if (previous === undefined && st.localGaps.size >= 2048) localGap = false;
-          // Store only evidence. Unknown/unresolved is not a permanent veto.
-          if ((ready || columns > 0) && (st.localGaps.has(key) || st.localGaps.size < 2048))
-            st.localGaps.set(key, localGap);
+          if (previous !== false && (previous === true || st.localGaps.size < 2048)) {
+            const buildings = runtime.satBuildings;
+            const columns = buildings?.queryColumns(wx, wz, radius, 1).length ?? 1;
+            const ready = columns === 0 && parcelGapSourceReady(buildings?.chunks, wx, wz, radius, now);
+            localGap = parcelGapDecision(previous, {
+              ready, columns, supported: ready && parcelGapSupported(localAnchors, wx, wz, mercK),
+            });
+            // Only an observed mapped footprint is a permanent veto. New
+            // residential anchors may still arrive from the vegetation worker.
+            if (columns > 0 || localGap) st.localGaps.set(key, localGap);
+            else if (ready) st.localGaps.delete(key);
+          }
           if (localGap) deficit = Math.max(deficit, 0.45);
         }
         densSum += dens;

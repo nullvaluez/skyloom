@@ -25,6 +25,50 @@ release instruction is recorded separately from the measurements it authorizes.
 
 ## Status
 
+### 2026-11-19 — Scenery ahead of a moving aircraft
+
+The canopy used to wait for the building arrival hold, its vegetation tile,
+its fine terrain grid and its imagery in sequence. A jet could leave that tile
+before seeing its trees. During arrival one image request can now run alongside
+the first terrain pass. A grove can appear as soon as its image and four local
+terrain samples are ready. Travelling 500 ground metres releases the arrival
+hold. Later terrain detail still corrects the resident trees.
+
+Buildings, skyline groups and the wider forest now rank pending work along the
+measured ground track. The lead is ten seconds of flight, capped at one and a
+half tile widths for each layer. The nearby ring still covers turns. Distant
+building groups wait for worker capacity before expanding into tile requests.
+Procedural housing can refresh after 350 ground metres, at most twice a second.
+A local residential gap requires mature mapped tiles and collision indices
+across its search area, residential anchors and road clearance. Streaming work
+elsewhere no longer blocks that decision.
+
+Fableflight uses cheaper distant trees and limits uploads per frame by count
+and bytes. Skyloom already had distant tree patches and frame budgets. This
+pass changes which scenery gets those resources first. [Fableflight world streamer](https://github.com/Rolandjg/fableflight/blob/d91a7c09154268f85635c412c5ffc607ad2ad951/src/world.rs)
+
+On the RTX 5080 in Chrome, flying east-southeast from Powell at 750 m/s,
+the first moving sample with trees in the forward strip came after 1,428 m
+and 2,161 m on two runs of `38b5f7d7`, and after 169 m on the final build.
+Sampling was approximately twice a second. At the first fixed checkpoint,
+500 m into the flight, the original runs had zero canopy instances in the
+strip and the final run had 179. Across the 24 km route, canopy appeared at
+22 of 24 checkpoints, up from 20. Procedural homes appeared ahead at 9 of 24,
+up from 2 in the instrumented baseline. Both builds had detailed buildings
+3 km ahead at 20 checkpoints and reported resolved empty tiles at the other
+four. On the 10 km Melton approach at 215 m/s, procedural homes appeared in
+seven of ten forward strips on both builds. The sum of house instances across
+those snapshots went from 231 to 295. Canopy coverage went from nine strips
+to ten. These runs measure scenery arrival on desktop. iPhone Safari is untested.
+
+For a moving comparison, run `node scripts/review-scenery-flight.cjs <server-url> <label> 750 powell`.
+Use `215 melton` for a residential approach. Each run records rendered canopy
+and house instances in a strip 1–2.5 km ahead and one kilometre wide, plus
+detailed building-tile status at 1.5 and 3 km. Reports and screenshots go
+under `.graphics-review/scenery-flight/<label>`. The deterministic gate
+`node scripts/verify-scenery-flight.mjs` also covers turns, warps, missing
+terrain and queue limits.
+
 ### 2026-11-19 — Powell seasonal imagery and scenery streaming
 
 The pale band visible on the Powell approach survived a stationary wait with

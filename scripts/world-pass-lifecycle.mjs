@@ -59,9 +59,8 @@ check('discarded memo constructions create no photo worker or atlas', () => {
 const api = { setDiag: () => Promise.resolve() };
 skyline.setWorker(api);
 const firstPhotos = skyline._photos, firstAtlas = skyline._atlas;
-const firstWorker = workers.at(-1);
-check('effect attachment creates one photo owner and the existing atlas size', () => {
-  assert.equal(workers.length, 1);
+check('effect attachment creates a photo owner and atlas before the first photo request', () => {
+  assert.equal(workers.length, 0);
   assert.ok(firstPhotos); assert.ok(firstAtlas);
   assert.equal(firstAtlas.texture.image.data.byteLength, 40 * 1024 * 1024);
   assert.equal(skyline._standInU.uStandInPhotos.value, firstAtlas.texture);
@@ -73,6 +72,8 @@ check('repeated attachment is idempotent', () => {
   assert.equal(skyline._photos, firstPhotos); assert.equal(skyline._atlas, firstAtlas);
 });
 firstPhotos.want([{ key: 'old', pz: 12, px: 0, py: 0 }]);
+const firstWorker = workers.at(-1);
+check('the first admitted request starts one photo worker', () => assert.equal(workers.length, 1));
 let disposedAtlas = 0;
 firstAtlas.texture.addEventListener('dispose', () => { disposedAtlas++; });
 skyline._photoArrived.push('stale'); skyline._photoRamps.set(0, 1); skyline._photoK[0] = 1;
@@ -92,6 +93,7 @@ check('StrictMode effect replay attaches fresh resources and restores fades', ()
   assert.equal(skyline._hardEvict, false);
 });
 skyline._photos.want([{ key: 'replay', pz: 12, px: 0, py: 0 }]);
+check('the replay request starts a fresh worker', () => assert.equal(workers.length, 2));
 workers.at(-1).reply(); await flush();
 check('photo completion works after effect replay', () => {
   assert.ok(skyline._photos.get('replay'));
