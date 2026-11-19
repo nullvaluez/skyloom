@@ -4,6 +4,7 @@
 
 ## Fly Mode assets
 
+- **F-35 cockpit surface finishes** (texture) — Skyloom, Original ImageGen material atlas · [MIT](https://github.com/nullvaluez/skyloom) · modifications: Four generated surface samples cropped and normalized for locally lit fascia, rubber, flight-suit twill and restraint webbing.
 - **Forest canopy — Tree Small 02** (texture) — Rico Cilliers, Poly Haven · [CC0-1.0](https://polyhaven.com/a/tree_small_02) · modifications: Four views baked offline from the CC0 3D source into one shared foliage atlas. Tiered KTX2 derivatives replace procedural forest crowns. Original high-poly authoring meshes are not shipped.
 - **Forest canopy — Fir Tree 01** (texture) — Rob Tuytel, Rico Cilliers, Poly Haven · [CC0-1.0](https://polyhaven.com/a/fir_tree_01) · modifications: Four views baked offline from the CC0 3D source into one shared foliage atlas. Tiered KTX2 derivatives replace procedural forest crowns. Original high-poly authoring meshes are not shipped.
 - **Earth surface — Aerial Asphalt 01** (texture) — Rob Tuytel, Poly Haven · [CC0-1.0](https://polyhaven.com/a/aerial_asphalt_01) · modifications: Albedo, roughness, OpenGL normal XY, displacement and AO packed offline into two eight-layer KTX2 arrays at 128/256/512/1024 px. Original checksums and authoring scales are preserved in the manifest.

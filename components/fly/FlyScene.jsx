@@ -11,7 +11,7 @@ import { createSimHold } from '@/lib/fly/sim-hold';
 import { installReviewPoses } from '@/lib/fly/airport-service/review-poses';
 import { connectGateToGate } from '@/lib/fly/gate-to-gate-runtime';
 import { cameraOwner, transitionMode } from '@/lib/fly/camera-mode';
-import { hasPilotSeat, pilotSeatSelected } from '@/lib/fly/pilot-seat';
+import { hasPilotSeat } from '@/lib/fly/pilot-seat';
 import { PilotCamera } from '@/lib/fly/pilot-camera';
 import { cameraDirector, opsFeel } from '@/lib/fly/ops-flags';
 import { renderView } from '@/lib/fly/render-view';
@@ -2172,7 +2172,7 @@ export function FlyScene({ runtime }) {
       input.neutralize();
     const cmd = input.read();
     if (!paused && pilotAvailable && input.consumePress('4')) {
-      useFlyStore.setState({ f35PilotSeat: !pilotSeatSelected(flyState), cameraMode: 'chase' });
+      flyState.selectF35View();
     }
     cmd.toggleParkingBrake = !paused && input.consumePress('b');
     // GATE TO GATE: gear (G), reverse (R) and the camera cycle (V) exist only behind their flags.
@@ -2580,7 +2580,7 @@ export function FlyScene({ runtime }) {
     }
     // GATE TO GATE: one precedence for who drives the camera (lib/fly/camera-mode.js).
     const owner = cameraOwner(runtime, flyState, { photoMode, photoExit: () => photo.handoff(), hasTarget: !!targeting.target, ops: operations });
-    const pilotNow = owner === 'pilot';
+    const pilotNow = owner === 'pilot' && pilot.ready;
     const seatCut = pilot.active !== pilotNow;
     if (seatCut) {
       pilot.reset();
@@ -2608,7 +2608,7 @@ export function FlyScene({ runtime }) {
       // CAMERA_DIRECTOR (W2 F): shots, beats and cuts.
       runtime.director.update(dt, renderView(flight), camera, { cmd, k: mercatorScale(flight.latDeg), chase, flyState, ops: operations });
     } else if (pilotNow) {
-      pilot.update(dt, flight, camera, input, getTrueScaleK());
+      pilot.update(dt, flight, camera, input, getTrueScaleK(), cmd);
     } else if (owner === 'cinema') {
       cinema.update(
         dt,

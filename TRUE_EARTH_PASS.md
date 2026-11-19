@@ -25,6 +25,39 @@ release instruction is recorded separately from the measurements it authorizes.
 
 ## Status
 
+### 2026-11-18 — F-35 cockpit and outside view
+
+An ordinary F-35 flight now offers **Cockpit view** and **Outside view**.
+Click the view button or press **4** on desktop. On touch, open **Flight
+actions** and tap the destination view. Settings retains both outside camera
+distances. Skyloom remembers the chosen seat for the next F-35 flight.
+With no saved choice, the outside view opens first while `F35_COCKPIT`
+defaults off. A positive URL pin starts the flight in the cockpit for one
+load. A negative pin disables cockpit selection for that load.
+
+The open sightline and panoramic display follow the F-35's publicly
+documented cockpit layout. Skyloom supplies its own flight instruments. The
+visor's compass follows the pilot's gaze, and the attitude marks follow the
+earth horizon. The main display reads the flight model, nearby places and
+traffic. Its standby attitude window shares the live attitude picture.
+[Lockheed Martin's cockpit design overview](https://www.f35.com/content/dam/lockheed-martin/eo/documents/webt/F-35_Mission_Systems_Design_Development_and_Verification.pdf)
+
+The side-stick and throttle animate from the simulation inputs. The
+sun lights the canopy bow, padded glare shield, fascia and flight suit in
+aircraft coordinates. The display dims at night. Cockpit meshes and textures
+load on the first seat selection and stay available until the airframe changes.
+
+Chrome on the RTX 5080 rendered the daytime and nighttime cockpit over
+Paris. Desktop checks covered the view button, keyboard shortcut, head
+movement, photo-mode return and seat persistence across F-35 flights.
+Touch emulation covered both switching directions and both phone
+orientations. The five seat/camera tests and the gameplay and source
+verification suites passed.
+
+For physical iPhone review, enter the cockpit from Flight actions, glance
+sideways, rotate the phone, and switch back outside. Check panel legibility
+and sustained frame pacing in Safari.
+
 ### 2026-11-18 — Missing water and terrain on Ultra
 
 An external-camera flight over the Hudson reproduced the missing river and

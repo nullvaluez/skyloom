@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
+import { F35_VIEW_KEY, hasPilotSeat, pilotSeatSelected } from '../lib/fly/pilot-seat.js';
 
 const initialState = {
   // Lifecycle: 'boot' | 'loading-terrain' | 'flying' | 'paused'
@@ -57,7 +58,7 @@ const initialState = {
   // auto-revert is scoped to 'cinema' on purpose and cannot eat 'photo'.
   cameraMode: 'chase',
   chaseFraming: 'world',
-  f35PilotSeat: true,
+  f35PilotSeat: false,
   encountersEnabled: true,
 
   // Overlays
@@ -209,6 +210,14 @@ export const useFlyStore = create(
     // saveAircraft() is the only writer, called from the "Fly this" click site
     // (same split as quality/sound: a choice is persisted, a state change is not).
     setAircraftId: (aircraftId) => set({ aircraftId }),
+    selectF35View: (cockpit) => set(state => {
+      if (!hasPilotSeat(state)) return state;
+      const selected = cockpit ?? !pilotSeatSelected(state);
+      try {
+        globalThis.window?.localStorage?.setItem(F35_VIEW_KEY, selected ? 'cockpit' : 'outside');
+      } catch { /* The view still switches for this session. */ }
+      return { f35PilotSeat: selected, cameraMode: 'chase' };
+    }),
 
     // R25: hangarOpen mirrors screen. Opening the hangar is screen 'hangar';
     // closing it (Fly, Continue flight, harness bypass) is screen 'flight'.

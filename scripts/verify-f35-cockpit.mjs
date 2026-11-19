@@ -7,10 +7,47 @@ register('./_node-resolve.mjs', import.meta.url);
 globalThis.window = { __flyF35CockpitOverride: { enabled: true } };
 const { cameraOwner } = await import('../lib/fly/camera-mode.js');
 const { PilotCamera } = await import('../lib/fly/pilot-camera.js');
+const { hasPilotSeat, initialPilotSeat } = await import('../lib/fly/pilot-seat.js');
+const { useFlyStore } = await import('../stores/fly-store.js');
 const { CameraTransition } = await import('../lib/fly/camera-transition.js');
 const { composeTrueScaleMatrix } = await import('../lib/fly/true-scale.js');
 const input = () => ({ freeLook: { active: false, dx: 0, dy: 0 }, keys: new Set() });
 const flight = () => ({ pos:new Vector3(100000,3200,-300000), latDeg:0, heading:1.03, bank:0, pitch:0 });
+
+test('ordinary flights expose the seat, remember explicit choices, and respect one-load overrides', () => {
+  const original=globalThis.window;
+  const saved=new Map();
+  globalThis.window={localStorage:{getItem:k=>saved.get(k),setItem:(k,v)=>saved.set(k,v)}};
+  try {
+    const store=useFlyStore.getState();
+    store.setAircraftId('f35');
+    assert.equal(initialPilotSeat(),false);
+    assert.equal(hasPilotSeat(useFlyStore.getState()),true);
+    store.selectF35View(true);
+    assert.equal(initialPilotSeat(),true);
+    assert.equal(cameraOwner({},useFlyStore.getState()),'pilot');
+    store.selectF35View();
+    assert.equal(initialPilotSeat(),false);
+    assert.equal(cameraOwner({},useFlyStore.getState()),'chase');
+    window.__flyF35CockpitOverride={enabled:true};
+    assert.equal(initialPilotSeat(),true);
+    window.__flyF35CockpitOverride={enabled:false};
+    store.selectF35View(true);
+    assert.equal(hasPilotSeat(useFlyStore.getState()),false);
+    assert.equal(useFlyStore.getState().f35PilotSeat,false);
+    delete window.__flyF35CockpitOverride;
+    store.setAircraftId('glider');
+    store.selectF35View(true);
+    assert.equal(useFlyStore.getState().f35PilotSeat,false);
+    store.setAircraftId('f35');
+    window.localStorage.setItem=()=>{throw Error('Storage unavailable');};
+    store.selectF35View(true);
+    assert.equal(cameraOwner({},useFlyStore.getState()),'pilot');
+  } finally {
+    useFlyStore.getState().reset();
+    globalThis.window=original;
+  }
+});
 
 test('pilot seat only owns the F-35 flight view and resumes after a photo', () => {
   const s = { aircraftId:'f35', f35PilotSeat:true, cameraMode:'chase' };

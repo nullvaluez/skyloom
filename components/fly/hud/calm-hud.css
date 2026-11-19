@@ -234,6 +234,12 @@
   color: var(--calm-ice);
   border-color: rgba(214, 232, 255, 0.4);
 }
+.calm-view kbd {
+  padding: 2px 4px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  font-size: 10px;
+}
 .calm-spotting i {
   width: 6px;
   height: 6px;
@@ -373,6 +379,13 @@
 .calm-root[data-calm='1'] .calm-spotting {
   opacity: var(--calm-dim-chrome, 0.38);
   transition: opacity 1.4s ease;
+}
+.calm-root[data-calm='1'] .calm-view {
+  opacity: .83;
+}
+.calm-view:focus-visible,
+.calm-root[data-calm='1'] .calm-view:hover {
+  opacity: 1;
 }
 .calm-root[data-calm='1'] .calm-keys,
 .calm-root[data-calm='1'] .calm-spot-row {

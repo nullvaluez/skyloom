@@ -121,7 +121,7 @@ export function SettingsRows({ sheet = false, includeConditions = true }) {
     setStakes(next);
   };
   const pickChase = (value) => {
-    if (seatAvailable) useFlyStore.setState({ f35PilotSeat: value === 'pilot', cameraMode: 'chase' });
+    if (seatAvailable) useFlyStore.getState().selectF35View(value === 'pilot');
     if (value === 'pilot') return;
     useFlyStore.setState({ chaseFraming: value });
     try {
@@ -350,7 +350,7 @@ export function SettingsRows({ sheet = false, includeConditions = true }) {
   const views = seatAvailable ? ['world', 'close', 'pilot'] : ['world', 'close'];
   const viewLabel = seatAvailable ? 'Flight view' : 'Chase view';
   const selectedView = pilotSelected ? 'pilot' : chaseFraming;
-  const viewNames = { world: 'World', close: 'Close', pilot: 'Pilot' };
+  const viewNames = { world: 'World', close: 'Close', pilot: 'Cockpit' };
   const seatHint = pilotSelected && <p className="mt-2 text-xs text-zinc-400">{isTouch
     ? 'Drag the window to look around. Lift your finger to face forward.'
     : 'Drag to look around. Hold [ or ] to glance sideways, or Page Up / Down to look up or down. Press 4 to switch views.'}</p>;

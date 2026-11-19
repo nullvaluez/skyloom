@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useFlyStore, inFlight } from '@/stores/fly-store';
-import { pilotSeatSelected } from '@/lib/fly/pilot-seat';
+import { hasPilotSeat, pilotSeatSelected } from '@/lib/fly/pilot-seat';
 import { useFlyContractsStore } from '@/stores/fly-contracts-store';
 import { usePassportStore } from '@/stores/passport-store';
 import { useEncounterStore } from '@/stores/encounter-store';
@@ -62,6 +62,7 @@ const LEGEND = [
 export function CalmHud({ runtime, mode, isTouch, newEarth, spotting }) {
   const cinema = useFlyStore((s) => s.cameraMode === 'cinema');
   const pilotSelected = useFlyStore(pilotSeatSelected);
+  const seatAvailable = useFlyStore(hasPilotSeat);
   const qualityTier = useFlyStore((s) => s.qualityTier);
   const qualityPreset = useFlyStore((s) => s.qualityPreset);
   const totalScore = useFlyContractsStore((s) => s.totalScore);
@@ -376,6 +377,23 @@ export function CalmHud({ runtime, mode, isTouch, newEarth, spotting }) {
                 </div>
               )}
               <div className="calm-row">
+                {seatAvailable && (
+                  <button type="button" className="calm-spotting calm-view" data-testid="switch-f35-view"
+                    aria-keyshortcuts="4"
+                    onClick={event => {
+                      useFlyStore.getState().selectF35View();
+                      // Return pointer users to flight controls. Keyboard
+                      // activation keeps focus on the button for the next Tab.
+                      if (event.detail > 0) event.currentTarget.blur();
+                    }}
+                    onKeyDown={event => {
+                      if (event.key !== '4' || event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
+                      event.preventDefault();
+                      event.currentTarget.click();
+                    }}>
+                    {pilotSelected ? 'Outside view' : 'Cockpit view'} <kbd aria-hidden="true">4</kbd>
+                  </button>
+                )}
                 {mode === 'explorer' && (
                   <div className="calm-cluster" data-testid="hud-cluster" aria-label="Flight data">
                     <div className="calm-cell" data-k="spd">
