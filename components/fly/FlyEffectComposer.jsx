@@ -206,7 +206,8 @@ const StableEffectComposer = /* @__PURE__ */ memo(
     useLayoutEffect(() => {
       const warm = createComposerPreflight(gl, scene, camera, composer);
       preflight.current = warm;
-      const presented = { owner: composer, frames: 0, enabled };
+      const presented = { owner: composer, frames: 0, enabled, applyDpr: null,
+        canStageTerrain: model => enabled && warm.canStageTerrain(model) };
       gl.__flyMainDraw = presented;
       if (typeof window !== 'undefined') (window.__flyStats ??= {}).composerWarm = warm.state;
       return () => {
@@ -304,10 +305,15 @@ const StableEffectComposer = /* @__PURE__ */ memo(
               });
             }
           }
-          // Compile exact live color/depth/post variants before first use.
-          // Returning keeps the last completed canvas; no buffer is cleared,
-          // swapped or counted as a rendered frame while the driver links.
+          // A governor DPR step clears the canvas. Wait for preflight before
+          // committing it, so even a frame held for a program keeps the image.
           if (!preflight.current?.prepare()) return;
+          const presented = gl.__flyMainDraw;
+          if (presented?.owner === composer) {
+            const applyDpr = presented.applyDpr;
+            presented.applyDpr = null;
+            applyDpr?.();
+          }
           const currentAutoClear = gl.autoClear;
           gl.autoClear = autoClear;
           const warm = preflight.current;

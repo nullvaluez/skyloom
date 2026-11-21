@@ -38,6 +38,7 @@ export function CinemaShadowRig({runtime,sunRef}){
     }
     const r=rig.current;
     r?.setMapSize(profile.shadowSize);
+    r?.setShadowPaused(profile.shadowPaused===true);
     if(sunRef.current){sunRef.current.castShadow=false;sunRef.current.intensity=r?0:e.sun;}
     // LOOK PASS B (SHADOW): the cloud-shadow gate follows the live profile (0 off High/Ultra).
     const lookCloud=lookShadowCloudGate(r?profile:null);
@@ -105,12 +106,12 @@ export function CinemaShadowRig({runtime,sunRef}){
     }
     if(airframeRefit(r.airframeBreakM,airframeBreak,lightBlock('AIRFRAME_SHADOW').refitFrac))r.setAirframeFit(airframeBreak,lightBlock('AIRFRAME_SHADOW'));
     // SHIP PASS LIGHT: other streams' casters (requestShadowCasters), bounded.
-    const requestedCasters=applyShadowCasterRequests(true);
+    const requestedCasters=applyShadowCasterRequests(!r.shadowPaused);
     camera.updateMatrixWorld();r.update();
     runtime.shadowRadiusM=rangeM;
     // LOOK PASS B (SHADOW): city-scale AO by day, today's AO at low sun.
     lookShadowAoSun(runtime.aoPass?.configuration,runtime.sun?.sinEl,DEPTH_PASS.n8ao,lookAo.current);
-    Object.assign(runtime.cinemaShadows??={}, {cascades:r.cascades,size:profile.shadowSize,rangeM,baseRangeM:profile.shadowRangeM,materials:r.owned.size,bytes:r.cascades*profile.shadowSize**2*5,scanObjects:r.scanObjects,scanMs:r.scanMs,
+    Object.assign(runtime.cinemaShadows??={}, {cascades:r.cascades,paused:!!r.shadowPaused,size:profile.shadowSize,rangeM,baseRangeM:profile.shadowRangeM,materials:r.owned.size,bytes:r.cascades*profile.shadowSize**2*5,scanObjects:r.scanObjects,scanMs:r.scanMs,
       airframeBreakM:r.airframeBreakM,reach:reach?(mobileReach?'mobile':'medium'):null,requestedCasters,lookCasters:lookShadowAglWeight(lookAgl)>0&&(lookCloud>0||lookShadowRangeM(profile)>profile.shadowRangeM)});
   },-.9);
   return null;

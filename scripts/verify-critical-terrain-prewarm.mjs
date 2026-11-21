@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { registerHooks } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { BufferGeometry, Group, Mesh, MeshStandardMaterial, Scene, Texture } from 'three';
-import { createCriticalTerrainGate, criticalTerrainReady, terrainArrivalCovered } from '../lib/fly/critical-terrain-prewarm.mjs';
+import { BufferGeometry, Group, Mesh, MeshStandardMaterial, PlaneGeometry, Scene, ShaderLib, Texture } from 'three';
+import { createCriticalTerrainGate, criticalTerrainReady, isTerrainPreview, previewTerrainTile, terrainArrivalCovered } from '../lib/fly/critical-terrain-prewarm.mjs';
 import { createTerrainProgramRetention } from '../lib/fly/terrain-program-retention.mjs';
 
 registerHooks({ resolve(specifier, context, next) {
@@ -16,6 +16,13 @@ registerHooks({ resolve(specifier, context, next) {
 } });
 const { worldReadiness, retryWorldContent } = await import('../lib/fly/world-readiness.js');
 const { compileSceneAsync } = await import('../lib/fly/compile-scene-safe.js');
+const { TerrainEngine } = await import('../lib/fly/terrain-engine.js');
+// The vendored imagery plugin allocates its dormant one-pixel canvas on import.
+globalThis.OffscreenCanvas ??= class OffscreenCanvas {};
+const { createImagerySource } = await import('../lib/fly/tile-sources.js');
+const { LoaderFactory } = await import('../lib/fly/vendor/three-tile/index.js');
+const { applyBendFade } = await import('../lib/fly/toy-world/world-bend.js');
+const { attachLodFade } = await import('../lib/fly/lod-crossfade.js');
 const deferred = () => {
   let resolve, reject;
   const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
@@ -24,6 +31,176 @@ const deferred = () => {
 let count = 0;
 const check = async (name, run) => { await run(); count++; console.log('PASS ' + name); };
 const step = (gate, compile, options = {}) => gate.tick({ key: 'env1/csm2', parallel: true, compile, ...options });
+
+await check('resident satellite imagery uses the real DEM, bend, night light and LOD blend until an exact-key frame', async () => {
+  const gate = createCriticalTerrainGate(), driver = deferred();
+  const geometry = new PlaneGeometry(120, 160), map = new Texture({ width: 64, height: 64 });
+  const originalWindow = globalThis.window, originalCaches = globalThis.caches;
+  let provider;
+  try {
+    globalThis.window = {};
+    globalThis.caches = {};
+    provider = createImagerySource('satellite', 'high');
+  } finally {
+    globalThis.window = originalWindow;
+    globalThis.caches = originalCaches;
+  }
+  assert.equal(provider.dataType, 'fly-image-cached', 'use the shipped cache-aware imagery path');
+  const loader = LoaderFactory.getMaterialLoader(provider);
+  const offlineLoader = Object.create(loader, { doLoad: { value: async () => map } });
+  const source = await offlineLoader.load({ x: 4139, y: 2818, z: 13, source: provider });
+  assert.equal(source.transparent, true, 'World Imagery marks its single full-opacity raster layer transparent');
+  assert.equal(source.opacity, 1);
+  const lod = attachLodFade(source);
+  const tile = new Group(), model = new Mesh(geometry, [source]);
+  const root = new Group(); root.add(tile); tile.add(model);
+  root.position.set(1200, 10, -1800); tile.rotation.x = -Math.PI / 2; model.position.z = 6;
+  let day = 1, visits = 0, previewDisposed = 0, mapDisposed = 0, geometryDisposed = 0;
+  map.addEventListener('dispose', () => mapDisposed++);
+  geometry.addEventListener('dispose', () => geometryDisposed++);
+  const engine = { map: root };
+  const unsubscribe = TerrainEngine.prototype.onTileMaterial.call(engine, (material, owner) => {
+    visits++;
+    assert.equal(material, source); assert.equal(owner, model);
+    gate.hold(material, onRemove => previewTerrainTile(owner, material, { patchBend: applyBendFade, daylight: () => day, onRemove }));
+  });
+  const [preview] = model.children;
+  assert.equal(visits, 1, 'attaching a preview during the terrain walk does not re-patch it');
+  assert.equal(gate.state.previews, 1); assert.equal(source.visible, false);
+  assert.equal(preview.geometry, geometry); assert.equal(preview.material.map, map);
+  assert.equal(preview.material.isMeshBasicMaterial, true);
+  assert.equal(preview.material.transparent, source.transparent);
+  assert.equal(preview.material.opacity, source.opacity);
+  assert.equal(preview.castShadow, false);
+  assert.equal(model.material[0], source); assert.equal(isTerrainPreview(preview), true);
+  TerrainEngine.prototype.forEachTileMaterial.call(engine, material => assert.equal(material, source));
+  preview.material.addEventListener('dispose', () => previewDisposed++);
+  root.updateMatrixWorld(true);
+  assert.ok(model.matrixWorld.equals(preview.matrixWorld));
+  assert.equal(preview.raycast(null, []), undefined);
+  const shader = { ...ShaderLib.basic, uniforms: {} };
+  preview.material.onBeforeCompile(shader);
+  assert.match(shader.vertexShader, /uBendCenter/);
+  if (lod) {
+    assert.equal(shader.uniforms.uLodFadeMix, lod.mix);
+    assert.equal(shader.uniforms.uLodFadeMap, lod.map);
+    assert.match(shader.fragmentShader, /sampledDiffuseColor = mix/);
+  }
+  preview.onBeforeRender(); const daylight = preview.material.color.clone();
+  day = 0; preview.onBeforeRender();
+  assert.ok(preview.material.color.r < daylight.r * .08);
+  assert.ok(preview.material.color.b > preview.material.color.r);
+  model.visible = false;
+  const drawn = [];
+  root.traverseVisible(node => drawn.push(node));
+  assert.ok(!drawn.includes(preview), 'vendor parking hides both original and temporary draw');
+  model.visible = true;
+  step(gate, () => driver.promise); gate.bypass('time-cap');
+  assert.equal(model.children[0], preview); assert.equal(source.visible, false);
+  driver.resolve(); await driver.promise; await Promise.resolve();
+  assert.equal(source.visible, false); assert.equal(model.children[0], preview);
+  step(gate, () => assert.fail('already linked'), { covered: false });
+  assert.equal(model.children.length, 0); assert.equal(source.visible, true);
+  assert.equal(gate.state.previews, 0); assert.equal(previewDisposed, 1);
+  assert.equal(mapDisposed, 0); assert.equal(geometryDisposed, 0);
+  unsubscribe(); source.map = null; source.dispose(); geometry.dispose(); map.dispose();
+});
+
+await check('182 revealed terrain tiles hand off in traversal order with eight exact draws at a time', async () => {
+  const gate = createCriticalTerrainGate(), geometry = new PlaneGeometry(), map = new Texture({width:64,height:64});
+  const tiles = Array.from({length:182}, () => {
+    const source = new MeshStandardMaterial({map}), model = new Mesh(geometry,source);
+    gate.hold(source, onRemove => previewTerrainTile(model,source,{patchBend:applyBendFade,daylight:()=>1,onRemove}));
+    return model;
+  });
+  const tick = () => step(gate, () => assert.fail('already linked'), { covered:false, canStageTile:()=>true });
+  step(gate, () => Promise.resolve(), { covered:false }); await Promise.resolve();
+  tick();
+  const later = new MeshStandardMaterial();
+  gate.hold(later); assert.equal(later.visible,true);
+  const sourceVisible = () => tiles.filter(t=>t.material.visible).length;
+  const pending = () => tiles.filter(t=>t.userData.terrainHandoff);
+  assert.deepEqual(pending(), tiles.slice(0,8));
+  tick(); assert.equal(pending().length,8,'pending links bound the backlog');
+  assert.equal(sourceVisible(),0);
+  let frames = 0;
+  while (gate.state.held) {
+    const before = sourceVisible(), batch = pending();
+    assert.deepEqual(batch,tiles.slice(before,before+8));
+    for (const tile of batch) tile.userData.terrainHandoff();
+    for (const tile of tiles) assert.equal(Number(tile.material.visible)+tile.children.length,1,'exactly one drawable surface');
+    assert.ok(sourceVisible()-before<=8); frames++; tick();
+  }
+  assert.equal(frames,23); assert.equal(gate.state.status,'ready'); assert.equal(gate.state.previews,0);
+  for (const model of tiles) model.material.dispose();
+  geometry.dispose(); map.dispose(); later.dispose();
+});
+
+await check('cover, style change, driver fallback and disposal clean up a partial visible handoff synchronously', async () => {
+  for (const exit of ['covered','style','unsupported','disposed','composer-off']) {
+    const gate=createCriticalTerrainGate(), tiles=Array.from({length:22},()=>new MeshStandardMaterial());
+    const waiting=new Set();
+    for (const m of tiles) gate.hold(m,onRemove=>{
+      const remove=()=>{waiting.delete(m);onRemove();};remove.stage=()=>waiting.add(m);return remove;
+    });
+    const options={covered:false,style:'satellite/enhanced',canStageTile:()=>true};
+    step(gate,()=>Promise.resolve(),options);await Promise.resolve();step(gate,()=>assert.fail(),options);
+    assert.equal(waiting.size,8);
+    tiles[0].dispose();assert.equal(waiting.size,7);assert.equal(gate.state.held,21);
+    if (exit==='disposed') gate.dispose();
+    else if (exit==='covered') step(gate,()=>assert.fail(),{...options,covered:true});
+    else if (exit==='unsupported') step(gate,()=>assert.fail(),{...options,parallel:false});
+    else if (exit==='style') {
+      const nextStyle={...options,style:'toy/classic',key:'toy'};
+      step(gate,()=>Promise.resolve(),nextStyle);
+      assert.equal(gate.state.required,true);assert.equal(gate.state.status,'compiling');
+      await Promise.resolve();step(gate,()=>assert.fail(),nextStyle);
+      assert.equal(gate.state.key,'toy');assert.equal(gate.state.status,'ready');
+    } else while (gate.state.held) step(gate,()=>assert.fail(),{...options,canStageTile:undefined});
+    assert.equal(gate.state.held,0);assert.equal(gate.state.previews,0);assert.equal(waiting.size,0);
+    assert.ok(tiles.every(m=>m.visible));
+    for(const m of tiles)m.dispose();
+  }
+});
+
+await check('a covered rekey waits for its new driver and a staged DEM can acquire a replacement preview', async () => {
+  const gate=createCriticalTerrainGate(), map=new Texture({width:64,height:64});
+  const source=new MeshStandardMaterial({map}), model=new Mesh(new PlaneGeometry(),source);
+  const hold=()=>gate.hold(source,onRemove=>previewTerrainTile(model,source,{patchBend:()=>{},daylight:()=>1,onRemove}));
+  const options={covered:false,canStageTile:()=>true};
+  hold();step(gate,()=>Promise.resolve(),options);await Promise.resolve();step(gate,()=>assert.fail(),options);
+  model.geometry.dispose();model.geometry=new PlaneGeometry();hold();step(gate,()=>assert.fail(),options);
+  assert.equal(source.visible,false);assert.equal(model.children[0].geometry,model.geometry);
+  assert.equal(typeof model.userData.terrainHandoff,'function');
+  const changed={...options,covered:true,key:'new-environment'},driver=deferred();
+  step(gate,()=>driver.promise,changed);
+  assert.equal(source.visible,false);assert.equal(model.children.length,1);
+  assert.equal(model.userData.terrainHandoff,undefined);assert.equal(gate.state.status,'compiling');
+  driver.resolve();await driver.promise;await Promise.resolve();step(gate,()=>assert.fail(),changed);
+  assert.equal(source.visible,true);assert.equal(model.children.length,0);assert.equal(gate.state.key,changed.key);
+  source.dispose();model.geometry.dispose();map.dispose();
+});
+
+await check('eviction and in-place DEM replacement release only the borrowed preview, and late tiles can still enter', () => {
+  const gate = createCriticalTerrainGate(), root = new Group();
+  const map = new Texture({ width: 64, height: 64 });
+  const source = new MeshStandardMaterial({ map });
+  const model = new Mesh(new PlaneGeometry(), [source]); root.add(model);
+  const prepare = () => gate.hold(source, onRemove => previewTerrainTile(model, source, {
+    patchBend: applyBendFade, daylight: () => 0, onRemove,
+  }));
+  let disposed = 0;
+  map.addEventListener('dispose', () => disposed++);
+  prepare(); prepare(); assert.equal(gate.state.previews, 1);
+  model.geometry.dispose(); model.geometry = new PlaneGeometry();
+  assert.equal(gate.state.previews, 0); assert.equal(model.children.length, 0);
+  prepare(); assert.equal(model.children[0].geometry, model.geometry);
+  model.removeFromParent();
+  assert.equal(gate.state.previews, 0); assert.equal(model.children.length, 0);
+  assert.equal(disposed, 0);
+  source.dispose(); assert.equal(gate.state.held, 0);
+  map.dispose(); model.geometry.dispose(); gate.dispose();
+});
 
 await check('first-draw publication waits for driver completion and a matching pre-render frame', async () => {
   let time = 100, dispatches = 0, draws = 0;
@@ -209,7 +386,7 @@ await check('production ordering retains exact critical programs, and degraded r
   const read = path => fs.readFileSync(new URL('../' + path, import.meta.url), 'utf8');
   const component = read('components/fly/PrewarmRig.jsx'), warm = read('lib/fly/prewarm.js');
   assert.match(component, /\}, -0\.7\)/, 'After CSM −0.9 and environment −0.8; before reflection −0.5');
-  assert.match(component, /beforeWarm: \(\) => runtime\.terrainPrewarm\?\.wait\(\)/);
+  assert.match(component, /terrainGate: \(\) => runtime\.terrainPrewarm/);
   assert.match(warm, /compileCinemaProfiles\(\{ gl, camera, scene, createWarmScene,/);
   assert.match(warm, /currentProgram\?\.cacheKey/);
   assert.match(warm, /return await cache\.retain\(key, job\)/);
@@ -223,6 +400,37 @@ await check('production ordering retains exact critical programs, and degraded r
 // unrelated React postprocessing inventory into Node. Only renderer services
 // are injected; this is the source function, not a reimplementation.
 const warmSource = fs.readFileSync(new URL('../lib/fly/prewarm.js', import.meta.url), 'utf8');
+await check('boot dispatches measured world after terrain submission and fences generic warm past a curtain timeout', async () => {
+  const terrain = createCriticalTerrainGate(), driver = deferred(), measured = deferred(), events = [];
+  const state = { worldProfiles: {} };
+  const start = warmSource.indexOf('export async function runPrewarm(');
+  const end = warmSource.indexOf('\n/**', start);
+  const deps = {
+    PREWARM: { enabled: true }, _state: state, settleOn: () => false, cinemaOn: () => true,
+    warmMeasuredWorld() { events.push('measured'); return measured.promise; },
+    buildWarmScene() { events.push('generic'); return {}; }, _keep: { materials: [] },
+    compileUnder: () => Promise.resolve(), dummyRT: () => ({}), shipPassOn: () => false,
+    drain: () => Promise.resolve(), queueAltShadowWarm() {}, publishPrewarmStats() {},
+  };
+  const run = Function(...Object.keys(deps),
+    warmSource.slice(start, end).replace('export ', '') + '\nreturn runPrewarm;')(...Object.values(deps));
+  const warm = run({ terrainGate: () => terrain });
+  await Promise.resolve();
+  assert.deepEqual(events, []);
+  step(terrain, () => { events.push('terrain'); return driver.promise; });
+  await Promise.resolve();
+  assert.deepEqual(events, ['terrain', 'measured']);
+  assert.equal(terrain.state.compiledAt, null);
+  measured.resolve(); terrain.bypass('time-cap');
+  await terrain.wait(); await Promise.resolve();
+  assert.deepEqual(events, ['terrain', 'measured']);
+  driver.resolve(); await driver.promise; await Promise.resolve();
+  assert.deepEqual(events, ['terrain', 'measured'], 'Wait for a matching frame before sharing terrain keys');
+  step(terrain, () => assert.fail('Already submitted'), { covered: false });
+  await warm;
+  assert.deepEqual(events, ['terrain', 'measured', 'generic']);
+  assert.equal(state.done, true);
+});
 const dispatchStart = warmSource.indexOf('export async function compileCriticalTerrain(');
 const dispatchEnd = warmSource.indexOf('\n/**', dispatchStart);
 const underStart = warmSource.indexOf('function compileUnder('), underEnd = warmSource.indexOf('\nfunction dummyRT', underStart);

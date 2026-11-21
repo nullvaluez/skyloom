@@ -107,11 +107,15 @@ export function SatSkylineLayer({ runtime, flight }) {
     }
     if (extra.length) engine.setWorker(api, extra.map((e) => e.a));
     else engine.setWorker(api);
-    // Boot and warp reserve imagery bandwidth. Moving rings keep a small
-    // background allowance so their distant buildings eventually get photos.
+    // Give terrain and the local city first use of imagery bandwidth. Once
+    // both are present the curtain may still be waiting for GPU programs.
+    // Prepare resident roofs during that wait at the existing busy-ring rate.
     if (engine.standInsOn) {
       engine.setPhotoGate(() => {
-        if (terrainArrivalCovered(runtime, window.__flyBoot, useFlyStore.getState().phase)) return false;
+        if (terrainArrivalCovered(runtime, window.__flyBoot, useFlyStore.getState().phase)) {
+          const parts = runtime.worldReadiness?.parts;
+          return parts?.terrain && parts.surfaces && parts.buildings ? 'busy' : false;
+        }
         const s = runtime.satBuildings?.stats;
         return s && (s.queued || s.building || s.draping) ? 'busy' : true;
       });

@@ -115,7 +115,7 @@ import { PoiLetters } from './PoiLetters';
 import { TrafficTracers } from './TrafficTracers';
 import { WarpBurst } from './WarpBurst';
 import { TerrainEngine } from '@/lib/fly/terrain-engine';
-import { createCriticalTerrainGate, terrainArrivalCovered } from '@/lib/fly/critical-terrain-prewarm.mjs';
+import { createCriticalTerrainGate, previewTerrainTile, terrainArrivalCovered } from '@/lib/fly/critical-terrain-prewarm.mjs';
 import {
   createImagerySource,
   createTerrainSources,
@@ -1160,6 +1160,7 @@ export function FlyScene({ runtime }) {
   const aircraftId = useFlyStore((s) => s.aircraftId);
   const aircraft = useMemo(() => resolveAircraft(aircraftId), [aircraftId]);
   const pilotAvailable = hasPilotSeat({ aircraftId });
+  const draftCockpit = useFlyStore(s => s.screen==='hangar' ? s.hangarCockpitId : null);
   const pilotExterior = useRef(null);
   const pilot = useMemo(() => new PilotCamera(aircraftId), [aircraftId]);
   // Built ONCE with the pick that was resolved pre-mount (FlyMode resolves the
@@ -1618,7 +1619,8 @@ export function FlyScene({ runtime }) {
     const gate = PREWARM.enabled && store.mapStyle === 'satellite' && covered ? createCriticalTerrainGate() : null;
     if (gate) { runtime.terrainPrewarm = gate; runtime.criticalTerrain = gate.state; }
     const offDispose = gate ? engine.onDispose(() => gate.dispose()) : null;
-    const offMaterials = engine.onTileMaterial((m) => {
+    const daylight = () => runtime.cinemaEnvironment?.day ?? runtime.sun?.frac ?? .25;
+    const offMaterials = engine.onTileMaterial((m, model) => {
         applyBendFade(m);
         // R24 D: the third argument is the per-material LOD crossfade slot —
         // null (and therefore an exact R19 program, key and text) whenever
@@ -1640,9 +1642,16 @@ export function FlyScene({ runtime }) {
           m.map.anisotropy = aniso;
           m.map.needsUpdate = true;
         }
-        // Hold draw publication, never the renderer-driven map/LOD tree.
-        // All shader patches above still run before the critical compile.
-        gate?.hold(m);
+        // The resident tile projects its own imagery while the exact lit
+        // material waits for the driver. The LOD tree continues updating.
+        // A style change leaves existing imagery in use until three-tile
+        // replaces it. Do not hold newly loaded toy materials or cancel the
+        // outstanding critical warm while the earlier models drain.
+        if (gate && useFlyStore.getState().mapStyle === 'satellite') {
+          gate.hold(m, onRemove => previewTerrainTile(model, m, {
+            patchBend: applyBendFade, daylight, onRemove,
+          }));
+        }
       });
     return () => {
       offMaterials(); offDispose?.(); gate?.dispose();
@@ -3783,7 +3792,11 @@ export function FlyScene({ runtime }) {
         {pilotAvailable ? <group ref={pilotExterior}><PlayerPlane key={aircraftId} flight={flight} aircraft={aircraft} /></group>
           : <PlayerPlane key={aircraftId} flight={flight} aircraft={aircraft} />}
       </group>
-      {pilotAvailable && <Suspense fallback={null}><PilotInterior key={aircraftId} aircraftId={aircraftId} runtime={runtime} pilot={pilot} /></Suspense>}
+      {(pilotAvailable || draftCockpit) && <Suspense fallback={null}>
+        {[pilotAvailable && aircraftId, draftCockpit!==aircraftId && draftCockpit].filter(Boolean).map(id =>
+          <PilotInterior key={id} aircraftId={id} runtime={runtime} pilot={id===aircraftId ? pilot : null} />
+        )}
+      </Suspense>}
 
       {/* Traffic writes rebased instance matrices — must stay OUTSIDE worldRoot */}
       <TrafficLayer runtime={runtime} flight={flight} origin={origin} />

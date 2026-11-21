@@ -20,7 +20,7 @@ let passed = 0;
 function check(name, test) { test(); passed++; console.log(`PASS ${name}`); }
 
 function environment({ cinematic = true, style = 'satellite' } = {}) {
-  const frames = [], cleanups = [], state = { mapStyle: style, qualityTier: 'high' };
+  const frames = [], cleanups = [], state = { mapStyle: style, qualityTier: 'high', screen: 'flight' };
   state.setQualityTier = tier => { state.qualityTier = tier; };
   const window = { location: { search: cinematic ? '?graphics=cinematic' : '?graphics=legacy' },
     devicePixelRatio: 1, __flyBoot: { pct: 100 } };
@@ -35,7 +35,8 @@ function environment({ cinematic = true, style = 'satellite' } = {}) {
     // Imports added since the gate was written (stubs read no browser).
     cinemaOn: () => cinematic && state.mapStyle === 'satellite', cinemaProfile: () => ({ targetFps: 60 }),
     setCinemaEffectLevel: () => {}, resolveCinemaProfile, ladderOrderOn, isMobileGraphicsClass: () => false,
-    initialRenderDpr: () => 1, ultraSupersampleScale: () => null, menuOpen: () => false,
+    initialRenderDpr: () => 1, ultraSupersampleScale: () => null,
+    menuOpen: s => !!s.hangarOpen || s.screen === 'title',
     shipPassOn: () => false, shipPassBlock: () => null, deviceFeature: () => ({ allowed: false, budget: {} }),
     ...paceAdapt, ...frameApi,
   });
@@ -142,6 +143,129 @@ check('legacy STEP_SAFE pin alias and explicit override retain their precedence'
   assert.equal(shell.ctx.takeDpr(), 0.875); assert.equal(immediate.length, 1);
 });
 shell.cleanups.forEach(fn => fn());
+
+check('hidden tabs, the title and the hangar cannot drive an automatic quality change', () => {
+  const env = environment();
+  const document = new EventTarget();
+  document.hidden = false;
+  env.ctx.document = document;
+  env.ctx.PerfGovernor({ setDpr() {} });
+  env.ctx.takeDpr();
+  const tick = env.frames.find(frame => frame.priority === -100).fn;
+  const run = (frames, dt) => { for (let i = 0; i < frames; i++) tick({}, dt); };
+  run(900, 1 / 60);
+  const initial = env.window.__flyGov.state();
+  assert.ok(initial.sampled > 0);
+  document.hidden = true;
+  run(400, .1);
+  document.hidden = false;
+  env.state.screen = 'title';
+  run(400, .1);
+  env.state.screen = 'hangar'; env.state.hangarOpen = true;
+  run(400, .1);
+  assert.equal(env.window.__flyGov.state().sampled, initial.sampled);
+  assert.equal(env.window.__flyGov.state().rung, initial.rung);
+  assert.equal(env.ctx.takeDpr(), null);
+  env.state.screen = 'flight'; env.state.hangarOpen = false;
+  tick({}, 2); // the first RAF may include the hidden-tab gap
+  assert.equal(env.window.__flyGov.state().rung, initial.rung);
+  run(120, .1);
+  assert.ok(env.window.__flyGov.state().rung > initial.rung, 'genuinely slow visible flight still reduces work');
+  env.cleanups.forEach(fn => fn());
+});
+
+check('held pictures cannot drive a recovery and a streaming frame still counts', () => {
+  const env = environment();
+  env.ctx.PerfGovernor({ setDpr() {} });
+  const main = { enabled: true, frames: 0 };
+  const frameState = { gl: { __flyMainDraw: main } };
+  const tick = env.frames.find(frame => frame.priority === -100).fn;
+  const run = (count, draw) => {
+    for (let i = 0; i < count; i++) {
+      tick(frameState, 1 / 144);
+      if (draw) main.frames++;
+    }
+  };
+  run(1440, true);
+  assert.equal(env.window.__flyGov.force(-1), true);
+  const lowered = env.window.__flyGov.state().rung;
+  run(720, true);
+  assert.equal(env.window.__flyGov.state().rung, lowered);
+  const last = env.window.__flyGov.state().sampled;
+  run(1, false); // the preceding frame drew
+  const beforeHold = env.window.__flyGov.state().sampled;
+  assert.equal(beforeHold, last + 1);
+  run(2160, false);
+  const held = env.window.__flyGov.state();
+  assert.equal(held.sampled, beforeHold);
+  assert.equal(held.rung, lowered);
+  assert.equal(held.emaFps, 0);
+  env.window.__flyStats.composerWarm = { holdReason: 'local', heldObjects: 8 };
+  run(3, true);
+  assert.equal(env.window.__flyGov.state().sampled, beforeHold + 1, 'resume frame excluded, following streaming sample accepted');
+  run(3 * 144, true);
+  assert.equal(env.window.__flyGov.state().rung, lowered, 'dwell before the hold cannot carry over');
+  run(10 * 144, true);
+  assert.equal(env.window.__flyGov.state().rung, lowered - 1, 'fresh visible frames can recover');
+  env.cleanups.forEach(fn => fn());
+});
+
+check('interrupting a cadence window preserves an existing lock and discards unfinished evidence', () => {
+  const lock = paceAdapt.createCadenceLock({ windowFrames: 10 });
+  for (let i = 0; i < 9; i++) lock.step(1000 / 30, 4);
+  lock.interrupt();
+  assert.equal(lock.step(1000 / 30, 4), null);
+  for (let i = 0; i < 9; i++) lock.step(1000 / 30, 4);
+  assert.equal(lock.locked, 30);
+  lock.interrupt();
+  assert.equal(lock.locked, 30);
+});
+
+check('a queued DPR waits past the valve until the visible composer can draw', () => {
+  const rig = environment(), writes = [], size = { width: 800, height: 450 };
+  let ratio = 1, now = 0, valve;
+  const gl = {
+    domElement: { width: 800, height: 450, style: { width: '800px', height: '450px' } },
+    setPixelRatio(dpr) { ratio = dpr; writes.push(['dpr', dpr]); },
+    getPixelRatio: () => ratio,
+    getSize: scratch => scratch.set(size.width, size.height),
+    setSize(width, height) {
+      this.domElement.width = width * ratio;
+      this.domElement.height = height * ratio;
+      writes.push(['canvas', width, height]);
+    },
+    setViewport() {},
+  };
+  const composer = { setSize: (w, h) => writes.push(['composer', w, h]) };
+  rig.ctx.performance = { now: () => now };
+  rig.ctx.document = { hidden: false };
+  rig.ctx.setInterval = fn => { valve = fn; };
+  rig.ctx.clearInterval = () => {};
+  rig.ctx.useThree = select => select({ gl });
+  const source = fs.readFileSync(new URL('../components/fly/StepSafeRig.jsx', import.meta.url), 'utf8');
+  vm.runInContext(plain(source), rig.ctx, { filename: 'StepSafeRig.jsx' });
+  rig.ctx.registerComposer(composer);
+  gl.__flyMainDraw = { owner: composer, enabled: true };
+  rig.ctx.StepSafeRig({ setDpr: value => writes.push(['state', value]) });
+  rig.ctx.parkDpr(.75);
+  rig.frames[0].fn({ gl, size });
+  now = 1100;
+  valve();
+  assert.equal(rig.ctx.peekDpr(), .75);
+  assert.deepEqual(writes, [], 'A pending render must keep the current drawing buffer');
+  gl.__flyMainDraw.applyDpr();
+  assert.deepEqual(writes, [['dpr', .75], ['canvas', 800, 450], ['composer', 800, 450], ['state', .75]]);
+  assert.equal(rig.ctx.peekDpr(), null);
+  assert.equal(gl.domElement.width, 600);
+
+  rig.ctx.document.hidden = true;
+  rig.ctx.parkDpr(1);
+  now = 2200;
+  valve();
+  assert.equal(rig.ctx.peekDpr(), null, 'A hidden tab still has the existing valve');
+  assert.deepEqual(writes.at(-1), ['state', 1]);
+  rig.cleanups.forEach(fn => fn());
+});
 
 const changingEnv = environment({ style: 'toy' }), changing = session(changingEnv);
 changing.run(8);

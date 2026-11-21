@@ -23,12 +23,9 @@
  *     produces from the same input — including the cases where the boundary
  *     scan must DECLINE and leave the skirt to the main thread.
  *
- * What this does NOT prove, and cannot prove in this container: that the
- * production LERC path streams correctly end to end. E's offline fixture serves
- * terrain-rgb, and three-tile's terrain-rgb loader builds its geometry on the
- * MAIN thread (`setData`), so the geometry-returning worker path is only
- * exercised by Esri LERC tiles — 403-blocked here. `skirtWorker` therefore
- * ships BUILT-BUT-OFF pending a run on the user's machine.
+ * The live flight comparison in review-flight-throughput.cjs also records
+ * completed worker skirts and hashes the actual resident DEM buffers. The
+ * offline terrain-rgb fixture exercises the main-thread fallback.
  */
 import { mkdirSync, copyFileSync, rmSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -55,13 +52,9 @@ const gate = (name, ok, detail = '') => {
 console.log('verify-skirt-worker — the DEM worker tail (recon T2 / A2, the F2 half)\n');
 
 // ---------------------------------------------------------- 0. the SHIP state
-// This gate is 8/8 green and the feature still ships OFF: the path it patches
-// is unreachable in the fixture (three-tile's terrain-rgb loader builds
-// geometry on the MAIN thread; only Esri LERC tiles reach the geometry
-// worker). A green gate is not a certification of a path nothing exercised.
 const shipSW = checkShip('TERRA_PACE');
-gate('0 skirtWorker ships OFF pending one real-hardware run',
-  shipSW.got.skirtWorker === false, `skirtWorker=${shipSW.got.skirtWorker}`);
+gate('0 LERC workers build terrain skirts by default',
+  shipSW.got.skirtWorker === true, `skirtWorker=${shipSW.got.skirtWorker}`);
 
 // ------------------------------------------------------- 1. the build is fresh
 const srcText = readFileSync(

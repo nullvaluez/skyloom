@@ -56,7 +56,7 @@ export const SHIP = {
     // and a 600 s sweep with identical flags. Ships ON with keepResident.
     parkOffscreen: true,
     // OFF, each with the run it waits for (see scripts/r24-a-pace.md §12):
-    skirtWorker: false, // needs one real-hardware run (the LERC worker path is unreachable in the fixture)
+    skirtWorker: true, // live Esri LERC sends finished vertex/index buffers
     bendSphere: false, // needs one real-hardware run (it submits tiles that are culled today)
     parallelLoad: false, // not implemented this round
     imageBitmap: false, // not implemented this round

@@ -51,6 +51,10 @@ assert.match(vertex, /vec3 objectNormal = vec3\( standInNormal \)/);
 assert.match(vertex, /vColor\.rgb \*= standInColor;/);
 assert.match(vertex, /vBuildingStyle = standInStyle;/);
 assert.match(vertex, /vFacadeMetres = \(standInUV/);
+assert.ok(vertex.indexOf('if (vStandInFade <= 0.0)')<vertex.indexOf('float sCy = cos(sDim.w)'));
+assert.ok(vertex.includes('if (uArchitectureNearFade * vArchitectureCovered >= 1.0)'));
+assert.ok(shader.fragmentShader.includes('wbBayer4(gl_FragCoord.xy) < uArchitectureNearFade * vArchitectureCovered'));
+assert.equal(vertex.match(/vArchitectureCovered = architectureCoverage\(/g)?.length,1);
 
 // For the reported +0.107-degree sun, the authored photo-ground blend must
 // reduce the directly facing low wall's horizon light. Near walls and towers
@@ -81,8 +85,17 @@ assert.equal(standIns.length, 1, 'active stand-in prepared exactly once');
 assert.equal(warm.scene.children.length, 20);
 assert.equal(standIns[0].isInstancedMesh, undefined, 'same ordinary Mesh over instanced geometry as live engine');
 assert.equal(standIns[0].geometry.isInstancedBufferGeometry, true);
+assert.equal(standIns[0].geometry.attributes.aCityRank.getX(0), 32, 'shipped approach rank survives the warm geometry clone');
+assert.equal(warm.scene.getObjectByName('homes').geometry.attributes.aHomeBorn.count,3);
 assert.notEqual(standIns[0].geometry.attributes.normal, standInBase().normal, 'warm disposer cannot release live shared buffers');
 warm.dispose();
+
+window.__flyWorldPassTierOverride = false; WP.__resetWorldPassLatchForTests();
+const compactWarm = createMeasuredWorldWarmScene();
+const compact = compactWarm.scene.getObjectByName('architecture-standin');
+assert.ok(compact && compact.material.customProgramCacheKey().includes('-0.9-1'), 'compact warm shader uses the live single-layer sampler');
+compactWarm.dispose();
+window.__flyWorldPassTierOverride = true; WP.__resetWorldPassLatchForTests();
 
 // Reuse the existing fake renderer, which obtains cache keys and compiled
 // hooks through Three.WebGLPrograms. Its driver readiness is controllable.

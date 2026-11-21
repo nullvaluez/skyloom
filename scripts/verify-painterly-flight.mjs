@@ -155,6 +155,30 @@ await check('WorldCover appearance feather preserves raw geography, roads and co
   assert.deepEqual(b.blend,new Uint8Array(256).fill(255));assert.equal(a.classes[8*16+7],before[8*16+7]);
   for(let i=0;i<256;i++)assert.ok(out[i]<=a.blend[i]); // feather never expands paint
 });
+await check('incremental neighbour arrivals reproduce the full feather and every packed atlas texel',()=>{
+  const size=64;
+  const make=seed=>({size,classes:Uint8Array.from({length:size*size},(_,i)=>(seed+Math.floor(i/size/8)+Math.floor((i%size)/5))%15),
+    exclusion:Uint8Array.from({length:size*size},(_,i)=>i%27===0?255:0),
+    blend:Uint8Array.from({length:size*size},(_,i)=>(i*31+seed)%256)});
+  const setup=()=>{
+    const band={i:0,size,texture:makeEarthAtlas(size*4),classTexture:makeEarthClassAtlas(size*4),
+      slots:Array.from({length:16},(_,i)=>({key:`14/${i%4}/${Math.floor(i/4)}`}))};
+    const ctx={paint:true,classAtlas:makeEarthClassAtlas(EARTH_CLASS_LAYOUT.width,EARTH_CLASS_LAYOUT.height),
+      appearanceAtlas:makeEarthAtlas(EARTH_CLASS_LAYOUT.width,EARTH_CLASS_LAYOUT.height),rects:[],
+      _packClassSlot(b,index,...rect){this.rects.push(rect);EarthSurfaceEngine.prototype._packClassSlot.call(this,b,index,...rect);}};
+    return {band,ctx,write:()=>EarthSurfaceEngine.prototype._writeSlot.call(ctx,band,5,band.slots[5].mask)};
+  };
+  const inc=setup(),full=setup();inc.band.slots[5].mask=full.band.slots[5].mask=make(0);
+  for(const i of [5,6,2,0,4,8,9,1,10,6]){
+    inc.band.slots[i].mask=full.band.slots[i].mask=make(i+1);
+    inc.write();full.band.slots[5].writtenMask=null;full.write();
+    assert.deepEqual(inc.ctx.appearanceAtlas.image.data,full.ctx.appearanceAtlas.image.data);
+    assert.deepEqual(inc.ctx.classAtlas.image.data,full.ctx.classAtlas.image.data);
+    if(i!==5){const [, ,w,h]=inc.ctx.rects.at(-1);assert.ok(w*h<=size*3);}
+  }
+  const n=inc.ctx.rects.length;inc.write();assert.equal(inc.ctx.rects.length,n);
+  for(const {band,ctx} of [inc,full]){band.texture.dispose();band.classTexture.dispose();ctx.classAtlas.dispose();ctx.appearanceAtlas.dispose();}
+});
 await check('Classic appearance atlas restores byte-for-byte after a painterly round trip',()=>{
   const size=256,mask={size,classes:new Uint8Array(size*size).fill(1),exclusion:new Uint8Array(size*size),blend:new Uint8Array(size*size).fill(255)};
   for(let y=0;y<size;y++)mask.classes.fill(14,y*size+128,(y+1)*size);

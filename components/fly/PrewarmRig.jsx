@@ -6,7 +6,7 @@ import { ENV_UNIFORM as ENV_UNIFORM_BLOCK, PREWARM, SETTLE_CALM } from '@/lib/fl
 import { pinned } from '@/lib/fly/fly-pins';
 // SHIP PASS FRAME (FR-3): ENV_UNIFORM through its pin (?flags=ENV_UNIFORM), as prewarm.js.
 const ENV_UNIFORM = pinned(ENV_UNIFORM_BLOCK, '__flyEnvUniformOverride');
-import { compileCriticalTerrain, prewarmPending, prewarmSliceStep, prewarmState, pumpRequeue, requeueForEnvironment, runPrewarm } from '@/lib/fly/prewarm';
+import { compileCriticalTerrain, prewarmBusyUnitPending, prewarmPending, prewarmSliceStep, prewarmState, pumpRequeue, requeueForEnvironment, runPrewarm } from '@/lib/fly/prewarm';
 import { terrainArrivalCovered } from '@/lib/fly/critical-terrain-prewarm.mjs';
 import { cinemaOn } from '@/lib/fly/cinema-policy';
 import { bumpArrival, noteFrame, popinState, settleOn } from '@/lib/fly/settle';
@@ -83,10 +83,8 @@ export function PrewarmRig({ runtime }) {
 
   // The long-frame census + the post-reveal compile slice, both on the RAW
   // inter-frame delta at priority -99 (behind the governor at -100, ahead of
-  // everything that draws). A unit is only ever taken on a frame that already
-  // had room: a compile is a synchronous driver stall, and spending one on a
-  // frame that is ALREADY long is how R21's straight-line warm produced the
-  // stutter this replaces.
+  // everything that draws). Optional work normally uses comfortable frames.
+  // The bounded generic material units can make paced progress on slow ones.
   const sliceRef = useRef(false);
   const sliceWaitRef = useRef(0);
   const envSeenRef = useRef(false);
@@ -95,7 +93,7 @@ export function PrewarmRig({ runtime }) {
   const warmedWithEnvRef = useRef(false);
   useFrame((_, delta) => {
     noteFrame(delta);
-    if (!settleOn()) return;
+    if (!settleOn() || (typeof document !== 'undefined' && document.hidden)) return;
     // THE ENVIRONMENT RE-KEY. A warm that ran before the HDRI resolved (the
     // PREWARM.envWaitMs cap firing on a cold or throttled fetch) minted the
     // no-environment permutation of every lit material; the moment
@@ -115,15 +113,18 @@ export function PrewarmRig({ runtime }) {
     // frames with no opportunity the bar rises to the frame time that machine
     // is actually delivering — still never a frame that is ALREADY the worst
     // one, which is the whole rule.
-    sliceWaitRef.current += delta;
+    sliceWaitRef.current += Math.min(delta, .1);
     // SHIP PASS FRAME (FR-7, PACE_ADAPT.sliceBar): the bar follows the
     // governor's target interval (sliceBarSec), so a 30 Hz page drains at
     // ~48 ms instead of waiting 20 s for a 24 ms frame it never draws.
     const bar = sliceWaitRef.current > 20 ? Math.max(0.05, SLICE_BAR(0.024)) : SLICE_BAR(0.024);
-    if (delta > bar) return;
+    const busy = delta > bar;
+    // A saturated flight may never reach even the relaxed threshold. The
+    // small generic units get one slot at a time; other jobs keep waiting.
+    if (busy && (sliceWaitRef.current < 1.25 || !prewarmBusyUnitPending())) return;
     sliceWaitRef.current = 0;
     sliceRef.current = true;
-    prewarmSliceStep(SETTLE_CALM.prewarmSlice?.perIdleRaf ?? 1).finally(() => {
+    prewarmSliceStep(busy ? 1 : SETTLE_CALM.prewarmSlice?.perIdleRaf ?? 1, { busy }).finally(() => {
       sliceRef.current = false;
     });
   }, -99);
@@ -145,13 +146,15 @@ export function PrewarmRig({ runtime }) {
     const gate = runtime?.terrainPrewarm;
     if (!gate) return;
     if (runtime.prewarm) runtime.prewarm.criticalTerrain = gate.state;
-    if (!['waiting', 'compiling', 'failed', 'bypassed'].includes(gate.state.status)) return;
+    if (!['waiting', 'compiling', 'failed', 'bypassed', 'publishing'].includes(gate.state.status)) return;
     const environment = scene.environment;
     const key = [environment?.id ?? 'none', environment?.mapping ?? '',
       runtime.cinemaShadows?.cascades ?? 'legacy', store.mapStyle, store.visuals, store.qualityTier,
       gl.shadowMap.enabled, gl.shadowMap.type].join('/');
     gate.tick({
       key,
+      style: store.mapStyle + '/' + store.visuals,
+      canStageTile: gl.__flyMainDraw?.canStageTerrain,
       parallel: gl.extensions.has('KHR_parallel_shader_compile'),
       covered: terrainArrivalCovered(runtime, typeof window !== 'undefined' ? window.__flyBoot : null, store.phase),
       available: (!!environment || performance.now() - gate.state.createdAt >= PREWARM.envWaitMs)
@@ -176,7 +179,7 @@ export function PrewarmRig({ runtime }) {
         camera,
         scene,
         adoptWarmScene: (object) => runtime.adoptCinematicWarmScene?.(object),
-        beforeWarm: () => runtime.terrainPrewarm?.wait(),
+        terrainGate: () => runtime.terrainPrewarm,
       });
     };
     const wait = () => {

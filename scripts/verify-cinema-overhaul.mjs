@@ -170,7 +170,57 @@ check('cloud banks preserve periodicity, open sky, volume and weather coverage',
  assert.ok(empty>full&&full>100);assert.equal(cinemaCloudDensity(100,1499,100,{},noise),0);
 });
 const {EarthSurfaceEngine}=await import('../lib/fly/earth-surface-engine.js');
-const {EARTH_CLASS_LAYOUT,makeEarthAtlas,makeEarthClassAtlas}=await import('../lib/fly/earth-surface-material.js');
+const {EARTH_CLASS_LAYOUT,applyEarthSurface,makeEarthAtlas,makeEarthClassAtlas}=await import('../lib/fly/earth-surface-material.js');
+check('cinema skips only bands fully overwritten by a finer geographic sample',()=>{
+ const material=new THREE.MeshStandardMaterial();
+ const prior=useFlyStore.getState().visuals;
+ const compile=visuals=>{
+   useFlyStore.setState({visuals});
+   const shader={uniforms:{},vertexShader:THREE.ShaderLib.standard.vertexShader,fragmentShader:THREE.ShaderLib.standard.fragmentShader};
+   material.onBeforeCompile(shader,{});
+   return shader.fragmentShader;
+ };
+ try {
+   applyEarthSurface(material);
+   const cinema=compile('enhanced');
+   const cinemaKey=material.customProgramCacheKey();
+   assert.match(cinemaKey,/fine-first/);
+   const blend=cinema.slice(cinema.indexOf('float coverage = 0.0;'));
+   const ordered=[...blend.matchAll(/earthBand([012])\(vEarthFlat|if \((fineBand|middleBand)\.amount != 1\.0\)|float amount=(\w+Band)\.amount/g)].map(m=>m[1]??m[2]??m[3]);
+   assert.deepEqual(ordered,['2','fineBand','1','middleBand','0','coarseBand','middleBand','fineBand']);
+   assert.match(blend,/earthNatural=mix\([^;]+;\s*}\s*}\s*\{\s*float amount=middleBand/);
+   assert.match(blend,/earthNatural=mix\([^;]+;\s*}\s*}\s*\{\s*float amount=fineBand/);
+   assert.match(cinema,/textureLod\(uEarthClasses,uv,0\.0\)/);
+   assert.doesNotMatch(cinema,/texture2D\(uEarthClasses,/);
+   const classic=compile('classic');
+   assert.notEqual(material.customProgramCacheKey(),cinemaKey);
+   assert.deepEqual([...classic.matchAll(/earthBand([012])\(vEarthFlat/g)].map(m=>m[1]),['0','1','2']);
+   assert.doesNotMatch(classic,/struct EarthBandSample/);
+ } finally { useFlyStore.setState({visuals:prior}); material.dispose(); }
+});
+check('opaque, empty and mixed masks preserve material IDs, transitions and continuous channels',()=>{
+ const smooth=(lo,hi,x)=>{const t=Math.max(0,Math.min(1,(x-lo)/(hi-lo)));return t*t*(3-2*t);};
+ const mix=(a,b,t)=>a*(1-t)+b*t;
+ function apply(state,band){
+   const {amount,layer,classified,confidence}=band;
+   const nextWeight=layer<0?0:classified*confidence;
+   if(layer===state.layer)state.weight=mix(state.weight,nextWeight,amount);
+   else if(amount<=.5)state.weight*=1-smooth(0,.5,amount);
+   else {state.layer=layer;state.weight=nextWeight*smooth(.5,1,amount);}
+   state.coverage=mix(state.coverage,classified,amount);
+ }
+ const masks=[0,.125,.5,.50001,.875,1-2**-24,1,1+2**-23];
+ for(const x of masks)for(const y of masks)for(const z of masks){
+   for(const layers of [[0,0,0],[1,2,1],[2,1,-1],[-1,0,0],[-1,-1,1]]){
+     const bands=[x,y,z].map((amount,i)=>({amount,layer:layers[i],classified:[.35,0,.9][i],confidence:[1,.25,.7][i]}));
+     const before={layer:-1,weight:0,coverage:.25},after={...before};
+     bands.forEach(b=>apply(before,b));
+     const first=z===1?2:y===1?1:0;
+     bands.slice(first).forEach(b=>apply(after,b));
+     assert.deepEqual(after,before);
+   }
+ }
+});
 const {CITY_HEIGHT_LAYOUT}=await import('../lib/fly/city-height-grid.mjs');
 for (const appearance of [EARTH_CLASS_LAYOUT, CITY_HEIGHT_LAYOUT]) {
 check(`packed ${appearance.width}×${appearance.height} atlas retains every terrain byte`,()=>{

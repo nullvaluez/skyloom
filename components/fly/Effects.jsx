@@ -15,6 +15,7 @@ import { r25On } from '@/lib/fly/visuals-profile';
 import { R25_SKY } from '@/lib/fly/fly-constants';
 import { releaseBloomTargets } from '@/lib/fly/release-bloom-targets';
 import { HDRGradeEffect } from '@/lib/fly/hdr-grade';
+import { hdrGuardBloom } from '@/lib/fly/hdr-guard';
 import { mobileEnhancedOn, resolveMobileEnhanced } from '@/lib/fly/mobile-enhanced';
 import { MobileBloomEffect } from '@/lib/fly/mobile-bloom';
 
@@ -23,7 +24,6 @@ import { forwardRef, memo, useCallback, useEffect, useLayoutEffect, useMemo, use
 import { Vector2 } from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
 import {
-  Bloom,
   BrightnessContrast,
   DepthOfField,
   HueSaturation,
@@ -97,15 +97,23 @@ const TONE_MODES = {
 
 const lerp = (a, b, t) => a + (b - a) * t;
 
-// Keep raw()/el() on the same effect constructor. In particular, the normal
-// <Bloom> wrapper cannot resize its mipmap targets with resolutionScale.
-const MobileBloom = forwardRef(function MobileBloom({ intensity, luminanceThreshold, luminanceSmoothing, resolutionScale, levels }, ref) {
-  const effect = useMemo(() => new MobileBloomEffect({
+function makeBloom(intensity, luminanceThreshold, resolutionScale, levels) {
+  const options = {
     blendFunction: BlendFunction.ADD,
+    mipmapBlur: true,
     intensity,
     luminanceThreshold,
-    luminanceSmoothing,
-  }, { scale: resolutionScale, levels }), [intensity, luminanceThreshold, luminanceSmoothing, resolutionScale, levels]);
+    luminanceSmoothing: 0.2,
+    resolutionScale,
+  };
+  return hdrGuardBloom(levels == null
+    ? new BloomEffect(options)
+    : new MobileBloomEffect(options, { scale: resolutionScale, levels }));
+}
+
+const SceneBloom = forwardRef(function SceneBloom({ intensity, luminanceThreshold, resolutionScale, levels }, ref) {
+  const effect = useMemo(() => makeBloom(intensity, luminanceThreshold, resolutionScale, levels),
+    [intensity, luminanceThreshold, resolutionScale, levels]);
   useEffect(() => () => effect.dispose(), [effect]);
   return <primitive object={effect} ref={ref} dispose={null} />;
 });
@@ -254,43 +262,21 @@ export function buildPassList(style, tier, ctx = {}) {
     if (ctx.overlay) list.push({id:'sky-overlays',boundary:true,el:()=> <primitive key="sky-overlays" object={ctx.overlay} dispose={null} />,raw:()=>null});
   }
   if (bloomScale > 0) {
+    const scale = mobileBloom ? mobileBloomBudget.bloomScale : bloomScale;
+    const levels = mobileBloom ? mobileBloomBudget.bloomLevels : undefined;
     list.push({
       id: 'bloom',
-      el: () => mobileBloom ? (
-        <MobileBloom
+      el: () => (
+        <SceneBloom
           key="bloom"
           ref={ctx.setBloom}
           intensity={bloom.intensity}
           luminanceThreshold={bloom.threshold}
-          luminanceSmoothing={0.2}
-          resolutionScale={mobileBloomBudget.bloomScale}
-          levels={mobileBloomBudget.bloomLevels}
-        />
-      ) : (
-        <Bloom
-          key="bloom"
-          ref={ctx.setBloom}
-          mipmapBlur
-          intensity={bloom.intensity}
-          luminanceThreshold={bloom.threshold}
-          luminanceSmoothing={0.2}
-          resolutionScale={bloomScale}
+          resolutionScale={scale}
+          levels={levels}
         />
       ),
-      // wrapEffect(BloomEffect, { blendFunction: BlendFunction.ADD })
-      raw: () => {
-        const options = {
-          blendFunction: BlendFunction.ADD,
-          mipmapBlur: true,
-          intensity: bloom.intensity,
-          luminanceThreshold: bloom.threshold,
-          luminanceSmoothing: 0.2,
-          resolutionScale: bloomScale,
-        };
-        return mobileBloom
-          ? new MobileBloomEffect(options, { scale: mobileBloomBudget.bloomScale, levels: mobileBloomBudget.bloomLevels })
-          : new BloomEffect(options);
-      },
+      raw: () => makeBloom(bloom.intensity, bloom.threshold, scale, levels),
     });
   }
   if (speedOn) {
@@ -583,7 +569,7 @@ export const Effects = memo(function Effects({ runtime }) {
   useSyncExternalStore(subscribeCinemaEffects,getCinemaEffectLevel,()=>0);
   useFlyStore(s=>s.qualityPreset);
   const effective=cinemaOn()?cinemaProfile(sceneTier):null;
-  const qualityTier = effective ? (effective.cascades>=2?'high':effective.cascades===1?'medium':'low') : sat && satelliteVisualsOn()
+  const qualityTier = effective ? effective.effectsTier : sat && satelliteVisualsOn()
     ? satelliteEffectTier(sceneTier, renderDpr) : sceneTier;
   useEffect(() => { clouds?.setTier(qualityTier); }, [clouds,qualityTier]);
 

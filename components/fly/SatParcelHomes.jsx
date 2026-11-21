@@ -18,7 +18,8 @@ import {
   Vector3,
 } from 'three';
 import { mercatorScale } from '@/lib/fly/coords';
-import { BEND_LEAD, CHUNK_FADE, GLOBE, LAMBERT_ENV, PARCEL_HOMES, POOL_FAIR, SAT_VEG, SETTLE_CALM, SUBURB_NIGHT, SURFACE_CALM } from '@/lib/fly/fly-constants';
+import { BEND_LEAD, BUILDING_APPROACH, CHUNK_FADE, GLOBE, LAMBERT_ENV, PARCEL_HOMES, POOL_FAIR, SAT_VEG, SETTLE_CALM, SUBURB_NIGHT, SURFACE_CALM } from '@/lib/fly/fly-constants';
+import { BUILDING_APPROACH_ON } from '@/lib/fly/world-clarity';
 import { chunkFadeOn } from '@/lib/fly/toy-world/chunk-fade';
 import { applyBendAnchor } from '@/lib/fly/toy-world/world-bend';
 import {
@@ -36,7 +37,7 @@ import { useFlyStore } from '@/stores/fly-store';
 import { satelliteVisualsOn, satelliteVisualProfile } from '@/lib/fly/satellite-visuals';
 import { createCinematicHomeMaterial, createCinematicHomeDepthMaterial } from '@/lib/fly/cinematic-ground';
 import { nearGroundOn } from '@/lib/fly/near-ground';
-import { parcelGapDecision, parcelGapSourceReady, parcelGapSupported, parcelPlacementDue } from '@/lib/fly/parcel-gap';
+import { inParcelRing, parcelGapDecision, parcelGapSourceReady, parcelGapSupported, parcelPlacementDue, placeParcelRings, residentParcelSignature } from '@/lib/fly/parcel-gap';
 import { parcelRoadDistance, parcelRoadScan, stepParcelRoadScan } from '@/lib/fly/parcel-roads';
 import { lookShadowHomesCast } from '@/lib/fly/look-shadow';
 
@@ -140,9 +141,10 @@ function resolvedFrac(s, inFlight) {
  * bilinear grid — the same grid the canopy stands on and the tint drapes over,
  * so a house, its trees and its ground can never disagree.
  */
-export function SatParcelHomes({ engine, runtime, flight, tier }) {
+export function SatParcelHomes({ engine, residentEngine, runtime, flight, tier }) {
   const meshRef = useRef(null);
   const cinematic = useMemo(() => satelliteVisualsOn('ground'), []);
+  const arrivalClock = useMemo(() => cinematic && BUILDING_APPROACH_ON ? { value: 0 } : null, [cinematic]);
   const pool = PARCEL_HOMES.poolByTier[cinematic ? 'high' : tier] ?? 0;
   const stateRef = useRef({
     t: -Infinity,
@@ -205,10 +207,11 @@ export function SatParcelHomes({ engine, runtime, flight, tier }) {
   const geometry = useMemo(() => {
     const g = buildHouseGeometry();
     if (cinematic) g.setAttribute('aHomeVariant', new InstancedBufferAttribute(new Float32Array(pool), 1));
+    if (arrivalClock) g.setAttribute('aHomeBorn', new InstancedBufferAttribute(new Float32Array(pool), 1).setUsage(DynamicDrawUsage));
     return g;
-  }, [cinematic, pool]);
+  }, [arrivalClock, cinematic, pool]);
   const material = useMemo(() => {
-    if (cinematic) return createCinematicHomeMaterial(applyBendAnchor);
+    if (cinematic) return createCinematicHomeMaterial(applyBendAnchor, arrivalClock);
     const m = new MeshLambertMaterial({
       vertexColors: true,
       emissive: new Color(PARCEL_HOMES.night.color),
@@ -225,8 +228,8 @@ export function SatParcelHomes({ engine, runtime, flight, tier }) {
     // adds no program cache key.
     applyBendAnchor(m);
     return m;
-  }, [cinematic]);
-  const depthMaterial = useMemo(() => cinematic ? createCinematicHomeDepthMaterial(applyBendAnchor) : null, [cinematic]);
+  }, [cinematic, arrivalClock]);
+  const depthMaterial = useMemo(() => cinematic ? createCinematicHomeDepthMaterial(applyBendAnchor, arrivalClock) : null, [cinematic, arrivalClock]);
   useEffect(
     () => () => {
       geometry.dispose();
@@ -279,6 +282,8 @@ export function SatParcelHomes({ engine, runtime, flight, tier }) {
     const mesh = meshRef.current;
     if (!mesh) return;
     const t = clock.elapsedTime;
+    // eslint-disable-next-line react-hooks/immutability -- Three reads this shared shader uniform in the visible and depth passes.
+    if (arrivalClock) arrivalClock.value = t;
     const st = stateRef.current;
     if (cinematic && st.roadScan && stepParcelRoadScan(st.roadScan)) {
       st.roadIndex = st.roadScan;
@@ -305,7 +310,7 @@ export function SatParcelHomes({ engine, runtime, flight, tier }) {
       // A low tier retains a bounded set of geographically supported homes.
       const activePool = cinematic ? Math.floor(pool * satelliteVisualProfile(useFlyStore.getState().qualityTier).vegetation) : pool;
       if (st.visualPool !== activePool) { st.visualPool = activePool; st.sig = ''; }
-      if (placeHomes(mesh, engine, runtime, flight, st, activePool, t)) resetEnv(envRef.current);
+      if (placeHomes(mesh, engine, residentEngine, runtime, flight, st, activePool, t)) resetEnv(envRef.current);
       // eslint-disable-next-line react-hooks/immutability -- runtime is the scene's mutable bus (FlyScene RUNTIME CONTRACTS (R18))
       runtime.parcelSettle = { mounted: true, resolved: !st.held, placed: st.placed,
         localGapPlaced: st.localGapPlaced ?? 0, anchors: st.anchors,
@@ -746,9 +751,10 @@ function clearMeasurements(st) {
  * the local REAL footprint density, each laid out as a hash-rotated block of
  * houses on the chunk's own DEM grid. Returns nothing; writes stats into `st`.
  */
-function placeHomes(mesh, engine, runtime, flight, st, pool, now) {
+function placeHomes(mesh, engine, residentEngine, runtime, flight, st, pool, now) {
   const P = PARCEL_HOMES;
   const cinematicGap = satelliteVisualsOn('ground');
+  const approach = BUILDING_APPROACH_ON && cinematicGap;
   const C = SURFACE_CALM.enabled ? SURFACE_CALM.parcel : null;
   const px = flight.pos.x;
   const pz = flight.pos.z;
@@ -861,6 +867,7 @@ function placeHomes(mesh, engine, runtime, flight, st, pool, now) {
       st.prevN = 0;
       st.localGaps = new Map();
       st.homeGround = new Map();
+      st.arrivals = null;
       st.groundCursor = 0;
       mesh.count = 0;
       mesh.visible = false;
@@ -899,6 +906,7 @@ function placeHomes(mesh, engine, runtime, flight, st, pool, now) {
     const sig =
       `${bs?.chunks ?? -1}|${bs?.ready ?? -1}|${bs?.empty ?? -1}|${bs?.columns ?? -1}|` +
       `${vs?.chunks ?? -1}|${vs?.ready ?? -1}|${vs?.parcelPts ?? -1}|${st.altK.toFixed(3)}` +
+      (approach ? residentParcelSignature(residentEngine) : '') +
       // Allow one re-evaluation once each newly resident source mesh has born.
       (cinematicGap ? `|${bs?.queued ?? 0}|${bs?.building ?? 0}|${bs?.draping ?? 0}|${Array.from(runtime.satBuildings?.chunks?.values() ?? []).filter(c => c.state === 'ready' && now - (c.readyAt ?? now) >= 3).length}` : '');
     // …but NEVER while the first measurement at this locality is still
@@ -948,7 +956,8 @@ function placeHomes(mesh, engine, runtime, flight, st, pool, now) {
     // needed and the two numbers cannot drift apart.
     let inRange = 0;
     const localAnchors = [];
-    for (const chunk of engine.nearest(px, pz)) {
+    const nearChunks = engine.nearest(px, pz);
+    for (const chunk of nearChunks) {
       const par = chunk.parcel;
       if (!par) continue;
       for (let i = 0; i < par.length; i += 2) {
@@ -1115,11 +1124,17 @@ function placeHomes(mesh, engine, runtime, flight, st, pool, now) {
     const ringN = Math.max(1, engine.maxChunks ?? SAT_VEG.maxChunksByTier.high ?? 1);
     const share = POOL_FAIR.enabled ? Math.max(1, Math.floor(pool / ringN)) : pool;
     if (cinematicGap && !st.localGaps) st.localGaps = new Map();
-    for (const chunk of engine.nearest(px, pz)) {
-      if (n >= pool) break;
+    // Keep the near census and cluster rules on their original resident
+    // ring. Only individual homes beside verified streets may use an outer
+    // vegetation tile. Read those existing records without fetching any.
+    const nearSet = approach ? new Set(nearChunks) : null;
+    const placementChunks = approach ? residentEngine.nearest(px,pz) : null;
+    const roadRange = BUILDING_APPROACH.roadsideEndM * mercK;
+    const roadRangeSq = roadRange ** 2;
+    const arrivals = approach ? new Map() : null;
+    placeParcelRings(nearChunks, placementChunks, pool, share, (chunk, nCap, outer) => {
       const par = chunk.parcel;
-      if (!par) continue;
-      const nCap = Math.min(pool, n + share);
+      if (!par) return n;
       for (let i = 0; i < par.length && n < nCap; i += 2) {
         const lx = par[i];
         const lz = par[i + 1];
@@ -1127,15 +1142,20 @@ function placeHomes(mesh, engine, runtime, flight, st, pool, now) {
         const wz = chunk.cz + lz;
         const roadside=chunk.parcelKind?.[i/2]===1;
         const d2 = (wx - px) ** 2 + (wz - pz) ** 2;
-        if (d2 > rangeSq) continue;
+        const verifiedStreet = approach && roadside;
+        if (!inParcelRing(outer, verifiedStreet, outer && nearSet.has(chunk), d2, rangeSq, roadRangeSq)) continue;
         const d = Math.sqrt(d2);
         st.anchors += 1;
         // --- TERM 2: LOCAL — "is this BLOCK already built?" ------------------
         // Multiplied by the regional term, so a mapped town suppresses
         // everywhere and an unmapped town still respects its mapped blocks.
-        const dens = realDensityAt(wx, wz, mercK);
+        const dens = d2 <= rangeSq ? realDensityAt(wx, wz, mercK) : 0;
         let deficit = (1 - dens / target) * regK;
-        if(roadside&&settled&&!st.stale&&parcelGapSourceReady(runtime.satBuildings.chunks,wx,wz,60*mercK,now)&&!occupiedAt(wx,wz))deficit=Math.max(deficit,.5);
+        // This anchor itself (and its full clearance disc) came from a
+        // positively identified street and a parsed footprint/land/airport
+        // mask. A detailed mesh may still be travelling from that same tile.
+        if (verifiedStreet) deficit = 0.5;
+        else if(roadside&&settled&&!st.stale&&parcelGapSourceReady(runtime.satBuildings.chunks,wx,wz,60*mercK,now)&&!occupiedAt(wx,wz))deficit=Math.max(deficit,.5);
         let localGap = false;
         if (cinematicGap && deficit < 0.45) {
           // A regional verdict cannot erase a fully-resolved, residential local
@@ -1193,7 +1213,9 @@ function placeHomes(mesh, engine, runtime, flight, st, pool, now) {
         // expression verbatim.
         st.growTarget = C && st.provisional ? C.growScale : 1;
         const growK = chunkFadeOn() ? st.growK : st.growTarget;
-        const fscale = (1 + (P.farScale.mul - 1) * ft) * st.altK * growK;
+        const edgeScale = verifiedStreet
+          ? 1 - smoothstep(BUILDING_APPROACH.roadsideFullM, BUILDING_APPROACH.roadsideEndM, d / mercK) : 1;
+        const fscale = (1 + (P.farScale.mul - 1) * ft) * st.altK * growK * edgeScale;
         // One yaw for the whole cluster: every house on a street shares it.
         const yaw = roadside ? chunk.parcelYaw[i/2] : hash(lx * 0.731 - lz * 1.117) * Math.PI * 2;
         const cs = Math.cos(yaw);
@@ -1219,7 +1241,7 @@ function placeHomes(mesh, engine, runtime, flight, st, pool, now) {
           // this keeps each individual HOUSE clear of what actually streamed,
           // which is the set the player can see and collide with.
           if (occupiedAt(hx, hz)) continue;
-          if (cinematicGap) {
+          if (cinematicGap && !verifiedStreet) {
             const roadM = parcelRoadDistance(st.roadIndex, hx, hz);
             if (roadM < 10 || roadM > 55) { st.roadRejected += 1; continue; }
           }
@@ -1233,6 +1255,11 @@ function placeHomes(mesh, engine, runtime, flight, st, pool, now) {
           const groundKey = `${(ox + Math.fround(hx - ox)).toFixed(1)},${(oz + Math.fround(hz - oz)).toFixed(1)}`;
           const exact = cinematicGap ? st.homeGround?.get(groundKey) : null;
           const gy = exact?.y ?? engine.groundAtLocal(chunk, lx + offX, lz + offZ);
+          if (arrivals) {
+            const born = st.arrivals?.get(groundKey) ?? now - 0.15 * hh;
+            arrivals.set(groundKey, born);
+            mesh.geometry.attributes.aHomeBorn.setX(n, born);
+          }
           _dummy.position.set(hx - ox, gy, hz - oz);
           _dummy.scale.set(fl * fscale, ht * fscale, fs * fscale);
           // Face the street: the cluster yaw plus a quarter turn for the odd
@@ -1252,7 +1279,9 @@ function placeHomes(mesh, engine, runtime, flight, st, pool, now) {
           if (localGap) st.localGapPlaced += 1;
         }
       }
-    }
+      return n;
+    }, px, pz, roadRange);
+    if (n && arrivals) st.arrivals = arrivals;
     st.meanScalar = st.anchors > 0 ? scalarSum / st.anchors : 0;
     st.meanDens = st.anchors > 0 ? densSum / st.anchors : 0;
 
@@ -1303,6 +1332,11 @@ function placeHomes(mesh, engine, runtime, flight, st, pool, now) {
   // Round 21 (C, S6): upload only what can have changed (see rangeUpload).
   const touched = Math.max(n, st.prevN | 0);
   rangeUpload(mesh.instanceMatrix, touched * 16);
+  if (approach && n) {
+    rangeUpload(mesh.geometry.attributes.aHomeBorn, n);
+    rangeUpload(mesh.geometry.attributes.aHomeVariant, n);
+  }
+  if (approach && !n) st.arrivals = null;
   if (mesh.instanceColor) rangeUpload(mesh.instanceColor, touched * 3);
   st.prevN = n;
   mesh.boundingSphere.center.set(0, 0, 0);

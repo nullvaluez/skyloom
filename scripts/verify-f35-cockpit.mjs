@@ -7,13 +7,114 @@ register('./_node-resolve.mjs', import.meta.url);
 globalThis.window = { __flyF35CockpitOverride: { enabled: true } };
 const { cameraOwner } = await import('../lib/fly/camera-mode.js');
 const { PilotCamera } = await import('../lib/fly/pilot-camera.js');
-const { hasPilotSeat, initialPilotSeat } = await import('../lib/fly/pilot-seat.js');
+const { CockpitPassOwner, prepareCockpitPass, publishCockpitPreparation } = await import('../lib/fly/cockpit-warm.js');
+const { hasPilotSeat, initialPilotSeat, stageHangarCockpit } = await import('../lib/fly/pilot-seat.js');
 const { PLAYER_AIRCRAFT } = await import('../lib/fly/player-aircraft.js');
 const { useFlyStore } = await import('../stores/fly-store.js');
 const { CameraTransition } = await import('../lib/fly/camera-transition.js');
 const { composeTrueScaleMatrix } = await import('../lib/fly/true-scale.js');
 const input = () => ({ freeLook: { active: false, dx: 0, dy: 0 }, keys: new Set() });
 const flight = () => ({ pos:new Vector3(100000,3200,-300000), latDeg:0, heading:1.03, bank:0, pitch:0 });
+
+test('settled hangar draft cancels independently and commits its warm deck to the new pilot', async () => {
+  const before=useFlyStore.getState(), runtime={};
+  const tick=()=>new Promise(resolve=>setTimeout(resolve,2));
+  try {
+    useFlyStore.setState({screen:'hangar',aircraftId:'airliner',f35PilotSeat:true,hangarCockpitId:null});
+    const current=new CockpitPassOwner(), draft=new CockpitPassOwner();
+    const pilot=new PilotCamera('airliner'), nextPilot=new PilotCamera('cargo');
+    const detachCurrent=current.attach(pilot);
+    current.setReady(true);
+    const primed={aircraftId:'airliner'}, next={aircraftId:'cargo'};
+    const release=publishCockpitPreparation(runtime,primed);
+    const skipped=stageHangarCockpit(useFlyStore,'prop',0);
+    skipped(); // another pick before its debounce
+    const cancel=stageHangarCockpit(useFlyStore,'cargo',0);
+    await tick();
+    assert.equal(useFlyStore.getState().aircraftId,'airliner');
+    assert.equal(useFlyStore.getState().hangarCockpitId,'cargo');
+    const close=publishCockpitPreparation(runtime,next);
+    draft.attach(null);
+    draft.setReady(true);
+    assert.equal(draft.pilot,null);
+    cancel(); close();
+    assert.deepEqual(Object.keys(runtime.cockpitPreparations),['airliner']);
+    assert.equal(runtime.cockpitPreparation,primed);
+    assert.equal(pilot.ready,true);
+    assert.equal(useFlyStore.getState().hangarCockpitId,null);
+    const commit=stageHangarCockpit(useFlyStore,'cargo',0);
+    await tick();
+    const chosen=new CockpitPassOwner();
+    chosen.setReady(true);
+    const final=publishCockpitPreparation(runtime,next);
+    useFlyStore.getState().setAircraftId('cargo');
+    useFlyStore.getState().setScreen('flight');
+    detachCurrent(); release();
+    const detachDraft=chosen.attach(nextPilot);
+    commit();
+    assert.equal(runtime.cockpitPreparation,next);
+    assert.equal(nextPilot.ready,true);
+    assert.equal(pilot.ready,false);
+    assert.equal(useFlyStore.getState().hangarCockpitId,null);
+    detachDraft(); final();
+    useFlyStore.setState({screen:'hangar',f35PilotSeat:false});
+    const outside=stageHangarCockpit(useFlyStore,'prop',0);
+    await tick();
+    assert.equal(useFlyStore.getState().hangarCockpitId,null);
+    outside();
+    useFlyStore.setState({screen:'hangar',f35PilotSeat:true});
+    const leaving=stageHangarCockpit(useFlyStore,'prop',0);
+    useFlyStore.getState().setScreen('title');
+    await tick();
+    assert.equal(useFlyStore.getState().hangarCockpitId,null);
+    leaving();
+  } finally {useFlyStore.setState(before,true);}
+});
+
+test('cockpit first use compiles for the screen and never writes a visible pixel', async () => {
+  for (const end of ['ready','render-error','abort']) {
+    const abort = new AbortController();
+    const side = { isMesh:true, frustumCulled:true }, front = { isMesh:true, frustumCulled:false };
+    const scene = { traverse(fn){ [side,front].forEach(fn); } };
+    let target = 'composer', face = 3, mip = 1, rect = [4,7,640,480], clipping = false;
+    let compiled = false, draws = 0;
+    const gl = {
+      autoClear:true, info:{autoReset:true}, domElement:new EventTarget(),
+      getContext:()=>({isContextLost:()=>false}), extensions:{has:()=>true},
+      properties:{get:()=>({currentProgram:{isReady:()=>compiled}})},
+      compile(){ assert.equal(target,null); return new Set([{}]); },
+      getRenderTarget:()=>target, getActiveCubeFace:()=>face, getActiveMipmapLevel:()=>mip,
+      setRenderTarget(t,f=0,m=0){ target=t; face=f; mip=m; },
+      getScissor:v=>v.fromArray(rect), getScissorTest:()=>clipping,
+      setScissor(...args){ rect=args[0]?.isVector4 ? args[0].toArray() : args; },
+      setScissorTest(t){ clipping=t; },
+      render(){
+        draws++;
+        assert.equal(target,null);
+        assert.deepEqual(rect,[0,0,0,0]);
+        assert.equal(clipping,true);
+        assert.equal(this.autoClear,false);
+        assert.equal(this.info.autoReset,false);
+        assert.equal(side.frustumCulled,false);
+        if(end==='render-error')throw Error('fixture failed draw');
+      },
+    };
+    const result=prepareCockpitPass(gl,scene,{},abort.signal);
+    assert.deepEqual([target,face,mip],['composer',3,1]);
+    gl.setRenderTarget('next pass',2,4); // the composer moves on during compile
+    compiled=true;
+    if(end==='abort'){abort.abort();await assert.rejects(result,{name:'AbortError'});}
+    else if(end==='render-error')await assert.rejects(result,/failed draw/);
+    else await result;
+    assert.equal(draws,end==='abort'?0:1);
+    assert.deepEqual([target,face,mip],['next pass',2,4]);
+    assert.deepEqual(rect,[4,7,640,480]);
+    assert.equal(clipping,false);
+    assert.equal(gl.autoClear,true);
+    assert.equal(gl.info.autoReset,true);
+    assert.deepEqual([side.frustumCulled,front.frustumCulled],[true,false]);
+  }
+});
 
 test('ordinary flights expose the seat, remember explicit choices, and respect one-load overrides', () => {
   const original=globalThis.window;

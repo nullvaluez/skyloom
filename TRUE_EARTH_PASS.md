@@ -25,6 +25,353 @@ release instruction is recorded separately from the measurements it authorizes.
 
 ## Status
 
+### 2026-11-21 — In-flight performance over Argenteuil
+
+The comparison starts from the build that already shipped the Paris facade,
+building coverage and startup fixes below. It measures the next 24 seconds
+of flight at 399 kt after the local scenery is loaded. High and Ultra run
+with their own fixed pixel ratios and shadow settings. The ordinary player
+launch is a separate run with the adaptive governor and the flight model
+in control.
+
+The CPU profile identified three sources of repeated work during flight.
+Detailed city meshes submitted visible ranges and then paid for another
+empty draw. The coastal mirror updated the world transform of every object
+twice. Airport terrain deformation scaled metre heights by the horizontal
+width of a tile, admitting distant runways into its vertex processing.
+The renderer now submits the last visible range in Three's normal draw,
+updates the reflected geometry and lights before the mirror pass, and tests
+physical terrain bounds against runway and shoulder footprints. Altitude
+queries use the same indexed terrain triangles as building contact. LERC
+workers return completed terrain skirts alongside each decoded tile.
+
+Surface-mask updates repaint the three-texel border affected by a new
+neighbor. The cinematic terrain shader reads the fine classification first
+and skips the coarser texture reads when coverage is exactly one. Partial
+coverage still blends in geographic order. Distant buildings also skip
+vertex shading when the existing rules already collapse all their triangles
+or discard every fragment.
+
+The two settled cockpit captures shared 170 live terrain tiles. All 170
+matched by SHA-256 for indices, positions, normals and UVs. All 569 decoded
+terrain meshes in the optimized capture arrived with their skirts completed
+in the worker. The High view had 31,840 building columns and 24 roof imagery
+tiles in both builds. The screenshots and timings use separate browser
+sessions. [Matched cockpit crops and frame-time traces](docs/reviews/building-approach/flight-throughput.webp)
+
+The harness is `scripts/review-flight-throughput.cjs`. Its fixed route uses
+live imagery and terrain and an empty traffic feed. Its player mode opens the
+ordinary flight link with live traffic, the default graphics preset, the
+adaptive governor, and full flight simulation.
+
+Two independent 24-second moving runs per build and preset, measured in
+Chrome on the RTX 5080 at 1440 × 900, gave the following pooled results.
+P95 and P99 measure intervals between completed world draws. High rendered
+at DPR 1 with two 1024 px shadow cascades. Ultra rendered at DPR 1.5 with
+three 2048 px cascades throughout both arms.
+
+| Moving flight | High before | High after | Ultra before | Ultra after |
+|---|---:|---:|---:|---:|
+| Average FPS | 22.5 | 31.0 | 20.9 | 29.5 |
+| P95 frame interval | 90.6 ms | 47.9 ms | 93.7 ms | 50.5 ms |
+| P99 frame interval | 146.4 ms | 73.2 ms | 156.9 ms | 73.9 ms |
+| Frames over 50 ms in 48 seconds | 233 | 63 | 253 | 75 |
+
+In two ordinary launches per build, the first 11 seconds of visible
+free flight averaged 23.5 → 29.1 FPS. The following 24 seconds averaged
+28.7 → 30.7 FPS, with P99 improving from 90.6 to 60.8 ms. The two later
+flight pairs measured 34.7 → 33.0 and 22.8 → 28.4 FPS. Live traffic,
+the actual flight path and the automatic graphics rung can differ across
+these launches, and each build used more than one pixel ratio. In a
+separate profiled repeat the optimized flight held native resolution for
+nearly the entire moving segment, while the older build stepped down
+to 0.75×. The fixed-preset comparison above isolates the scenery changes.
+
+A separate 22-second entry check observed zero black frames in 618
+compositor samples and zero dark frames in 975 sampled browser
+presentations. The longest interval between completed world draws in
+that cold-entry check was 245 ms.
+
+All 49 beta suites passed. The separate historical city gate reported
+46 passes and the same three worker or shader fingerprint differences on
+both the unchanged Git baseline and the working tree. An independent
+comparison of its 48 flag-off worker fixtures matched byte for byte.
+
+### 2026-11-21 — Default scenery and the Argenteuil approach
+
+The owner requested that `BUILDING_APPROACH` and `CANOPY_VIEW_LOD` ship on.
+Ordinary Enhanced sessions now use the building changes, and the airborne
+canopy policy applies on its supported tiers. The previous scenery can be
+compared on the same build with `?flags=-BUILDING_APPROACH,-CANOPY_VIEW_LOD`.
+
+The Paris material region applied central-city limestone across the approach
+to Argenteuil. Mapped wall colors now take priority, including named colors,
+and untagged walls use a stable mix of suburban materials as the city center
+recedes. Near and distant meshes agree. On the approach tile, 1,863 of 1,895
+facades met the pale-warm sRGB threshold before the change, and 597 met it
+afterward. Median wall color moved from RGB (212, 200, 177) to (185, 181, 168).
+Median roof color was (129, 129, 111) in both runs. Across the 1,257 roofs
+with usable reference imagery, median CIE76 error held at 4.24. The threshold
+was R ≥ 165, R − B ≥ 20 and R ≥ G ≥ B, evaluated on material colors before
+scene lighting. [Matched cockpit views](docs/reviews/building-approach/argenteuil-facades.webp)
+
+The previous approach preview supplied an incomplete building geometry to
+shader preparation. A missing instance attribute threw during cloning and
+aborted the entire world material batch. The warm scene now mirrors the
+geometry and cutout/shadow shaders used by the live renderer, including the
+compact skyline on lower tiers. Free Flight reuses the arrival already
+streamed at its launch point. A genuine relocation still resets the stream.
+Resident skyline roofs can start their low-priority imagery requests once
+the local terrain, surfaces and buildings are ready.
+
+The 1.895-second task at cockpit entry had a separate cause. A Chrome CPU
+profile attributed 1.475 seconds to the instrument panel's first color pass
+and 0.308 seconds to its first shadow pass. The game now builds the selected
+deck and prepares its actual screen and shadow programs before use. A
+settled hangar selection can prepare one candidate while the current deck
+remains available for Cancel. Exterior-only selections skip that work.
+The terrain and building programs can link concurrently as soon as terrain
+is submitted. Warm-up work that shares the terrain program still waits for
+the driver to finish.
+
+The governor now resizes the visible WebGL drawing buffer on the frame that
+can actually draw. The compositor reuses prepared material variants as
+objects return to view. Bloom rejects non-finite input at its extraction
+stage, including frames on which the cloud pass is skipped.
+
+First-second screen captures exposed another cause of the unfinished city.
+The driver took about 24 seconds to link the full terrain material in a
+single submission. The loading cap could release the player while the river
+and ground underneath the buildings still showed the scene background.
+During that interval, the terrain now uses its resident satellite texture,
+elevation mesh and world curvature. The exact lit material takes over when
+the driver completes its link. [First-second and eighth-second captures](docs/reviews/building-approach/argenteuil-entry.webp)
+
+An Ultra CPU profile caught a second cost at that handoff. Switching 170
+resident tile materials to full lighting in one frame took a 198 ms
+main-thread task. About 89 ms went into preparing the actual tile programs
+and another 32 ms into the generic warm-up batch. After reveal the game
+now promotes up to eight tiles per frame and retains each tile's preview
+until its own color and depth programs can draw. Generic preparation uses
+batches of up to four meshes. In the follow-up profile the same 170 tiles
+finished switching in 22 frames over 1.09 seconds, with the longest task
+overlapping the handoff down to 58 ms.
+
+**Live RTX 5080 comparison.** Chrome ran the production builds at 1440 ×
+900, High, with fixed daytime weather and sun. The previous build had both
+scenery preview flags explicitly on. The corrected build used its defaults.
+The camera was placed south of Argenteuil at 48.889° N, 2.246° E, looking
+037° at 2,072 ft MSL. This approximates the supplied screenshot. The facade
+stills also locked pixel ratio to 1 on both builds. Both showed 16 detailed
+tiles, 31,840 building columns and 24 photographically colored skyline groups.
+Automated Chrome retains shader diagnostics during these measurements.
+
+| Stationary cold flight, from navigation | Previous build | Corrected build |
+|---|---:|---:|
+| Flight released | 37.8 s | 22.7 s |
+| Full detailed building ring | 14.3 s | 19.8 s |
+| First skyline imagery received | 38.6 s | 16.3 s |
+| 24 skyline imagery groups received | 50.3 s | 32.7 s |
+| World material batch | Failed | 20 linked programs, ready at 9.5 s |
+| Longest main-thread task from the title-to-flight transition through 45 s after release | 1,608 ms | 79 ms |
+
+The old flight remained covered for another 15 seconds after the title
+handed off. Both detailed rings were available by the time the player got
+control. The corrected run spent more of its startup time drawing the
+terrain that had already loaded. The full terrain lighting was ready at
+26.5 seconds. These are single cold runs with live scenery.
+
+A separate replay advanced 9.2 km at 399 kt and counted completed world
+draws. On the previous build the longest interval between draws was 14.65
+seconds. The browser continued running animation callbacks throughout that
+interval. After the startup fixes the issue was still reproducible at 13.97
+seconds. At the start of that gap, the adaptive effect level reduced the
+number of shadow cascades from two to one with the same environment texture,
+High scenery tier and 0.75 pixel ratio. The compositor held the previous
+frame while 18 shader programs linked. The governor subsequently attempted
+to restore the second cascade while the aircraft was still showing the
+same frame.
+
+Automatic quality reductions now retain the lighting configuration the
+world's shaders already use. At High, the first structural reduction
+shrinks the two shadow maps from 1024 to 512 pixels and reduces their
+base reach from 1,800 to 600 metres. At the lowest automatic setting,
+the game pauses shadow drawing and keeps the existing sampler bindings.
+Clouds and post-processing still follow their reduced budgets. A phone
+that started above Low can park its single map, while a phone that starts
+at Low allocates none. The governor also pauses its measurements whenever
+the compositor retains the previous frame.
+
+| First 45 s of moving flight, High | Previous build | Corrected defaults |
+|---|---:|---:|
+| Completed world draws | 795 | 1,539 |
+| 95th percentile interval between draws | 64.1 ms | 63.0 ms |
+| 99th percentile interval between draws | 129.1 ms | 114.4 ms |
+| Longest interval between draws | 14.654 s | 0.185 s |
+
+The corrected flight reached both automatic shadow reductions. The two
+light identities and the environment remained stable. The post-processing
+chain still briefly waited while its cheaper passes became available.
+[Completed world draws by second](docs/reviews/building-approach/argenteuil-motion.webp)
+
+An 80-second Ultra run started at 1.5 pixel ratio and exercised the automatic
+reductions through Low. It retained all three light bindings. Direct pixel
+readback found zero black world frames among 2,170. A separate Chrome
+screencast found zero black windshield views among 2,763 samples. The
+longest gap in this instrumented Ultra run was 391 ms. The earlier build
+also produced zero whole-frame blackouts on the sampled route. Controlled
+invalid HDR input reproduced the bloom defect in the WebGL2 regression.
+The test therefore establishes the repair for that input and the observed
+route coverage. Intermittent local flicker may still occur elsewhere.
+
+The hangar check used the ordinary title and aircraft controls. Choosing
+the airliner prepared its cockpit, Cancel restored the original aircraft,
+and choosing it again and launching reused the prepared cockpit instance.
+All 49 beta suites passed, including the new facade, shader, cockpit and
+governor checks. Outside that suite, the original R25 flight-plan harness still has
+three historical source/markup comparison failures (7h, 8a, 8b), and
+the measured-world harness's recorded shader key predates the current
+material version. Those failures also reproduce on the previous revision.
+The standalone vendor and terrain LOD checks retain their previously
+failing assertions (33/34 and 60/64 respectively).
+Physical iPhone Safari remains unmeasured for this change.
+
+To repeat the moving-flight measurement against a locally served production
+build, run `node scripts/review-argenteuil-loading.cjs http://127.0.0.1:3428 release cruise`.
+The optional last argument sets the number of seconds in flight. Set
+`FLY_REVIEW_PRESET=ultra` to exercise three shadow cascades. The
+`cruise-pixels` mode also records the world buffer and samples browser
+presentations. Timing comparisons use the separate `cruise` mode to avoid
+the cost of pixel readback.
+
+### 2026-11-21 — Buildings on approach, initial comparison
+
+These measurements compared the earlier defaults with the two opt-in
+features. The default release is recorded above. “Current defaults” and
+“preview” in the original captures refer to those two historical arms.
+
+The detailed city already streamed along the flight path. On a 4.2 km
+High flight over Powell, Ohio, detailed building tiles were present 3 km
+ahead at all 27 samples on the measured route. Farther out, the skyline
+worker rejected small, mapped footprints without tagged
+heights even when the near renderer could determine a plausible house height.
+On nine recorded local source tiles the old worker emitted one distant body.
+The preview emitted 557. Five of those nine tiles still emitted zero.
+
+The preview admits low-rise clusters using neighboring mapped footprints.
+It uses the detailed building height model and represents each distant body
+with a roof and two camera-facing walls, six triangles altogether. Projected
+roof width matters for a long, low building. A stable footprint sample tapers
+with screen size, and the detailed tile takes over as its actual mesh arrives.
+The existing per-tier triangle and request ceilings still apply. Elevated
+building parts can retain their open space underneath.
+
+In mapped residential gaps, the near houses get the first share of the
+existing pool. Remaining slots can place individual houses beside verified
+streets on already-resident terrain. Those candidates pass the worker's
+building, water, land-cover and airfield masks. The outer houses taper from
+2.6 to 4 km in true ground distance. A new house and its shadow appear
+together over 1.2 seconds. A change to the resident tiles refreshes a parked
+view as well as a moving one. The initial settlement hold still applies on
+arrival.
+
+A close look at Quail Crossing Drive, Ohio, exposed a separate near-field
+failure. Its vector tile contained two mapped building footprints. ESA
+WorldCover classified small patches beside the streets as built and the
+surrounding lawns as grass. The previous placement rule required the entire
+clearance area to be built. The preview can place a house on a compact built
+patch 20–40 m from a minor street, with room around the whole house.
+Long paved strips, continuous parking areas, protected land classes, and
+areas occupied by a mapped building are excluded. A regression covers a
+7 m shed narrow enough to fall between the original raster samples.
+The November 15 vector tile replay produced 12 inferred roadside houses,
+including four within 250 m of the inspected spot and ten within 500 m.
+The positions are estimates from ESA 2021 and mapped roads. No extra tile
+requests are needed.
+
+On the RTX 5080, all four of the nearby houses reached the scene. The aircraft
+was 1.32 km from the reference point at the approach endpoint. Removing only
+those houses changed 642 pixels in the rendered frame, including any shadow
+contribution. [Quail Crossing comparison](docs/reviews/building-approach/quail-crossing.webp)
+
+In warmed Node replays the extra roadside search took 1.63 ms per Quail
+tile and 3.21 ms on a Manhattan tile with 2,817 mapped building features.
+The Quail worker transferred 156 additional bytes. Manhattan added zero homes
+and zero parcel bytes. These are tile-worker costs. Browser frame intervals
+are measured independently below.
+
+**Measured in the renderer.** The High comparison uses Chrome on the RTX
+5080 at 1440 × 900 with live scenery. The aircraft flew 4.2 km at 180 m/s.
+The camera, sun, weather and detailed geometry matched at the two endpoints.
+For each still, the capture rendered the same instant with the distant
+building layer visible and hidden. It counted pixels changing by at least
+six levels in any 8-bit RGB channel, after excluding differences between
+repeat control renders. A second measurement collapsed only the boxes in one
+ground-distance band at a time. Occlusion and postprocessing make the band
+counts non-additive. The mask measures the mapped skyline layer. Procedural
+house placements and canopy triangles are counted separately.
+
+| Powell High at the approach endpoint | Current defaults | Building preview |
+|---|---:|---:|
+| Detailed building tiles / indexed columns | 19 / 3,435 | 19 / 3,435 |
+| Pixels affected by distant buildings, full frame | 1,938 | 8,590 |
+| Pixels affected by buildings at 3–6 km | 123 | 1,090 |
+| Pixels affected by buildings at 6–10 km | 1,266 | 6,038 |
+| Pixels affected by buildings beyond 10 km | 543 | 1,537 |
+| Procedural home instances at least 2.5 km away | 0 | 75 |
+| Distant building triangles / draws in the composer render | 50,694 / 16 | 306,222 / 11 |
+
+At that Powell endpoint the default canopy used 142,344 triangles in the
+main view and submitted 91,324 more for crown shadows. The combined preview
+used 59,250 main-view canopy triangles. At this height the canopy selected
+patches for the forest and submitted zero near-crown shadow triangles.
+The whole composer render went from 776,072 triangles at default settings
+to 1,055,692 with buildings alone and 880,373 with both previews. The
+combined preview used 13.4% more triangles than the default at this point.
+The moving-flight p95 frame interval was 25.0 ms in all three configurations,
+one run per configuration. The performance tradeoff will vary with the
+camera height and neighborhood. [Powell comparison](docs/reviews/building-approach/powell-high.webp)
+
+The Medium flight from Brooklyn toward the Hudson exercised a different
+budget. At the matched endpoint its distant layer affected 12,540 pixels
+before and 26,652 in preview. Distant geometry went from 91,338 triangles
+in nine draws to 57,258 in six. Both arms had 11 detailed tiles and 25,342
+indexed columns. The moving p95 frame interval was 16.8 ms in both flights.
+[Brooklyn comparison](docs/reviews/building-approach/brooklyn-medium.webp)
+
+**Cold maximum-boost approach.** Four 24 km flights at 750 m/s started
+moving as soon as the world became available. The check sampled the same
+forward strip (1–2.5 km ahead, 1 km wide) once per kilometre. At defaults,
+procedural houses appeared at 10 and 8 of 24 checkpoints. With both
+previews they appeared at 17 and 18. Trees were present at 23 of 24 in
+all four runs. At 3 km ahead, the mapped detailed-building source had a
+mesh at 20 checkpoints and had explicitly returned empty at the other four
+in every run. Median frame interval was 16.7 ms throughout. In run order,
+p95 was 33.4 ms (default), 41.7 ms (preview), 58.2 ms (preview) and
+58.3 ms (default). This stress test demonstrates earlier coverage. It leaves
+boost-speed frame pacing open. All nine flight captures completed without a
+page error or shader error.
+
+The independent review caught three regressions before the final build. A full
+pool could drop nearby houses when more outer tiles arrived. Enabling both
+city previews could erase an existing, loosely spaced subdivision. The
+small mapped shed at Quail scale exposed an overlap beyond the detailed
+collision ring. The regression tests now exercise 25 competing tiles in a
+5,000-home pool, the union of both footprint policies, and worker exclusion
+of the overlapping house. Physical iPhone Safari and owner visual acceptance
+remain open.
+
+Reproduce the worker and pool checks with
+`node scripts/verify-building-approach.mjs`. Add `--quail --powell` to
+replay the source tiles. Run
+`node scripts/review-building-approach.cjs <production-url> baseline powell high`,
+repeat with `buildings` and `combined`, then run
+`node scripts/review-building-approach.cjs compare buildings powell high`.
+Append `quail` to isolate the four houses. Use `brooklyn medium` to repeat
+the city comparison. Append `--publish` to a comparison command to export a WebP.
+The full images, masks, motion samples and frame intervals are under
+`.graphics-review/building-approach/`.
+
 ### 2026-11-19 — Forest crowns from the air and distant road lights
 
 Fableflight represents trees from multiple directions over the upper hemisphere,

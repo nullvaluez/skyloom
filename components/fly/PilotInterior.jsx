@@ -1,25 +1,30 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { addAfterEffect, useFrame, useThree } from '@react-three/fiber';
 import { DirectionalLight, HemisphereLight, MathUtils, Mesh, MeshBasicMaterial, PerspectiveCamera, PlaneGeometry, Quaternion, Scene, Vector3 } from 'three';
+import { CockpitPassOwner, prepareCockpitPass, publishCockpitPreparation } from '@/lib/fly/cockpit-warm';
+import { cockpitWantedFor } from '@/lib/fly/pilot-seat';
+import { pendingDeepLink } from '@/lib/fly/deep-link.mjs';
 import { buildF35Interior } from '@/lib/fly/f35-interior';
 import { createPilotDisplays } from '@/lib/fly/pilot-displays';
 import { buildFleetInterior } from '@/lib/fly/fleet-interior';
 import { useFlyStore } from '@/stores/fly-store';
 
-const inCockpit = s => s.f35PilotSeat && s.screen === 'flight';
+const cockpitSelected = (s,id) => cockpitWantedFor(s,id) &&
+  (s.screen === 'flight' || pendingDeepLink()?.kind !== 'watch');
 
 export function PilotInterior(props) {
   // Outside-only flights do not allocate the panel, textures or geometry.
   // Keep a visited cockpit warm for subsequent cuts within this airframe.
-  const [visited, setVisited] = useState(() => inCockpit(useFlyStore.getState()));
+  const { aircraftId } = props;
+  const [visited, setVisited] = useState(() => cockpitSelected(useFlyStore.getState(),aircraftId));
   useEffect(() => {
     if (visited) return;
-    return useFlyStore.subscribe(inCockpit, selected => {
+    return useFlyStore.subscribe(s => cockpitSelected(s,aircraftId), selected => {
       if (selected) setVisited(true);
     }, { fireImmediately: true });
-  }, [visited]);
+  }, [visited,aircraftId]);
   return visited ? <PilotInteriorPass {...props} /> : null;
 }
 
@@ -28,10 +33,13 @@ export function PilotInterior(props) {
  * the normal flight projection on both conventional and reversed depth. */
 function PilotInteriorPass({ runtime, pilot, aircraftId }) {
   const gl = useThree(s => s.gl);
+  const invalidate = useThree(s => s.invalidate);
   const camera = useThree(s => s.camera);
   const outside = useThree(s => s.scene);
   const framePending = useRef(false);
-  useFrame(() => { framePending.current = pilot.active; }, -29);
+  const owner = useMemo(() => new CockpitPassOwner(), []);
+  useLayoutEffect(() => owner.attach(pilot), [owner, pilot]);
+  useFrame(() => { framePending.current = !!owner.pilot?.active; }, -29);
   useEffect(() => {
     const scene = new Scene();
     const optical = new PerspectiveCamera(62, 1, .016, 14);
@@ -70,11 +78,70 @@ function PilotInteriorPass({ runtime, pilot, aircraftId }) {
       optical.add(visor);
     }
     scene.add(optical);
-    pilot.setInteriorReady(true);
+    const prep = { aircraftId, status:'waiting', started:performance.now() };
+    const unpublish = publishCockpitPreparation(runtime,prep);
+    const abort = new AbortController();
+    // A settled hangar sleeps on demand. Give the selected deck a final
+    // frame even if the last scan arrives after terrain staging stops.
+    let wake = setTimeout(invalidate, 3600);
+    let warmEnvironment, warmMaps = false, warmShadows;
+    let generation = 0;
+    const contextLost = () => {
+      generation++;
+      prep.status = 'lost';
+      owner.setReady(false);
+    };
+    const restored = () => {
+      prep.started = performance.now();
+      warmEnvironment = warmShadows = undefined;
+      prep.status = 'waiting';
+      clearTimeout(wake);
+      wake = setTimeout(invalidate, 3600);
+      invalidate();
+    };
+    gl.domElement.addEventListener('webglcontextlost', contextLost);
+    gl.domElement.addEventListener('webglcontextrestored', restored);
+    const prepare = (mapsReady) => {
+      const current = generation;
+      // A ready seat may be preparing again after a covered environment or
+      // quality change. Keep the exterior until the new optical pass is ready.
+      owner.setReady(false);
+      prep.status = 'compiling';
+      warmEnvironment = scene.environment = outside.environment;
+      warmMaps = mapsReady;
+      warmShadows = gl.shadowMap.enabled;
+      sun.shadow.needsUpdate = sun.castShadow;
+      prepareCockpitPass(gl, scene, optical, abort.signal).then(() => {
+        if (abort.signal.aborted || current !== generation) return;
+        const loaded = interior.maps.every(map => map.image);
+        if (outside.environment !== warmEnvironment || loaded !== warmMaps || gl.shadowMap.enabled !== warmShadows) {
+          prepare(loaded);
+          return;
+        }
+        prep.status = 'ready';
+        prep.readyAt = performance.now();
+        owner.setReady(true);
+      }).catch(error => {
+        if (abort.signal.aborted || current !== generation) return;
+        if (error?.code === 'WEBGL_CONTEXT_LOST') { contextLost(); return; }
+        prep.status = 'fallback';
+        owner.setReady(true);
+      });
+    };
     const inverse = new Quaternion();
     let lastDraw = -1, nextDisplay = -1;
     const paint = addAfterEffect((now) => {
-      if (!framePending.current || !pilot.active) return;
+      if (prep.status === 'waiting' || (prep.status === 'ready' && useFlyStore.getState().screen !== 'flight')) {
+        // The background environment and bump scans select real shader keys.
+        // Network failure must still permit the existing untextured deck.
+        const age = performance.now() - prep.started;
+        const mapsReady = interior.maps.every(map => map.image);
+        const keysChanged = outside.environment !== warmEnvironment || warmMaps !== mapsReady ||
+          gl.shadowMap.enabled !== warmShadows;
+        if (keysChanged && (age > 3500 || (outside.environment && mapsReady))) prepare(mapsReady);
+      }
+      const pilot = owner.pilot;
+      if (!framePending.current || !pilot?.active) return;
       framePending.current = false;
       const main = gl.__flyMainDraw;
       if (main?.enabled && main.frames === lastDraw) return;
@@ -142,7 +209,12 @@ function PilotInteriorPass({ runtime, pilot, aircraftId }) {
       }
     });
     return () => {
-      pilot.setInteriorReady(false);
+      abort.abort();
+      clearTimeout(wake);
+      gl.domElement.removeEventListener('webglcontextlost', contextLost);
+      gl.domElement.removeEventListener('webglcontextrestored', restored);
+      unpublish();
+      owner.setReady(false);
       paint();
       displays?.dispose();
       sun.shadow.dispose();
@@ -152,6 +224,6 @@ function PilotInteriorPass({ runtime, pilot, aircraftId }) {
       for (const material of materials) material.dispose();
       scene.clear();
     };
-  }, [aircraftId, camera, gl, outside, pilot, runtime]);
+  }, [aircraftId, camera, gl, invalidate, outside, owner, runtime]);
   return null;
 }

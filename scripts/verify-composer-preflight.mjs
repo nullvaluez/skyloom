@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { BackSide, BoxGeometry, DirectionalLight, DoubleSide, Group, Mesh, MeshDepthMaterial, MeshStandardMaterial, PerspectiveCamera, Scene, ShaderMaterial, Texture, WebGLRenderTarget } from 'three';
 import { createComposerPreflight, shadowWarmMaterial } from '../lib/fly/composer-preflight.js';
+import { createCriticalTerrainGate, previewTerrainTile } from '../lib/fly/critical-terrain-prewarm.mjs';
 import { KawaseBlurPass, MipmapBlurPass, Pass } from 'postprocessing';
 import { N8AOPostPass } from 'n8ao';
 
@@ -19,18 +20,18 @@ function fixture(parallel = true) {
     extensions: { has: () => parallel }, getContext: () => ({ isContextLost: () => false }),
     getRenderTarget: () => binding, setRenderTarget: value => { binding = value; }, properties: { get: m => properties.get(m) ?? {} },
     compile(holder, cam, world) {
-      const materials = new Set(), objects = []; let lights = 0;
-      world.traverseVisible(o => { if (o.isLight) lights++; });
+      const materials = new Set(), objects = [], lights = [];
+      world.traverseVisible(o => { if (o.isLight && o.layers.test(cam.layers)) lights.push(o); });
       holder.traverse(o => {
         objects.push(o);
         for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
-          const key = [m.type, m.side, m.version, m.customProgramCacheKey(), !!o.isInstancedMesh, !!o.isSkinnedMesh, lights, !!world.fog, world.environment?.id, binding?.texture.colorSpace ?? 'screen'].join('/');
-          if (!cache.has(key)) cache.set(key, { cacheKey: key, isReady: () => gl.ready, usedTimes: 1 });
+          const key = [m.type, m.side, m.version, m.customProgramCacheKey(), !!o.isInstancedMesh, !!o.isSkinnedMesh, lights.length, !!world.fog, world.environment?.id, binding?.texture.colorSpace ?? 'screen'].join('/');
+      if (!cache.has(key)) cache.set(key, { cacheKey: key, isReady: () => gl.ready && !gl.programBlocked?.(key), usedTimes: 1 });
           const program = cache.get(key), props = properties.get(m) ?? { programs: new Map() };
           props.programs.set(key, program); props.currentProgram = program; properties.set(m, props); materials.add(m);
         }
       });
-      this.calls.push({ objects, world, target: binding }); return materials;
+      this.calls.push({ objects, lights, world, target: binding }); return materials;
     },
     restore() { properties = new WeakMap(); cache.clear(); this.domElement.dispatchEvent(new Event('webglcontextrestored')); },
   };
@@ -54,6 +55,30 @@ check('exact color/depth/post batches wait for links without rendering or repare
   f.gl.ready = true; assert.equal(f.warm.prepare(), true);
   for (let i = 0; i < 10; i++) assert.equal(f.warm.prepare(), true);
   assert.equal(f.gl.calls.length, calls, 'Settled stable frames do not recompile'); f.dispose();
+});
+
+check('compile batches use indexed live lights without revisiting world geometry', () => {
+  const f = fixture(), hidden = new Group();
+  const nested = new DirectionalLight(), otherLayer = new DirectionalLight();
+  hidden.visible = false; hidden.add(nested); otherLayer.layers.set(2);
+  f.scene.add(hidden, otherLayer);
+  f.scene.environment = new Texture();
+  f.scene.fog = { isFog: true };
+  f.scene.traverseVisible = () => assert.fail('the renderer should only visit indexed lights');
+  f.gl.ready = true; f.warm.prepare();
+  const [color, darkDepth, litDepth] = f.gl.calls;
+  assert.deepEqual(color.lights, [f.light]);
+  assert.deepEqual(darkDepth.lights, []);
+  assert.deepEqual(litDepth.lights, [f.light]);
+  assert.equal(color.world.environment, f.scene.environment);
+  assert.equal(color.world.fog, f.scene.fog);
+  assert.equal(litDepth.world.environment, null); assert.equal(litDepth.world.fog, null);
+  hidden.visible = true; f.scene.remove(f.light);
+  const first = f.gl.calls.length;
+  f.warm.prepare();
+  assert.deepEqual(f.gl.calls[first].lights, [nested]);
+  assert.deepEqual(f.gl.calls[first + 2].lights, [nested]);
+  f.scene.environment.dispose(); f.dispose();
 });
 
 check('async additions compile only new renderables and removed objects are forgotten', () => {
@@ -87,6 +112,58 @@ check('late shader links hold only affected renderables while completed world fr
   f.warm.beforeRender(); assert.equal(next.visible, true); f.warm.afterRender();
   next.material.dispose(); f.dispose();
 });
+
+{
+  const f=fixture(); f.gl.ready=true; f.warm.prepare(); f.warm.didRender();
+  const gate=createCriticalTerrainGate(), source=new MeshStandardMaterial({map:new Texture({width:64,height:64})});
+  source.customProgramCacheKey=()=>'tile-specific-color';
+  const tile=new Mesh(f.geometry,source);
+  tile.castShadow=true; tile.customDepthMaterial=new MeshDepthMaterial();
+  tile.customDepthMaterial.customProgramCacheKey=()=>'tile-specific-depth';
+  f.scene.add(tile);
+  gate.hold(source,onRemove=>previewTerrainTile(tile,source,{patchBend:()=>{},daylight:()=>1,onRemove}));
+  const preview=tile.children[0];
+  const tick=()=>gate.tick({key:'env',parallel:true,covered:false,canStageTile:f.warm.canStageTerrain,compile:()=>Promise.resolve()});
+  tick(); await Promise.resolve(); tick();
+  f.gl.programBlocked=key=>key.includes('tile-specific-depth');
+  for(let frame=0;frame<3;frame++){
+    assert.equal(f.warm.prepare(),true);
+    f.warm.beforeRender();
+    const drawn=[]; f.scene.traverseVisible(o=>{if(o.isMesh&&o.material.visible)drawn.push(o);});
+    assert.ok(drawn.includes(preview)); assert.ok(!drawn.includes(tile));
+    f.warm.didRender(); f.warm.afterRender(); tick();
+  }
+  f.scene.environment=new Texture();
+  assert.equal(f.warm.prepare(),true,'pending hidden sources must not become global dependencies');
+  assert.equal(source.visible,false);
+  f.gl.programBlocked=null;assert.equal(f.warm.prepare(),true);
+  assert.equal(source.visible,true);assert.equal(tile.children.length,0);
+  const calls=f.gl.calls.length;
+  f.warm.beforeRender();assert.equal(tile.visible,true);f.warm.didRender();f.warm.afterRender();
+  tick();assert.equal(gate.state.status,'ready');f.warm.prepare();
+  assert.equal(f.gl.calls.length,calls,'publishing a known material must not compile it again');
+  tile.customDepthMaterial.dispose();source.map.dispose();source.dispose();f.scene.environment.dispose();f.dispose();
+  console.log('PASS terrain preview stays drawable until the actual color and shadow programs are ready');count++;
+}
+
+{
+  const f=fixture(), gate=createCriticalTerrainGate(), branch=new Group();
+  const map=new Texture({width:64,height:64});
+  const tiles=Array.from({length:18},()=>new Mesh(f.geometry,new MeshStandardMaterial({map})));
+  for(const tile of tiles){
+    branch.add(tile);
+    gate.hold(tile.material,onRemove=>previewTerrainTile(tile,tile.material,{patchBend:()=>{},daylight:()=>1,onRemove}));
+  }
+  f.scene.add(branch);
+  const tick=()=>gate.tick({key:'env',parallel:true,covered:false,canStageTile:f.warm.canStageTerrain,compile:()=>Promise.resolve()});
+  tick();await Promise.resolve();tick();assert.equal(tiles.filter(t=>t.userData.terrainHandoff).length,8);
+  branch.removeFromParent();
+  for(let i=0;i<4;i++)tick();
+  assert.equal(gate.state.status,'ready');
+  assert.ok(tiles.every(t=>t.material.visible&&!t.children.length&&!t.userData.terrainHandoff));
+  for(const tile of tiles)tile.material.dispose();map.dispose();f.dispose();
+  console.log('PASS removing a terrain ancestor drains its staged and waiting tiles without a draw');count++;
+}
 
 check('scene-wide key transitions retain the completed canvas with an explicit global hold', () => {
   const f = fixture(); f.gl.ready = true; f.warm.prepare(); f.warm.didRender();
@@ -127,6 +204,100 @@ check('hidden ancestors, camera layers and held materials warm on their first el
   before = f.gl.calls.length; otherLayer.layers.set(0); f.warm.prepare(); assert.equal(f.gl.calls.length, before + 1);
   before = f.gl.calls.length; held.material.visible = true; f.warm.prepare(); assert.equal(f.gl.calls.length, before + 1);
   dormant.material.dispose(); otherLayer.material.dispose(); held.material.dispose(); f.dispose();
+});
+
+check('repeated visibility changes reuse warm color and depth programs until the scene changes', () => {
+  const f = fixture();
+  f.gl.ready = true;
+  assert.equal(f.warm.prepare(), true);
+  f.warm.didRender();
+  const calls = f.gl.calls.length;
+  for (let i = 0; i < 8; i++) {
+    f.object.visible = false;
+    assert.equal(f.warm.prepare(), true);
+    f.object.visible = true;
+    assert.equal(f.warm.prepare(), true);
+  }
+  assert.equal(f.gl.calls.length, calls);
+
+  f.object.visible = false;
+  f.scene.environment = new Texture();
+  f.warm.prepare();
+  const whileHidden = f.gl.calls.length;
+  f.object.visible = true;
+  assert.equal(f.warm.prepare(), true);
+  assert.equal(f.gl.calls.length, whileHidden + 3, 'The returning object still needs the new lighting variant');
+  f.scene.environment.dispose();
+  f.dispose();
+});
+
+check('a hidden transparent mesh warms a revised shader key when it returns', () => {
+  const f = fixture();
+  f.material.transparent = true; f.material.side = DoubleSide;
+  f.material.customProgramCacheKey = () => 'initial-transparent';
+  f.gl.ready = true;
+  assert.equal(f.warm.prepare(), true);
+  f.warm.didRender();
+  const calls = f.gl.calls.length;
+  f.object.visible = false;
+  f.material.customProgramCacheKey = () => 'returning-transparent';
+  f.material.needsUpdate = true;
+  assert.equal(f.warm.prepare(), true);
+  f.warm.didRender();
+  assert.equal(f.gl.calls.length, calls);
+  f.gl.programBlocked = key => key.includes('returning-transparent');
+  f.object.visible = true;
+  assert.equal(f.warm.prepare(), true);
+  assert.equal(f.warm.state.heldObjects, 1);
+  assert.equal(f.gl.calls.length, calls + 3);
+  f.gl.programBlocked = null;
+  assert.equal(f.warm.prepare(), true);
+  assert.equal(f.warm.state.heldObjects, 0);
+  f.dispose();
+});
+
+check('draw-time side bumps are shared with dormant users of the same key', () => {
+  const f = fixture(), twin = new Mesh(f.geometry, f.material);
+  f.scene.add(twin);
+  f.material.transparent = true; f.material.side = DoubleSide;
+  f.gl.ready = true;
+  assert.equal(f.warm.prepare(), true);
+  f.warm.didRender();
+  const calls = f.gl.calls.length;
+  for (let i = 0; i < 4; i++) {
+    twin.visible = false;
+    assert.equal(f.warm.prepare(), true);
+    f.material.needsUpdate = true; f.material.needsUpdate = true;
+    f.warm.didRender();
+  }
+  twin.visible = true;
+  assert.equal(f.warm.prepare(), true);
+  assert.equal(f.gl.calls.length, calls);
+  f.dispose();
+});
+
+check('detached shader links do not block first draw or a later scene-wide transition', () => {
+  for (const afterFirstDraw of [false, true]) {
+    const f = fixture(), unused = new Mesh(f.geometry, new MeshStandardMaterial());
+    unused.material.customProgramCacheKey = () => 'detached-still-linking';
+    f.gl.ready = true;
+    if (afterFirstDraw) {
+      assert.equal(f.warm.prepare(), true);
+      f.warm.didRender();
+    }
+    f.gl.programBlocked = key => key.includes('detached-still-linking');
+    f.scene.add(unused);
+    assert.equal(f.warm.prepare(), afterFirstDraw);
+    assert.equal(f.warm.state.heldObjects, 1);
+    f.scene.remove(unused);
+    f.scene.environment = new Texture();
+    assert.equal(f.warm.prepare(), true);
+    assert.ok(f.warm.state.pending > 0, 'The detached program is still linking');
+    assert.equal(f.warm.state.holdReason, null);
+    unused.material.dispose();
+    f.scene.environment.dispose();
+    f.dispose();
+  }
 });
 
 check('material/layout, environment, light visibility and screen-target changes invalidate appropriate work', () => {

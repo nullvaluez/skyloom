@@ -34,7 +34,8 @@
  *  (13) every audited consumer goes through the helpers (lights, the mirror
  *       camera, billboards, ribbons, metre-authored instances, shaders);
  *  (14) wiring: installed in FlyCanvas onCreated, k0 published at the top of
- *       the main frame, before any camera rig runs.
+ *       the main frame, before any camera rig runs;
+ *  (15) forced matrix refreshes still move a static local camera with its parent.
  *
  * Run: node scripts/verify-true-scale.mjs
  */
@@ -288,6 +289,15 @@ if (legArg) {
   ts.setTrueScaleK(1);
   out.billboardK1 = ts.faceCameraInto(new Matrix4(), cam, new Vector3(), 2) === false;
   out.helpersK1 = ts.trueHorizontalK(1.7) === 1 && ts.ribbonSideInto(new Vector3(), new Vector3(1, 0, 0), new Vector3(0, 0, 1)) === false;
+  const parent = new THREE.Group(), staticCamera = new PerspectiveCamera();
+  parent.add(staticCamera);
+  ts.installTrueScaleCamera(staticCamera);
+  parent.updateMatrixWorld();
+  staticCamera.matrixAutoUpdate = false;
+  parent.position.x = 75;
+  parent.updateWorldMatrix(false, false);
+  staticCamera.updateWorldMatrix(false, false, true);
+  out.forcedCameraX = staticCamera.matrixWorld.elements[12];
   console.log(JSON.stringify(out));
   process.exit(0);
 }
@@ -379,6 +389,7 @@ check(
   const ok = /onCreated=\{\(\{ gl, camera \}\) => \{[\s\S]{0,1600}installTrueScaleCamera\(camera\);/.test(canvas) && set > 0 && rig > set;
   check('(14) installed in FlyCanvas onCreated; k0 published before any camera rig runs', ok);
 }
+check('(15) a forced refresh moves a static local camera with its parent', on.forcedCameraX === 75);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { Vector3, BufferGeometry, Float32BufferAttribute, Mesh, MeshBasicMaterial, EventDispatcher } from 'three';
 import { FlightOperations } from '../lib/fly/flight-operations.js';
-import { OPERATIONS_AIRPORTS,airportById,airportFrame,airportPoint,airportLocal,airportSurface,airportTaxiExits,taxiRoute,airportEligible } from '../lib/fly/operations-airports.js';
+import { OPERATIONS_AIRPORTS,airportById,airportFrame,airportPoint,airportLocal,airportSurface,airportTaxiExits,taxiRoute,airportEligible,registerAirport,retainDiscoveredAirports } from '../lib/fly/operations-airports.js';
 import { operationsProfile } from '../lib/fly/operations-profiles.js';
 import { operationsFootprint,addOperationsMask } from '../lib/fly/operations-scenery.js';
 import { installOperationsTerrain } from '../lib/fly/operations-terrain.js';
@@ -81,6 +81,31 @@ test('airport terrain deformation preserves skirt depth instead of collapsing tr
   for(let i=0;i<g.index.count;i+=3){a.fromBufferAttribute(g.attributes.position,g.index.getX(i));b.fromBufferAttribute(g.attributes.position,g.index.getX(i+1));c.fromBufferAttribute(g.attributes.position,g.index.getX(i+2));assert.ok(b.sub(a).cross(c.sub(a)).lengthSq()>0);}
   release();g.dispose();mesh.material.dispose();
 });
+{
+  const runway={id:'TEST:09-27',name:'Dynamic field',width:40,
+    a:{lon:1,lat:47,elevation:50},b:{lon:1.02,lat:47,elevation:52}};
+  const g=new BufferGeometry(),p=new Float32BufferAttribute([-.5,-.5,0,.5,-.5,0,0,.5,0,0,.5,-35],3);
+  g.setAttribute('position',p);g.setIndex([0,1,2,0,2,3]);
+  const mesh=new Mesh(g,new MeshBasicMaterial()),anchor=new Vector3(1e5,0,-5e6);
+  // The real terrain mixes normalized tile coordinates and metre heights.
+  // Install before the airport is discovered to exercise the registry epoch.
+  const point=airportFrame(runway),map=new EventDispatcher();
+  mesh.position.set(point.x+200-anchor.x,0,point.z-anchor.z);
+  mesh.scale.set(20,20,1);mesh.rotateX(-Math.PI/2);
+  const original=p.array.slice(),release=installOperationsTerrain({object:mesh,map,_anchor:anchor});
+  assert.deepEqual(p.array,original);
+  registerAirport(runway);await Promise.resolve();
+  assert.ok(p.getZ(0)>49&&p.getZ(0)<51);
+  assert.ok(Math.abs(p.getZ(2)-p.getZ(3)-35)<.001);
+  retainDiscoveredAirports([]);await Promise.resolve();
+  assert.deepEqual(p.array,original,'removing the runway must restore the exact prior DEM');
+  mesh.position.x+=4e6;mesh.scale.set(20000,20000,1);
+  registerAirport(runway);await Promise.resolve();
+  assert.equal(g.userData.operationsOriginal,undefined,'deep skirts must not put distant runways inside the tile');
+  retainDiscoveredAirports([]);await Promise.resolve();
+  release();g.dispose();mesh.material.dispose();checks++;
+  console.log('PASS anisotropic terrain bounds, runway discovery and exact restoration');
+}
 test('arrival guidance advances past a missed exit in either runway direction',()=>{
   for(const airport of OPERATIONS_AIRPORTS)for(const reverse of [false,true]){
     const {o,f}=make('prop',airport.id),length=airportFrame(airport).length,direction=reverse?-1:1;

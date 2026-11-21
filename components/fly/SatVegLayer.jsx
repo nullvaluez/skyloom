@@ -516,7 +516,7 @@ export function SatVegLayer({ runtime, flight }) {
           FlyScene gets a mount line from C ICONS this round and this one would
           collide with it for no benefit. */}
       {PARCEL_HOMES.enabled && (
-        <SatParcelHomes engine={engine.legacy} runtime={runtime} flight={flight} tier={tier} />
+        <SatParcelHomes engine={engine.legacy} residentEngine={engine} runtime={runtime} flight={flight} tier={tier} />
       )}
     </>
   );

@@ -33,21 +33,33 @@ async function check(name, run) {
 }
 function scheduler(preset = 'ultra') {
   const store = { qualityPreset: preset, qualityTier: preset === 'ultra' ? 'high' : preset, mapStyle: 'satellite', visuals: 'enhanced' };
-  const calls = [], pending = [], state = { started: false, done: false }, keep = { materials: [], scene: null };
+  const calls = [], batches = [], pending = [], state = { started: false, done: false }, keep = { materials: [], scene: null };
+  let revealed = false;
   const scene = new THREE.Scene(); scene.environment = {};
   const gl = { getContext: () => ({ getContextAttributes: () => ({ alpha: false }) }),
     getDrawingBufferSize: () => ({ width: 100, height: 100 }),
-    compileAsync: async () => { calls.push(['current-materials']); }, shadowMap: { enabled: preset !== 'low' } };
+    compileAsync: async (owner, camera, target) => {
+      calls.push(['current-materials']);
+      const objects = [];
+      owner.traverse(object => { if (object.isMesh) objects.push(object); });
+      batches.push({ objects, target });
+    }, shadowMap: { enabled: preset !== 'low' } };
   const context = {
     _pending: pending, _slice: { queued: 0 }, _state: state, _keep: keep,
     PREWARM: { enabled: true, maxMs: 1, warmAtlases: false, warmExtra: true, warmSmaaLuts: true, warmEffectsAltTier: true, warmAltStyle: false },
-    performance, settleOn: () => true, cinemaOn: () => true, useFlyStore: { getState: () => store },
+    performance, settleOn: () => true, sinceRevealMs: () => revealed ? 10 : -1,
+    cinemaOn: () => true, useFlyStore: { getState: () => store },
     cinemaProfile: () => resolveCinemaProfile({ preset: store.qualityPreset, tier: store.qualityTier }),
     reachableCinemaCascades: () => [0, 1, 2, 3], isMobileGraphicsClass: () => false,
     warmMeasuredWorld: async () => calls.push(['world', context.cinemaProfile().cascades]),
     warmMeasuredWorldProfiles: async ({ cascadeCounts }) => calls.push(['unused-world', ...cascadeCounts]),
     compileCriticalTerrain: async ({ cascadeCounts }) => calls.push(['unused-terrain', ...cascadeCounts]),
-    buildWarmScene: () => new THREE.Scene(), buildExtraScene: () => new THREE.Scene(),
+    buildWarmScene: () => {
+      const owner = new THREE.Scene();
+      for (let i = 0; i < 10; i++) owner.add(new THREE.Mesh());
+      return owner;
+    },
+    buildExtraScene: () => new THREE.Scene(),
     compileUnder: (_, __, fn) => fn(), dummyRT: () => null, Vector2: THREE.Vector2,
     warmCinematicVariants: async () => calls.push(['opposite-shadow']),
     warmTroikaLetters: async () => calls.push(['letters']), warmShadowDepth: async () => calls.push(['shadow-depth']),
@@ -63,11 +75,80 @@ function scheduler(preset = 'ultra') {
   };
   vm.createContext(context);
   vm.runInContext(['warmSelectionKey', 'enqueue', 'runPrewarm'].map(name => declaration(source, name, name === 'warmSelectionKey')).join('\n'), context);
-  return { store, calls, pending, context,
+  const submitted = async () => calls.push(['critical-terrain', context.cinemaProfile().cascades]);
+  return { store, calls, batches, pending, context, scene, reveal: () => { revealed = true; },
     boot: () => context.runPrewarm({ gl, camera: {}, scene, style: store.mapStyle, tier: store.qualityTier,
-      beforeWarm: async () => calls.push(['critical-terrain', context.cinemaProfile().cascades]) }),
+      terrainGate: () => ({ state: {}, waitForDispatch: submitted, waitForPrograms: async () => {} }),
+      beforeWarm: submitted }), // older --ref arms use this hook
     drain: async () => { while (pending.length) await pending.shift().fn(); },
   };
+}
+
+if (!ref) {
+  await check('covered material preparation keeps the single exact warm batch', async () => {
+    const f = scheduler(); await f.boot();
+    assert.equal(f.batches.length, 1);
+    assert.deepEqual(f.batches[0].objects, f.context._keep.scene.children);
+    assert.equal(f.batches[0].target, f.scene);
+  });
+
+  await check('revealed generic builds and fixed compile batches progress alone on busy frames', async () => {
+    const f = scheduler(); f.reveal();
+    vm.runInContext('const WARM_MESHES_PER_SLICE = 4;\n' +
+      ['queueWarmSceneSlices', 'runUnit', 'prewarmSliceStep', 'prewarmBusyUnitPending']
+        .map(name => declaration(source, name)).join('\n'), f.context);
+    let optional = 0;
+    f.context.enqueue('older optional job', () => { optional++; });
+    await f.boot();
+    assert.equal(f.context._keep.scene, null);
+    assert.equal(f.batches.length, 0);
+    assert.equal(f.context.prewarmBusyUnitPending(), true);
+    await f.context.prewarmSliceStep(1, { busy: true });
+    assert.equal(f.batches.length, 0, 'build is a separate frame unit');
+    const owner = f.context._keep.scene, ordered = [...owner.children];
+    for (const count of [4, 4, 2]) {
+      assert.equal(f.context.prewarmBusyUnitPending(), true);
+      await f.context.prewarmSliceStep(1, { busy: true });
+      const batch = f.batches.at(-1);
+      assert.equal(batch.target, f.scene);
+      assert.equal(batch.objects.length, count);
+      assert.ok(batch.objects.every(object => object.parent === owner));
+      assert.deepEqual(owner.children, ordered);
+    }
+    assert.deepEqual(f.batches.flatMap(batch => batch.objects), ordered);
+    assert.equal(f.context.prewarmBusyUnitPending(), false);
+    await f.context.prewarmSliceStep(1, { busy: true }); assert.equal(optional, 0);
+    await f.context.prewarmSliceStep(1); assert.equal(optional, 1);
+  });
+
+  await check('slow flight frames admit only one bounded warm unit at a time', async () => {
+    const rig = fs.readFileSync(new URL('../components/fly/PrewarmRig.jsx', import.meta.url), 'utf8');
+    const ast = ts.createSourceFile('PrewarmRig.jsx', rig, ts.ScriptTarget.Latest, true, ts.ScriptKind.JSX);
+    const component = ast.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === 'PrewarmRig');
+    const frame = component.body.statements.find(node => ts.isExpressionStatement(node) &&
+      ts.isCallExpression(node.expression) && node.expression.expression.getText(ast) === 'useFrame');
+    let bounded = true;
+    const calls = [], document = { hidden: false };
+    const callback = vm.runInNewContext(frame.expression.arguments[0].getText(ast), {
+      document, noteFrame() {}, settleOn: () => true, scene: {},
+      envSeenRef: { current: true }, sliceRef: { current: false }, sliceWaitRef: { current: 0 },
+      prewarmPending: () => 2, prewarmBusyUnitPending: () => bounded,
+      SLICE_BAR: () => .024, SETTLE_CALM: { prewarmSlice: { perIdleRaf: 4 } },
+      prewarmSliceStep: async (max, { busy }) => { calls.push([max, busy]); },
+    });
+    for (let i = 0; i < 17; i++) callback({}, 1 / 14);
+    assert.equal(calls.length, 0);
+    callback({}, 1 / 14); await Promise.resolve();
+    assert.deepEqual(calls, [[1, true]]);
+    bounded = false;
+    for (let i = 0; i < 14 * 21; i++) callback({}, 1 / 14);
+    assert.equal(calls.length, 1, 'a heavy optional unit still waits for a comfortable frame');
+    callback({}, 1 / 60); await Promise.resolve();
+    assert.deepEqual(calls, [[1, true], [4, false]]);
+    document.hidden = true; bounded = true;
+    for (let i = 0; i < 30; i++) callback({}, 1 / 14);
+    assert.equal(calls.length, 2);
+  });
 }
 await check('the explicit alternate-style experiment keeps the selected tier', async () => {
   const f = scheduler(); f.context.PREWARM.warmAltStyle = true;

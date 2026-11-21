@@ -59,6 +59,7 @@ const initialState = {
   cameraMode: 'chase',
   chaseFraming: 'world',
   f35PilotSeat: false,
+  hangarCockpitId: null,
   encountersEnabled: true,
 
   // Overlays

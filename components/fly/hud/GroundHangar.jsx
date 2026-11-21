@@ -13,6 +13,7 @@ import { adventureMinutes, aircraftAdvice } from '@/lib/fly/adventure-activities
 import { RouteTrace } from './AdventureExperience';
 import { useAdventureStore } from '@/stores/adventure-store';
 import { contentAccess } from '@/lib/fly/content-access.mjs';
+import { stageHangarCockpit } from '@/lib/fly/pilot-seat';
 import { airportEligible,airportById } from '@/lib/fly/operations-airports';
 // The departure list: one row per airport, the selected catalog runway shown once.
 import { airportChoices } from '@/lib/fly/ops-labels.mjs';
@@ -47,6 +48,9 @@ function HangarBody({runtime}){
   const [startMode,setStartMode]=useState(()=>airportById(airport)?.authored===false?'runway':'apron'),[view,setView]=useState('quarter');
   useEffect(()=>{if(airportById(airport)?.authored===false&&startMode==='apron')setStartMode('runway');},[airport,startMode]);
   const [confirmReturn,setConfirmReturn]=useState(()=>!draft&&!!runtime.operations && !['hangar','completed'].includes(runtime.operations.phase));
+  useEffect(() => {
+    if (!confirmReturn) return stageHangarCockpit(useFlyStore,id);
+  },[id,confirmReturn]);
   useEffect(()=>{useFlyStore.getState().setHangarDismissible(confirmReturn);},[confirmReturn]);
   // R25 B FLIGHT PLAN: the panel adapts to the title's choice. Flag-off (and
   // ops mode) renders today's dispatch panel; free mode is the destination

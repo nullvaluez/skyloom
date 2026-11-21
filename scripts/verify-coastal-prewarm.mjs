@@ -16,7 +16,8 @@ function fixture(parallel=true){
   const camera=new PerspectiveCamera();camera.position.set(0,200,0);camera.lookAt(0,0,-1000);
   const runtime={satBuildings:{object:group},flight:{pos:{y:200},groundElev:4},earthSurface:{nearWaterCells:20}};
   const main={name:'main'},cache=new Map();let target=main,alpha=.5,color=new Color('#abcdef'),properties=new WeakMap(),lost=false;
-  const gl={domElement:new EventTarget(),autoClear:false,xr:{enabled:true},shadowMap:{enabled:true,type:1,autoUpdate:true,needsUpdate:true},
+  const gl={domElement:new EventTarget(),autoClear:false,autoClearColor:false,autoClearDepth:false,
+    xr:{enabled:true},shadowMap:{enabled:true,type:1,autoUpdate:true,needsUpdate:true},
     outputColorSpace:'srgb',toneMapping:0,info:{autoReset:false,render:{calls:0}},compiles:[],draws:[],clears:0,polls:0,
     extensions:{has:()=>parallel},getContext:()=>({isContextLost:()=>lost}),properties:{get:m=>properties.get(m)},
     getRenderTarget:()=>target,setRenderTarget:v=>{target=v;},getClearAlpha:()=>alpha,getClearColor:v=>v.copy(color),
@@ -38,7 +39,12 @@ function fixture(parallel=true){
         }
       });this.compiles.push(objects);return materials;
     },
-    render(world,cam){const objects=[];world.traverseVisible(o=>{if(o.isMesh&&o.layers.test(cam.layers))objects.push(o);});this.draws.push(objects);this.info.render.calls+=objects.length;},
+    render(world,cam){
+      if(world.matrixWorldAutoUpdate)world.updateMatrixWorld();
+      if(this.autoClear){assert.equal(this.autoClearColor,true);assert.equal(this.autoClearDepth,true);this.clear();}
+      const objects=[];world.traverseVisible(o=>{if(o.isMesh&&o.layers.test(cam.layers))objects.push(o);});
+      this.draws.push(objects);this.info.render.calls+=objects.length;
+    },
     complete(){for(const p of cache.values())p.ready=true;},
     lose(){lost=true;this.domElement.dispatchEvent(new Event('webglcontextlost'));},
     restore(){lost=false;properties=new WeakMap();cache.clear();this.domElement.dispatchEvent(new Event('webglcontextrestored'));},
@@ -47,7 +53,8 @@ function fixture(parallel=true){
   return {gl,rig,scene,group,mesh,material,camera,main,runtime,
     update(){rig.update(gl,scene,camera,runtime,'high',true);},
     restored(){assert.equal(target,main);assert.equal(alpha,.5);assert.equal(color.getHexString(),'abcdef');assert.equal(mesh.layers.mask,1);
-      assert.equal(gl.autoClear,false);assert.equal(gl.xr.enabled,true);assert.equal(gl.shadowMap.autoUpdate,true);assert.equal(gl.shadowMap.needsUpdate,true);},
+      assert.equal(gl.autoClear,false);assert.equal(gl.autoClearColor,false);assert.equal(gl.autoClearDepth,false);
+      assert.equal(gl.xr.enabled,true);assert.equal(gl.shadowMap.autoUpdate,true);assert.equal(gl.shadowMap.needsUpdate,true);},
     dispose(){rig.dispose();geometry.dispose();material.dispose();},
   };
 }
@@ -59,6 +66,47 @@ check('initial links run under the exact reflection state without clearing or pu
   for(let i=0;i<10;i++)f.update();assert.equal(f.gl.compiles.length,1);
   f.gl.complete();f.update();f.restored();assert.equal(f.gl.draws.length,1);assert.equal(u.uCoastReady.value,1);
   for(let i=0;i<10;i++)f.update();assert.equal(f.gl.compiles.length,1,'Settled captures do not compile again');f.dispose();
+});
+check('reflect-only transforms and one clear preserve the capture without walking unrelated geometry',()=>{
+  const f=fixture(false),update=f.scene.updateMatrixWorld;
+  const cameraParent=new Group();f.scene.add(cameraParent);cameraParent.add(f.camera);
+  cameraParent.position.set(40,12,-60);
+  const unrelated = new Mesh(f.mesh.geometry, f.material); f.scene.add(unrelated);
+  unrelated.position.x = 100;
+  f.group.position.x = 20;
+  let walks=0;
+  f.scene.updateMatrixWorld=function(...args){walks++;return update.apply(this,args);};
+  f.update();f.restored();
+  assert.equal(walks,0);assert.equal(f.gl.clears,1);
+  assert.deepEqual(f.rig.camera.position.toArray(),[40,-212,-60]);
+  assert.equal(f.mesh.matrixWorld.elements[12],20);
+  assert.equal(unrelated.matrixWorld.elements[12],0);
+  assert.equal(f.scene.matrixWorldAutoUpdate,true);
+  unrelated.layers.enable(COASTAL_REFLECTION_LAYER);
+  f.update();f.restored();
+  assert.equal(walks,1);assert.equal(f.gl.clears,2);
+  assert.equal(unrelated.matrixWorld.elements[12],100);
+  assert.ok(f.gl.draws.at(-1).includes(unrelated));
+  f.scene.matrixWorldAutoUpdate=false;
+  f.update();f.restored();
+  assert.equal(walks,2);assert.equal(f.gl.clears,3);
+  assert.equal(f.scene.matrixWorldAutoUpdate,false);
+  f.dispose();
+});
+check('reflection applies parent rebases to static local camera, architecture and lights',()=>{
+  const f=fixture(false),rebase=new Group(),staticParent=new Group();
+  const light=f.scene.children.find(o=>o.isLight);
+  f.scene.add(rebase);rebase.add(staticParent);staticParent.add(f.camera,f.group,light,light.target);
+  f.scene.updateMatrixWorld();
+  for(const object of [staticParent,f.camera,f.group,f.mesh,light,light.target])object.matrixAutoUpdate=false;
+  rebase.position.set(75,4,20);
+  f.update();f.restored();
+  assert.deepEqual(f.rig.camera.position.toArray(),[75,-204,20]);
+  for(const object of [f.mesh,light,light.target]){
+    assert.equal(object.matrixWorld.elements[12],75);
+    assert.equal(object.matrixWorld.elements[14],20);
+  }
+  f.dispose();
 });
 check('late geometry waits only in the reflection while existing geometry continues capturing',()=>{
   const f=fixture();f.update();f.gl.complete();f.update();

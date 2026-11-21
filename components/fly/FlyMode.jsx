@@ -58,6 +58,8 @@ import {
 } from '@/lib/fly/front-door';
 import { installTitleCamera } from '@/lib/fly/title-camera';
 import { resolveInitialSpawn } from '@/lib/fly/flight-plan';
+import { pendingDeepLink } from '@/lib/fly/deep-link.mjs';
+import { contentAccess } from '@/lib/fly/content-access.mjs';
 import { CinemaTitle } from './hud/CinemaTitle';
 import { AdventureExperience } from './hud/AdventureExperience';
 import { EncounterExperience } from './hud/EncounterExperience';
@@ -194,11 +196,17 @@ export function FlyMode({ onClose }) {
     // build their materials from it), then the opening screen and the spawn.
     // W0 stubs = today (mandatory hangar, KOSU, SPAWN_ALT_M).
     resolveInitialVisuals();
-    const picked = resolveAircraft(useFlyStore.getState().aircraftId);
-    useGLTF.preload(aircraftPresentation(picked, isPhoneClass()).url);
     Promise.resolve(resolveInitialSpawn()).then((spawn) => {
       if (cancelled) return;
+      // The accepted free-flight link already staged its terrain. Stage the
+      // same airframe before the canvas mounts so its selected seat can warm.
+      const link = pendingDeepLink();
+      if (link?.ok && (link.kind === 'at' || link.kind === 'fly') &&
+          link.aircraftId && contentAccess(`aircraft:${link.aircraftId}`).allowed) {
+        useFlyStore.getState().setAircraftId(link.aircraftId);
+      }
       const fly = useFlyStore.getState();
+      useGLTF.preload(aircraftPresentation(resolveAircraft(fly.aircraftId), isPhoneClass()).url);
       fly.setScreen(resolveInitialScreen());
       fly.setSpawn(spawn);
       fly.setPhase('flying');

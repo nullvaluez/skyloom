@@ -56,7 +56,7 @@ check('spatial shadow ranges keep every original triangle once and preserve trim
  installArchitectureShadowRange(mesh);mesh.position.z=-80;mesh.updateMatrixWorld();
  const camera=new PerspectiveCamera(60,1,1,200);camera.updateMatrixWorld();let submitted=0;
  mesh.onBeforeShadow({renderBufferDirect(_cam,_scene,g){submitted+=g.drawRange.count;}},null,null,camera,geo,mesh.material);
- assert.equal(submitted,indices.length-6);assert.equal(geo.drawRange.count,0);mesh.onAfterShadow();assert.equal(geo.drawRange.count,Infinity);
+ assert.equal(submitted,0);assert.equal(geo.drawRange.count,indices.length-6);mesh.onAfterShadow();assert.equal(geo.drawRange.count,Infinity);
  camera.far=100000;camera.updateProjectionMatrix();
  const renderer={getDrawingBufferSize:v=>v.set(1920,1080)};
  mesh.position.z=-10000;mesh.updateMatrixWorld();mesh.onBeforeRender(renderer,null,camera);assert.equal(geo.drawRange.count,indices.length-6);mesh.onAfterRender();
@@ -64,9 +64,23 @@ check('spatial shadow ranges keep every original triangle once and preserve trim
  submitted=0;mesh.position.z=-10000;mesh.updateMatrixWorld();
  renderer.renderBufferDirect=(_cam,_scene,g)=>{submitted+=g.drawRange.count;assert.equal(mesh.modelViewMatrix.elements[14],-10000);};
  mesh.onBeforeRender(renderer,new Scene(),camera,geo,mesh.material);
- assert.equal(submitted,indices.length-6);assert.equal(geo.drawRange.count,0);mesh.onAfterRender();assert.equal(geo.drawRange.count,Infinity);
+ assert.equal(submitted,0);assert.equal(geo.drawRange.count,indices.length-6);mesh.onAfterRender();assert.equal(geo.drawRange.count,Infinity);
+ // Separate visible runs genuinely require an auxiliary dispatch; a single
+ // surviving run is submitted by Three's normal draw.
+ const first=r.regions[0],last=r.regions.at(-1);
+ geo.userData.architectureRegions=[first,last];
+ const spans=[];
+ renderer.renderBufferDirect=(_camera,_scene,g)=>spans.push([g.drawRange.start,g.drawRange.count]);
+ mesh.onBeforeShadow(renderer,null,null,camera,geo,mesh.material);
+ spans.push([geo.drawRange.start,geo.drawRange.count]);
+ assert.deepEqual(spans,[[first.start,first.count],[last.start,last.count]]);
+ // Simulate Three throwing before onAfterShadow; the next pass recovers
+ // the complete incoming range and still restores it after drawing both runs.
+ mesh.onBeforeShadow(renderer,null,null,camera,geo,mesh.material);mesh.onAfterShadow();
+ assert.equal(geo.drawRange.count,Infinity);
  renderer.renderBufferDirect=()=>{throw Error('simulated submission failure');};
  assert.throws(()=>mesh.onBeforeShadow(renderer,null,null,camera,geo,mesh.material),/simulated/);assert.equal(geo.drawRange.count,Infinity);
+ renderer.renderBufferDirect=()=>{assert.equal(mesh.modelViewMatrix.elements[14],-10000);throw Error('simulated submission failure');};
  assert.throws(()=>mesh.onBeforeRender(renderer,new Scene(),camera,geo,mesh.material),/simulated/);assert.equal(geo.drawRange.count,Infinity);
  geo.dispose();mesh.material.dispose();
 });

@@ -14,17 +14,9 @@ import {
 /**
  * ROUND 24 (A PACE) — STEP_SAFE's frame half. Recon A3 / FL-05.
  *
- * The governor parks a DPR (lib/fly/step-safe.js); this applies it INSIDE a
- * frame, in one tick:
- *
- *   priority -100  PerfGovernor decides and parks
- *   priority  -99  THIS: gl.setPixelRatio -> gl.setSize -> composer.setSize
- *                        -> React setDpr
- *   priority  -50  FlyScene's simulation
- *   priority   +1  FlyEffectComposer renders
- *
- * so the canvas realloc, the composer's render targets and the React state all
- * move before anything draws.
+ * The governor parks a DPR (lib/fly/step-safe.js). For the stable composer we
+ * hand it the resize at -99. It commits the drawing buffer, post targets and
+ * React state just before a draw that preflight has cleared to proceed.
  *
  * `setDpr` is FlyCanvas's React STATE setter, so calling it here is what keeps
  * r3f's store honest — and also what makes r3f re-apply the same numbers from
@@ -49,35 +41,35 @@ export function StepSafeRig({ setDpr }) {
   useEffect(() => installResizeGuard(gl), [gl]);
 
   useFrame(({ gl: glFrame, size }) => {
-    const d = takeDpr();
-    if (d == null) return;
-    const t0 = performance.now();
-    glFrame.setPixelRatio(d);
-    // `updateStyle` true: the CSS size is unchanged, so this only rewrites the
-    // backing store — the same call r3f's subscriber would make, made here.
-    glFrame.setSize(size.width, size.height, true);
-    // The composer's targets are sized in CSS pixels; it multiplies by the
-    // renderer's pixel ratio internally, exactly as its own passive effect
-    // does. Registered from a keyed effect with an owner-checked disposer, so
-    // a StrictMode double-mount cannot leave this pointing at a dead composer.
-    getComposer()?.setSize(size.width, size.height);
-    setDpr(d);
-    if (typeof window !== 'undefined') {
-      // The record verify-step-clean reads: everything below happened in ONE
-      // animation frame. `rafId` is the frame counter, so a gate can assert
-      // the renderer resize, the composer resize and the draw share a frame.
-      const st = (window.__flyStats ??= {});
-      const prev = st.step;
-      st.step = {
-        n: (prev?.n ?? 0) + 1,
-        dpr: d,
-        atMs: t0,
-        applyMs: +(performance.now() - t0).toFixed(3),
-        canvasW: glFrame.domElement.width,
-        canvasH: glFrame.domElement.height,
-        composer: !!getComposer(),
-        viaValve: false,
-      };
+    if (peekDpr() == null) return;
+    const composer = getComposer();
+    const apply = () => {
+      const d = takeDpr();
+      if (d == null) return;
+      const t0 = performance.now();
+      glFrame.setPixelRatio(d);
+      glFrame.setSize(size.width, size.height, true);
+      composer?.setSize(size.width, size.height);
+      setDpr(d);
+      if (typeof window !== 'undefined') {
+        const st = (window.__flyStats ??= {});
+        st.step = {
+          n: (st.step?.n ?? 0) + 1,
+          dpr: d,
+          atMs: t0,
+          applyMs: +(performance.now() - t0).toFixed(3),
+          canvasW: glFrame.domElement.width,
+          canvasH: glFrame.domElement.height,
+          composer: !!composer,
+          viaValve: false,
+        };
+      }
+    };
+    const main = glFrame.__flyMainDraw;
+    if (main?.enabled && main.owner === composer) {
+      main.applyDpr = apply;
+    } else {
+      apply();
     }
   }, -99);
 
@@ -92,6 +84,10 @@ export function StepSafeRig({ setDpr }) {
     const id = setInterval(() => {
       if (peekDpr() == null) return;
       if (pendingAgeMs() < cfg.valveMs) return;
+      const main = gl.__flyMainDraw;
+      // A visible compositor may be waiting on a program. A state-only resize
+      // would clear the canvas during that hold.
+      if (main?.enabled && main.owner === getComposer() && !document.hidden) return;
       const d = takeDpr();
       if (d == null) return;
       setDpr(d);
@@ -102,7 +98,7 @@ export function StepSafeRig({ setDpr }) {
       }
     }, 250);
     return () => clearInterval(id);
-  }, [setDpr]);
+  }, [gl, setDpr]);
 
   return null;
 }

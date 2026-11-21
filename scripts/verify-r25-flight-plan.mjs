@@ -678,6 +678,42 @@ await tryGate('7b launchFreeFlight rejects', () => {
   gate('7b unknown / ops-airport / null destinations are refused', r.every((x) => x === false) && w.operations.phase === 'hangar', r.join(','));
   w.off();
 });
+await tryGate('7b resident Free Flight launch', () => {
+  const screen = useFlyStore.getState().screen;
+  const d = FP.FEATURED_DESTINATIONS[0];
+  try {
+    const cases = [
+      { screen:'title', dx:0, dy:0, ready:true, warp:false },
+      { screen:'hangar', dx:0, dy:0, degraded:true, warp:false },
+      { screen:'hangar', dx:0, dy:0, loading:true, staged:true, warp:false },
+      { screen:'hangar', dx:0, dy:0, staged:true, stageReady:true, warp:false },
+      { screen:'hangar', dx:0, dy:0, loading:true, staged:true, stageLaunched:true, warp:true },
+      { screen:'title', dx:0, dy:0, loading:true, warp:true },
+      { screen:'title', dx:0, dy:700, ready:true, warp:true },
+      { screen:'title', dx:2000, dy:0, ready:true, warp:true },
+      { screen:'flight', dx:0, dy:0, ready:true, warp:true },
+    ];
+    for (const row of cases) {
+      const w = makeWorld({elev:d.groundM});
+      try {
+        useFlyStore.setState({screen:row.screen});
+        const p = FP.freeFlightPlacement(d,d.groundM,resolveAircraft('prop').cfg);
+        w.flight.pos.copy(w.engine.geoToWorld(p.lon,p.lat,p.altM));
+        w.flight.pos.x += row.dx; w.flight.pos.y += row.dy;
+        w.runtime.worldLoading = !!row.loading;
+        w.runtime.worldReadiness = {ready:!!row.ready};
+        w.runtime.worldDegraded = !!row.degraded;
+        if (row.staged) w.runtime.staging = {key:d.id,warped:true,since:performance.now(),ready:row.stageReady,launched:row.stageLaunched};
+        let resets=0;
+        w.engine.notifyWarp=()=>{resets++;};
+        const epoch=useFlyStore.getState().warpEpoch;
+        const ok=w.runtime.launchFreeFlight('prop',d.id);
+        gate('resident launch '+JSON.stringify(row),ok && resets===Number(row.warp) &&
+          useFlyStore.getState().warpEpoch===epoch+Number(row.warp) && w.counts.snap===1 && w.counts.disarm===1);
+      } finally { w.off(); }
+    }
+  } finally { useFlyStore.setState({screen}); }
+});
 await tryGate('7c staging', async () => {
   setPlan(true);
   const doorWas = C.FRONT_DOOR.enabled;

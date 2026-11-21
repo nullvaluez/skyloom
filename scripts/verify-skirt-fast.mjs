@@ -172,8 +172,8 @@ rows.push(
 
 // ---------------------------------------------------- 0 the SHIP state
 const shipSF = checkShip('TERRA_PACE');
-gate('0 skirtFast ships ON and skirtWorker ships OFF (the ruled state)',
-  shipSF.ok && shipSF.got.skirtFast === true && shipSF.got.skirtWorker === false,
+gate('0 worker skirts and the main-thread fallback are both enabled',
+  shipSF.ok && shipSF.got.skirtFast === true && shipSF.got.skirtWorker === true,
   `skirtFast=${shipSF.got.skirtFast} skirtWorker=${shipSF.got.skirtWorker}`);
 
 // ------------------------------------------------- 1-6 real Martini tiles
