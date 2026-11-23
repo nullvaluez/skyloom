@@ -242,6 +242,18 @@ RTX 5080: the cloud container renders with SwiftShader.
   within five minutes, so run the build a second time and judge that run.
   Do not change the environment or the configuration to suppress the
   advisory. Record in your report that it appeared.
+- **The five shader gates run here now, and they pass at the scaffold
+  commit.** `verify-hdr-guard`, `verify-phys-sky`, `verify-road-light-filter`,
+  `verify-night-ground-gpu` and `verify-terrain-dfg` failed in the first
+  baseline run only because the project's Playwright (1.61.1) looks for
+  browser build 1228 and the container ships build 1243. Two symlinks in
+  `/opt/pw-browsers` (`chromium-1228`, `chromium_headless_shell-1228`) fixed
+  that for this session. The true baseline of `node scripts/beta-checks.mjs`
+  is therefore 60 passing and none failing. **A failure in any of those five
+  is a regression, whatever an earlier brief says.** A script of your own
+  that needs a browser can use the project's Playwright the same way, or
+  `require('/opt/node-tools/node_modules/playwright')`; do not run
+  `playwright install`.
 - WebGL here is SwiftShader, about one frame a second. Draw counts, triangle
   counts, ordering and main-thread JavaScript time are meaningful; frame
   rate, GPU time and appearance are not.
@@ -267,4 +279,100 @@ The record below says what each round did.
 
 ## Record
 
-(Filled in at the close of the pass.)
+### Round 1 (2026-11-23): the procedural layer
+
+Built by three implementors on disjoint files, reviewed by a test runner and
+a code reviewer, then repaired and re-checked. Nothing here has been seen on
+a real GPU.
+
+**What was built**
+
+- **Data** (`lib/fly/horizon-fill/fill-gen.js`, `height-tiles.js`,
+  `fill.worker.js`, the route). The generator splits the survey value
+  `a` (built volume over cell area) into ground coverage
+  `c = min(0.65, 0.10 a^0.7)` and height `H = a / c`, fitted to mapped
+  ground in Paris, Manhattan and Powell. A cell is built only above a noise
+  floor and with built neighbours. Level 0 lays lots on a lattice whose
+  orientation is shared by a 4 x 4-cell neighbourhood; every hash uses global
+  cell indices. The tile source keeps a memory LRU, persists to the Cache
+  API and batches requests; the route gained `?v=1&tiles=x.y,...` (up to
+  16 tiles, partial success) and a 256-tile LRU, with the single-tile form
+  unchanged.
+- **Carpet** (`lib/fly/horizon-fill/carpet-engine.js`,
+  `components/fly/HorizonFillLayer.jsx`). A ring of z11 tiles led along
+  the ground track, three levels by distance, one instanced draw per chunk
+  with a size-sorted prefix, the tier's triangle budget with hysteresis, a
+  draped ground lattice, cross-faded swaps, and uploads limited to one chunk
+  a frame. It uses the stand-in material with one keyed variant
+  (`|horizon-hole-v1`, registered for prewarm) that adds the layer's own
+  near hole; without that option every existing caller's shader and program
+  key are unchanged.
+- **Stream** (`lib/fly/horizon-fill/coverage.js`,
+  `lib/fly/toy-world/worker/bundle-cache.js`, marked blocks in the skyline
+  worker and engine). The stand-in worker counts mapped footprints per survey
+  cell; the skyline engine keeps the census and the carpet rebuilds a tile
+  without its mapped cells. Built stand-in tiles persist in a Cache API
+  bundle cache keyed by tileset, tile, protocol, the whole request and the
+  build stamp, checked before the vector tile is fetched. Idle skyline
+  workers pre-build the next groups along the track into that cache.
+  `WORKER_PROTOCOL` did not move: the census rides only on requests that
+  ask for it.
+
+**Measured (node, real survey and map data)**
+
+| Place | Survey volume, Mm3 | Mapped volume, Mm3 | Level 0 instances where the map has nothing |
+|---|---:|---:|---:|
+| Manhattan | 930 | 1,109 | (fully mapped) |
+| Paris | 984 | 702 | (fully mapped) |
+| Powell, Ohio | 257 | 87 | 24,895 |
+| Melton, Victoria | 54.7 | 5.4 | 10,932 |
+| Owens Valley | 1.3 | 0.8 | 41 |
+
+Generated volume matches the survey to 0.14 % at every level. On the gate's
+New York scene at High the ring held 30 tiles in 42 chunks and 236,034
+triangles against the 240,000 budget; a 2,400-frame flight with a turn and a
+warp made 25 swaps with no frame missing a chunk, and steady flight made no
+builds and no uploads.
+
+**Checks**
+
+- `scripts/verify-horizon-fill-data.mjs`, `-carpet.mjs` (60 checks) and
+  `-stream.mjs` (52), now in the `world` group of `beta-checks.mjs`.
+- The whole beta suite passes, 49 of 49, including the five shader gates.
+- `scripts/world-pass-worker-proof.mjs`: 1,062 of 1,062 cases and 7,308
+  buffers identical to the scaffold, so the worker's output is unchanged
+  without the request field.
+- Production build passes. A software-rendered smoke with the flag on
+  reached 38 chunks with no console error; with the flag off the page made
+  no height request and started no fill worker.
+
+**Found in review and fixed**
+
+- A chunk waiting for measured ground was re-draped every frame (289 ground
+  queries and two allocations each). It now retries every 0.4 s, at most one
+  attempt a frame, and the worker is not fed past 12 waiting chunks.
+- The layer's own near hole did nothing in the shader, because the distant
+  material replaces the line that read it. The hole is now a per-instance
+  term in the stand-in vertex shader behind the keyed variant.
+- The survey's credit could be missing until the scene mounted. The
+  attribution bar now reads the flag request, which never latches.
+
+**Not verified here**
+
+- Appearance, frame time and the near-hole and taper look on a real GPU.
+- The fill worker inside a real browser on your machine, the batched route
+  against the live survey under production hosting, and Safari.
+- How often idle pre-builds fire in flight, and the census's worker cost on
+  a dense tile (it parses each building polygon a second time).
+- Suburban houses come out about 11 m tall on average because that is what
+  the survey's volume implies; check that suburbs do not read as rows of
+  three-storey boxes.
+
+**Try it**
+
+Open the game with `?flags=HORIZON_FILL` at High or Ultra. For numbers on
+the RTX 5080, against a production server you start:
+
+    node scripts/review-horizon-fill.cjs <server-url> off-run melton high off
+    node scripts/review-horizon-fill.cjs <server-url> on-run melton high on
+    node scripts/review-horizon-fill.cjs compare off-run on-run

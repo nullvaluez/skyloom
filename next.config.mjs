@@ -10,6 +10,18 @@ function buildSha() {
     return '';
   }
 }
+// HORIZON FILL: the stand-in bundle cache must never read another build's
+// bundles. The sha alone does not change for uncommitted edits, so a dirty
+// tree adds the time this config was loaded (each build or dev-server start).
+function buildStamp() {
+  const sha = process.env.NEXT_PUBLIC_BUILD_SHA || buildSha();
+  try {
+    const dirty = execSync('git status --porcelain', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim() !== '';
+    return dirty ? `${sha}-${Date.now().toString(36)}` : sha;
+  } catch {
+    return sha;
+  }
+}
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Isolate review builds from a running local server's generated files.
@@ -25,7 +37,7 @@ const nextConfig = {
     },
   } : {}),
   reactStrictMode: true,
-  env: { NEXT_PUBLIC_BUILD_SHA: process.env.NEXT_PUBLIC_BUILD_SHA || buildSha() },
+  env: { NEXT_PUBLIC_BUILD_SHA: process.env.NEXT_PUBLIC_BUILD_SHA || buildSha(), NEXT_PUBLIC_BUILD_STAMP: process.env.NEXT_PUBLIC_BUILD_STAMP || buildStamp() },
 
   // Required for the three.js ecosystem (Fly mode). Do NOT enable
   // experimental.cacheComponents — it breaks R3F canvas re-init on

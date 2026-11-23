@@ -7,6 +7,21 @@
 >   Enhanced Satellite is the default on every device
 >   (`VISUALS.defaultProfile:'enhanced'`), and `R25_SKY` / `R25_GROUND` ship
 >   `enabled:true`.
+> - **Horizon Fill (2026-11-23, owner-requested, IN PROGRESS on
+>   `phresh/magical-lamport-ji58ab`, flag OFF):**
+>   [FLY_HORIZON_FILL.md](FLY_HORIZON_FILL.md) is the plan, the contracts and
+>   the record. Buildings to the horizon: a procedural layer generated from
+>   the GHS-BUILT-H built-height survey (`/api/city-height`) fills the
+>   ground the detailed ring and the mapped stand-ins leave bare (no mapped
+>   footprints, past the stand-in reach, or still streaming), as instanced
+>   stand-ins at three levels of detail under a fixed triangle budget. Mapped
+>   cells always win (the stand-in worker's cell census). `HORIZON_FILL`
+>   ships `enabled:false`, is read only through `lib/fly/horizon-fill.js`,
+>   and needs desktop High / Ultra with the World Pass stand-ins on;
+>   `?flags=HORIZON_FILL` turns it on for one page load. Gates:
+>   `scripts/verify-horizon-fill-{data,carpet,stream}.mjs` (in
+>   `verify:beta`). Owner harness: `scripts/review-horizon-fill.cjs`. No
+>   RTX 5080 look or frame-rate check has been made.
 > - **World Pass (2026-11-16, owner-requested; all five flags ON on `main`
 >   since 2026-11-17 at the owner's request):**
 >   [FLY_WORLD_PASS.md](FLY_WORLD_PASS.md) is the plan and the record. How the

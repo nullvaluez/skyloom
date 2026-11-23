@@ -58,10 +58,10 @@ check('flag on: the reader turns the carpet on (World Pass tier pinned)', hf.hor
 
 const THREE = await import('three');
 const { ShaderLib, UniformsUtils } = THREE;
-const { CarpetEngine } = await import('../lib/fly/horizon-fill/carpet-engine.js');
+const { CarpetEngine, buildCarpetPrewarm } = await import('../lib/fly/horizon-fill/carpet-engine.js');
 const G = await import('../lib/fly/horizon-fill/carpet-grid.js');
 const { worldPassConfig } = await import('../lib/fly/world-pass.js');
-const { createStandInMaterial, createStandInUniforms } = await import('../lib/fly/sat-stand-in-material.js');
+const { createStandInMaterial, createStandInUniforms, STAND_IN_HOLE_KEY } = await import('../lib/fly/sat-stand-in-material.js');
 const { satelliteVisualsOn } = await import('../lib/fly/satellite-visuals.js');
 const { STAND_IN_TRIANGLES } = await import('../lib/fly/toy-world/sat-stand-ins.js');
 const { resetWpFrameSlice } = await import('../lib/fly/toy-world/wp-frame-slice.js');
@@ -227,7 +227,7 @@ function makeEngine(over = {}) {
   if (over.ring) Object.assign(config.ring, over.ring);
   const api = over.api ?? makeApi();
   const engine = new CarpetEngine({
-    api, config, tier: over.tier ?? 'high', groundAt, coverage: over.coverage ?? null,
+    api, config, tier: over.tier ?? 'high', groundAt: over.groundAt ?? groundAt, coverage: over.coverage ?? null,
     houses: over.houses ?? true, preload: over.preload ?? false, reachCfg, lighting: satelliteVisualsOn('lighting'),
   });
   engine.setView(800, 900);
@@ -264,7 +264,12 @@ const dt = 1 / 30;
   const { engine } = makeEngine();
   const sky = createStandInMaterial({ lighting: satelliteVisualsOn('lighting'), uniforms: createStandInUniforms(reachCfg), footprintK: reachCfg.worker?.footprintK ?? 0.5 });
   const key = engine.material.customProgramCacheKey();
-  check('program key equals the skyline stand-in material', key === sky.customProgramCacheKey(), key.slice(-60));
+  // The one documented variant: the skyline stand-in key plus the near hole.
+  check('program key is the skyline stand-in key plus the near-hole suffix', key === sky.customProgramCacheKey() + STAND_IN_HOLE_KEY, key.slice(-60));
+  const warm = buildCarpetPrewarm({ reachCfg, lighting: satelliteVisualsOn('lighting') });
+  check('prewarm builder carries the live carpet key', warm.material.customProgramCacheKey() === key && warm.geometry.instanceCount === 1);
+  warm.geometry.dispose();
+  warm.material.dispose();
   const twin = engine._fadePool.acquire();
   check('fade twin has the same program key', twin.material.customProgramCacheKey() === key);
   const compile = (mat) => {
@@ -274,11 +279,20 @@ const dt = 1 / 30;
   };
   const a = compile(engine.material);
   const b = compile(sky);
-  check('same GLSL as the skyline stand-ins', a.vertexShader === b.vertexShader && a.fragmentShader === b.fragmentShader);
-  check('own near hole, outer taper and altitude fade uniforms', a.uniforms.uSkyHole === engine._hole && a.uniforms.uSkyFade === engine._fadeU && (!a.uniforms.uCityHorizonBand || a.uniforms.uCityHorizonBand === engine._band) && b.uniforms.uSkyHole !== engine._hole);
+  const HOLE_DECL = '\nuniform vec2 uStandInHole;';
+  const HOLE_TERM = '  if (uStandInHole.x > 0.0) vStandInFade *= smoothstep(uStandInHole.x, uStandInHole.x + uStandInHole.y, distance(sCentre.xz, uBendCenter));\n';
+  check('same GLSL as the skyline stand-ins but for the near-hole term', a.vertexShader.replace(HOLE_DECL, '').replace(HOLE_TERM, '') === b.vertexShader && a.fragmentShader === b.fragmentShader && !b.vertexShader.includes('uStandInHole'));
+  // The distant material swaps the bend's uSkyHole test for the coverage discard,
+  // so the hole must live in the carpet's own (vertex) path, before the collapse.
+  const holeAt = a.vertexShader.indexOf(HOLE_TERM);
+  const collapseAt = a.vertexShader.indexOf('if (vStandInFade <= 0.0) { gl_Position', holeAt);
+  const fadeAt = a.vertexShader.indexOf('vStandInFade = smoothstep(uStandInView.y');
+  check('near hole is in the compiled vertex text, after the size fade, before the collapse', a.vertexShader.includes(HOLE_DECL) && holeAt > fadeAt && fadeAt > 0 && collapseAt > holeAt);
+  check('the fragment has no uSkyHole reader (why the hole cannot ride uSkyHole)', !/uSkyHole\.[xy]/.test(a.fragmentShader.replace(/uniform vec2 uSkyHole;/g, '')));
+  check('own near hole, outer taper and altitude fade uniforms', a.uniforms.uStandInHole === engine._hole && a.uniforms.uSkyFade === engine._fadeU && (!a.uniforms.uCityHorizonBand || a.uniforms.uCityHorizonBand === engine._band) && !b.uniforms.uStandInHole);
   check('own stand-in view uniform (not the skyline\'s)', a.uniforms.uStandInView === engine.uniforms.uStandInView && b.uniforms.uStandInView !== engine.uniforms.uStandInView);
   const tw = compile(twin.material);
-  check('twin shares the base architecture uniforms, has its own fade', tw.uniforms.uArchitectureTiles === a.uniforms.uArchitectureTiles && tw.uniforms.uSkyFade === twin.uniform);
+  check('twin shares the base architecture uniforms and the hole, has its own fade', tw.uniforms.uArchitectureTiles === a.uniforms.uArchitectureTiles && tw.uniforms.uSkyFade === twin.uniform && tw.uniforms.uStandInHole === engine._hole && tw.vertexShader === a.vertexShader);
   engine._fadePool.release(twin);
   // syncSkyline copies the detailed ring's coverage into the carpet's own uniforms.
   const su = sky.userData.architecture.uniforms;
@@ -561,6 +575,61 @@ const dt = 1 / 30;
   for (let i = 0; i < 60; i++) await frame(ctx, (t += dt), NYC.x, NYC.z);
   check('admission: allowed frames upload', ctx.engine.stats.uploads > 0);
   ctx.engine.dispose();
+}
+
+// --- 6b. no measured ground yet: bounded retries, bounded backlog ---------------------
+{
+  let have = false;
+  const nullGround = (lon, lat) => (have ? groundAt(lon, lat) : null);
+  const ctx = makeEngine({ groundAt: nullGround });
+  const { engine, config } = ctx;
+  const B = config.budget;
+  const perTry = (B.drapeGridN + 1) ** 2;
+  const maxTries = Math.max(B.uploadsPerFrame, B.drapeTriesPerFrame);
+  let t = 0;
+  let worst = 0;
+  let worstReady = 0;
+  let total = 0;
+  const frames = Math.floor((B.drapeWaitSec - 1) / dt);
+  for (let i = 0; i < frames; i++) {
+    const q0 = engine.drapeQueries;
+    await frame(ctx, (t += dt), NYC.x, NYC.z);
+    const q = engine.drapeQueries - q0;
+    total += q;
+    if (q > worst) worst = q;
+    if (engine.ready.length > worstReady) worstReady = engine.ready.length;
+  }
+  check('no ground: at most drapeTriesPerFrame drape attempts a frame', worst <= maxTries * perTry && worst > 0, `worst ${worst} queries/frame (cap ${maxTries * perTry})`);
+  const attempts = total / perTry;
+  const bound = engine.stats.builds * (Math.floor((frames * dt) / B.drapeRetrySec) + 1);
+  check('no ground: each waiting chunk asks again only after drapeRetrySec', engine.stats.uploads === 0 && attempts <= bound, `${attempts} attempts in ${(frames * dt).toFixed(1)} s for ${engine.stats.builds} built chunks (bound ${bound})`);
+  check('no ground: the worker is not fed past maxReady', worstReady <= B.maxReady + B.maxInFlight, `${worstReady} ready (maxReady ${B.maxReady})`);
+  have = true;
+  for (let i = 0; i < 120; i++) await frame(ctx, (t += dt), NYC.x, NYC.z);
+  check('ground arrives: waiting chunks upload', engine.stats.uploads > 0, `${engine.stats.uploads} uploads`);
+  engine.dispose();
+  // Ground that never comes: after drapeWaitSec the chunks drape on the player's ground.
+  const never = makeEngine({ groundAt: () => null });
+  t = 0;
+  for (let i = 0; i < Math.ceil((B.drapeWaitSec + 3) / dt); i++) await frame(never, (t += dt), NYC.x, NYC.z);
+  check('no ground ever: chunks upload on the player\'s ground after drapeWaitSec', never.engine.stats.uploads > 0, `${never.engine.stats.uploads} uploads`);
+  never.engine.dispose();
+}
+
+// --- 7. StrictMode: effect, cleanup, effect again on the same engine ---------------
+{
+  const ctx = makeEngine({ api: makeApi({ latency: 4 }) });
+  let t = 0;
+  for (let i = 0; i < 3; i++) await frame(ctx, (t += dt), NYC.x, NYC.z);
+  const inFlight = ctx.engine.inFlight;
+  ctx.engine.dispose(); // the cleanup; the old worker's answers never come back
+  ctx.api.pending.length = 0;
+  ctx.engine.revive();
+  ctx.engine.setWorker(ctx.api);
+  for (let i = 0; i < 120; i++) await frame(ctx, (t += dt), NYC.x, NYC.z);
+  check('revive: a re-run effect streams again (lost in-flight answers do not block)', inFlight > 0 && ctx.engine.object.children.length > 0 && ctx.engine.stats.pending === 0, `${ctx.engine.object.children.length} meshes`);
+  ctx.engine.dispose();
+  check('revive then dispose: zero live geometries', ctx.engine.liveGeometries === 0);
 }
 
 console.log(`\n${passes} passed, ${failures} failed`);

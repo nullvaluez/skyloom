@@ -5,7 +5,8 @@ import { useFrame } from '@react-three/fiber';
 import { wrap } from 'comlink';
 import { horizonFillOn, horizonFillConfig, horizonFillTier } from '@/lib/fly/horizon-fill';
 import { worldPassConfig } from '@/lib/fly/world-pass';
-import { CarpetEngine } from '@/lib/fly/horizon-fill/carpet-engine';
+import { CarpetEngine, buildCarpetPrewarm } from '@/lib/fly/horizon-fill/carpet-engine';
+import { registerPrewarm } from '@/lib/fly/prewarm-registry';
 import { mayFinalize } from '@/lib/fly/finalize-pace';
 import { satelliteVisualsOn } from '@/lib/fly/satellite-visuals';
 import { eyeAglVis, groundElevVis } from '@/lib/fly/ground-vis';
@@ -59,6 +60,16 @@ function HorizonFillCarpet({ runtime, flight }) {
   useEffect(() => {
     runtime.horizonFill = engine;
     /* eslint-enable react-hooks/immutability */
+    engine.revive(); // a StrictMode re-run of this effect follows a dispose
+    // The carpet's one program variant (the near hole); the registry consumer
+    // rescans for late entries. Same key on a re-run: registering replaces it.
+    try {
+      const reachCfg = worldPassConfig('reach');
+      const lighting = satelliteVisualsOn('lighting');
+      registerPrewarm({ stream: 'HORIZON', key: 'HORIZON:carpet-hole', build: () => buildCarpetPrewarm({ reachCfg, lighting }), when: { tiers: ['high', 'ultra'] } });
+    } catch {
+      /* a cold first compile is the only cost */
+    }
     // Upload admission: the shared finalize brake (a probe, it reserves
     // nothing), and the detailed ring's arrival first.
     let held = 0;
