@@ -11,7 +11,7 @@ import { registerCinemaResources } from '@/lib/fly/cinema-resources';
 import { useFlyStore } from '@/stores/fly-store';
 // SHIP PASS SKY (SK-4): SKY_LITE's aerial reach switch, from the device policy.
 import { skyLiteAerialSwitch } from '@/lib/fly/sky-lite';
-// LOOK PASS A (ATMOS): the boundary layer's per-frame light (desktop High/Ultra only).
+// LOOK PASS A (ATMOS): the boundary layer's per-frame light.
 import { updateLookAtmos } from '@/lib/fly/look-atmos';
 import { cinemaProfile } from '@/lib/fly/cinema-policy';
 

@@ -8,6 +8,7 @@ import { SAT_ROADS } from '@/lib/fly/fly-constants';
 import { getEdgeFade } from '@/lib/fly/toy-world/world-bend';
 import { useFlyStore } from '@/stores/fly-store';
 import { NIGHT_LIGHTS_UNIFORMS } from '@/lib/fly/night-lights-atlas';
+import { nightCityTier } from '@/lib/fly/living-ground';
 import {
   createNightLiteGeometry,
   createNightLiteMaterial,
@@ -37,7 +38,7 @@ const _col = new Color();
  */
 export function SatNightLite({ runtime, flight, origin, engine }) {
   const block = nightLiteBlock();
-  const qualityTier = useFlyStore((s) => s.qualityTier);
+  const qualityTier = useFlyStore(nightCityTier);
   const policy = useMemo(() => nightLitePolicy(qualityTier), [qualityTier]);
   const cities = useMemo(() => buildPoiList().filter((p) => p.kind === 'city'), []);
   const geometry = useMemo(() => createNightLiteGeometry(block), [block]);

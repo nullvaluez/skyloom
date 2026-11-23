@@ -7,9 +7,7 @@
  *  (2) flag on: the boundary-layer edit lands exactly once, before the world
  *      fade, with its declarations once before mainImage, and a text without
  *      the physical anchor (PHYS_SKY off, Classic) is returned unchanged;
- *  (3) the device gate: outside desktop High/Ultra (allowed = false) the
- *      layer is off (w = 0) and the mist floor is 0, so Medium, phones and Low
- *      keep the previous law exactly;
+ *  (3) on the mobile shader path (allowed = false) the layer and mist floor are off;
  *  (4) the shipped AerialPerspective wiring picks the layer text only in the
  *      Enhanced branch and keeps the clarity text as its fallback.
  * Run: node scripts/verify-look-atmos.mjs
@@ -43,8 +41,8 @@ check('(2d) a repeated anchor throws instead of editing silently', threw);
 
 const env = { day: 1, golden: 0, overcast: 0 };
 LA.updateLookAtmos(env, false);
-check('(3a) outside desktop High/Ultra the layer is off (w = 0)', LA.LOOK_ATMOS_UNIFORMS.uLookAtmosA.value.w === 0);
-check('(3b) outside desktop High/Ultra the mist floor is 0', [-20, -3, 0, 7, 20, 45].every((el) => LA.lookMistFloor(el, false) === 0 && LA.lookMistFloor(el, true) === 0));
+check('(3a) the disabled layer has w = 0', LA.LOOK_ATMOS_UNIFORMS.uLookAtmosA.value.w === 0);
+check('(3b) the disabled layer contributes no mist floor', [-20, -3, 0, 7, 20, 45].every((el) => LA.lookMistFloor(el, false) === 0 && LA.lookMistFloor(el, true) === 0));
 LA.updateLookAtmos(env, true);
 const A = LA.LOOK_ATMOS_UNIFORMS.uLookAtmosA.value;
 if (LA.LOOK_ATMOS_ON) {
@@ -66,7 +64,7 @@ check('(4b) wiring: the layer uniforms bind only with the layer text', ap.includ
 
 // (5) the ground mist shape: flag off or off-device = GROUND_MIST's own law.
 LA.updateLookAtmos(env, false);
-check('(5a) outside desktop High/Ultra the mist shape is the old law (1, 0)', LA.LOOK_MIST_SHAPE.value.x === 1 && LA.LOOK_MIST_SHAPE.value.y === 0);
+check('(5a) the disabled layer keeps the base mist shape (1, 0)', LA.LOOK_MIST_SHAPE.value.x === 1 && LA.LOOK_MIST_SHAPE.value.y === 0);
 LA.updateLookAtmos({ day: 0, golden: 0, overcast: 0 }, true);
 check('(5b) at night the mist shape is the old law (1, 0)', LA.LOOK_MIST_SHAPE.value.x === 1 && LA.LOOK_MIST_SHAPE.value.y === 0);
 const GM = await import('../lib/fly/ground-mist.js');

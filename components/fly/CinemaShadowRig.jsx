@@ -39,7 +39,8 @@ export function CinemaShadowRig({runtime,sunRef}){
     const r=rig.current;
     r?.setMapSize(profile.shadowSize);
     r?.setShadowPaused(profile.shadowPaused===true);
-    if(sunRef.current){sunRef.current.castShadow=false;sunRef.current.intensity=r?0:e.sun;}
+    const lookKey=lookShadowKeyGain();
+    if(sunRef.current){sunRef.current.castShadow=false;sunRef.current.intensity=r?0:e.sun*lookKey;}
     // LOOK PASS B (SHADOW): the cloud-shadow gate follows the live profile (0 off High/Ultra).
     const lookCloud=lookShadowCloudGate(r?profile:null);
     if(!r){applyShadowCasterRequests(false);runtime.cinemaShadows={cascades:0};delete runtime.adoptCinematicWarmScene;return;}
@@ -75,7 +76,6 @@ export function CinemaShadowRig({runtime,sunRef}){
     // key direction is S⁻¹·keyDir (identity at k0 = 1). A parallel projection
     // along it in scene space is exactly the true projection after S.
     toSceneDir(r.lightDirection.fromArray(e.keyDir),r.lightDirection).negate();
-    const lookKey=lookShadowKeyGain(); // LOOK PASS B r3: 1 except under a low sun
     for(const light of r.lights){light.intensity=e.sun*lookKey;light.color.fromArray(e.keyColor);compactDepthShadowTarget(light.shadow,gl.shadowMap.type);}
     // Register new streamed materials before their first color draw. A dispose
     // listener drops evicted materials, so the registry never pins the world.

@@ -136,13 +136,12 @@ const OFF = { ...LOOK_SHADOW, enabled: false };
     && grey.fill === 0.3 && off.fill === 0.3 && off.environment === 0.8 && LS.lookShadowKeyGain(OFF) === 1);
   check('(6b) a 7 deg sun cuts fill and IBL and raises the cascade key', w > 0.99 && gold.fill < 0.3 && gold.environment < 0.8 && kg > 1,
     `w ${w.toFixed(2)} fill ${gold.fill.toFixed(3)} env ${gold.environment.toFixed(3)} key x${kg.toFixed(2)}`);
-  // (6c) r5: desktop High/Ultra only. Medium, phone and Low (and their rungs) keep today's pixels.
-  const lower = Object.values(CINEMA_PROFILES).filter((p) => !/^(ultra|high)/.test(p.name));
-  const upper = Object.values(CINEMA_PROFILES).filter((p) => /^(ultra|high)/.test(p.name));
+  const lower = Object.values(CINEMA_PROFILES).filter((p) => p.name.startsWith('phone'));
+  const upper = Object.values(CINEMA_PROFILES).filter((p) => !p.name.startsWith('phone'));
   const bad = lower.filter((p) => { const g = env(7); const wl = LS.applyLookShadowLowSun(g, ON, p);
     return wl !== 0 || g.fill !== 0.3 || g.environment !== 0.8 || LS.lookShadowKeyGain(ON) !== 1; }).map((p) => p.name);
   const missed = upper.filter((p) => !(LS.applyLookShadowLowSun(env(7), ON, p) > 0.99)).map((p) => p.name);
-  check('(6c) Medium, phone and Low: weight 0, fill and IBL untouched, key gain 1; High/Ultra rungs apply',
+  check('(6c) desktop fill and key balance survives every rung; phone keeps its own lighting',
     lower.length >= 3 && bad.length === 0 && missed.length === 0,
     `lower ${lower.map((p) => p.name).join(',')}${bad.length ? ` BAD ${bad}` : ''}${missed.length ? ` MISSED ${missed}` : ''}`);
 }

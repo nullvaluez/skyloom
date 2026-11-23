@@ -25,6 +25,31 @@ release instruction is recorded separately from the measurements it authorizes.
 
 ## Status
 
+### 2026-11-23 — Lighting across automatic quality changes
+
+At a fixed position and heading over Dublin, Ohio, the Spotting button left
+the world brightness steady. Stepping the governor down from Ultra reproduced
+the dark view. By the time the HUD showed Medium, the active effects profile
+was already Low. It had removed the desktop exposure and display grade, the
+low-altitude haze, and the distant city-light atlas. The city-light fallback
+was still waiting for the scenery tier to reach Low.
+
+Desktop Enhanced now keeps its exposure, fill, display grade and horizon haze
+throughout the quality ladder. The selected preset determines the city-light
+source. A flight that starts with the atlas keeps it when effects step down,
+and ground mist uses two samples on the lowest adaptive rung. Cloud resolution,
+shadow filtering and scenery detail still follow the rendering budget.
+
+In Chrome on the RTX 5080, the same night transition took mean display luma
+in the Dublin horizon band from 56.7 to 27.0 before the fix and from 56.0 to
+55.0 afterward (0–255 scale). The test held the camera, sun and weather fixed
+and stepped back up to Ultra in the same flight. Further checks covered dawn,
+daylight, golden hour, dusk and overcast in Dublin, overcast Manhattan, and
+Chrome's emulated touch profile at dusk and in daylight. Switching through
+High, Medium, Low and back to Ultra in the pause menu kept the dusk exposure
+at 1.863 across all four selections. The grade, profile and
+city-light regressions now run in `npm run verify:beta`.
+
 ### 2026-11-21 — In-flight performance over Argenteuil
 
 The comparison starts from the build that already shipped the Paris facade,

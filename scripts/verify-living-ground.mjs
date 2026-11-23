@@ -62,6 +62,8 @@ async function buildLeg(on) {
   const inc = (t) => t.replace(/^[ \t]*#include +<([\w\d./]+)>/gm, (m, n) => inc(THREE.ShaderChunk[n] ?? `// missing ${n}`));
   const out = {
     active: LG.LIVING_GROUND_ACTIVE,
+    cityTiers: ['ultra','medium','low'].map(qualityPreset => ['high','medium','low'].map(qualityTier =>
+      LG.nightCityTier({ mapStyle: 'satellite', visuals: 'enhanced', qualityPreset, qualityTier }))),
     shaders: { ...LG.LIVING_GROUND_SHADERS },
     enhanced: enhanced.getFragmentShader(),
     classic: classic.getFragmentShader(),
@@ -200,6 +202,10 @@ const check = (name, ok, detail = '') => { (ok ? pass++ : fail++); console.log(`
 const run = (l) => JSON.parse(execFileSync(process.execPath, [fileURLToPath(import.meta.url), `--leg=${l}`], { cwd: ROOT, maxBuffer: 64 << 20, stdio: ['ignore', 'pipe', 'ignore'] }).toString());
 const off = run('off');
 const on = run('on');
+check('night lights follow the selected preset throughout an adaptive flight', JSON.stringify(on.cityTiers) === JSON.stringify([
+  ['high','high','high'], ['medium','medium','medium'], ['low','low','low'],
+]));
+check('when the atlas is disabled the city pools follow their scenery budget', off.cityTiers.every(tiers => tiers.join(',') === 'high,medium,low'));
 const GROUND_ID = /\b(lgHash|lgNoise|nlLights|nlFresh|nlLum|gmApply|gmSegment|gfField|gfGrid|livingGround|lgGround|lgEmit|uNL\w+|uGM\w+|uGF\w+)\b/;
 
 // (1) off
@@ -209,12 +215,16 @@ check('(1c) flags off: the patch is the identity, the attach a no-op, no dev han
 check('(1d) flags off: the satellite credits and the Credits list do not name NASA', !off.onScreen.includes(off.nasa) && !off.credits.includes(off.nasa));
 
 // (2) on
+const lightAddition = [
+  '      lit+=lgEmit*apT*transmission;\n',
+  '      lit+=lgEmit*apT*transmission*(uR25Mode.x>.5?1.-smoothstep(uR25WorldFade.x,uR25WorldFade.y,dXZ):1.);\n',
+].find(line => on.enhanced.includes(line));
 const marks = {
   field: on.enhanced.includes('vec4 gfField(vec2 xz){'),
   lights: on.enhanced.includes('emit=nlLights(world,metricRay,dXZ,trueY,city);'),
   mist: on.enhanced.includes('gmApply(world,metricRay,city*uNLMist,ground,emit);'),
   driver: on.enhanced.includes('    livingGround(world,metricRay,dXZ,trueY,lgGround,lgEmit);\n'),
-  phys: on.enhanced.includes('vec3 lit=lgGround*apT+') && on.enhanced.includes('lit+=lgEmit*apT*transmission;'),
+  phys: on.enhanced.includes('vec3 lit=lgGround*apT+') && !!lightAddition,
   fallback: on.enhanced.includes('outputColor=vec4((lgGround*transmittance+haze*(1.-transmittance)+lgEmit*transmittance)*uR25Exposure,inputColor.a);'),
 };
 check('(2a) flags on: every block is in the Enhanced aerial program', Object.values(marks).every(Boolean) && on.shaders['aerial-enhanced'] === 'patched', JSON.stringify(marks));
@@ -222,12 +232,14 @@ check('(2b) flags on: the Classic and LAW aerial texts are byte-identical to fla
 {
   // Undo exactly the GROUND edits; what is left must BE the flags-off text.
   let t = on.enhanced;
-  const MAIN = 'void mainImage(const in vec4 inputColor, const in vec2 uv, const in float depth, out vec4 outputColor) {';
   const declAt = t.indexOf('\nfloat lgHash(');
-  t = declAt >= 0 ? t.slice(0, declAt) + t.slice(t.indexOf(MAIN)) : t;
+  // The boundary-layer declarations can follow livingGround before mainImage.
+  const driverEnd = 'gmApply(world,metricRay,city*uNLMist,ground,emit);\n}\n';
+  const end = t.indexOf(driverEnd, declAt);
+  if (declAt >= 0 && end >= 0) t = t.slice(0, declAt) + t.slice(end + driverEnd.length);
   t = t.replace('    vec3 lgGround=inputColor.rgb,lgEmit;\n    livingGround(world,metricRay,dXZ,trueY,lgGround,lgEmit);\n', '');
   t = t.replace('vec3 lit=lgGround*apT+', 'vec3 lit=inputColor.rgb*apT+');
-  t = t.replace('      lit+=lgEmit*apT*transmission;\n', '');
+  if (lightAddition) t = t.replace(lightAddition, '');
   t = t.replace('outputColor=vec4((lgGround*transmittance+haze*(1.-transmittance)+lgEmit*transmittance)*uR25Exposure,inputColor.a);', 'outputColor=vec4((inputColor.rgb*transmittance+haze*(1.-transmittance))*uR25Exposure,inputColor.a);');
   check('(2c) flags on minus the GROUND edits === flags off (the only difference is the blocks)', t === off.enhanced, t === off.enhanced ? '' : `lengths ${t.length} vs ${off.enhanced.length}`);
 }

@@ -3,7 +3,7 @@
  *
  * Node only (no GPU). Every cinema profile name, on a desktop and on the mobile
  * graphics class, goes through the shared predicate AND through each stream's
- * own gate function, and all six answers must agree:
+ * own gate function. Lighting stays consistent as detail budgets change:
  *   ATMOS   updateLookAtmos(env, profile)  -> uLookAtmosA.w
  *   SHADOW  lookShadowLightDepth(profile)  -> non-null; lookShadowCloudGate(profile) > 0;
  *           lookShadowTerrainSoftGate(profile) -> 1 (the terrain uTsSoft ring)
@@ -19,7 +19,7 @@ import { register } from 'node:module';
 import fs from 'node:fs';
 
 register('./_node-resolve.mjs', import.meta.url);
-const { lookTierAllowed, LOOK_TIER_PROFILES } = await import('../lib/fly/look-tier.js');
+const { lookLightingAllowed, lookTierAllowed, LOOK_TIER_PROFILES } = await import('../lib/fly/look-tier.js');
 const { CINEMA_PROFILES, resolveCinemaProfile } = await import('../lib/fly/cinema-profile.js');
 const LA = await import('../lib/fly/look-atmos.js');
 const LS = await import('../lib/fly/look-shadow.js');
@@ -61,16 +61,17 @@ ok(names.every((n) => lookTierAllowed(n, false) === /^(ultra|high)/.test(n)), '(
 ok(names.every((n) => lookTierAllowed(n, true) === false), '(1c) mobile graphics class: never allowed');
 ok([undefined, null, '', 'ultra-x', { name: 'medium' }].every((p) => lookTierAllowed(p, false) === false) && lookTierAllowed({ name: 'ultra' }, false), '(1d) object or name; anything else is not allowed');
 
-// 2. Every profile x device: the predicate and all five streams agree.
+// 2. Every profile x device: the lighting model and optional detail budgets.
 for (const mobile of [false, true]) {
   if (mobile) globalThis.window = MOBILE_WINDOW; else delete globalThis.window;
   const rows = [];
   for (const p of Object.values(CINEMA_PROFILES)) {
     const want = lookTierAllowed(p);
     const got = streams(p);
-    const bad = Object.entries(got).filter(([k, v]) => v !== (want && flagOn[k]));
+    const lighting = !mobile && !p.name.startsWith('phone');
+    const bad = Object.entries(got).filter(([k, v]) => v !== ((k === 'grade' || k === 'atmos' ? lighting : want) && flagOn[k]));
     rows.push(`${p.name}=${want ? 'on' : 'off'}`);
-    ok(!bad.length && want === (!mobile && LOOK_TIER_PROFILES.includes(p.name)), `(2) ${mobile ? 'mobile ' : 'desktop'} ${p.name}: predicate ${want ? 'on' : 'off'}, all five streams agree`, bad.map(([k, v]) => `${k}=${v}`).join(' '));
+    ok(!bad.length && lookLightingAllowed(p) === lighting && want === (!mobile && LOOK_TIER_PROFILES.includes(p.name)), `(2) ${mobile ? 'mobile ' : 'desktop'} ${p.name}: lighting ${lighting}, detail ${want}`, bad.map(([k, v]) => `${k}=${v}`).join(' '));
   }
   console.log(`      ${mobile ? 'mobile ' : 'desktop'}: ${rows.join(' ')}`);
 }
@@ -85,7 +86,7 @@ const sbl = read('components/fly/SatBuildingLayer.jsx');
 ok(/updateLookAtmos\(runtime\.cinemaEnvironment, cinemaProfile\(\)\)/.test(rig) && !/updateLookAtmos\([^)]*qt\b/.test(rig), '(3a) AtmosphereRig hands ATMOS the live cinema profile, not the store tier');
 ok(/setLookFacadeProfile\(cinemaProfile\(\)\)/.test(sbl) && !/setLookFacade\w*\(qualityTier\)/.test(sbl), '(3b) SatBuildingLayer sets the FACADE gate from the live cinema profile each frame, not the store tier');
 const src = { grade: read('lib/fly/look-grade.js'), shadow: read('lib/fly/look-shadow.js'), layers: read('lib/fly/look-layers.js'), facade: read('lib/fly/look-facade.js'), atmos: read('lib/fly/look-atmos.js') };
-ok(Object.values(src).every((s) => s.includes("import { lookTierAllowed } from './look-tier';")), '(3c) all five stream modules import the shared tier test');
+ok(Object.values(src).every((s) => s.includes("from './look-tier';")), '(3c) all five stream modules use the shared profile policy');
 ok(Object.values(src).every((s) => !/new Set\(\[\s*'ultra'/.test(s) && !/isMobileGraphicsClass\(\)/.test(s)), '(3d) no stream module keeps its own profile set or device-class test');
 // The flag-on shader text stays a static, per-session decision: no governor rung recompiles.
 ok(!/lookTierAllowed|cinemaProfile/.test(read('lib/fly/look-grade-flag.js')) && /LOOK_GRADE_COMPILED = LOOK_GRADE_ON && !isMobileGraphicsClass\(\)/.test(read('lib/fly/look-grade-flag.js')), '(3e) GRADE shader text keys off the static device class, not the live profile');

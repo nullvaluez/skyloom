@@ -1,11 +1,13 @@
 // LOOK PASS E (GRADE) node gate: the exposure law and key/fill terms, and the
-// identities that keep Medium/phone/Low and `?flags=-LOOK_GRADE` on today's pixels.
+// identities for the mobile shader and `?flags=-LOOK_GRADE`.
 //   node scripts/verify-look-grade.mjs
 import { register } from 'node:module';
 register('./_node-resolve.mjs', import.meta.url);
 const { createCinemaEnvironment, evaluateCinemaEnvironment } = await import('../lib/fly/cinema-environment.js');
 const { applyLookGradeEnvironment, lookGradeWeight, LOOK_GRADE_CFG, LOOK_WATER_UNIFORM } = await import('../lib/fly/look-grade.js');
 const { hdrGradeGLSL } = await import('../lib/fly/hdr-grade.js');
+const { CINEMA_PROFILES } = await import('../lib/fly/cinema-profile.js');
+const { applyLookShadowLowSun, lookShadowKeyGain } = await import('../lib/fly/look-shadow.js');
 
 let pass = 0, fail = 0;
 const ok = (c, m, d = '') => { if (c) { pass++; console.log(`PASS  ${m}${d ? `  — ${d}` : ''}`); } else { fail++; console.log(`FAIL  ${m}${d ? `  — ${d}` : ''}`); } };
@@ -63,6 +65,24 @@ const noonKey = at(45).keyColor.slice(); applyLookGradeEnvironment(noon.e, 1);
 ok(noon.e.keyColor.every((v, i) => Math.abs(v - noonKey[i]) < 1e-3), 'noon key colour is untouched (no brown daylight)');
 const ov = stops(7, { overcastT: 1 });
 ok(ov.d < golden.d, 'overcast golden opens less than clear golden', ov.d.toFixed(3));
+
+// A performance step previously removed the exposure, tone curve and sky
+// fill together. Exercise the actual environment writers at the same sun
+// angle and camera heading, including the sun/moon handoff.
+const desktop = Object.values(CINEMA_PROFILES).filter(p => !p.name.startsWith('phone'));
+for (const el of [-40, -9, -4, 0, 7, 45]) {
+  for (const overcastT of [0, 1]) {
+    const lighting = (profile) => {
+      const e = at(el, { overcastT });
+      const weight = lookGradeWeight(profile);
+      applyLookGradeEnvironment(e, weight, cam(e.sunDir[0], e.sunDir[2]));
+      applyLookShadowLowSun(e, undefined, profile);
+      return snap({ weight, e, direct: lookShadowKeyGain() });
+    };
+    const reference = lighting(CINEMA_PROFILES.ultra);
+    ok(desktop.every(p => lighting(p) === reference), `desktop profiles match Ultra lighting at ${el}° and overcast ${overcastT}`);
+  }
+}
 
 console.log(`\nverify-look-grade: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

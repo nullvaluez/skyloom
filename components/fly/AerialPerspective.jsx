@@ -609,8 +609,7 @@ export class AerialPerspectiveEffect extends Effect {
   constructor(opts = {}) {
     const law = LAW();
     const r25 = !law && opts?.r25 === true;
-    // LOOK PASS A: phones never compile the boundary layer (Medium is chosen
-    // later, at run time, and keeps the dormant branch with w = 0).
+    // Desktop profiles share the boundary layer across adaptive quality steps.
     const look = r25 && LOOK_TEXT_ON && !isMobileGraphicsClass();
     super('AerialPerspectiveEffect', law ? lawFragmentShader : look ? enhancedFragmentShaderLook : r25 ? enhancedFragmentShaderClarity : fragmentShader, {
       // This is what makes the composer allocate + bind its depth texture.
