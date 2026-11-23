@@ -9,6 +9,13 @@ import { worldReadiness, retryWorldContent } from '@/lib/fly/world-readiness';
 import { holdCapMs } from '@/lib/fly/load-guard';
 import { LIVING_EARTH } from '@/lib/fly/living-earth';
 import { bootCompactFor } from '@/lib/fly/front-door';
+// ONE REVEAL (FLY_HORIZON_FILL.md second round, stream L): the final-picture gate.
+import { oneRevealOn, ONE_REVEAL_ACTIVE } from '@/lib/fly/one-reveal';
+import { bootDecision, makeHoldClock, missingTerms, progressSig, revealTerms, stepHold, TERM_CAPTIONS } from '@/lib/fly/one-reveal-gate';
+import { noteHold, noteReveal, publishOneReveal, revealArea, setRevealCovered } from '@/lib/fly/one-reveal-state';
+import { REVEAL_DEPS, termsRecord } from '@/lib/fly/one-reveal-deps';
+
+const REVEAL_GATE = oneRevealOn('gate');
 
 /**
  * R9-1 boot loading screen — the full-screen INK+ICE overlay that covers the
@@ -92,6 +99,10 @@ export function BootScreen({ runtime }) {
   useEffect(() => {
     publish('spawn', 0);
     const t0 = performance.now();
+    // ONE REVEAL: the curtain is up; the instrument runs in both arms.
+    setRevealCovered(true);
+    publishOneReveal();
+    const revealClock = makeHoldClock('boot', t0);
     const gate = {
       worldHoldStart: null, // hold timer for gate (a)
       satSawDownload: false,
@@ -186,7 +197,18 @@ export function BootScreen({ runtime }) {
           }
         }
       }
-      if(living){worldSteady=content.ready;worldP=content.progress;}
+      // ONE REVEAL: the gate's terms over the reveal area. Computed in both
+      // arms (the off arm records what was still changing at its reveal);
+      // only with the gate on do they hold the curtain.
+      const terms = living ? revealTerms(rt, revealArea(rt.flight), REVEAL_DEPS, { nowMs: now }) : null;
+      const termsMissing = terms ? missingTerms(terms) : [];
+      const finalReady = !!content?.ready && termsMissing.length === 0;
+      const revealStep = living ? stepHold(revealClock, {
+        nowMs: now, capMs: holdCapMs('boot'), baseReady: content.ready, termsReady: termsMissing.length === 0,
+        sig: progressSig(content, terms), advancing: terms.advancing,
+        missing: REVEAL_GATE ? [...content.blocking, ...termsMissing] : content.blocking,
+      }) : null;
+      if(living){worldSteady=REVEAL_GATE?finalReady:content.ready;worldP=REVEAL_GATE&&content.ready&&!finalReady?Math.min(.99,content.progress):content.progress;}
       if (worldSteady) {
         if (gate.worldHoldStart == null) gate.worldHoldStart = now;
       } else {
@@ -213,11 +235,14 @@ export function BootScreen({ runtime }) {
       // LOAD_GUARD: the Enhanced boot hold gets a hard limit too — only once a
       // spawn exists and the canvas has drawn, so a cap never reveals nothing.
       const bootCapMs = living ? holdCapMs('boot') : null;
-      const bootCapped =
-        bootCapMs != null && now - t0 >= bootCapMs && !!store.spawn && frames >= BOOT.minFrames && !content?.ready;
-      const timedOut = living ? reducedEntry.current || bootCapped : now - t0 >= BOOT.maxBootMs;
-      const allDone =
-        timedOut || (living ? content.ready && worldDone && frames>=BOOT.minFrames && !!store.spawn : worldDone && modelsP === 1 && shadersP === 1 && !!store.spawn);
+      // ONE REVEAL: gate off, bootDecision is the HEAD expression verbatim
+      // (scripts/verify-one-reveal.mjs proves it); gate on, the final picture
+      // releases and the cap is extended only while something measured advances.
+      const { timedOut, allDone } = bootDecision(REVEAL_GATE, {
+        living, elapsedMs: now - t0, capMs: bootCapMs, maxBootMs: BOOT.maxBootMs, spawn: store.spawn,
+        frames, minFrames: BOOT.minFrames, contentReady: REVEAL_GATE && living ? finalReady : !!content?.ready,
+        worldDone, reduced: reducedEntry.current, modelsP, shadersP, step: revealStep,
+      });
 
       // Weighted, monotonic, and pinned ≤99 until the reveal moment so the
       // harness can rely on pct === 100 ⇔ world revealed.
@@ -230,17 +255,38 @@ export function BootScreen({ runtime }) {
       let phase;
       if (!store.spawn) phase = 'spawn';
       else if (living && content.blocking.length && content.blocking.every(part => part === 'shaders' || part === 'fleet')) phase = content.parts.fleet ? 'shaders' : 'fleet';
+      else if (REVEAL_GATE && living && content.ready && termsMissing.length) phase = `reveal-${termsMissing[0]}`;
       else if (!worldDone) phase = 'world';
       else if (!modelsP) phase = 'fleet';
       else if (shadersP < 1) phase = 'shaders';
       else phase = 'ready';
 
       if (allDone) {
-        if (living && timedOut) {
+        // ONE REVEAL: when the base world is ready and only a final-picture
+        // term (a late far photo, say) ran the hold out, nothing is missing
+        // that the bypasses exist for and the world is not degraded. Gate off,
+        // lateTermOnly is false and both lines are HEAD's.
+        const lateTermOnly = REVEAL_GATE && timedOut && !reducedEntry.current && content?.ready === true;
+        if (living && timedOut && !lateTermOnly) {
           const reason = reducedEntry.current ? 'explicit-reduced' : 'time-cap';
           rt.terrainPrewarm?.bypass(reason); rt.loungeRoom?.bypassWarm?.(reason); rt.prewarm?.bypassWorldProfiles?.(reason);
         }
-        rt.worldLoading=false;rt.worldDegraded=!!(living&&(reducedEntry.current||timedOut));
+        rt.worldLoading=false;rt.worldDegraded=!!(living&&(reducedEntry.current||(timedOut&&!lateTermOnly)));
+        // ONE REVEAL: the hold's record and the reveal pose the after counters use.
+        if (living) {
+          noteHold({
+            kind: 'boot', gate: REVEAL_GATE, holdMs: Math.round(now - t0), capMs: bootCapMs,
+            ceilingMs: ONE_REVEAL_ACTIVE.revealHold?.ceilingMs?.boot ?? null,
+            released: reducedEntry.current ? 'explicit-reduced' : timedOut ? (REVEAL_GATE ? revealStep.reason : 'time-cap') : REVEAL_GATE ? 'final' : 'content',
+            extendedMs: Math.round(revealClock.extendedMs),
+            heldMs: Object.fromEntries(Object.entries(revealClock.held).map(([k, v]) => [k, Math.round(v)])),
+            finalAtMs: revealClock.finalAtMs == null ? null : Math.round(revealClock.finalAtMs - t0),
+            missingAtReveal: [...(content?.missing ?? []), ...termsMissing],
+            terms: termsRecord(terms),
+          });
+        }
+        noteReveal('boot', rt.flight, rt.criticalTerrain);
+        publishOneReveal();
         if(typeof window!=='undefined')window.__flyWorldStatus={ready:content?.ready??true,degraded:rt.worldDegraded,missing:content?.missing??[]};
         gate.done = true;
         gate.pct = 100;
@@ -285,6 +331,7 @@ export function BootScreen({ runtime }) {
     return () => {
       clearInterval(poll);
       if (revealTimer) clearTimeout(revealTimer);
+      if (!gate.done) setRevealCovered(false); // ONE REVEAL: an unmounted hold covers nothing
     };
   }, []);
 
@@ -294,7 +341,7 @@ export function BootScreen({ runtime }) {
   const caption =
     view.phase === 'world'
       ? CAPTIONS.world[mapStyle] ?? CAPTIONS.world.toy
-      : CAPTIONS[view.phase];
+      : view.phase.startsWith('reveal-') ? TERM_CAPTIONS[view.phase.slice(7)] : CAPTIONS[view.phase];
   const revealing = stage === 'reveal';
 
   const retry = () => {

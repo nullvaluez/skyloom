@@ -9,6 +9,13 @@ import { useFlyStore } from '@/stores/fly-store';
 import { worldReadiness, retryWorldContent } from '@/lib/fly/world-readiness';
 import { holdCapMs } from '@/lib/fly/load-guard';
 import { LIVING_EARTH } from '@/lib/fly/living-earth';
+// ONE REVEAL (FLY_HORIZON_FILL.md second round, stream L): the final-picture gate.
+import { oneRevealOn, ONE_REVEAL_ACTIVE } from '@/lib/fly/one-reveal';
+import { makeHoldClock, missingTerms, progressSig, revealTerms, stepHold, warpDecision, TERM_CAPTIONS } from '@/lib/fly/one-reveal-gate';
+import { noteHold, noteReveal, publishOneReveal, revealArea, setRevealCovered } from '@/lib/fly/one-reveal-state';
+import { REVEAL_DEPS, termsRecord } from '@/lib/fly/one-reveal-deps';
+
+const REVEAL_GATE = oneRevealOn('gate');
 
 // On the title the window shade owns every stage warp's transition (the tour,
 // a hangar pick), so the overlay keeps its readiness hold and bookkeeping but
@@ -34,6 +41,7 @@ export function WarpFlash({ runtime }) {
   const { isPhone: phone } = useDeviceLayout();
   const [stage, setStage] = useState(null); // 'flash' | 'streak' | 'hold' | 'reveal'
   const [help,setHelp]=useState(null);
+  const [revealWait,setRevealWait]=useState(null); // ONE REVEAL: the gate term the hold waits on
   // GATE TO GATE: the kind of the warp on screen ('airport' draws the calm airport card).
   const [shownKind,setShownKind]=useState(null);
   const reducedEntry=useRef(false);
@@ -53,22 +61,39 @@ export function WarpFlash({ runtime }) {
       // and the remaining detail keeps streaming (null = legacy, uncapped).
       const capMs=holdCapMs('warp');
       let readySince=null,helpSince=t0,revealTimer;
+      // ONE REVEAL: the curtain is up; the instrument runs in both arms.
+      setRevealCovered(true);publishOneReveal();setRevealWait(null);
+      const revealClock=makeHoldClock('warp',t0);
       const poll=setInterval(()=>{
         if(cancelled)return;
         const now=performance.now(),content=worldReadiness(rt,now-t0);
         rt.worldReadiness=content;
         if(now-t0>WARP.flashMs)setStage('hold');
-        if(content.ready){readySince??=now;}else readySince=null;
+        // ONE REVEAL: gate off, `ready` and the release are HEAD's verbatim
+        // (warpDecision; scripts/verify-one-reveal.mjs); gate on, the final
+        // picture is the ready test and the cap extends only while something advances.
+        const terms=revealTerms(rt,revealArea(rt.flight),REVEAL_DEPS,{nowMs:now}),termsMissing=missingTerms(terms);
+        const revealStep=stepHold(revealClock,{nowMs:now,capMs,baseReady:content.ready,termsReady:!termsMissing.length,sig:progressSig(content,terms),advancing:terms.advancing,missing:REVEAL_GATE?[...content.blocking,...termsMissing]:content.blocking});
+        const ready=REVEAL_GATE?revealStep.finalReady:content.ready;
+        if(REVEAL_GATE)setRevealWait(content.ready&&termsMissing.length?termsMissing[0]:null);
+        if(ready){readySince??=now;}else readySince=null;
         if(now-helpSince>=LIVING_EARTH.loadingHelpMs&&!content.ready)setHelp(content.missing);
         rt.arrivalStats={kind,epoch:warpEpoch,gateArmed:true,holdStartAt:t0,holdCapMs:capMs,terms:content,revealAt:null};
-        const settled=readySince!==null&&now-readySince>=600&&now-t0>=WARP.flashMs;
-        const capped=!settled&&capMs!=null&&now-t0>=capMs;
+        const {settled,capped}=warpDecision(REVEAL_GATE,{readySinceMs:readySince,nowMs:now,elapsedMs:now-t0,flashMs:WARP.flashMs,capMs,reduced:reducedEntry.current,step:revealStep});
         if(settled||reducedEntry.current||capped){
-          if(reducedEntry.current||capped){
+          noteHold({kind:'warp',warpKind:kind,gate:REVEAL_GATE,holdMs:Math.round(now-t0),capMs,ceilingMs:ONE_REVEAL_ACTIVE.revealHold?.ceilingMs?.warp??null,
+            released:reducedEntry.current?'explicit-reduced':capped?(REVEAL_GATE?revealStep.reason:'time-cap'):REVEAL_GATE?'final':'content',
+            extendedMs:Math.round(revealClock.extendedMs),heldMs:Object.fromEntries(Object.entries(revealClock.held).map(([k,v])=>[k,Math.round(v)])),
+            finalAtMs:revealClock.finalAtMs==null?null:Math.round(revealClock.finalAtMs-t0),missingAtReveal:[...content.missing,...termsMissing],terms:termsRecord(terms)});
+          noteReveal('warp',rt.flight,rt.criticalTerrain);publishOneReveal();setRevealWait(null);
+          // ONE REVEAL: a hold run out only by a late final-picture term, with the
+          // base world ready, is not a degraded arrival (gate off: always false).
+          const lateTermOnly=REVEAL_GATE&&capped&&!reducedEntry.current&&content.ready===true;
+          if(reducedEntry.current||(capped&&!lateTermOnly)){
             const reason=reducedEntry.current?'explicit-reduced':'time-cap';
             rt.terrainPrewarm?.bypass(reason);rt.loungeRoom?.bypassWarm?.(reason);rt.prewarm?.bypassWorldProfiles?.(reason);
           }
-          clearInterval(poll);rt.worldLoading=false;rt.worldDegraded=reducedEntry.current||capped;
+          clearInterval(poll);rt.worldLoading=false;rt.worldDegraded=reducedEntry.current||(capped&&!lateTermOnly);
           rt.arrivalStats={...rt.arrivalStats,revealAt:now,holdMs:Math.round(now-t0),reason:reducedEntry.current?'explicit-reduced':capped?'time-cap':content.deferred.length?'background-detail':'content'};
           window.__flyWorldStatus={degraded:rt.worldDegraded,capped,missing:content.missing};
           (window.__flyStats??={}).warpGate=rt.arrivalStats;
@@ -76,7 +101,7 @@ export function WarpFlash({ runtime }) {
           revealTimer=setTimeout(()=>!cancelled&&setStage(null),WARP.far.revealMs);
         }
       },250);
-      return()=>{cancelled=true;clearInterval(poll);clearTimeout(revealTimer);rt.worldLoading=false;};
+      return()=>{cancelled=true;clearInterval(poll);clearTimeout(revealTimer);rt.worldLoading=false;setRevealCovered(false);};
     }
     const gate = arrivalOn();
     // R22 (B ↔ E CONTRACT): `runtime.arrivalStats` tells a gate WHICH cap is in
@@ -396,7 +421,7 @@ export function WarpFlash({ runtime }) {
           className="mt-3 font-mono text-[11px] uppercase tracking-[0.5em] text-white/60"
           style={{ animation: 'fly-hold-pulse 1.4s ease-in-out infinite' }}
         >
-          {stage === 'reveal' ? 'arrived' : 'streaming world'}
+          {stage === 'reveal' ? 'arrived' : revealWait ? TERM_CAPTIONS[revealWait] : 'streaming world'}
         </div>
         {help&&<div className="mx-auto mt-7 max-w-md font-sans text-sm normal-case tracking-normal text-white/80" role="status">
           <p>Nearby detail is still loading. You can keep waiting or enter with reduced detail.</p>

@@ -67,6 +67,14 @@ import { mercatorScale } from '@/lib/fly/coords';
 import { eyeAglVis } from '@/lib/fly/ground-vis';
 import { groundArrivalHeld } from '@/lib/fly/ground-arrival';
 import { beginGroundBatch, endGroundBatch } from '@/lib/fly/terrain-ground-query';
+import { frameLeanOn, FRAME_LEAN_ACTIVE } from '@/lib/fly/frame-lean';
+import { budgetK } from '@/lib/fly/harness-budget';
+
+// Third round (FRAME_LEAN.idle.batch, FLY_HORIZON_FILL.md "Third round"): the
+// frame's ground queries (the exact crowns, the placement steps and the near
+// contacts) in one ground-query batch: the same answers, the terrain query's
+// matrix chain brought up to date once.
+const IDLE_BATCH = frameLeanOn('engines') && FRAME_LEAN_ACTIVE.idle?.batch !== false;
 
 const PHOTO_ACTIVE = 3; // photo looks in flight at once (1 during the arrival hold)
 const SLICE_MS = 1.2; // placement work per frame (checked every 16 writes, so a slice ends near 1.5 ms)
@@ -252,9 +260,8 @@ export function WpCanopyLayer({ engine, runtime, flight, tier }) {
     return () => { if (window.__wpCanopy === handle) delete window.__wpCanopy; };
   }, [meshes, engine, runtime, cfg, flight]);
 
-  useFrame(({ clock, camera }) => {
+  const canopyFrame = ({ clock, camera }) => {
     const photo = photoRef.current;
-    if (!photo) return;
     const t = clock.elapsedTime;
     const s = st.current;
     // During arrival, prepare one photo and the first fine support grid in
@@ -321,6 +328,16 @@ export function WpCanopyLayer({ engine, runtime, flight, tier }) {
     }
     if (!held) sampleExact(s, meshes.near, runtime, cfg.sinkM, t);
     updateNearContactMatrices(meshes.near, s.contacts, engine.nearSupport);
+  };
+  useFrame((state) => {
+    if (!photoRef.current) return;
+    if (!IDLE_BATCH) return canopyFrame(state);
+    beginGroundBatch();
+    try {
+      canopyFrame(state);
+    } finally {
+      endGroundBatch();
+    }
   }, -45);
 
   return (
@@ -341,7 +358,7 @@ function sampleExact(s, near, runtime, sink, now) {
   let lo = Infinity, hi = -1;
   beginGroundBatch();
   try {
-    while (s.wantAt < want.length && performance.now() - t0 < 0.6) {
+    while (s.wantAt < want.length && performance.now() - t0 < 0.6 * budgetK()) {
       const ch = want[s.wantAt], i = want[s.wantAt + 1], n = want[s.wantAt + 2];
       s.wantAt += 3;
       const l0 = ch.canopy.l0, wx = ch.cx + l0[i * 5], wz = ch.cz + l0[i * 5 + 1];
@@ -382,7 +399,7 @@ function startJob(s, chunks, flight, tc, altK, k, now, cone) {
   const o = { k, nearCap: tc.nearCap, farCap: tc.farCap, d0: tc.d0, d1: tc.d1, d2: tc.d2, d3: tc.d3, sigma: s.sigma, cone, view: s.view };
   const live = altK > 0.001 && chunks.length > 0;
   s.job = {
-    it: live ? planCanopy(chunks, px, pz, o, s.scratch, () => performance.now() - s.sliceT0 > SLICE_MS) : null,
+    it: live ? planCanopy(chunks, px, pz, o, s.scratch, () => performance.now() - s.sliceT0 > SLICE_MS * budgetK()) : null,
     plan: null, q: 0, chunks, px, pz, ox: Math.round(px / 1000) * 1000, oz: Math.round(pz / 1000) * 1000,
     altK, k, now, ramping, nN: 0, nF: 0, exactN: 0, want: [], contacts: s.spare, ms: 0, frames: 0, maxSlice: 0,
   };
@@ -415,7 +432,7 @@ function stepJob(s, meshes, engine, tc, cfg, k) {
     try {
       while (j.q < j.plan.n) {
         writeOp(j, s, meshes, engine, tc, cfg, j.q++);
-        if ((j.q & 15) === 0 && performance.now() - t0 > SLICE_MS) { finish(); return; }
+        if ((j.q & 15) === 0 && performance.now() - t0 > SLICE_MS * budgetK()) { finish(); return; }
       }
     } finally {
       endGroundBatch();

@@ -189,7 +189,9 @@ function setup({preset,kind,playerProfile,playerHold}){
     }else{
       await page.route('**/api/aircraft?*',route=>route.fulfill({json:{ac:[],now:1782046800}}));
     }
-    const query=kind==='player'?'':'graphicsReview=1&';
+    // FLY_REVIEW_FLAGS=-FRAME_LEAN (or any ?flags= list) measures one arm of a flag on the same build.
+    const reviewFlags=/^[-A-Za-z0-9_,]+$/.test(process.env.FLY_REVIEW_FLAGS||'')?'flags='+process.env.FLY_REVIEW_FLAGS+'&':'';
+    const query=(kind==='player'?'':'graphicsReview=1&')+reviewFlags;
     await page.goto(origin+'/?'+query+'at=48.889,2.246,2072&aircraft=airliner&sunUtc=2026-06-21T13:00:00Z&weather=baseline',{waitUntil:'domcontentloaded',timeout:100000});
     if(kind==='player'){
       await page.waitForFunction(()=>window.__flyBoot?.pct===100&&window.__flyDeepLink?.state==='launched'&&

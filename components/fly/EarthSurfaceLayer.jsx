@@ -11,10 +11,41 @@ import { LivingAirports } from '@/lib/fly/living-airports';
 import { CityContinuity } from '@/lib/fly/city-continuity';
 import { CITY_CONTINUITY_ON } from '@/lib/fly/world-clarity';
 import { useFlyStore } from '@/stores/fly-store';
+import { beginGroundBatch, endGroundBatch } from '@/lib/fly/terrain-ground-query';
+import { frameLeanOn, FRAME_LEAN_ACTIVE } from '@/lib/fly/frame-lean';
+import { leanEmptyInstances } from '@/lib/fly/frame-loop-lean';
+
+// Third round (FLY_HORIZON_FILL.md "Third round", stream G):
+// - FRAME_LEAN.idle.batch: the scenery's and the forest's ground queries in
+//   one ground-query batch (the same answers; the terrain query's matrix
+//   chain brought up to date once). Neither touches the terrain tree.
+// - FRAME_LEAN loop (stream R's leanEmptyInstances): the scrub and the stones
+//   instanced meshes are not submitted while they have nothing to draw.
+const IDLE_BATCH = frameLeanOn('engines') && FRAME_LEAN_ACTIVE.idle?.batch !== false;
+const LEAN_LOOP = frameLeanOn('loop');
+
+/**
+ * The scenery's two instanced meshes through leanEmptyInstances. The stones
+ * are a CHILD of the scrub mesh, so the scrub is offered only while the stones
+ * are empty too (hiding a parent hides its children), and the scenery writes
+ * the scrub's `visible` itself every frame (its height fade): a scrub it showed
+ * again is no longer the lean's to restore.
+ */
+function leanScenery(scenery, state) {
+  const m = scenery.mesh, st = scenery.stones;
+  if (m.userData.__leanHidden && m.visible) m.userData.__leanHidden = false;
+  const list = state.list;
+  list.length = 0;
+  if (st) list.push(st);
+  if (!st || st.count === 0) list.push(m);
+  else if (m.userData.__leanHidden) { m.visible = true; m.userData.__leanHidden = false; }
+  leanEmptyInstances(list, state);
+}
 
 export function EarthSurfaceLayer({ runtime }) {
   const ref=useRef(null);
   const group=useRef(null);
+  const leanState=useRef({ list: [] });
   useEffect(()=>{
     const worker=new Worker(new URL('../../lib/fly/toy-world/vector-tile.worker.js',import.meta.url),{type:'module'});
     const api=withRunwayGeometry(wrap(worker)),engine=new EarthSurfaceEngine(api);
@@ -47,8 +78,14 @@ export function EarthSurfaceLayer({ runtime }) {
       engine.cityContinuity.update(engine,runtime,gl,performance.now()/1000,useFlyStore.getState().qualityTier);
       if(typeof window!=='undefined'&&window.__flyStats)window.__flyStats.cityContinuity=engine.cityContinuity.stats;
     }
-    engine.scenery.update(engine,runtime,performance.now()/1000);
-    engine.forest.update(engine,runtime,performance.now()/1000);
+    if(IDLE_BATCH)beginGroundBatch();
+    try{
+      engine.scenery.update(engine,runtime,performance.now()/1000);
+      engine.forest.update(engine,runtime,performance.now()/1000);
+    }finally{
+      if(IDLE_BATCH)endGroundBatch();
+    }
+    if(LEAN_LOOP)leanScenery(engine.scenery,leanState.current);
     engine.airports.update(engine,runtime);
     engine.stats.airports=engine.airports.stats;
     engine.stats.forest=engine.forest.stats;

@@ -34,6 +34,11 @@ import { FLEET_VIEW } from '@/lib/fly/observation-config';
 import { getR25Sky } from '@/lib/fly/r25-sky';
 import { worldToSite } from '@/lib/fly/lounge-site';
 import { createTrafficOperatorPaint, attachTrafficOperatorPaint, detachTrafficOperatorPaint, bindTrafficOperatorGeometry, writeTrafficOperatorPaint } from '@/lib/fly/traffic-operator-paint';
+import { frameLeanOn } from '@/lib/fly/frame-lean';
+import { leanEmptyInstances } from '@/lib/fly/frame-loop-lean';
+
+// FRAME LEAN (stream R): resolved once. Off = the frame loop at HEAD, untouched.
+const LEAN_LOOP = frameLeanOn('loop');
 
 // Upload only the instances that will be drawn. A full-capacity upload of
 // every pool every frame was ~0.5 MB of buffer traffic for a handful of
@@ -119,6 +124,7 @@ export function TrafficLayer({ runtime, flight, origin }) {
   const renderer = useThree((s) => s.gl);
   const scene = useThree((s) => s.scene);
   const detailedRef=useRef(null),detailedMount=useRef(null);
+  const leanList=useRef([]),leanState=useRef({ frame: -1, hidden: 0 });
   // Aircraft lights and touchdown smoke: sky overlays (drawn after the cloud
   // composite, depth-tested), one draw each.
   const lights = useMemo(() => new AircraftLights(), []);
@@ -470,6 +476,19 @@ export function TrafficLayer({ runtime, flight, origin }) {
     uploadPrefix(billboards.instanceMatrix, billboardsUsed);
     if (billboards.instanceColor) uploadPrefix(billboards.instanceColor, billboardsUsed);
     uploadPrefix(billboards.geometry.attributes.aTrafficPresence, billboardsUsed);
+
+    // FRAME LEAN (stream R): an instanced mesh with nothing to draw is not
+    // submitted (three would still bind its program and upload its uniforms in
+    // every pass). The live fleet's families join once its programs are warm.
+    if (LEAN_LOOP) {
+      const list = leanList.current;
+      list.length = 0;
+      for (const mesh of meshes) list.push(mesh);
+      list.push(billboards);
+      if (detailed.stats.ready) for (const child of detailed.group.children) if (child.isInstancedMesh) list.push(child);
+      leanEmptyInstances(list, leanState.current);
+      runtime.trafficLean = leanState.current;
+    }
 
     if (process.env.NODE_ENV === 'development' && window.__flyStats) {
       window.__flyStats.horizonFaded = horizonFaded;

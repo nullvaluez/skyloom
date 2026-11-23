@@ -67,10 +67,20 @@ const labels = (list) => list.map((a) => a.label);
     const list = attributionsFor('satellite', f);
     const flight = list.filter((a) => a.label.startsWith('Flight data ©'));
     const others = list.filter((a) => !a.label.startsWith('Flight data ©'));
-    const baseOthers = ATTRIBUTIONS_BY_STYLE.satellite.filter((a) => !a.label.startsWith('Flight data ©'));
+    // The style's credits as shipped: since 2026-11-23 that includes the
+    // GHS-BUILT-H line HORIZON_FILL adds, so the reference is the list with
+    // no live feed, not the raw table.
+    const baseOthers = attributionsFor('satellite', null).filter((a) => !a.label.startsWith('Flight data ©'));
     if (flight.length !== 1 || flight[0] !== FLIGHT_DATA_ATTRIBUTIONS[f] || JSON.stringify(others) !== JSON.stringify(baseOthers)) swapOk = false;
   }
-  const unknownOk = attributionsFor('satellite', 'nope') === ATTRIBUTIONS_BY_STYLE.satellite && attributionsFor('toy', null) === ATTRIBUTIONS_BY_STYLE.toy;
+  // An unknown feed changes nothing; with HORIZON_FILL pinned off the list is the table itself.
+  const hadWindow = 'window' in globalThis;
+  const prevWindow = globalThis.window;
+  globalThis.window = { ...(prevWindow ?? {}), __flyHorizonFillOverride: { enabled: false } };
+  const tableOk = attributionsFor('satellite', 'nope') === ATTRIBUTIONS_BY_STYLE.satellite;
+  if (hadWindow) globalThis.window = prevWindow;
+  else delete globalThis.window;
+  const unknownOk = tableOk && JSON.stringify(attributionsFor('satellite', 'nope')) === JSON.stringify(attributionsFor('satellite', null)) && attributionsFor('toy', null) === ATTRIBUTIONS_BY_STYLE.toy;
   check(
     '(2) every proxy feed has a credit; attributionsFor swaps only the flight-data line',
     feeds.length >= 3 && missing.length === 0 && swapOk && unknownOk,

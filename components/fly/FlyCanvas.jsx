@@ -34,6 +34,8 @@ import { configureCinemaAssets } from '@/lib/fly/cinema-material-assets';
 import { installContextResourceLifetime } from '@/lib/fly/context-resource-lifetime';
 // SHIP PASS FRAME (FR-1, FR-2, FR-4): shader-error policy, census, error telemetry.
 import { installFrameRenderer } from '@/lib/fly/census';
+import { installUniformDedupe, loopLeanLive, setLoopLeanLive } from '@/lib/fly/frame-loop-lean';
+import { graphicsReviewOn } from '@/lib/fly/satellite-visuals';
 import { deepCensusWanted } from '@/lib/fly/program-census';
 import { CensusRig } from './CensusRig';
 // SHIP PASS FRAME (FR-5, FR-9; PACE_ADAPT): the presentation cadence.
@@ -41,6 +43,8 @@ import { shipPassOn } from '@/lib/fly/ship-pass';
 import { presentationFps } from '@/lib/fly/pace-adapt';
 import { cadenceState, frameCadence, subscribeCadence, subscribeFrameCadence } from '@/lib/fly/frame-api';
 import { PaceClock } from './PaceClock';
+import { StreamPaceRig } from './StreamPaceRig';
+import { streamPaceOn } from '@/lib/fly/stream-pace';
 
 // Resolved once per page load (the pin is set before Fly mode mounts).
 const PACE_ON = shipPassOn('PACE_ADAPT');
@@ -236,6 +240,15 @@ export function FlyCanvas({ runtime }) {
         // TRUE EARTH (TRUE_SCALE): the anisotropic view. Not installed at all
         // with the flag off; with it on, k0 = 1 frames are three's own matrix.
         installTrueScaleCamera(camera);
+        // FRAME LEAN (stream R): skip uniform uploads that would not change the
+        // program's value (lib/fly/frame-loop-lean.js). Not installed with
+        // ?flags=-FRAME_LEAN. Kept after installTrueScaleCamera so the
+        // verify-true-scale (14) wiring window holds; it wraps only the
+        // context's uniform* methods, which nothing above calls.
+        const dedupe = installUniformDedupe(gl.getContext());
+        // The in-session A/B the pixel proof needs (scripts/bench-frame-loop.cjs
+        // --proof). Review builds only; it can turn the lean off, never on.
+        if (graphicsReviewOn()) window.__flyFrameLoopLean = { set: setLoopLeanLive, get: loopLeanLive, uniforms: dedupe };
         if (process.env.NODE_ENV === 'development') {
           console.info(
             '[fly] reversedDepthBuffer active:',
@@ -253,6 +266,8 @@ export function FlyCanvas({ runtime }) {
       <SessionRecovery runtime={runtime}/>
       <BudgetFramePump enabled={budgetedFrames} fps={paceFps ?? 60} />
       {PACE_ON && <PaceClock />}
+      {/* STREAM PACE (stream P; ships off): the shared streaming scale, priority -98. */}
+      {streamPaceOn() && <StreamPaceRig runtime={runtime} presentFps={budgetedFrames ? paceFps : null} />}
       {/* Round 24 (E CERT): the frame-pace instrument. Priority -101 puts it
           ahead of the governor (-100) and A's STEP_SAFE rig (-99), so its dt
           is the raw inter-frame delta of the frame that just presented. Not

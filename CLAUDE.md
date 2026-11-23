@@ -7,6 +7,45 @@
 >   Enhanced Satellite is the default on every device
 >   (`VISUALS.defaultProfile:'enhanced'`), and `R25_SKY` / `R25_GROUND` ship
 >   `enabled:true`.
+> - **Horizon Fill (2026-11-23, owner-requested, MERGED to `main` with all
+>   four flags ON at the owner's request; no RTX 5080 check yet):**
+>   [FLY_HORIZON_FILL.md](FLY_HORIZON_FILL.md) is the plan, the contracts and
+>   the record. Buildings to the horizon: a procedural layer generated from
+>   the GHS-BUILT-H built-height survey (`/api/city-height`) fills the
+>   ground the detailed ring and the mapped stand-ins leave bare (no mapped
+>   footprints, past the stand-in reach, or still streaming), as instanced
+>   stand-ins at three levels of detail under a fixed triangle budget. Mapped
+>   cells always win (the stand-in worker's cell census). `HORIZON_FILL`
+>   ships `enabled:true`, is read only through `lib/fly/horizon-fill.js`,
+>   and needs desktop High / Ultra with the World Pass stand-ins on;
+>   `?flags=-HORIZON_FILL` is the world without it for one page load. Gates:
+>   `scripts/verify-horizon-fill-{data,carpet,stream}.mjs` (in
+>   `verify:beta`). Owner harness: `scripts/review-horizon-fill.cjs`. No
+>   RTX 5080 look or frame-rate check has been made.
+>   - **Second round, same file:** `ONE_REVEAL` (ships ON; read through
+>     `lib/fly/one-reveal.js`) makes the boot and warp holds wait, bounded,
+>     for the final colour and lighting of what the camera faces, and has
+>     later arrivals born with their final colour. `FRAME_LEAN` (ships ON;
+>     read through `lib/fly/frame-lean.js`; `?flags=-FRAME_LEAN` is the
+>     previous frame loop) holds main-thread optimizations proven to leave
+>     the settled picture identical. Instruments:
+>     `scripts/bench-flight-cpu.mjs` (headless flight of the real
+>     streaming engines) and `scripts/bench-frame-loop.cjs` (per-frame
+>     callbacks, passes and GL calls). Gates:
+>     `scripts/verify-{one-reveal,flight-cpu,frame-loop}.mjs`. Frame rate
+>     itself is unmeasured: the cloud container renders in software.
+>   - **Third round, same file:** under `FRAME_LEAN` the streaming engines'
+>     per-frame ground loops skip questions whose answer cannot have changed
+>     (a ground change log in `lib/fly/terrain-ground-query.js`) and batch
+>     their queries. `STREAM_PACE` (ships ON; read through
+>     `lib/fly/stream-pace.js`) puts one scale on every streaming time
+>     allowance: lower while frames run late, higher under the loading
+>     curtain. `FRAME_LEAN.settle` (its own switch off; on with `STREAM_PACE`)
+>     makes a parked world settle on the same bytes whatever the pace.
+>     `FLY_HORIZON_FILL.md` has the owner's run list and ends with
+>     "Default on (2026-11-23)": what the flip changes for a player, and
+>     `?flags=-HORIZON_FILL,-ONE_REVEAL,-STREAM_PACE,-FRAME_LEAN` as the
+>     game before the pass. The harness fleet pins all four off.
 > - **World Pass (2026-11-16, owner-requested; all five flags ON on `main`
 >   since 2026-11-17 at the owner's request):**
 >   [FLY_WORLD_PASS.md](FLY_WORLD_PASS.md) is the plan and the record. How the

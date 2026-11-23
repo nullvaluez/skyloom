@@ -1,6 +1,7 @@
 'use client';
 import { terrainArrivalCovered } from '@/lib/fly/critical-terrain-prewarm.mjs';
 import { withRunwayGeometry } from '@/lib/fly/runway-worker';
+import { oneRevealOn } from '@/lib/fly/one-reveal';
 
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -20,12 +21,18 @@ import {
 } from '@/lib/fly/settle';
 import { satelliteVisualsOn, satelliteVisualProfile } from '@/lib/fly/satellite-visuals';
 import { useFlyStore } from '@/stores/fly-store';
+// FRAME LEAN: the engine's stats getter walks every group; the frame loop
+// needs two numbers from it, and the photo gate one test.
+import { frameLeanOn } from '@/lib/fly/frame-lean';
 // SHIP PASS CITY (CT-2): CITY_RANGE resolved per tier through the device policy.
 import { cityRangeFor } from '@/lib/fly/city-range';
 // SHIP PASS CITY (CT-5): NIGHT_RHYTHM's occupancy / twilight uniform.
 import { NIGHT_RHYTHM_ON, updateNightRhythm } from '@/lib/fly/night-rhythm';
 // R24 B (GROUND_VIS, recon A6/T8) — AGL fade bands read the DAMPED ground.
 import { eyeAglVis, groundElevVis } from '@/lib/fly/ground-vis';
+
+// ONE REVEAL (stream L): latched once per page, like every other reader.
+const ONE_REVEAL_GATE = oneRevealOn('gate');
 
 /**
  * Round 18 (A2 "SKYLINE") — mounts the DISTANT BLOCK-MASS streamer inside
@@ -54,6 +61,8 @@ import { eyeAglVis, groundElevVis } from '@/lib/fly/ground-vis';
  * costs exactly zero — the round's strictest invariant, pinned by
  * scripts/verify-skyline.js alongside verify-sat-depth's total.
  */
+const LEAN_ENGINES = frameLeanOn('engines');
+
 export function SatSkylineLayer({ runtime, flight }) {
   const qualityTier = useFlyStore((s) => s.qualityTier);
   const engine = useMemo(
@@ -114,8 +123,14 @@ export function SatSkylineLayer({ runtime, flight }) {
       engine.setPhotoGate(() => {
         if (terrainArrivalCovered(runtime, window.__flyBoot, useFlyStore.getState().phase)) {
           const parts = runtime.worldReadiness?.parts;
+          // ONE REVEAL (gate): the reveal waits for these photos, so they load
+          // under the curtain, in order: nothing before the local terrain, a
+          // trickle while the near city streams, then every group in want,
+          // nearest first, at the full in-flight budget ('reveal').
+          if (ONE_REVEAL_GATE) return parts?.terrain && parts.surfaces && parts.buildings ? 'reveal' : parts?.terrain ? 'busy' : false;
           return parts?.terrain && parts.surfaces && parts.buildings ? 'busy' : false;
         }
+        if (LEAN_ENGINES && runtime.satBuildings?.streamBusy) return runtime.satBuildings.streamBusy() ? 'busy' : true;
         const s = runtime.satBuildings?.stats;
         return s && (s.queued || s.building || s.draping) ? 'busy' : true;
       });
@@ -157,7 +172,7 @@ export function SatSkylineLayer({ runtime, flight }) {
     if (NIGHT_RHYTHM_ON) updateNightRhythm(runtime.sun, runtime.geo?.y); // SHIP PASS CITY (CT-5): one shared uniform
     setSatelliteArchitectureCoverage(engine.material, runtime.satBuildings, runtime.origin?.anchor, getSatBldgFade());
     engine.update(t, flight.pos.x, flight.pos.z, eyeAgl, gVis);
-    const ready = engine.stats.ready;
+    const ready = LEAN_ENGINES ? engine.readyCount() : engine.stats.ready;
     const k = birthK(
       birthRef.current,
       t,
@@ -177,7 +192,7 @@ export function SatSkylineLayer({ runtime, flight }) {
       );
       fadeRef.current.lastWritten = Number.NaN;
     }
-    notePopin('satSkyline', ready > 0, birthRef.current.running || engine.stats.births > 0);
+    notePopin('satSkyline', ready > 0, birthRef.current.running || (LEAN_ENGINES ? engine.birthCount() : engine.stats.births) > 0);
     if (
       process.env.NODE_ENV === 'development' &&
       window.__flyStats &&
