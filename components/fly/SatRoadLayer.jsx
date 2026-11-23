@@ -29,9 +29,12 @@ import { getTrueScaleK } from '@/lib/fly/true-scale';
 import { airfieldSuppressions, subscribeAirfieldSuppression } from '@/lib/fly/airfield/airfield-suppression';
 import { worldPassOn } from '@/lib/fly/world-pass'; // WORLD PASS E (GROUND)
 import { WpBridgeLayer } from './WpBridgeLayer';
-import { frameLeanOn } from '@/lib/fly/frame-lean'; // FRAME LEAN M
+import { frameLeanOn, FRAME_LEAN_ACTIVE } from '@/lib/fly/frame-lean'; // FRAME LEAN M
+import { beginGroundBatch, endGroundBatch } from '@/lib/fly/terrain-ground-query';
 
 const LEAN_ENGINES = frameLeanOn('engines');
+// Third round (FRAME_LEAN.idle.batch): the beacon placement's ground queries in one batch (same answers).
+const IDLE_BATCH = LEAN_ENGINES && FRAME_LEAN_ACTIVE.idle?.batch !== false;
 
 const TIERS = ['low', 'medium', 'high']; // mirrors FlyCanvas's quality ladder
 const atLeastTier = (tier, min) => TIERS.indexOf(tier) >= TIERS.indexOf(min);
@@ -227,6 +230,8 @@ export function SatRoadLayer({ runtime, flight }) {
         near.sort((x, y) => x.d - y.d);
         const fs = P.farScale;
         let n = 0;
+        if (IDLE_BATCH) beginGroundBatch();
+        try {
         for (const { a, d } of near) {
           if (n >= BEACON_POOL) break;
           let ft = Math.min(1, Math.max(0, (d - fs.startM) / (fs.endM - fs.startM)));
@@ -245,6 +250,9 @@ export function SatRoadLayer({ runtime, flight }) {
           _dummy.updateMatrix();
           mesh.setMatrixAt(n, _dummy.matrix);
           n += 1;
+        }
+        } finally {
+          if (IDLE_BATCH) endGroundBatch();
         }
         st.placed = n;
         mesh.count = n; // 0 = the draw is parked entirely (three skips primcount 0)

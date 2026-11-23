@@ -316,6 +316,8 @@ if (!isMainThread) {
 // ============================================================================
 /** --exact: virtual milliseconds per performance.now() call. */
 const EXACT_TICK_MS = 0.004;
+/** The FRAME_LEAN.idle switches (third round), for --idle. */
+export const IDLE_SWITCHES = ['refine', 'drapeRepair', 'contact', 'vegRegrid', 'batch'];
 
 export const ROUTES = {
   // The owner's measured leg (FLY_HORIZON_FILL.md "What was measured").
@@ -423,6 +425,11 @@ if (isMainThread && !argv.includes('--compare') && process.env.FLIGHT_CPU_LIB !=
     exact: flag('--exact'),
     alloc: flag('--alloc'),
     groundUs: Number(opt('--ground-us', 2)),
+    parked: Number(opt('--parked', 0)),
+    slow: Number(opt('--slow', 0)),
+    slowKt: Number(opt('--slow-kt', 60)),
+    groundChange: opt('--ground-change', null),
+    idle: opt('--idle', null),
     buildingChunks: opt('--building-chunks', null) == null ? undefined : Number(opt('--building-chunks')),
     skylineChunks: opt('--skyline-chunks', null) == null ? undefined : Number(opt('--skyline-chunks')),
     writePack: opt('--write-pack', null),
@@ -452,6 +459,12 @@ export async function runFlight(o) {
   };
   if (o.arm === 'off') globalThis.window.__flyFrameLeanOverride = { enabled: false };
   else if (o.arm !== 'on') throw new Error(`--arm on|off, not ${o.arm}`);
+  // --idle none | a,b,c (third round): with --arm on, only these idle switches
+  // of FRAME_LEAN.idle stay on (an ablation; the default is the shipped block).
+  if (o.idle != null && o.arm === 'on') {
+    const want = new Set(String(o.idle).split(',').filter((k) => k && k !== 'none'));
+    globalThis.window.__flyFrameLeanOverride = { idle: Object.fromEntries(IDLE_SWITCHES.map((k) => [k, want.has(k)])) };
+  }
   globalThis.document ??= {
     createElement: () => ({ getContext: () => null, width: 0, height: 0, style: {} }),
   };
@@ -672,7 +685,49 @@ export async function runFlight(o) {
   const x0 = toX(r.lon);
   const z0 = toZ(r.lat);
   // The ground stand-in: a smooth height field, constant in time.
-  const groundH = (lon, lat) => 60 + 22 * Math.sin(lon * 41.3 + 0.7) * Math.cos(lat * 37.1) + 13 * Math.sin(lon * 151 + lat * 97);
+  const groundH0 = (lon, lat) => 60 + 22 * Math.sin(lon * 41.3 + 0.7) * Math.cos(lat * 37.1) + 13 * Math.sin(lon * 151 + lat * 97);
+  // --ground-change <segment>:<sec>[:<radius m>] (third round): at that moment a
+  // square region centred on the aircraft (half side `radius`, default 2,500 m)
+  // REFINES, as a finer terrain tile loading there does: inside it the ground
+  // answers a new height field at tileZ 16 instead of 15. The stand-in's change
+  // log (`groundChanges`, the shape lib/fly/terrain-ground-query.js exports)
+  // records the region at that epoch, and the engines are handed it, so an
+  // engine that skips idle work must see the change and converge to the new
+  // ground. Deterministic: the moment is a frame of virtual time.
+  const GC = (() => {
+    if (!o.groundChange) return null;
+    const [seg, sec, rad] = String(o.groundChange).split(':');
+    return { seg, sec: Number(sec) || 0, radiusM: Number(rad) || 2500, at: Infinity, box: null };
+  })();
+  const inChange = (lon, lat) => {
+    const b = GC?.box;
+    return !!b && vnow >= GC.at && lon >= b[0] && lon <= b[2] && lat >= b[1] && lat <= b[3];
+  };
+  const groundH = (lon, lat) => (inChange(lon, lat) ? groundH0(lon, lat) + 6.5 + 4 * Math.sin(lon * 97 + lat * 61) : groundH0(lon, lat));
+  const groundZ = (lon, lat) => (inChange(lon, lat) ? 16 : 15);
+  // The stand-in's change log: one entry per change (epoch, lon/lat box).
+  const changeLog = [];
+  let changeEpoch = 1;
+  const groundChanges = {
+    live: () => true,
+    epoch: () => changeEpoch,
+    changedSince(e, w, s, east, n) {
+      if (!(e < changeEpoch)) return false;
+      for (const c of changeLog) if (c.epoch > e && !(c.box[2] < w || c.box[0] > east || c.box[3] < s || c.box[1] > n)) return true;
+      return false;
+    },
+  };
+  const triggerChange = () => {
+    const lon = (flight.pos.x / R) * (180 / Math.PI);
+    const lat = flight.latDeg;
+    const dLat = (GC.radiusM / R) * (180 / Math.PI);
+    const dLon = dLat / Math.cos((lat * Math.PI) / 180);
+    GC.box = [lon - dLon, lat - dLat, lon + dLon, lat + dLat];
+    GC.at = vnow;
+    changeEpoch += 1;
+    changeLog.push({ epoch: changeEpoch, box: GC.box });
+    log(`ground change at ${vnow.toFixed(2)} s virtual (${GC.seg}:${GC.sec}): box ${GC.box.map((v) => v.toFixed(5)).join(', ')}`);
+  };
   // Each query also costs `--ground-us` microseconds of real time (default 2,
   // a model of the batched exact terrain query; the unbatched reference
   // measured 17 to 21 us, FLY_WORLD_PASS.md), so a loop that queries more
@@ -714,7 +769,7 @@ export async function runFlight(o) {
     return (lon, lat) => {
       queries[name]++;
       if (spinN) spin(spinN);
-      return { elev: groundH(lon, lat), tileZ: 15 };
+      return { elev: groundH(lon, lat), tileZ: groundZ(lon, lat) };
     };
   };
   const flight = { pos: { x: x0, y: altM, z: z0 }, heading: hdg, speed: 0, latDeg: r.lat, groundElev: 0 };
@@ -746,7 +801,7 @@ export async function runFlight(o) {
   const engines = [];
   let buildings = null;
   if (want.has('buildings')) {
-    const e = new SatBuildingEngine({ groundAt: groundFor('buildings') });
+    const e = new SatBuildingEngine({ groundAt: groundFor('buildings'), groundChanges });
     e.setWaterEnabled(!stylizedEarthOn() && C.SAT_WATER.enabled && (satelliteVisualsOn('water') ? profile.water : tier === C.SAT_WATER.minTier));
     e.setFacadeEnabled(C.SAT_BUILDINGS.facade.enabled);
     const nightMinTier = nightCityOn('tier') ? C.NIGHT_CITY_R23.tier.nightMinTier : C.SAT_BUILDINGS.night.minTier;
@@ -779,7 +834,7 @@ export async function runFlight(o) {
     });
   }
   if (want.has('roads')) {
-    const e = new SatRoadEngine({ groundAt: groundFor('roads') });
+    const e = new SatRoadEngine({ groundAt: groundFor('roads'), groundChanges });
     const pool = makePool('roads', 1);
     e.setWorker(withRunwayGeometry(pool.apis[0]));
     e.setRunwayLightExclusion(null);
@@ -797,7 +852,7 @@ export async function runFlight(o) {
     });
   }
   if (want.has('skyline')) {
-    const e = new SatSkylineEngine({ groundAt: groundFor('skyline') });
+    const e = new SatSkylineEngine({ groundAt: groundFor('skyline'), groundChanges });
     e.setMaxChunks(o.skylineChunks ?? (satelliteVisualsOn() ? profile.skylineChunks : C.SAT_SKYLINE.maxChunksByTier[tier]) ?? 0);
     e.setHorizonTier(tier);
     e.setCityRange(cityRangeFor(tier));
@@ -831,7 +886,7 @@ export async function runFlight(o) {
   }
   if (want.has('veg')) {
     const poolTier = satelliteVisualsOn('ground') ? 'high' : tier;
-    const e = new SatVegEngine({ groundAt: groundFor('veg'), maxChunks: C.SAT_VEG.maxChunksByTier[poolTier] ?? 0 });
+    const e = new SatVegEngine({ groundAt: groundFor('veg'), groundChanges, maxChunks: C.SAT_VEG.maxChunksByTier[poolTier] ?? 0 });
     const pool = makePool('veg', 1);
     e.setWorker(withRunwayGeometry(pool.apis[0]));
     engines.push({
@@ -846,7 +901,7 @@ export async function runFlight(o) {
     });
   }
   if (want.has('clutter') && C.CLUTTER.enabled) {
-    const e = new SatClutterEngine({ groundAt: groundFor('clutter') });
+    const e = new SatClutterEngine({ groundAt: groundFor('clutter'), groundChanges });
     const pool = makePool('clutter', 1, true);
     e.setWorker(withRunwayGeometry(pool.apis[0]));
     engines.push({
@@ -890,10 +945,13 @@ export async function runFlight(o) {
   const DT = 1 / 60;
   let frameNo = 0;
   const series = [];
+  const segStart = {}; // segment -> virtual seconds at its first frame
   async function frame(phase) {
     vnow = frameNo * DT;
     ticks = 0;
     frameNo++;
+    segStart[phase] ??= vnow;
+    if (GC && GC.at === Infinity && GC.seg === phase && vnow - segStart[phase] >= GC.sec) triggerChange();
     // Off the clock: make sure every job due by this frame has its result.
     await scheduleUntil(vnow);
     frameRec.phases = new Map();
@@ -947,6 +1005,18 @@ export async function runFlight(o) {
     });
     const rec = { n: frameNo, t: vnow, phase, ms, heap0, heap1, start: f0, end: f0 + ms, phases: Object.fromEntries(frameRec.phases), ready };
     series.push(rec);
+    // --ground-change: how many frames each engine takes to stand entirely on
+    // the new ground (audited every 6 frames, off the clock).
+    if (GC && GC.at <= vnow && (frameNo - 1) % 6 === 0) {
+      GC.converge ??= {};
+      const au = groundAudit(engines, GC.box, groundH0);
+      const since = Math.round((vnow - GC.at) * 60);
+      for (const [k, a] of Object.entries(au)) {
+        if (!a.inRegion) continue;
+        if (a.old === 0) GC.converge[k] ??= since;
+        else delete GC.converge[k]; // fell back (a new chunk on old ground): not converged yet
+      }
+    }
     return rec;
   }
   const busy = () => {
@@ -967,6 +1037,19 @@ export async function runFlight(o) {
     if (settleFrames > 120 && !busy()) break;
   }
   log(`settled the start in ${(settleFrames / 60).toFixed(1)} s virtual (${((realNow() - tWall0) / 1000).toFixed(1)} s wall); in flight next`);
+  // phase A2 (third round, `--parked N`): N seconds stationary at the start
+  // with the world settled, measured: what the engines cost a frame while
+  // nothing is arriving (the idle tax).
+  const segRange = {};
+  const qAt = () => ({ ...queries });
+  const segQ = {};
+  if (o.parked > 0) {
+    const a = series.length;
+    const q = qAt();
+    for (let i = 0; i < Math.round(o.parked * 60); i++) await frame('parked');
+    segRange.parked = [a, series.length];
+    segQ.parked = Object.fromEntries(Object.entries(queries).map(([k, v]) => [k, v - (q[k] ?? 0)]));
+  }
   // phase B: the measured flight
   let session = null;
   if (o.sample || o.cpuProf || o.alloc) {
@@ -1003,6 +1086,24 @@ export async function runFlight(o) {
   }
   const flightEnd = series.length;
   const flightQueries = Object.fromEntries(Object.entries(queries).map(([k, v]) => [k, v - (q0[k] ?? 0)]));
+  segRange.flight = [flightStart, flightEnd];
+  segQ.flight = flightQueries;
+  // phase B2 (third round, `--slow N`): N seconds onward along the route at
+  // `--slow-kt` (default 60 kt), measured: a slow taxi-speed drift that brings
+  // little new into any ring.
+  if (o.slow > 0) {
+    const a = series.length;
+    const q = qAt();
+    const d0 = speed * nFlight * DT;
+    const sp = o.slowKt * 0.514444;
+    flight.speed = sp;
+    for (let i = 1; i <= Math.round(o.slow * 60); i++) {
+      place(d0 + sp * i * DT);
+      await frame('slow');
+    }
+    segRange.slow = [a, series.length];
+    segQ.slow = Object.fromEntries(Object.entries(queries).map(([k, v]) => [k, v - (q[k] ?? 0)]));
+  }
   // phase C: parked at the end, settle for the final state
   flight.speed = 0;
   let tail = 0;
@@ -1037,11 +1138,32 @@ export async function runFlight(o) {
   // allocation proxy: the heap growth inside frames (heapUsed after - before,
   // positive parts; a collection inside a frame hides what it freed)
   const growth = fl.reduce((s, f) => s + Math.max(0, f.heap1 - f.heap0), 0);
+  // Per segment (third round): frame statistics and, per engine entry point,
+  // the mean milliseconds a frame (total / frames, every frame counted).
+  const summarize = ([a, b], q) => {
+    const fr = series.slice(a, b);
+    if (!fr.length) return null;
+    const m = fr.map((f) => f.ms).sort((x, y) => x - y);
+    const at = (p) => m[Math.min(m.length - 1, Math.floor(p * m.length))];
+    const ph = {};
+    for (const f of fr) for (const [k, v] of Object.entries(f.phases)) ph[k] = (ph[k] ?? 0) + v;
+    return {
+      frames: fr.length,
+      frame: { p50: at(0.5), p95: at(0.95), p99: at(0.99), max: m.at(-1), mean: m.reduce((s, v) => s + v, 0) / m.length, totalSec: m.reduce((s, v) => s + v, 0) / 1000 },
+      perFrameMs: Object.fromEntries(Object.entries(ph).sort((x, y) => y[1] - x[1]).map(([k, v]) => [k, v / fr.length])),
+      groundQueriesPerFrame: Object.fromEntries(Object.entries(q ?? {}).map(([k, v]) => [k, v / fr.length])),
+    };
+  };
+  const segments = {};
+  for (const k of ['parked', 'flight', 'slow']) if (segRange[k]) segments[k] = summarize(segRange[k], segQ[k]);
   const report = {
     label: o.label,
     arm: o.arm,
     exact: !!o.exact,
     lean,
+    segments,
+    groundChange: GC ? { seg: GC.seg, sec: GC.sec, radiusM: GC.radiusM, at: GC.at, box: GC.box, audit: groundAudit(engines, GC.box, groundH0), convergeFrames: GC.converge ?? {} } : null,
+    idle: Object.fromEntries(engines.map((en) => [en.name, en.e._idle ?? null])),
     route: r,
     engines: engines.map((e) => e.name),
     model: { groundUs, groundSpinN: spinN, fetchMs: FETCH_MS, serviceMs: 'fetchMs + a + b * KB', service: SERVICE, photoMs: PHOTO_MS, pools: Object.fromEntries(engines.map((e) => [e.name, e.pool.slots.length])) },
@@ -1113,6 +1235,71 @@ export async function runFlight(o) {
   for (const th of threads) await th.terminate();
   for (const en of engines) en.e.dispose?.();
   return report;
+}
+
+/**
+ * The ground-change run's audit (third round): inside the changed region, how
+ * many of each engine's ground samples still hold the OLD ground (the tileZ 15
+ * answer) at the end. Buildings: drape runs (zoom); skyline: drape lattice
+ * points (zoom) and stand-ins inside the refine limit (gz); vegetation: fine
+ * grid points whose height is still the old field's. Roads and clutter drape
+ * once at arrival and are not repaired in place (today's behaviour), so they
+ * are not audited. Both arms must report the same numbers.
+ */
+export function groundAudit(engines, box, oldH) {
+  if (!box) return null;
+  const R = 6378137;
+  const lonOf = (x) => (x / R) * (180 / Math.PI);
+  const latOf = (z) => (2 * Math.atan(Math.exp(-z / R)) - Math.PI / 2) * (180 / Math.PI);
+  const inBox = (x, z) => {
+    const lon = lonOf(x), lat = latOf(z);
+    return lon >= box[0] && lon <= box[2] && lat >= box[1] && lat <= box[3];
+  };
+  const out = {};
+  for (const en of engines) {
+    const a = { inRegion: 0, old: 0 };
+    for (const c of en.e.chunks?.values?.() ?? []) {
+      if (en.name === 'buildings' && c.drapeRuns) {
+        for (const r of c.drapeRuns) {
+          if (r.end - r.start > 16384 || !inBox(c.cx + r.ax, c.cz + r.az)) continue;
+          a.inRegion++;
+          if (!(r.zoom >= 16)) a.old++;
+        }
+      }
+      if (en.name === 'skyline') {
+        const d = c.drape;
+        if (d?.grid) {
+          for (let i = 0; i < d.grid.length; i++) {
+            const wx = d.minX + (i % (d.n + 1)) * d.step, wz = d.minZ + Math.floor(i / (d.n + 1)) * d.step;
+            if (!inBox(wx, wz)) continue;
+            a.inRegion++;
+            if (!(d.zoom[i] >= 16)) a.old++;
+          }
+        }
+        const S = c.standIns;
+        if (S?.gz && c.mesh) {
+          const lim = Math.min(S.n, S.rLimit ?? 0);
+          for (let i = 0; i < lim; i++) {
+            const root = S.parent?.get(i) ?? i;
+            if (!inBox(c.mesh.position.x + S.ax[root], c.mesh.position.z + S.az[root])) continue;
+            a.inRegion++;
+            if (!(S.gz[i] >= 16)) a.old++;
+          }
+        }
+      }
+      if (en.name === 'veg' && c.wpGrid && en.e.wpGridSegments) {
+        const G = en.e.wpGridSegments;
+        for (let gi = 0; gi < c.wpGrid.length; gi++) {
+          const wx = c.cx - c.span / 2 + ((gi % (G + 1)) / G) * c.span, wz = c.cz - c.span / 2 + (((gi / (G + 1)) | 0) / G) * c.span;
+          if (!inBox(wx, wz)) continue;
+          a.inRegion++;
+          if (c.wpGrid[gi] === Math.fround(oldH(lonOf(wx), latOf(wz)))) a.old++;
+        }
+      }
+    }
+    out[en.name] = a;
+  }
+  return out;
 }
 
 /** Sampled allocation (self bytes) per function from a V8 sampling heap profile. */
@@ -1253,6 +1440,13 @@ function printTable(rep) {
     rows.push('hottest functions in the flight window (self ms):');
     for (const h of rep.hot.slice(0, 25)) rows.push(`  ${h.selfMs.toFixed(1).padStart(8)}  ${h.fn}`);
   }
+  for (const [name, sg] of Object.entries(rep.segments ?? {})) {
+    if (!sg) continue;
+    rows.push(`segment ${name}: ${sg.frames} frames, frame ms mean ${sg.frame.mean.toFixed(3)} p50 ${sg.frame.p50.toFixed(3)} p95 ${sg.frame.p95.toFixed(3)} max ${sg.frame.max.toFixed(2)}; ground queries a frame ${JSON.stringify(Object.fromEntries(Object.entries(sg.groundQueriesPerFrame).map(([k, v]) => [k, +v.toFixed(1)])))}`);
+    for (const [k, v] of Object.entries(sg.perFrameMs)) if (v >= 0.0005) rows.push(`  ${k.padEnd(38)} ${v.toFixed(4).padStart(9)} ms/frame`);
+  }
+  if (rep.groundChange) rows.push(`ground change ${rep.groundChange.seg}:${rep.groundChange.sec} at ${rep.groundChange.at?.toFixed?.(2)} s; old-ground samples left in the region: ${JSON.stringify(rep.groundChange.audit)}; frames to converge ${JSON.stringify(rep.groundChange.convergeFrames)}`);
+  if (rep.idle) rows.push(`idle counters: ${JSON.stringify(rep.idle)}`);
   if (rep.alloc) {
     rows.push('allocation sites in the flight window (sampled MB, includes the off-clock result decode):');
     for (const h of rep.alloc.slice(0, 20)) rows.push(`  ${h.MB.toFixed(1).padStart(8)}  ${h.fn}`);

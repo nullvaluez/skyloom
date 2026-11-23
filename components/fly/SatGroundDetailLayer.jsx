@@ -9,6 +9,13 @@ import { NEAR_GROUND, nearGroundOn } from '@/lib/fly/near-ground';
 import { buildGroundDetail, buildGroundScrubGeometry, createGroundScrubMaterial, DETAIL_UNIFORMS } from '@/lib/fly/near-ground-detail';
 import { applyBendAnchor } from '@/lib/fly/toy-world/world-bend';
 import { NEAR_SUPPORT, updateNearContactMatrices } from '@/lib/fly/near-ground-support';
+import { beginGroundBatch, endGroundBatch } from '@/lib/fly/terrain-ground-query';
+import { frameLeanOn, FRAME_LEAN_ACTIVE } from '@/lib/fly/frame-lean';
+import { budgetK } from '@/lib/fly/harness-budget';
+
+// Third round (FRAME_LEAN.idle.batch): the frame's ground queries (the scan's
+// steps and the near contacts) in one ground-query batch, the same answers.
+const IDLE_BATCH = frameLeanOn('engines') && FRAME_LEAN_ACTIVE.idle?.batch !== false;
 
 const dummy = new Object3D(), color = new Color();
 const tones = { 2: '#414c32', 3: '#637044', 5: '#817848' };
@@ -26,9 +33,8 @@ export function SatGroundDetailLayer({ runtime, flight }) {
   const material = useMemo(() => createGroundScrubMaterial(applyBendAnchor), []);
   const depth = useMemo(() => createGroundScrubMaterial(applyBendAnchor, true), []);
   useEffect(() => () => { geometry.dispose(); material.dispose(); depth.dispose(); }, [geometry, material, depth]);
-  useFrame(() => {
+  const detailFrame = () => {
     const mesh = meshRef.current;
-    if (!mesh) return;
     const now = performance.now() / 1000, store = useFlyStore.getState(), st = stateRef.current;
     const mercK = mercatorScale(flight.latDeg ?? 0), signal = runtime.groundImmersion;
     const visible = store.mapStyle === 'satellite' && nearGroundOn('detail') && (signal?.k ?? 0) > 0.001;
@@ -62,7 +68,7 @@ export function SatGroundDetailLayer({ runtime, flight }) {
           st.born = kept;
           break;
         }
-        if (performance.now() - started >= 0.55) break;
+        if (performance.now() - started >= 0.55 * budgetK()) break;
       }
       st.ms = performance.now() - started;
     }
@@ -104,6 +110,16 @@ export function SatGroundDetailLayer({ runtime, flight }) {
     runtime.groundDetail = { count: mesh.count, ...(st.kinds ?? { grass: 0, scrub: 0, hedges: 0 }),
       triangles: mesh.count * 18, scanning: !!st.scan,
       scanMs: st.ms, k: signal.k, draws: mesh.visible ? 1 : 0, castShadow: mesh.castShadow };
+  };
+  useFrame(() => {
+    if (!meshRef.current) return;
+    if (!IDLE_BATCH) return detailFrame();
+    beginGroundBatch();
+    try {
+      detailFrame();
+    } finally {
+      endGroundBatch();
+    }
   }, -40);
   return <instancedMesh name="sat-ground-detail" ref={(mesh) => {
     meshRef.current = mesh;

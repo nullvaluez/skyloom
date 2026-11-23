@@ -43,6 +43,8 @@ import { shipPassOn } from '@/lib/fly/ship-pass';
 import { presentationFps } from '@/lib/fly/pace-adapt';
 import { cadenceState, frameCadence, subscribeCadence, subscribeFrameCadence } from '@/lib/fly/frame-api';
 import { PaceClock } from './PaceClock';
+import { StreamPaceRig } from './StreamPaceRig';
+import { streamPaceOn } from '@/lib/fly/stream-pace';
 
 // Resolved once per page load (the pin is set before Fly mode mounts).
 const PACE_ON = shipPassOn('PACE_ADAPT');
@@ -264,6 +266,8 @@ export function FlyCanvas({ runtime }) {
       <SessionRecovery runtime={runtime}/>
       <BudgetFramePump enabled={budgetedFrames} fps={paceFps ?? 60} />
       {PACE_ON && <PaceClock />}
+      {/* STREAM PACE (stream P; ships off): the shared streaming scale, priority -98. */}
+      {streamPaceOn() && <StreamPaceRig runtime={runtime} />}
       {/* Round 24 (E CERT): the frame-pace instrument. Priority -101 puts it
           ahead of the governor (-100) and A's STEP_SAFE rig (-99), so its dt
           is the raw inter-frame delta of the frame that just presented. Not
