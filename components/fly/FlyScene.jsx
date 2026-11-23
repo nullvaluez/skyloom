@@ -220,6 +220,7 @@ import { ToyWorldLayer } from './ToyWorldLayer';
 import { SatBuildingLayer } from './SatBuildingLayer';
 import { SatRoadLayer } from './SatRoadLayer';
 import { SatSkylineLayer } from './SatSkylineLayer';
+import { HorizonFillLayer } from './HorizonFillLayer';
 import { SatClutterLayer } from './SatClutterLayer';
 import { SatCityGlow } from './SatCityGlow';
 import { SatEnvironment } from './SatEnvironment';
@@ -3778,6 +3779,13 @@ export function FlyScene({ runtime }) {
             &&-chain / same worldRoot reason as the two layers above. */}
         {mapStyle === 'satellite' && SAT_SKYLINE.enabled && (qualityTier !== 'low' || satelliteVisualsOn()) && (
           <SatSkylineLayer key={`SatSkylineLayer:${airportContentEpoch}`} runtime={runtime} flight={flight} />
+        )}
+        {/* HORIZON FILL (FLY_HORIZON_FILL.md): procedural stand-ins where the mapped
+            rings have nothing to draw. The layer itself reads the latched flag
+            and renders null while off (the shipped default), so this line is a
+            no-op: no worker, no engine, no draws. Same worldRoot reason as above. */}
+        {mapStyle === 'satellite' && SAT_SKYLINE.enabled && (
+          <HorizonFillLayer key={`HorizonFillLayer:${airportContentEpoch}`} runtime={runtime} flight={flight} />
         )}
         {/* R22 (C CLUTTER): ground life — parked/moving cars + poles. Same
             &&-chain / worldRoot reason as the layers above; W0 stub renders

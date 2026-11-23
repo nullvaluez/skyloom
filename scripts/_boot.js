@@ -186,6 +186,9 @@ async function bootFly(
     window.__flyWorldReachOverride = { enabled: false };
     window.__flyWorldLookOverride = { enabled: false };
     window.__flyWorldGroundOverride = { enabled: false };
+    // Horizon Fill (FLY_HORIZON_FILL.md): the same idiom. The fleet runs without it
+    // whatever the shipped default becomes; a Horizon Fill gate un-pins it.
+    window.__flyHorizonFillOverride = { enabled: false };
     try {
       localStorage.setItem('fly-controls-seen', '1');
       // Round 10: the APP default is now satellite (PauseMenu defaults an
@@ -238,6 +241,7 @@ async function bootFly(
       window.__flyWorldReachOverride = { enabled: false };
       window.__flyWorldLookOverride = { enabled: false };
       window.__flyWorldGroundOverride = { enabled: false };
+      window.__flyHorizonFillOverride = { enabled: false }; // Horizon Fill: same idiom, reload leg
       localStorage.setItem('fly-controls-seen', '1');
       localStorage.setItem('fly-map-style-2', s || 'toy'); // round 10: default toy for harnesses
     }, { s: style, terraPin });
