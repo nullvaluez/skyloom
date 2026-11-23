@@ -327,6 +327,18 @@ Rules added for this round:
 14. **Do not kill processes by name.** Other people's browsers and servers
     run on this machine. Stop only the process ids you started.
 
+## Third round: the time allowances
+
+Round 2's instruments say where the frame still goes. Several loops run every
+frame on a fixed time allowance whether or not anything changed, a time
+allowance does not shrink on a faster machine, several can land in one frame,
+and the terrain ground query updates its matrix chain per sample. Two streams:
+
+| Stream | Owns | Builds |
+|---|---|---|
+| G IDLE LOOPS | `lib/fly/terrain-ground-query.js`, `lib/fly/toy-world/sat-building-engine.js`, `sat-skyline-engine.js`, `sat-veg-engine.js`, `sat-road-engine.js`, `sat-clutter-engine.js` (outside the `ONE REVEAL L` blocks), `lib/fly/earth-surface-engine.js`, `components/fly/SatRoadLayer.jsx`, `SatClutterLayer.jsx`, `SatGroundDetailLayer.jsx`, `EarthSurfaceLayer.jsx`, `WpCanopyLayer.jsx`, `scripts/bench-flight-cpu.mjs`, `scripts/verify-flight-cpu.mjs`, the stream M section of `FRAME_LEAN` | loops that stop when nothing they depend on changed, and ground queries batched per frame |
+| P STREAM PACE | `lib/fly/stream-pace.js`, `lib/fly/finalize-pace.js`, `lib/fly/harness-budget.js`, new `components/fly/StreamPaceRig.jsx` and its one mount line in `components/fly/FlyCanvas.jsx`, `scripts/verify-stream-pace.mjs`, the stream P section of `STREAM_PACE` | one shared scale on every streaming allowance that follows frame pressure in flight and is raised under the loading curtain |
+
 ## Record
 
 ### Round 1 (2026-11-23): the procedural layer

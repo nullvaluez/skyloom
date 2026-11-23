@@ -193,6 +193,7 @@ async function bootFly(
     // was certified on. A ONE_REVEAL or FRAME_LEAN gate un-pins its own flag.
     window.__flyOneRevealOverride = { enabled: false };
     window.__flyFrameLeanOverride = { enabled: false };
+    window.__flyStreamPaceOverride = { enabled: false };
     try {
       localStorage.setItem('fly-controls-seen', '1');
       // Round 10: the APP default is now satellite (PauseMenu defaults an
@@ -248,6 +249,7 @@ async function bootFly(
       window.__flyHorizonFillOverride = { enabled: false }; // Horizon Fill: same idiom, reload leg
       window.__flyOneRevealOverride = { enabled: false }; // second round: same idiom, reload leg
       window.__flyFrameLeanOverride = { enabled: false };
+      window.__flyStreamPaceOverride = { enabled: false };
       localStorage.setItem('fly-controls-seen', '1');
       localStorage.setItem('fly-map-style-2', s || 'toy'); // round 10: default toy for harnesses
     }, { s: style, terraPin });
