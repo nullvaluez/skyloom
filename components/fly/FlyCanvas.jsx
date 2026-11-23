@@ -267,7 +267,7 @@ export function FlyCanvas({ runtime }) {
       <BudgetFramePump enabled={budgetedFrames} fps={paceFps ?? 60} />
       {PACE_ON && <PaceClock />}
       {/* STREAM PACE (stream P; ships off): the shared streaming scale, priority -98. */}
-      {streamPaceOn() && <StreamPaceRig runtime={runtime} />}
+      {streamPaceOn() && <StreamPaceRig runtime={runtime} presentFps={budgetedFrames ? paceFps : null} />}
       {/* Round 24 (E CERT): the frame-pace instrument. Priority -101 puts it
           ahead of the governor (-100) and A's STEP_SAFE rig (-99), so its dt
           is the raw inter-frame delta of the frame that just presented. Not

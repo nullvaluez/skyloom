@@ -551,3 +551,105 @@ that needs the RTX 5080.
     node scripts/review-flight-throughput.cjs <server-url> lean-on high timing
     FLY_REVIEW_FLAGS=-FRAME_LEAN node scripts/review-flight-throughput.cjs <server-url> lean-off high timing
     node scripts/review-one-reveal.cjs <server-url> argenteuil high 30
+
+### Round 3 (2026-11-23): the time allowances
+
+Two implementors, one reviewer who also ran the tests, one fix.
+
+**Idle loops and batched ground queries (`FRAME_LEAN`, on)**
+
+Headless flight of the real streaming engines on the Argenteuil leg
+(`scripts/bench-flight-cpu.mjs --parked 20 --slow 30`), main-thread
+milliseconds a frame, median of two runs; the reviewer's own runs agree:
+
+| Streaming engines, ms a frame | Before | After |
+|---|---:|---:|
+| Parked | 2.17 | 0.28 |
+| 60 kt | 1.60 | 0.16 |
+| 399 kt | 1.38 | 0.92 |
+| Ground queries a frame, parked | 822 | 63 |
+| Ground queries a frame, 399 kt | 406 | 294 |
+
+- **The ground query keeps a change log**
+  (`lib/fly/terrain-ground-query.js`), fed by the same tile and mesh
+  events that already invalidate its cache, plus the lounge's airfield ground
+  provider. An engine can ask whether the ground under a box changed since
+  an epoch, with no allocation.
+- **Three loops keep their schedule and skip the question.** The stand-in
+  refine, the skyline lattice repair and the canopy re-grid still visit the
+  same points on the same frames, but do not ask the ground again where the
+  answer cannot have changed. Skipping whole sweeps was tried first and
+  rejected: it shifted other engines through the shared finalize allowance
+  and the result stopped being identical.
+- **The building contact sweep sleeps** until the ground changes under a
+  resident chunk or a new chunk arrives.
+- **Ground queries are batched** per caller per frame in the five engines
+  and the road, ground-detail, surface and canopy layers, so the terrain's
+  matrix chain is brought up to date once instead of per sample (504
+  updates to 1 on a real tile tree in node, identical answers).
+- **Proof.** On a virtual clock the final-state hash is equal between
+  `?flags=-FRAME_LEAN` and the default in steady flight and in three runs
+  where the ground changes mid-run; in each of those both arms end with no
+  sample left on the old ground.
+
+**Stream pace (`STREAM_PACE`, ships off; `?flags=STREAM_PACE`)**
+
+- One scale on every streaming time allowance and on the shared finalize
+  allowance. In flight it falls toward a floor of 0.3 while frames run late
+  and the main thread is busy, and recovers when there is headroom, with
+  hysteresis and a 3 s hold after every reveal and warp. Under the loading
+  curtain it rises to 4, since nobody can see the frame rate, and ramps back
+  over the reveal. `window.__flyStats.streamPace` reports what it did.
+- In a model that adds a 15 ms render cost to each frame of the headless
+  flight, frames over the 16.7 ms display interval fell from 712 to 227 of
+  1,200 in flight, and the last building arrived 8 frames later. That is a
+  model. Whether it helps on real hardware is the owner's measurement.
+- **It changes when scenery arrives, and the engines' settled result used
+  to depend on that.** Pacing the same leg twice as fast left different
+  roads in 2 of 16 chunks and different stand-in seating in 12 of 24 groups.
+  The fix is a set of settle rules (a held road chunk gives its slot back
+  after 6 s; with the eye at rest the stand-ins' count factor and heights
+  move to canonical values; tiles merge in tile order). They change what a
+  parked world settles on, were added after the review, and have not been
+  seen on a GPU, so **they ship off** and are on only with
+  `STREAM_PACE` or the pin `__flyFrameLeanOverride = { settle: {
+  enabled: true } }`. With them on, a constant x2 scale leaves the settled
+  world identical on the fixture and on the owner leg.
+
+**Found in review and fixed**
+
+- The lounge's airfield ground provider was invisible to the change log, so
+  loops could sleep on stale heights over an open lounge airfield. The
+  provider now reports when it is set, removed or rebuilt.
+- The pacing scale stayed at its floor for as long as a menu was open. It
+  now recovers during the pause.
+- The settle rules shipped on in both `FRAME_LEAN` arms, which broke the
+  promise that `?flags=-FRAME_LEAN` is the previous behaviour. Made opt-in
+  as above.
+
+**Not verified here, any round**
+
+- Frame rate, GPU time and appearance. Every number above is main-thread
+  time in node, or call counts in a software renderer.
+- The ground change log against a live terrain tree in a browser. Its
+  sources are the hooks the query's own cache already relies on, but an edit
+  to a terrain mesh that nothing announces would not wake a sleeping loop.
+  `__flyFrameLeanOverride = { idle: { refine: false, drapeRepair: false,
+  contact: false, vegRegrid: false } }` turns the sleeping off.
+- `ONE_REVEAL`'s hold lengths on a real cold start, and `STREAM_PACE`'s
+  effect on real frames.
+
+## What to run on the RTX 5080
+
+Start a production server (`npm run build`, `npm run start`), then:
+
+| Question | Command or URL |
+|---|---|
+| Did the optimizations help in flight? | `node scripts/review-flight-throughput.cjs <url> lean-on high timing`, then `FLY_REVIEW_FLAGS=-FRAME_LEAN node scripts/review-flight-throughput.cjs <url> lean-off high timing` |
+| Does streaming that yields to the frame help? | `FLY_REVIEW_FLAGS=STREAM_PACE node scripts/review-flight-throughput.cjs <url> pace-on high timing`, and read `window.__flyStats.streamPace` |
+| Does the world arrive once? | `node scripts/review-one-reveal.cjs <url> argenteuil high 30` |
+| Does Horizon Fill fill the terrain, and at what cost? | `node scripts/review-horizon-fill.cjs <url> off-run melton high off`, the same with `on-run ... on`, then `compare off-run on-run` |
+| Everything together, by eye | `/?flags=HORIZON_FILL,ONE_REVEAL,STREAM_PACE` at High and at Ultra |
+
+A flag that proves itself becomes the default by setting `enabled: true`
+in its block at the end of `lib/fly/fly-constants.js`.

@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { AIRFIELD } from '@/lib/fly/observation-config';
 import { AirfieldGroundSet } from '@/lib/fly/airfield/airfield-ground';
+import { noteGroundChanged } from '@/lib/fly/terrain-ground-query';
 
 /**
  * AIRFIELD GROUND — the observed airport's surfaces and lights: real OSM
@@ -71,6 +72,7 @@ export function AirfieldGround({ runtime }) {
     };
   }, [runtime, gl]);
 
+  const groundSeen = useRef({ state: null, triangles: -1, buildMs: -1 });
   useFrame((state) => {
     const ground = set.current;
     if (!ground) return;
@@ -82,6 +84,17 @@ export function AirfieldGround({ runtime }) {
       provider.current = { engine, off: engine.setGroundProvider((x, z) => ground.groundAt(x, z)) };
     }
     ground.update(state, state.clock.elapsedTime);
+    // FRAME LEAN (idle loops): the provider's answers change when this set
+    // builds or rebuilds its surface, and no terrain tile event says so. Tell
+    // the ground change log, so loops asleep on the old heights re-ask.
+    const gs = ground.stats;
+    const seen = groundSeen.current;
+    if (seen.state !== gs.state || seen.triangles !== gs.triangles || seen.buildMs !== gs.buildMs) {
+      seen.state = gs.state;
+      seen.triangles = gs.triangles;
+      seen.buildMs = gs.buildMs;
+      noteGroundChanged();
+    }
     if (typeof window !== 'undefined' && window.__flyStats) window.__flyStats.airfieldGround = ground.stats;
   }, -39);
 

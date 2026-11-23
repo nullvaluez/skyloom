@@ -40,8 +40,8 @@
  *
  * THE GROUND. A documented stand-in for the terrain engine: `groundAt(lon,
  * lat)` returns a smooth analytic height field (Seine-valley scale, 25 to 95 m)
- * at tileZ 15, constant in time, so a drape's answer does not depend on WHEN
- * it runs. The terrain query itself (terrain-ground-query.js, which needs the
+ * at tileZ 15, constant in time unless --ground-change says otherwise, so a
+ * drape's answer does not depend on WHEN it runs. The terrain query itself (terrain-ground-query.js, which needs the
  * three-tile mesh) is not exercised.
  *
  * WHAT IS MEASURED. Per frame: main-thread milliseconds per engine entry point
@@ -84,6 +84,33 @@
  * <file[.gz]>, --write-pack <file[.gz]> (every response the run read),
  * --sample (top self-time functions), --cpu-prof (flight.cpuprofile for
  * DevTools), --alloc (sampled allocation sites), --quiet.
+ *
+ * THIRD ROUND (stream G, idle loops; FLY_HORIZON_FILL.md "Third round"):
+ *   --parked N   N seconds stationary at the start once the world settled,
+ *                measured (the idle tax: what the engines cost a frame while
+ *                nothing arrives).
+ *   --slow N     N seconds onward along the route after the flight at
+ *                --slow-kt (default 60 kt), measured.
+ *   --ground-change <segment>:<sec>[:<radius m>]  at that moment a square
+ *                region centred on the aircraft (half side 2,500 m) refines:
+ *                inside it the ground answers new heights at tileZ 16. The
+ *                stand-in's change log (the shape lib/fly/terrain-ground-query.js
+ *                exports as `groundChanges`) records it and is handed to every
+ *                engine. The report's `groundChange.audit` counts the samples
+ *                still on the old ground at the end (both arms must agree, and
+ *                end on zero) and `convergeFrames` how long each engine took.
+ *   --idle none | a,b   with --arm on, only these FRAME_LEAN.idle switches
+ *                (refine, drapeRepair, contact, vegRegrid, batch): an ablation.
+ *   --dump-heights   writes every skyline stand-in height table to heights.json.
+ *   --scale K    a constant scale K on every streaming allowance (the seam
+ *                STREAM_PACE uses): the settled world must not depend on it.
+ *   --settle off FRAME_LEAN.settle off (in either arm): the previous settled
+ *                state, which depends on when work was reached.
+ *   The report adds `segments.{parked,flight,slow}` (frame statistics, per
+ *   entry point the mean milliseconds a frame, ground queries a frame) and the
+ *   engines' `idle` counters. A run with a ground change needs a tail longer
+ *   than the canopy's re-grid back-off (up to 60 s) for the off arm to settle
+ *   (--tail-min 75 for a change in the tail).
  *
  * OUTPUT. .graphics-review/flight-cpu/<label>/report.json (every number, the
  * per-frame series with its arrival timeline, the final-state hash per engine
@@ -430,6 +457,9 @@ if (isMainThread && !argv.includes('--compare') && process.env.FLIGHT_CPU_LIB !=
     slowKt: Number(opt('--slow-kt', 60)),
     groundChange: opt('--ground-change', null),
     idle: opt('--idle', null),
+    scale: opt('--scale', null) == null ? null : Number(opt('--scale')),
+    settle: opt('--settle', null),
+    dumpHeights: flag('--dump-heights'),
     buildingChunks: opt('--building-chunks', null) == null ? undefined : Number(opt('--building-chunks')),
     skylineChunks: opt('--skyline-chunks', null) == null ? undefined : Number(opt('--skyline-chunks')),
     writePack: opt('--write-pack', null),
@@ -465,6 +495,19 @@ export async function runFlight(o) {
     const want = new Set(String(o.idle).split(',').filter((k) => k && k !== 'none'));
     globalThis.window.__flyFrameLeanOverride = { idle: Object.fromEntries(IDLE_SWITCHES.map((k) => [k, want.has(k)])) };
   }
+  // --settle on|off (third round repair): FRAME_LEAN.settle in either arm.
+  // It ships off (the previous, history-dependent settled state); on is what
+  // the constant-scale identity in scripts/verify-flight-cpu.mjs is proven with.
+  if (o.settle === 'off' || o.settle === 'on') globalThis.window.__flyFrameLeanOverride = { ...(globalThis.window.__flyFrameLeanOverride ?? {}), settle: { enabled: o.settle === 'on' } };
+  else if (o.settle != null) throw new Error(`--settle on|off, not ${o.settle}`);
+  // --scale K: a constant scale on every time and count allowance, through the
+  // seam STREAM_PACE uses (lib/fly/harness-budget.js setStreamPaceK; budgetK()
+  // = harness factor x K). Not a measurement arm: an identity probe (does the
+  // settled world depend on how fast the allowances let work through?).
+  if (o.scale != null) {
+    if (!(o.scale > 0)) throw new Error(`--scale must be positive, not ${o.scale}`);
+    (await import(pathToFileURL(path.join(ROOT, 'lib/fly/harness-budget.js')).href)).setStreamPaceK(o.scale);
+  }
   globalThis.document ??= {
     createElement: () => ({ getContext: () => null, width: 0, height: 0, style: {} }),
   };
@@ -490,8 +533,34 @@ export async function runFlight(o) {
   globalThis.clearTimeout = (id) => timers.delete(id);
   globalThis.setInterval = () => 0;
   globalThis.clearInterval = () => {};
-  globalThis.requestAnimationFrame = () => 0;
-  globalThis.cancelAnimationFrame = () => {};
+  // Animation-frame callbacks run at the start of the next frame (virtual
+  // time), as a browser runs them before its frame. Until the third round's
+  // repair this was a no-op, so a roof-photo fade (lib/fly/look-roof-patch.js)
+  // that began on a drawn tile never advanced: the tile kept its old roof
+  // colours for good, and whether a photo landed before or after its tile was
+  // first drawn decided the final colours (an instrument artifact; in a
+  // browser the fade ends on the new colours either way).
+  const rafs = new Map();
+  let rafId = 1;
+  globalThis.requestAnimationFrame = (fn) => {
+    const id = rafId++;
+    rafs.set(id, fn);
+    return id;
+  };
+  globalThis.cancelAnimationFrame = (id) => rafs.delete(id);
+  const runRafs = () => {
+    if (!rafs.size) return 0;
+    const due = [...rafs];
+    rafs.clear();
+    for (const [, fn] of due) {
+      try {
+        fn(performance.now());
+      } catch (e) {
+        log('animation frame threw', e?.message);
+      }
+    }
+    return due.length;
+  };
   globalThis.requestIdleCallback = undefined;
   const runTimers = () => {
     let n = 0;
@@ -990,6 +1059,11 @@ export async function runFlight(o) {
         addPhase('timers', realNow() - t0);
       }
     }
+    if (rafs.size) {
+      const t0 = realNow();
+      runRafs();
+      addPhase('raf', realNow() - t0);
+    }
     // 2. the frame callbacks, in the layers' priority order
     noteFinalizeFrame(DT);
     const agl = Math.max(0, flight.pos.y - flight.groundElev);
@@ -1020,10 +1094,13 @@ export async function runFlight(o) {
     return rec;
   }
   const busy = () => {
-    if (jobs.length || photoReplies.length) return true;
+    if (jobs.length || photoReplies.length || rafs.size) return true; // rafs: a roof fade still running
     for (const en of engines) {
       const e = en.e;
       if (e.queue?.length || e.building > 0 || e.pendingFinalize?.length || e.pendingDrape?.length || e.pendingSample?.length || e.wpPending?.length) return true;
+      if (e.settlePending?.()) return true; // FRAME_LEAN.settle: the stand-ins still moving to their canonical state at rest
+      // a roof photo still to land (lib/fly/look-roof-patch.js lookRoofPending's first term)
+      if (e._lookRoofJobs?.size) for (const job of e._lookRoofJobs.values()) if (!(job.delay > 0)) return true;
     }
     return false;
   };
@@ -1205,6 +1282,15 @@ export async function runFlight(o) {
   }
   if (allocProfile) report.alloc = allocSites(allocProfile, 30);
   report.ok = true;
+  // A library caller's own look at the engines once the run has ended.
+  if (typeof o.inspect === 'function') report.inspect = o.inspect(engines);
+  // --dump-heights: every skyline stand-in height table (for diffing two arms).
+  if (o.dumpHeights) {
+    const sk = engines.find((en) => en.name === 'skyline');
+    const dump = {};
+    for (const [k, c] of sk?.e.chunks ?? []) if (c.standIns?.base) dump[k] = { h: Array.from(c.standIns.base.array), rLimit: c.standIns.rLimit, gz: Array.from(c.standIns.gz ?? []) };
+    fs.writeFileSync(path.join(OUT, 'heights.json'), JSON.stringify(dump));
+  }
   fs.writeFileSync(path.join(OUT, 'report.json'), JSON.stringify(report));
   const table = printTable(report);
   fs.writeFileSync(path.join(OUT, 'table.txt'), table);

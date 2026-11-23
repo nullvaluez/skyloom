@@ -34,6 +34,15 @@
 >     callbacks, passes and GL calls). Gates:
 >     `scripts/verify-{one-reveal,flight-cpu,frame-loop}.mjs`. Frame rate
 >     itself is unmeasured: the cloud container renders in software.
+>   - **Third round, same file:** under `FRAME_LEAN` the streaming engines'
+>     per-frame ground loops skip questions whose answer cannot have changed
+>     (a ground change log in `lib/fly/terrain-ground-query.js`) and batch
+>     their queries. `STREAM_PACE` (ships off; read through
+>     `lib/fly/stream-pace.js`) puts one scale on every streaming time
+>     allowance: lower while frames run late, higher under the loading
+>     curtain. `FRAME_LEAN.settle` (ships off; on with `STREAM_PACE`)
+>     makes a parked world settle on the same bytes whatever the pace.
+>     `FLY_HORIZON_FILL.md` ends with the owner's run list.
 > - **World Pass (2026-11-16, owner-requested; all five flags ON on `main`
 >   since 2026-11-17 at the owner's request):**
 >   [FLY_WORLD_PASS.md](FLY_WORLD_PASS.md) is the plan and the record. How the

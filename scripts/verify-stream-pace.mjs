@@ -229,14 +229,16 @@ if (mode === '--bench') {
     return origHeap.call(v8);
   };
 
+  // Both arms pin the settle rules on (they ship off; STREAM_PACE turns them
+  // on in the app): with them the settled world does not depend on the pace.
   const report = await benchMod.runFlight(
     leg === 'owner'
       ? // the bench's own default: the owner's Argenteuil leg, every engine, full rings
         { arm: 'on', label, route: 'owner', seconds: SECONDS, settleMax: 90, tailMax: 90, tailMin: 15, offline: true, pack: null, threads: 4,
-          engines: ['buildings', 'skyline', 'veg', 'roads', 'clutter'], quiet: false, exact, groundUs: 2 }
+          engines: ['buildings', 'skyline', 'veg', 'roads', 'clutter'], quiet: false, exact, groundUs: 2, settle: 'on' }
       : // scripts/verify-flight-cpu.mjs's leg on the committed pack
         { arm: 'on', label, route: 'fixture', seconds: SECONDS, settleMax: 40, tailMax: 90, tailMin: 6, offline: true, pack: PACK, threads: 4,
-          engines: ['buildings', 'skyline'], quiet: false, exact, groundUs: 2, buildingChunks: 4, skylineChunks: 2 }
+          engines: ['buildings', 'skyline'], quiet: false, exact, groundUs: 2, buildingChunks: 4, skylineChunks: 2, settle: 'on' }
   );
   console.log = realLog;
   const summary = {
@@ -358,6 +360,12 @@ let tFloor = null;
   const menu = sp.createPaceLaw(onCfg());
   const km = run(menu, 20, late, { sample: false });
   check('a frame the governor does not sample (a menu, a hidden page) does not move it', km.every((x) => x.k === 1), `min ${minK(km)}`);
+  // A menu opened while the scale is at the floor: it recovers during the
+  // pause instead of holding the floor until the menu closes.
+  const paused = sp.createPaceLaw(onCfg());
+  const down = run(paused, 12, late, {});
+  const during = run(paused, 12, late, { sample: false });
+  check('a scale at the floor recovers while a menu is open, and late frames in the menu cannot lower it', minK(down) === F.floor && during.at(-1).k === 1 && during.every((x, i) => i === 0 || x.k >= during[i - 1].k), `floor ${minK(down)}, after the pause ${during.at(-1).k}`);
 }
 
 // Against a stepping quality governor. CPU and GPU are pipelined: the
@@ -538,7 +546,7 @@ check('the block ships off', STREAM_PACE.enabled === false && sp.STREAM_PACE_ON 
 {
   const src = fs.readFileSync(path.join(ROOT, 'components/fly/FlyCanvas.jsx'), 'utf8');
   const mounts = src.match(/<StreamPaceRig\b[^>]*>/g) ?? [];
-  const guarded = /\{\s*streamPaceOn\(\)\s*&&\s*<StreamPaceRig runtime=\{runtime\}\s*\/>\s*\}/.test(src);
+  const guarded = /\{\s*streamPaceOn\(\)\s*&&\s*<StreamPaceRig runtime=\{runtime\}[^>]*\/>\s*\}/.test(src);
   check('the rig is mounted once, only behind streamPaceOn()', mounts.length === 1 && guarded, `${mounts.length} mount(s), guarded ${guarded}`);
   const rig = fs.readFileSync(path.join(ROOT, 'components/fly/StreamPaceRig.jsx'), 'utf8');
   const frameBody = rig.slice(rig.indexOf('useFrame(('), rig.indexOf('}, -98)'));
