@@ -496,8 +496,9 @@ for (const [name, x, y] of TILES) {
   const { SatSkylineEngine } = await import('../lib/fly/toy-world/sat-skyline-engine.js');
   const { SAT_SKYLINE } = await import('../lib/fly/fly-constants.js');
   HF.__resetHorizonFillLatchForTests();
+  globalThis.window.__flyHorizonFillOverride = { enabled: false }; // the off arm is pinned: the flag ships on since 2026-11-23
   const off = new SatSkylineEngine({ groundAt: () => null });
-  check('(36) off (the shipped default): no census, no cache, no pre-builds, no stats key, the request unchanged', off.fillCoverage === null && off._hfPre === null && off._hfCacheOn === false && !('horizonFill' in off.stats) && HF.horizonFillRequest().horizonFill === undefined);
+  check('(36) off (?flags=-HORIZON_FILL): no census, no cache, no pre-builds, no stats key, the request unchanged', off.fillCoverage === null && off._hfPre === null && off._hfCacheOn === false && !('horizonFill' in off.stats) && HF.horizonFillRequest().horizonFill === undefined);
   off.dispose();
 
   HF.__resetHorizonFillLatchForTests();

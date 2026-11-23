@@ -17,7 +17,7 @@ import { useFlyStore } from '@/stores/fly-store';
  *
  * Mounted by FlyScene inside worldRoot, after SatSkylineLayer, in satellite
  * only. The latched reader decides once per mount whether anything exists:
- * off (the shipped default, Medium / Low, phones, stand-ins off) this
+ * off (?flags=-HORIZON_FILL, Medium / Low, phones, stand-ins off) this
  * component renders null and creates no worker, no engine, no draw and no
  * global.
  *

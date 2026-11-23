@@ -241,13 +241,15 @@ if (process.argv[2] === '--child-settle') {
     matchMedia: () => ({ matches: false }),
     __flyWorldPassTierOverride: { preset: 'high', mobile: false },
   };
-  // The settle rules ship off: 'on' pins them on, 'off' pins them off, 'default'
-  // is the shipped block and 'pace' is STREAM_PACE on with no settle pin.
+  // The settle rules' own switch ships off and they ride on STREAM_PACE, which
+  // ships on: 'on' pins them on, 'off' pins them off, 'default' is the shipped
+  // blocks, 'pace' / 'nopace' pin STREAM_PACE on / off with no settle pin.
   if (arm === 'on' || arm === 'off') globalThis.window.__flyFrameLeanOverride = { settle: { enabled: arm === 'on' } };
   if (arm === 'pace') globalThis.window.__flyStreamPaceOverride = { enabled: true };
+  if (arm === 'nopace') globalThis.window.__flyStreamPaceOverride = { enabled: false };
   const imp = (p) => import(pathToFileURL(path.join(ROOT, p)).href);
   const { FRAME_SETTLE } = await imp('lib/fly/frame-lean.js');
-  if (arm === 'default' || arm === 'pace') {
+  if (arm === 'default' || arm === 'pace' || arm === 'nopace') {
     const d = path.join(ROOT, '.graphics-review/flight-cpu');
     fs.mkdirSync(d, { recursive: true });
     fs.writeFileSync(path.join(d, `verify-settle-${arm}.json`), JSON.stringify({ arm, settle: !!FRAME_SETTLE, holdMaxSec: FRAME_SETTLE?.holdMaxSec ?? null }));
@@ -803,8 +805,9 @@ const settleChild = (arm) => {
   if (so && sf) {
     const sd = settleChild('default');
     const sp = settleChild('pace');
-    check('settle: it ships off, a pin turns it on (with the block\'s numbers) or off, and STREAM_PACE turns it on', so.settle === true && so.holdMaxSec > 0 && sf.settle === false && sd?.settle === false && sp?.settle === true && sp.holdMaxSec === so.holdMaxSec,
-      `pin on ${so.settle}, pin off ${sf.settle}, shipped ${sd?.settle}, with STREAM_PACE ${sp?.settle}`);
+    const sn = settleChild('nopace');
+    check('settle: a pin turns it on (with the block\'s numbers) or off; without a pin it follows STREAM_PACE, which ships on', so.settle === true && so.holdMaxSec > 0 && sf.settle === false && sd?.settle === true && sp?.settle === true && sp.holdMaxSec === so.holdMaxSec && sn?.settle === false,
+      `pin on ${so.settle}, pin off ${sf.settle}, shipped ${sd?.settle}, STREAM_PACE on ${sp?.settle}, STREAM_PACE off ${sn?.settle}`);
     check('settle: the road ring hold keeps a far chunk in place of a nearer unbuilt one, then gives the slot back after holdMaxSec',
       so.roadHeldAtStart.length === 1 && !so.roadK15QueuedAtStart && so.roadHeldAt4 && so.roadK15QueuedLate && so.roadHeldLate.length === 0,
       `held ${so.roadHeldAtStart.join(',')}; at 4 s still held ${so.roadHeldAt4}; after ${so.holdMaxSec} s: nearer chunk queued ${so.roadK15QueuedLate}, far chunk evicted ${so.roadHeldLate.length === 0}`);

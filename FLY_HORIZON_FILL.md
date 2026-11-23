@@ -5,9 +5,16 @@ Buildings to the horizon. Plan, contracts and record of the pass started
 buildings, not only the ground near the aircraft, without paying for it in
 frame time.
 
-**State: built behind `HORIZON_FILL`, which ships `enabled:false`.** Turn it
-on for one page load with `?flags=HORIZON_FILL` (desktop, High or Ultra,
-Enhanced). The record sections at the end say what was built and measured.
+**State: merged to `main` on 2026-11-23 with every flag of this pass ON, at
+the owner's request.** `HORIZON_FILL`, `ONE_REVEAL`, `STREAM_PACE` and
+`FRAME_LEAN` ship `enabled:true` (desktop High or Ultra, Enhanced, for the
+first; the settle rules ride on `STREAM_PACE`). None of them has had an RTX
+5080 look or frame-rate check: the first real-hardware read is the owner's.
+`?flags=-HORIZON_FILL,-ONE_REVEAL,-STREAM_PACE,-FRAME_LEAN` is the game as it
+was before the pass, for one page load, and each flag can be dropped on its
+own. The sections below were written as each round shipped and say "ships
+off" where that was true at the time; "Default on" at the end is the current
+state. The record sections say what was built and measured.
 
 ## What the review found
 
@@ -653,3 +660,42 @@ Start a production server (`npm run build`, `npm run start`), then:
 
 A flag that proves itself becomes the default by setting `enabled: true`
 in its block at the end of `lib/fly/fly-constants.js`.
+
+
+## Default on (2026-11-23)
+
+The owner asked for the pass to be merged to `main` with its flags enabled.
+
+| Flag | Was | Now | The previous behaviour, for one page load |
+|---|---|---|---|
+| `HORIZON_FILL` | off | **on** | `?flags=-HORIZON_FILL` |
+| `ONE_REVEAL` | off | **on** | `?flags=-ONE_REVEAL` |
+| `STREAM_PACE` | off | **on** | `?flags=-STREAM_PACE` |
+| `FRAME_LEAN.settle` | off | **on**, through `STREAM_PACE` (its own switch stays off) | `?flags=-STREAM_PACE` |
+| `FRAME_LEAN` | on | on | `?flags=-FRAME_LEAN` |
+
+What this means for a player on desktop High or Ultra:
+
+- Buildings are drawn to 45 km (High) or 60 km (Ultra) wherever the map has
+  none. The server now reads the GHS-BUILT-H survey on every such session;
+  if it cannot, the layer is simply absent.
+- A cold start can hold the curtain up to 40 s (a warp 30 s) while the final
+  picture arrives, where it used to release at 20 s (15 s) and keep changing.
+- Streaming allowances rise to four times under the curtain and fall to
+  0.3 times while frames run late in flight.
+- A parked world settles on the same roads and stand-ins whatever the pace.
+
+Medium, Low, phones and tablets never get Horizon Fill. They do get
+`ONE_REVEAL`, `STREAM_PACE` and `FRAME_LEAN`, which are not tier-gated.
+
+State of the checks at the decision: every node gate and the whole beta suite
+(56 suites) pass with the flags on, the production build passes, and the
+vector worker's output is still byte-identical for a request without the
+Horizon Fill field. In the software renderer the page as shipped reached
+flight with no console or page error, Horizon Fill on with 29 chunks, the
+hold released by the stall rule at 38.8 s; with all four flags off it
+reached flight at 23.3 s on the time cap and made no survey request. Seven
+gates used the shipped default as their off arm; each now pins its off arm. No frame rate, GPU time or
+appearance has been measured anywhere. The harness fleet
+(`scripts/_boot.js`) pins all four flags off, so its frozen numbers are
+unmoved; the gates of this pass set their own arms explicitly.

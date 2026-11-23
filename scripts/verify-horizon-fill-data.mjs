@@ -638,7 +638,7 @@ const isTile = (b, x, y) => b instanceof Uint8Array && b.length === CITY_HEIGHT_
   const ts = code('../lib/fly/tile-sources.js');
   check(/horizonFillRequested\(\)/.test(ts) && /CITY_CONTINUITY_ON \? \[GHS_BUILT_H_ATTRIBUTION\]/.test(ts),
     'attribution: the GHS-BUILT-H credit shows for CITY_CONTINUITY and whenever Horizon Fill is on (read without latching)');
-  check(HORIZON_FILL.enabled === false, 'HORIZON_FILL ships enabled:false');
+  check(HORIZON_FILL.enabled === true, 'HORIZON_FILL ships enabled:true (the default since 2026-11-23, at the owner\'s request)');
   // The credit at runtime (the OffscreenCanvas stub is scripts/verify-attribution.mjs's).
   if (typeof globalThis.OffscreenCanvas === 'undefined') {
     const inert = new Proxy(function () {}, { get: (t, k) => (k === Symbol.toPrimitive ? () => 0 : inert), apply: () => inert, construct: () => inert });
@@ -647,19 +647,22 @@ const isTile = (b, x, y) => b instanceof Uint8Array && b.length === CITY_HEIGHT_
   const TS = await import('../lib/fly/tile-sources.js');
   const HF = await import('../lib/fly/horizon-fill.js');
   const ghs = (list) => list.filter((a) => a.label.includes('GHS-BUILT-H')).length;
-  const offList = TS.attributionsFor('satellite', 'adsb.lol');
-  const offSame = HF.horizonFillState() === null && TS.attributionsFor('satellite', null) === TS.ATTRIBUTIONS_BY_STYLE.satellite;
+  // The off arm is pinned explicitly: the shipped default is on.
   HF.__resetHorizonFillLatchForTests();
   globalThis.window.__flyHorizonFillOverride = { enabled: false };
+  const offList = TS.attributionsFor('satellite', 'adsb.lol');
+  const offSame = HF.horizonFillState() === null && TS.attributionsFor('satellite', null) === TS.ATTRIBUTIONS_BY_STYLE.satellite;
   HF.horizonFillOn();
   const offLatched = TS.attributionsFor('satellite', null) === TS.ATTRIBUTIONS_BY_STYLE.satellite;
   HF.__resetHorizonFillLatchForTests();
+  delete globalThis.window.__flyHorizonFillOverride;
+  const shipped = ghs(TS.attributionsFor('satellite', null)) === 1 && HF.horizonFillState() === null; // the default, before anything latches
   globalThis.window.__flyHorizonFillOverride = { enabled: true };
   const on = HF.horizonFillOn();
   const onList = TS.attributionsFor('satellite', 'adsb.fi');
-  check(offSame && offLatched && ghs(offList) === ghs(TS.ATTRIBUTIONS_BY_STYLE.satellite) && on && ghs(onList) === 1 && ghs(TS.attributionsFor('toy', null)) === 0
+  check(offSame && offLatched && ghs(offList) === ghs(TS.ATTRIBUTIONS_BY_STYLE.satellite) && shipped && on && ghs(onList) === 1 && ghs(TS.attributionsFor('toy', null)) === 0
     && onList.some((a) => a.label === 'Flight data © adsb.fi'),
-  'attribution: off (unlatched or latched off) the list is the same object; on, satellite carries one GHS-BUILT-H line', `on ${on}`);
+  'attribution: pinned off (unlatched or latched) the list is the same object; as shipped and pinned on, satellite carries one GHS-BUILT-H line', `on ${on}, shipped ${shipped}`);
   HF.__resetHorizonFillLatchForTests();
   delete globalThis.window.__flyHorizonFillOverride;
 }

@@ -50,7 +50,7 @@ const { createCriticalTerrainGate } = await import('../lib/fly/critical-terrain-
 const { ONE_REVEAL } = await import('../lib/fly/fly-constants.js');
 
 check('pins: ?flags=ONE_REVEAL turns the reader and its three switches on', OR.ONE_REVEAL_ON && OR.oneRevealOn('gate') && OR.oneRevealOn('bornFinal') && OR.oneRevealOn('carpetHold'));
-check('shipped: the block ships enabled:false', ONE_REVEAL.enabled === false);
+check('shipped: the block ships enabled:true (the default since 2026-11-23, at the owner\'s request)', ONE_REVEAL.enabled === true);
 const CFG = OR.ONE_REVEAL_ACTIVE;
 check('config: area, hold, born and carpet numbers are present and sane',
   CFG.revealArea.groundM > CFG.revealArea.radiusM && CFG.revealHold.ceilingMs.boot > 20000 && CFG.revealHold.ceilingMs.warp > 15000 &&

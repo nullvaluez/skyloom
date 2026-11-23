@@ -35,7 +35,8 @@ globalThis.Worker = class {
   }
   terminate() {}
 };
-globalThis.window = { location: { search: '' }, __flyWorldPassTierOverride: true };
+// The off arm is pinned (?flags=-HORIZON_FILL): the flag ships on since 2026-11-23.
+globalThis.window = { location: { search: '' }, __flyWorldPassTierOverride: true, __flyHorizonFillOverride: { enabled: false } };
 const { installUrlFlags } = await import('../lib/fly/fly-pins.js');
 installUrlFlags();
 const hf = await import('../lib/fly/horizon-fill.js');

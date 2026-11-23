@@ -274,8 +274,12 @@ const check = (name, ok, detail = '') => {
 const r3 = (x) => (Number.isFinite(x) ? +x.toFixed(3) : x);
 
 const { STREAM_PACE, PERF_GOVERNOR } = await imp('lib/fly/fly-constants.js');
+// The parent process is the flag-OFF arm, and it is pinned: the block ships on
+// since 2026-11-23, and the reader resolves once, when it is imported.
+globalThis.window = { __flyStreamPaceOverride: { enabled: false } };
 const sp = await imp('lib/fly/stream-pace.js');
 const hb = await imp('lib/fly/harness-budget.js');
+delete globalThis.window;
 const F = STREAM_PACE.flightLaw;
 const C = STREAM_PACE.curtainLaw;
 const onCfg = (extra = {}) => sp.paceLawConfig({ ...STREAM_PACE, enabled: true, ...extra }, PERF_GOVERNOR);
@@ -528,7 +532,7 @@ let govRows = [];
 }
 
 // --- 2. off is a no-op; on composes ---------------------------------------------
-check('the block ships off', STREAM_PACE.enabled === false && sp.STREAM_PACE_ON === false, `STREAM_PACE.enabled ${STREAM_PACE.enabled}`);
+check('the block ships on, and ?flags=-STREAM_PACE (the pin) turns the reader off', STREAM_PACE.enabled === true && sp.STREAM_PACE_ON === false, `STREAM_PACE.enabled ${STREAM_PACE.enabled}, reader ${sp.STREAM_PACE_ON}`);
 {
   const before = [sp.paceK(), hb.budgetK()];
   const ret = sp.stepStreamPace({ dtMs: 50, workMs: 40, targetMs: DISPLAY_MS, sample: true, curtain: false, epoch: 0, bootDone: true });
