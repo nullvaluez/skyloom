@@ -29,6 +29,9 @@ import { getTrueScaleK } from '@/lib/fly/true-scale';
 import { airfieldSuppressions, subscribeAirfieldSuppression } from '@/lib/fly/airfield/airfield-suppression';
 import { worldPassOn } from '@/lib/fly/world-pass'; // WORLD PASS E (GROUND)
 import { WpBridgeLayer } from './WpBridgeLayer';
+import { frameLeanOn } from '@/lib/fly/frame-lean'; // FRAME LEAN M
+
+const LEAN_ENGINES = frameLeanOn('engines');
 
 const TIERS = ['low', 'medium', 'high']; // mirrors FlyCanvas's quality ladder
 const atLeastTier = (tier, min) => TIERS.indexOf(tier) >= TIERS.indexOf(min);
@@ -179,6 +182,7 @@ export function SatRoadLayer({ runtime, flight }) {
     });
   }, [engine]);
 
+  // eslint-disable-next-line react-hooks/immutability -- useFrame writes the engine's shared material (the scene's, not React state); reported here since the React compiler lint (pre-existing at HEAD)
   useFrame(({ clock }) => {
     const t = clock.elapsedTime;
     nowRef.current = t;
@@ -187,7 +191,7 @@ export function SatRoadLayer({ runtime, flight }) {
     // (1) and the whole network stays dark forever.
     engine.update(t, flight.pos.x, flight.pos.z, eyeAgl, runtime.sun?.frac);
     // …and the birth: one material property write, only while it is running.
-    const roadsReady = engine.stats.ready;
+    const roadsReady = LEAN_ENGINES ? engine.readyCount() : engine.stats.ready; // FRAME LEAN M
     const bk = birthK(
       birthRef.current,
       t,

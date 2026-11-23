@@ -34,6 +34,8 @@ import { configureCinemaAssets } from '@/lib/fly/cinema-material-assets';
 import { installContextResourceLifetime } from '@/lib/fly/context-resource-lifetime';
 // SHIP PASS FRAME (FR-1, FR-2, FR-4): shader-error policy, census, error telemetry.
 import { installFrameRenderer } from '@/lib/fly/census';
+import { installUniformDedupe, loopLeanLive, setLoopLeanLive } from '@/lib/fly/frame-loop-lean';
+import { graphicsReviewOn } from '@/lib/fly/satellite-visuals';
 import { deepCensusWanted } from '@/lib/fly/program-census';
 import { CensusRig } from './CensusRig';
 // SHIP PASS FRAME (FR-5, FR-9; PACE_ADAPT): the presentation cadence.
@@ -223,6 +225,13 @@ export function FlyCanvas({ runtime }) {
         adoptGpuContext(gl.getContext());
         // SHIP PASS FRAME (FR-1, FR-2, FR-4): lib/fly/census.js installFrameRenderer.
         installFrameRenderer(gl);
+        // FRAME LEAN (stream R): skip uniform uploads that would not change the
+        // program's value (lib/fly/frame-loop-lean.js). Not installed with
+        // ?flags=-FRAME_LEAN.
+        const dedupe = installUniformDedupe(gl.getContext());
+        // The in-session A/B the pixel proof needs (scripts/bench-frame-loop.cjs
+        // --proof). Review builds only; it can turn the lean off, never on.
+        if (graphicsReviewOn()) window.__flyFrameLoopLean = { set: setLoopLeanLive, get: loopLeanLive, uniforms: dedupe };
         // eslint-disable-next-line react-hooks/immutability -- Renderer-owned diagnostics live on the mutable simulation handle.
         if(cinemaOn())runtime.cinemaContextResources=installContextResourceLifetime(gl.getContext());
         configureCinemaAssets(gl);

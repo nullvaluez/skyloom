@@ -1,6 +1,7 @@
 'use client';
 import { terrainArrivalCovered } from '@/lib/fly/critical-terrain-prewarm.mjs';
 import { withRunwayGeometry } from '@/lib/fly/runway-worker';
+import { oneRevealOn } from '@/lib/fly/one-reveal';
 
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -26,6 +27,9 @@ import { cityRangeFor } from '@/lib/fly/city-range';
 import { NIGHT_RHYTHM_ON, updateNightRhythm } from '@/lib/fly/night-rhythm';
 // R24 B (GROUND_VIS, recon A6/T8) — AGL fade bands read the DAMPED ground.
 import { eyeAglVis, groundElevVis } from '@/lib/fly/ground-vis';
+
+// ONE REVEAL (stream L): latched once per page, like every other reader.
+const ONE_REVEAL_GATE = oneRevealOn('gate');
 
 /**
  * Round 18 (A2 "SKYLINE") — mounts the DISTANT BLOCK-MASS streamer inside
@@ -114,6 +118,11 @@ export function SatSkylineLayer({ runtime, flight }) {
       engine.setPhotoGate(() => {
         if (terrainArrivalCovered(runtime, window.__flyBoot, useFlyStore.getState().phase)) {
           const parts = runtime.worldReadiness?.parts;
+          // ONE REVEAL (gate): the reveal waits for these photos, so they load
+          // under the curtain, in order: nothing before the local terrain, a
+          // trickle while the near city streams, then every group in want,
+          // nearest first, at the full in-flight budget ('reveal').
+          if (ONE_REVEAL_GATE) return parts?.terrain && parts.surfaces && parts.buildings ? 'reveal' : parts?.terrain ? 'busy' : false;
           return parts?.terrain && parts.surfaces && parts.buildings ? 'busy' : false;
         }
         const s = runtime.satBuildings?.stats;

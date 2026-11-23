@@ -49,6 +49,10 @@ import { LOOK_FACADE_ON, setLookFacadeProfile, updateLookFacade } from '@/lib/fl
 import { cinemaProfile } from '@/lib/fly/cinema-policy';
 // WORLD PASS B (ARRIVAL): the building worker pool size (flag on only).
 import { worldPassOn, worldPassConfig } from '@/lib/fly/world-pass';
+// FRAME LEAN M: the per-frame ready / births reads without the whole stats object.
+import { frameLeanOn } from '@/lib/fly/frame-lean';
+
+const LEAN_ENGINES = frameLeanOn('engines');
 
 const TIERS = ['low', 'medium', 'high']; // mirrors FlyCanvas's quality ladder
 const atLeastTier = (tier, min) => TIERS.indexOf(tier) >= TIERS.indexOf(min);
@@ -275,7 +279,7 @@ export function SatBuildingLayer({ runtime, flight }) {
     // PLAY PASS CITY: one region vote a second, a few uniform writes while easing.
     if (CITY_FACADES_ON) updateCityFacades(engine, clock.elapsedTime, runtime.origin?.anchor);
     // …and the birth, AFTER the engine's own uniform write.
-    const ready = engine.stats.ready;
+    const ready = LEAN_ENGINES ? engine.readyCount() : engine.stats.ready;
     const k = birthK(
       birthRef.current,
       clock.elapsedTime,
@@ -293,7 +297,7 @@ export function SatBuildingLayer({ runtime, flight }) {
       applyUniformBirth(fadeRef.current, getSatBldgFade(), 1, setSatBldgFade);
       fadeRef.current.lastWritten = Number.NaN;
     }
-    notePopin('satBuildings', ready > 0, birthRef.current.running || engine.stats.births > 0);
+    notePopin('satBuildings', ready > 0, birthRef.current.running || (LEAN_ENGINES ? engine.birthCount() : engine.stats.births) > 0);
     if (
       process.env.NODE_ENV === 'development' &&
       window.__flyStats &&
