@@ -262,11 +262,16 @@ export function BootScreen({ runtime }) {
       else phase = 'ready';
 
       if (allDone) {
-        if (living && timedOut) {
+        // ONE REVEAL: when the base world is ready and only a final-picture
+        // term (a late far photo, say) ran the hold out, nothing is missing
+        // that the bypasses exist for and the world is not degraded. Gate off,
+        // lateTermOnly is false and both lines are HEAD's.
+        const lateTermOnly = REVEAL_GATE && timedOut && !reducedEntry.current && content?.ready === true;
+        if (living && timedOut && !lateTermOnly) {
           const reason = reducedEntry.current ? 'explicit-reduced' : 'time-cap';
           rt.terrainPrewarm?.bypass(reason); rt.loungeRoom?.bypassWarm?.(reason); rt.prewarm?.bypassWorldProfiles?.(reason);
         }
-        rt.worldLoading=false;rt.worldDegraded=!!(living&&(reducedEntry.current||timedOut));
+        rt.worldLoading=false;rt.worldDegraded=!!(living&&(reducedEntry.current||(timedOut&&!lateTermOnly)));
         // ONE REVEAL: the hold's record and the reveal pose the after counters use.
         if (living) {
           noteHold({

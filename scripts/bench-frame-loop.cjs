@@ -30,6 +30,7 @@
  *                    in the order off, off, on, on, off, on, reading the
  *                    drawing buffer after each, and compares the bytes. Also
  *                    records what each arm submitted (the mechanism acted).
+ *   --proofSeq a,b   the arm order for --proof (default an irregular 19)
  *   --profile 1      also take a CDP CPU profile of the sampled window and
  *                    write the top functions by self time (with a source
  *                    snippet from the production chunk) to profile-<run>.txt
@@ -69,7 +70,7 @@ function loadPlaywright() {
 }
 
 function parseArgs(argv) {
-  const a = { url: null, label: 'run', arm: 'on', frames: 30, warm: 20, warmFrames: 0, profile: 0, proof: 0, runs: 2, dsf: 0.2, width: 1600, height: 900, timeout: 420 };
+  const a = { url: null, label: 'run', arm: 'on', frames: 30, warm: 20, warmFrames: 0, profile: 0, proof: 0, proofSeq: '', runs: 2, dsf: 0.2, width: 1600, height: 900, timeout: 420 };
   for (let i = 2; i < argv.length; i++) {
     const k = argv[i].replace(/^--/, ''), v = argv[i + 1];
     if (k in a) { a[k] = typeof a[k] === 'number' ? Number(v) : v; i++; }
@@ -547,7 +548,7 @@ function table(report) {
 }
 
 /* In the page: the same frame, lean off and on, read back and compared. */
-async function runProof() {
+async function runProof(customSeq) {
   const B = window.__benchFL, lean = window.__flyFrameLoopLean, rt = window.__fly;
   if (!lean) return { error: 'window.__flyFrameLoopLean missing (needs ?graphicsReview=1 and FRAME_LEAN on)' };
   rt.simHold.add('review');
@@ -562,30 +563,100 @@ async function runProof() {
   const gl = state.gl, ctx = gl.getContext();
   const w = ctx.drawingBufferWidth, h = ctx.drawingBufferHeight;
   const hash = (buf) => { let x = 2166136261; for (let i = 0; i < buf.length; i++) x = Math.imul(x ^ buf[i], 16777619); return (x >>> 0).toString(16); };
+  // Warm with the lean on: the traffic layer hides its empty instanced meshes
+  // in its own frame callback, every program is compiled.
+  lean.set(true);
+  for (let i = 0; i < 3; i++) state.advance(T / 1000, true);
+  const hidden = [];
+  B.scene.traverse((o) => { if (o.userData && o.userData.__leanHidden === true) hidden.push(o); });
+  // The render half of a frame only (the composer's subscriber and anything
+  // after it, then the after-effects): no simulation, no streaming, no
+  // subscriber can move anything between the two arms.
+  // Every pass's output is read back right after it renders, so a pass that
+  // varies from one render to the next on its own (a noise seed, a counter) is
+  // told apart from a difference the lean made.
+  const composer = window.__flyComposer;
+  const passHashes = [];
+  const readTarget = (target) => {
+    const tw = target ? target.width : w, th = target ? target.height : h;
+    gl.setRenderTarget(target || null);
+    const float = target && target.texture && target.texture.type !== 1009; // not UnsignedByteType
+    const buf = float ? new Float32Array(tw * th * 4) : new Uint8Array(tw * th * 4);
+    ctx.readPixels(0, 0, tw, th, ctx.RGBA, float ? ctx.FLOAT : ctx.UNSIGNED_BYTE, buf);
+    return hash(new Uint8Array(buf.buffer));
+  };
+  const wrapped = [];
+  for (const [i, pass] of composer.passes.entries()) {
+    const r = pass.render;
+    wrapped.push([pass, r]);
+    pass.render = function (renderer, inputBuffer, outputBuffer, ...rest) {
+      const out = r.call(this, renderer, inputBuffer, outputBuffer, ...rest);
+      if (passHashes.current) {
+        const target = this.renderToScreen ? null : this.needsSwap ? outputBuffer : inputBuffer;
+        const prev = renderer.getRenderTarget();
+        passHashes.current.push(`${i}:${this.name}=${readTarget(target)}`);
+        renderer.setRenderTarget(prev);
+      }
+      return out;
+    };
+  }
+  // A seeded Math.random for each render: an effect that draws a fresh random
+  // seed per frame (film grain, dither) then draws the same one in both arms.
+  const realRandom = Math.random;
+  const seeded = () => { let t = 0x2545f491; return () => { t = (t + 0x6d2b79f5) >>> 0; let r = Math.imul(t ^ (t >>> 15), 1 | t); r = (r + Math.imul(r ^ (r >>> 7), 61 | r)) ^ r; return ((r ^ (r >>> 14)) >>> 0) / 4294967296; }; };
+  // The render half of a frame only (the composer's subscriber and anything
+  // after it): no simulation, no streaming, no subscriber can move anything
+  // between the two arms.
+  // The film grain advances its own seed every render (lib/fly/film-grade.js):
+  // pin it, so both arms draw the same grain.
+  const grains = [];
+  for (const pass of composer.passes) for (const e of pass.effects || []) if (e && e.name === 'FilmGrade') grains.push(e);
+  const renderOnly = () => {
+    for (const e of grains) e.frame = 0;
+    Math.random = seeded();
+    passHashes.current = [];
+    try { for (const sub of state.internal.subscribers) if (sub.priority >= 1) sub.ref.current(state, 0, undefined); }
+    finally { Math.random = realRandom; }
+    const out = passHashes.current; passHashes.current = null;
+    return out;
+  };
+  const apply = (on) => {
+    lean.set(on); // the uniform dedupe
+    for (const o of hidden) o.visible = !on; // exactly what leanEmptyInstances does with the lean off / on
+  };
   const shots = [];
-  const seq = ['off', 'off', 'on', 'on', 'off', 'on'];
+  for (let i = 0; i < 2; i++) renderOnly();
+  // An irregular order, so a state that recurs every N renders on its own
+  // (a counter in some layer) lands on both arms.
+  const seq = customSeq || ['on', 'off', 'off', 'on', 'on', 'off', 'on', 'off', 'off', 'on', 'on', 'off', 'off', 'on', 'off', 'on', 'on', 'on', 'off'];
   for (const arm of seq) {
-    lean.set(arm === 'on');
-    B.frames = []; B.sampling = true; B.cur = null;
-    state.advance(T / 1000, true);
-    // close the accumulator this advance filled
+    apply(arm === 'on');
+    B.frames = []; B.sampling = true; B.cur = { t0: 0, subs: {}, gl: {}, matrix: { world: 0, local: 0 }, matrixBy: {}, uniforms: {}, emptyNames: {}, canvas: {}, commits: 0, renderMs: {} };
+    const passes = renderOnly();
     const f = B.cur; B.sampling = false; B.cur = null;
     gl.setRenderTarget(null);
     const px = new Uint8Array(w * h * 4);
     ctx.readPixels(0, 0, w, h, ctx.RGBA, ctx.UNSIGNED_BYTE, px);
     const total = (k) => (f ? Object.values(f.gl).reduce((s, g) => s + (g[k] || 0), 0) : null);
-    shots.push({ arm, px, hash: hash(px), submitted: total('objects'), emptyInstanced: total('emptyInstanced'), draws: total('draw'), uniforms: total('uniform'), glCalls: total('calls'), trafficHidden: rt.trafficLean ? rt.trafficLean.hidden : null });
-    await new Promise((r) => setTimeout(r, 300));
+    shots.push({ arm, px, hash: hash(px), submitted: total('objects'), emptyInstanced: total('emptyInstanced'), draws: total('draw'), triangles: total('triangles'), uniforms: total('uniform'), glCalls: total('calls'), hiddenByLean: hidden.length, passes });
+    await new Promise((r) => setTimeout(r, 200));
   }
   lean.set(true);
+  for (const [pass, r] of wrapped) pass.render = r;
   const ref = shots[0].px;
   const diff = (px) => { let n = 0, max = 0; for (let i = 0; i < px.length; i++) { const d = Math.abs(px[i] - ref[i]); if (d) { n++; if (d > max) max = d; } } return { bytesDiffer: n, maxDelta: max }; };
   let nonBlack = 0; for (let i = 0; i < ref.length; i += 4) if (ref[i] | ref[i + 1] | ref[i + 2]) nonBlack++;
   return {
     width: w, height: h, nonBlackPixels: nonBlack,
     uniformDedupe: lean.uniforms ? { ...lean.uniforms } : null,
-    shots: shots.map((s) => ({ arm: s.arm, hash: s.hash, ...diff(s.px), submitted: s.submitted, emptyInstanced: s.emptyInstanced, draws: s.draws, uniforms: s.uniforms, glCalls: s.glCalls, trafficHidden: s.trafficHidden })),
+    shots: shots.map((s) => ({ arm: s.arm, hash: s.hash, ...diff(s.px), submitted: s.submitted, emptyInstanced: s.emptyInstanced, draws: s.draws, triangles: s.triangles, uniforms: s.uniforms, glCalls: s.glCalls, hiddenByLean: s.hiddenByLean, passes: s.passes })),
     identical: shots.every((s) => s.hash === shots[0].hash),
+    filmGrainPinned: grains.length,
+    // each distinct final image and the arms that produced it: the lean is
+    // pixel-identical when no image belongs to one arm only
+    imageClasses: Object.entries(shots.reduce((m, s, i) => { (m[s.hash] ||= []).push(`${i}:${s.arm}`); return m; }, {})).map(([hash, list]) => ({ hash, shots: list, arms: [...new Set(list.map((x) => x.split(':')[1]))] })),
+    // pairs of consecutive renders (one per arm) whose final image matches
+    consecutiveArmPairs: shots.slice(1).map((s, i) => ({ a: shots[i].arm, b: s.arm, same: s.hash === shots[i].hash })),
   };
 }
 
@@ -650,7 +721,7 @@ async function bootAndSample(chromium, a, runIndex) {
       await page.waitForFunction((n) => (window.__benchFL.rendered || 0) >= n, base + a.warmFrames, { timeout: a.timeout * 1000, polling: 1000 });
     }
     if (a.proof) {
-      const proof = await page.evaluate(runProof);
+      const proof = await page.evaluate(runProof, a.proofSeq ? a.proofSeq.split(',') : null);
       return { gpu, summary: null, proof };
     }
     let cdp = null;

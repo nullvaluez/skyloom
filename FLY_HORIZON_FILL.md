@@ -310,7 +310,7 @@ The record below says what each round did.
 |---|---|---|
 | L ONE REVEAL | `components/fly/hud/BootScreen.jsx`, `WarpFlash.jsx`, `lib/fly/world-readiness.js`, `load-guard.js`, `look-roof-patch.js`, `settle.js`, `ground-arrival.js`, `r25-color-ref.js`, `lib/fly/toy-world/sat-stand-in-photo.js`, `components/fly/SatSkylineLayer.jsx`, `lib/fly/critical-terrain-prewarm.mjs`, `lib/fly/horizon-fill/carpet-engine.js`, `coverage.js`, new `lib/fly/one-reveal-*.js`, marked blocks (`// ONE REVEAL L begin` / `end`) in `sat-skyline-engine.js` and `sat-building-engine.js`, `scripts/verify-one-reveal.mjs`, the stream L section of `ONE_REVEAL` | one reveal: the hold waits for final colour and lighting in view, later arrivals are born final, Horizon Fill never rearranges after it appears |
 | M FLIGHT CPU | `lib/fly/toy-world/sat-building-engine.js`, `sat-skyline-engine.js`, `sat-veg-engine.js`, `sat-road-engine.js`, `sat-clutter-engine.js`, `sat-stand-ins.js`, `sat-stand-in-prep.js` (all outside stream L's marked blocks), `lib/fly/terrain-ground-query.js`, `skyline-drape.js`, `parcel-gap.js`, `ground-canopy-*.js`, `earth-surface-engine.js`, `earth-surface-mask.js`, `components/fly/SatParcelHomes.jsx`, `WpCanopyLayer.jsx`, `SatBuildingLayer.jsx`, `SatVegLayer.jsx`, `SatRoadLayer.jsx`, `scripts/bench-flight-cpu.mjs`, `scripts/verify-flight-cpu.mjs`, files named `flight-*` under `scripts/fixtures/horizon-fill/`, the stream M section of `FRAME_LEAN` | a headless flight benchmark of the real streaming engines, and the main-thread work it finds removed |
-| R FRAME LOOP | `components/fly/FlyScene.jsx`, `FlyCanvas.jsx`, `Effects.jsx`, `FlyEffectComposer.jsx`, `CinemaShadowRig.jsx`, `CoastalReflectionRig.jsx`, `TrafficLayer.jsx`, `HorizonFillLayer.jsx`, the HUD under `components/fly/hud/` except the two files stream L owns, `lib/fly/terrain-engine.js`, `cinema-shadows.js`, `coastal-reflection.js`, `architecture-draw-range.js`, `perf-governor.js`, `frame-stats.js`, `scripts/bench-frame-loop.cjs`, `scripts/verify-frame-loop.mjs`, the stream R section of `FRAME_LEAN` | an instrument for what one frame costs outside the engines (frame callbacks, passes, GL calls, HUD), and that cost reduced |
+| R FRAME LOOP | `components/fly/FlyScene.jsx`, `FlyCanvas.jsx`, `Effects.jsx`, `FlyEffectComposer.jsx`, `CinemaShadowRig.jsx`, `CoastalReflectionRig.jsx`, `TrafficLayer.jsx`, `HorizonFillLayer.jsx`, the HUD under `components/fly/hud/` except the two files stream L owns, `lib/fly/terrain-engine.js`, `cinema-shadows.js`, `coastal-reflection.js`, `architecture-draw-range.js`, `perf-governor.js`, `frame-stats.js`, `frame-loop-lean.js` (new), `scripts/bench-frame-loop.cjs`, `scripts/verify-frame-loop.mjs`, the stream R section of `FRAME_LEAN` | an instrument for what one frame costs outside the engines (frame callbacks, passes, GL calls, HUD), and that cost reduced |
 
 Rules added for this round:
 
@@ -426,3 +426,116 @@ the RTX 5080, against a production server you start:
     node scripts/review-horizon-fill.cjs <server-url> off-run melton high off
     node scripts/review-horizon-fill.cjs <server-url> on-run melton high on
     node scripts/review-horizon-fill.cjs compare off-run on-run
+
+
+### Round 2 (2026-11-23): one reveal, and the first optimization pass
+
+Three implementors, two reviewers, one fix and a re-check, as in round 1.
+
+**ONE REVEAL (`ONE_REVEAL`, ships off)**
+
+- **The gate.** With it on, the boot and warp holds also wait for the final
+  picture of a reveal area (a 55 degree cone about the heading to 6 km, plus
+  1.5 km all round): the lit terrain program in use, every resident building
+  tile with its final roof colour, the regional colour reference at full
+  weight, the distant groups drawn with their photos, and no soft birth still
+  running. The work those terms wait on now runs under the curtain, in order:
+  far photos start once terrain, surfaces and near buildings are in.
+- **The hold stays bounded.** The existing caps (20 s boot, 15 s warp) still
+  release it when nothing is advancing. Past the cap it continues only while
+  a measured term advanced in the last 3 s, to a hard ceiling of 40 s (boot)
+  and 30 s (warp). A release caused only by a late final-picture term is not
+  marked as a degraded world.
+- **Born final.** In flight, a building tile waits up to 2 s for its roof
+  photo and a distant group up to 3 s for its ground photo before it is first
+  drawn. Nothing within 1.5 km of the aircraft waits.
+- **Horizon Fill does not rearrange.** Inside the mapped reach a procedural
+  block stays hidden until its census reports or 15 s pass, and a block that
+  has been shown is never hidden again.
+- **Numbers to read on your machine.** `window.__flyStats.oneReveal`
+  records which rule released the hold, how long each term held it, and how
+  many roofs, terrain tiles, colour slots, photos and procedural tiles
+  changed inside the reveal area in the 60 s after the reveal. It is
+  published with the flag off too, so the off arm is the control.
+
+**FRAME LEAN (`FRAME_LEAN`, ships on; `?flags=-FRAME_LEAN` is the previous frame loop)**
+
+Headless flight of the real streaming engines on the Argenteuil leg
+(`scripts/bench-flight-cpu.mjs`: 60 s at 399 kt, 3,600 frames, median of
+3 runs per arm; the reviewer's independent runs agree):
+
+| Main thread, streaming engines | Before | After |
+|---|---:|---:|
+| Frame p99 | 7.27 ms | 5.31 ms |
+| Frames over 8 ms | 31 | 10 |
+| Frames over 16 ms | 6 | 1 |
+| Worst contact-repair frame | 22.9 ms | 12.7 ms |
+| Total main-thread time | 5.56 s | 4.96 s |
+| Garbage collections | 68 | 42 |
+| Heap growth during frames | 671 MB | 328 MB |
+
+- The building engine's ground-contact sweep built and sorted one object
+  per resident building in a single frame every two to three seconds (17 to
+  37 ms). It is now collected over several frames into a heap.
+- The building and road layers read the engines' whole statistics object
+  twice a frame for two numbers; they now read the two numbers. The skyline
+  layer does the same.
+- The settled result is identical: with the engines on a virtual clock the
+  final-state hash over every resident chunk's geometry, instance counts and
+  drawn prefixes is the same in both arms.
+
+One frame outside the engines (`scripts/bench-frame-loop.cjs`, same build
+and pose, two boots per arm, software renderer):
+
+| Per frame | Before | After |
+|---|---:|---:|
+| GL calls | 2,117 | 1,204 |
+| Uniform uploads | 1,076 | 259 |
+| Objects submitted to the main pass | 115 | 56 |
+| Draws and triangles | unchanged | unchanged |
+
+- 64 of the 115 objects submitted to the main pass were instanced meshes
+  with nothing to draw (traffic archetypes, the billboard pool, empty fleet
+  families). three still sorted them, bound their programs and uploaded
+  their uniforms. They are no longer submitted while empty, except once
+  every 90 frames so their programs keep following the scene.
+- three re-uploads array uniforms on every material refresh even when the
+  value is unchanged. A per-location cache on the context skips an upload
+  whose bits equal the last one. It allocates nothing after a location's
+  first upload.
+- Pixels: at a frozen state in one session, renders with the change off and
+  on produced the same images.
+
+**What these numbers are not.** They are main-thread milliseconds and call
+counts from node and a software renderer. Frame rate has not been measured:
+that needs the RTX 5080.
+
+**Found in review and fixed**
+
+- A source check in `verify-true-scale` failed because the new canvas
+  wiring pushed a call outside its search window; the wiring moved.
+- The uniform cache allocated two or three objects per upload; rewritten
+  allocation-free, with a gate check.
+- A hold released only by a late far photo was labelled a time cap and marked
+  the world degraded.
+- The loading gate's comparison with the previous carpet engine read it from
+  git at HEAD, which would have compared the engine with itself after this
+  commit; it now reads a recorded fixture.
+
+**Still open after round 2**
+
+- The frame instrument attributes most remaining per-frame JavaScript to
+  loops that run every frame on a time allowance whether or not anything
+  changed: the stand-in ground refine (1.5 ms a frame), the building contact
+  repair (0.6 ms), and similar loops in the road, clutter and surface layers.
+  A time allowance does not shrink on a faster machine.
+- The terrain ground query brings its matrix chain up to date per sample:
+  about 5,000 matrix updates a frame.
+- Each engine has its own time allowance, and several can land in one frame
+  (5 to 8 ms). Nothing scales them back when the frame is already late.
+
+**Measure it on the RTX 5080** (against a production server you start)
+
+    node scripts/review-flight-throughput.cjs <server-url> lean-on high timing
+    FLY_REVIEW_FLAGS=-FRAME_LEAN node scripts/review-flight-throughput.cjs <server-url> lean-off high timing
+    node scripts/review-one-reveal.cjs <server-url> argenteuil high 30

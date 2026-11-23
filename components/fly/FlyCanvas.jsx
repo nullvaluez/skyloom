@@ -225,13 +225,6 @@ export function FlyCanvas({ runtime }) {
         adoptGpuContext(gl.getContext());
         // SHIP PASS FRAME (FR-1, FR-2, FR-4): lib/fly/census.js installFrameRenderer.
         installFrameRenderer(gl);
-        // FRAME LEAN (stream R): skip uniform uploads that would not change the
-        // program's value (lib/fly/frame-loop-lean.js). Not installed with
-        // ?flags=-FRAME_LEAN.
-        const dedupe = installUniformDedupe(gl.getContext());
-        // The in-session A/B the pixel proof needs (scripts/bench-frame-loop.cjs
-        // --proof). Review builds only; it can turn the lean off, never on.
-        if (graphicsReviewOn()) window.__flyFrameLoopLean = { set: setLoopLeanLive, get: loopLeanLive, uniforms: dedupe };
         // eslint-disable-next-line react-hooks/immutability -- Renderer-owned diagnostics live on the mutable simulation handle.
         if(cinemaOn())runtime.cinemaContextResources=installContextResourceLifetime(gl.getContext());
         configureCinemaAssets(gl);
@@ -245,6 +238,15 @@ export function FlyCanvas({ runtime }) {
         // TRUE EARTH (TRUE_SCALE): the anisotropic view. Not installed at all
         // with the flag off; with it on, k0 = 1 frames are three's own matrix.
         installTrueScaleCamera(camera);
+        // FRAME LEAN (stream R): skip uniform uploads that would not change the
+        // program's value (lib/fly/frame-loop-lean.js). Not installed with
+        // ?flags=-FRAME_LEAN. Kept after installTrueScaleCamera so the
+        // verify-true-scale (14) wiring window holds; it wraps only the
+        // context's uniform* methods, which nothing above calls.
+        const dedupe = installUniformDedupe(gl.getContext());
+        // The in-session A/B the pixel proof needs (scripts/bench-frame-loop.cjs
+        // --proof). Review builds only; it can turn the lean off, never on.
+        if (graphicsReviewOn()) window.__flyFrameLoopLean = { set: setLoopLeanLive, get: loopLeanLive, uniforms: dedupe };
         if (process.env.NODE_ENV === 'development') {
           console.info(
             '[fly] reversedDepthBuffer active:',

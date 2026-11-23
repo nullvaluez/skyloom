@@ -86,11 +86,14 @@ export function WarpFlash({ runtime }) {
             extendedMs:Math.round(revealClock.extendedMs),heldMs:Object.fromEntries(Object.entries(revealClock.held).map(([k,v])=>[k,Math.round(v)])),
             finalAtMs:revealClock.finalAtMs==null?null:Math.round(revealClock.finalAtMs-t0),missingAtReveal:[...content.missing,...termsMissing],terms:termsRecord(terms)});
           noteReveal('warp',rt.flight,rt.criticalTerrain);publishOneReveal();setRevealWait(null);
-          if(reducedEntry.current||capped){
+          // ONE REVEAL: a hold run out only by a late final-picture term, with the
+          // base world ready, is not a degraded arrival (gate off: always false).
+          const lateTermOnly=REVEAL_GATE&&capped&&!reducedEntry.current&&content.ready===true;
+          if(reducedEntry.current||(capped&&!lateTermOnly)){
             const reason=reducedEntry.current?'explicit-reduced':'time-cap';
             rt.terrainPrewarm?.bypass(reason);rt.loungeRoom?.bypassWarm?.(reason);rt.prewarm?.bypassWorldProfiles?.(reason);
           }
-          clearInterval(poll);rt.worldLoading=false;rt.worldDegraded=reducedEntry.current||capped;
+          clearInterval(poll);rt.worldLoading=false;rt.worldDegraded=reducedEntry.current||(capped&&!lateTermOnly);
           rt.arrivalStats={...rt.arrivalStats,revealAt:now,holdMs:Math.round(now-t0),reason:reducedEntry.current?'explicit-reduced':capped?'time-cap':content.deferred.length?'background-detail':'content'};
           window.__flyWorldStatus={degraded:rt.worldDegraded,capped,missing:content.missing};
           (window.__flyStats??={}).warpGate=rt.arrivalStats;

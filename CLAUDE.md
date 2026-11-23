@@ -22,6 +22,18 @@
 >   `scripts/verify-horizon-fill-{data,carpet,stream}.mjs` (in
 >   `verify:beta`). Owner harness: `scripts/review-horizon-fill.cjs`. No
 >   RTX 5080 look or frame-rate check has been made.
+>   - **Second round, same file:** `ONE_REVEAL` (ships off; read through
+>     `lib/fly/one-reveal.js`) makes the boot and warp holds wait, bounded,
+>     for the final colour and lighting of what the camera faces, and has
+>     later arrivals born with their final colour. `FRAME_LEAN` (ships ON;
+>     read through `lib/fly/frame-lean.js`; `?flags=-FRAME_LEAN` is the
+>     previous frame loop) holds main-thread optimizations proven to leave
+>     the settled picture identical. Instruments:
+>     `scripts/bench-flight-cpu.mjs` (headless flight of the real
+>     streaming engines) and `scripts/bench-frame-loop.cjs` (per-frame
+>     callbacks, passes and GL calls). Gates:
+>     `scripts/verify-{one-reveal,flight-cpu,frame-loop}.mjs`. Frame rate
+>     itself is unmeasured: the cloud container renders in software.
 > - **World Pass (2026-11-16, owner-requested; all five flags ON on `main`
 >   since 2026-11-17 at the owner's request):**
 >   [FLY_WORLD_PASS.md](FLY_WORLD_PASS.md) is the plan and the record. How the

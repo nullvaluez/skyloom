@@ -406,33 +406,44 @@ const visible = (mask) => {
   for (let s = 3; s <= 40; s += 0.5) await run2.step(s, px, pz);
   const rel = run2.reqs.slice(n0).filter((r) => r.tx === 1100 && r.ty === 800);
   check('F timeout: unreported blocks are released after carpetWait.timeoutSec', run2.engine.stats.holdTimeouts > 0 && rel.length >= 1 && !(rel.at(-1).mask && rel.at(-1).mask.some((v) => v === 255)), `${run2.engine.stats.holdTimeouts} timeouts, ${rel.length} rebuilds`);
-  // Hold off: the request stream equals HEAD's carpet engine.
-  let HeadEngine = null;
-  try {
-    const src = execFileSync('git', ['show', 'HEAD:lib/fly/horizon-fill/carpet-engine.js'], { cwd: ROOT, encoding: 'utf8' });
+  // Hold off: the request stream equals the round-1 carpet engine's (commit
+  // caba420, before ONE REVEAL touched the file), recorded as a fixture so the
+  // check keeps its meaning after this work is committed and needs no git.
+  //   node scripts/verify-one-reveal.mjs --record-parity <git ref>   re-records it
+  const PARITY = path.join(ROOT, 'scripts/fixtures/horizon-fill/carpet-parity-round1.json');
+  const script = async (E, hold) => {
+    const c = fakeCoverage(24000);
+    const r = carpetRun(E, { hold, coverage: c });
+    for (let s = 0; s < 30; s += 0.5) {
+      if (s === 5) for (let j = 0; j < 8; j++) for (let i = 0; i < 8; i++) c.setTile(1100 * 8 + i, 800 * 8 + j, j === 2 ? cells : new Uint8Array(256));
+      await r.step(s, px + s * 200, pz);
+    }
+    return { reqs: r.reqs.map((q) => `${q.tx}/${q.ty}/${q.level}/${q.qx}/${q.qy}/${q.maskEpoch}/${q.mask ? Buffer.from(q.mask).toString('base64').length + ':' + q.mask.reduce((a, v, i) => (a + v * (i + 1)) % 1e9, 0) : '-'}`), stats: r.engine.stats };
+  };
+  const recordAt = process.argv.indexOf('--record-parity');
+  if (recordAt > 0) {
+    const ref = process.argv[recordAt + 1];
+    const src = execFileSync('git', ['show', `${ref}:lib/fly/horizon-fill/carpet-engine.js`], { cwd: ROOT, encoding: 'utf8' });
     const dir = path.join(tmpdir(), `one-reveal-head-${process.pid}`);
     mkdirSync(dir, { recursive: true });
     const fly = pathToFileURL(path.join(ROOT, 'lib/fly')).href;
     const file = path.join(dir, 'carpet-engine-head.mjs');
     writeFileSync(file, src.replace(/from '\.\.\//g, `from '${fly}/`).replace(/from '\.\//g, `from '${fly}/horizon-fill/`).replace(/from 'three'/g, `from '${import.meta.resolve('three')}'`));
-    ({ CarpetEngine: HeadEngine } = await import(pathToFileURL(file).href));
-  } catch (err) {
-    console.log(`note: HEAD carpet engine unavailable (${err.message.split('\n')[0]})`);
+    const { CarpetEngine: RecordedEngine } = await import(pathToFileURL(file).href);
+    writeFileSync(PARITY, JSON.stringify({ ref, ...(await script(RecordedEngine, undefined)) }));
+    console.log(`recorded ${PARITY} from ${ref}`);
   }
-  if (HeadEngine) {
-    const script = async (E, hold) => {
-      const c = fakeCoverage(24000);
-      const r = carpetRun(E, { hold, coverage: c });
-      for (let s = 0; s < 30; s += 0.5) {
-        if (s === 5) for (let j = 0; j < 8; j++) for (let i = 0; i < 8; i++) c.setTile(1100 * 8 + i, 800 * 8 + j, j === 2 ? cells : new Uint8Array(256));
-        await r.step(s, px + s * 200, pz);
-      }
-      return { reqs: r.reqs.map((q) => `${q.tx}/${q.ty}/${q.level}/${q.qx}/${q.qy}/${q.maskEpoch}/${q.mask ? Buffer.from(q.mask).toString('base64').length + ':' + q.mask.reduce((a, v, i) => (a + v * (i + 1)) % 1e9, 0) : '-'}`), stats: r.engine.stats };
-    };
-    const a = await script(CarpetEngine, false), b = await script(HeadEngine, undefined);
-    check('F parity: hold off, the request stream equals HEAD\'s carpet engine on the same script', a.reqs.join('|') === b.reqs.join('|') && a.reqs.length > 0, `${a.reqs.length} vs ${b.reqs.length} requests`);
-    check('F parity: hold off, the stats keys and counts equal HEAD\'s', JSON.stringify(a.stats) === JSON.stringify(b.stats));
-  } else check('F parity: HEAD carpet engine loaded', false);
+  let recorded = null;
+  try {
+    recorded = JSON.parse(readFileSync(PARITY, 'utf8'));
+  } catch {
+    recorded = null;
+  }
+  if (recorded) {
+    const a = await script(CarpetEngine, false);
+    check('F parity: hold off, the request stream equals the recorded round-1 carpet engine on the same script', a.reqs.join('|') === recorded.reqs.join('|') && a.reqs.length > 0, `${a.reqs.length} vs ${recorded.reqs.length} requests (${recorded.ref})`);
+    check('F parity: hold off, the stats keys and counts equal the recorded ones', JSON.stringify(a.stats) === JSON.stringify(recorded.stats));
+  } else check('F parity: the recorded round-1 request stream is present', false);
 }
 
 // --- G: FillCoverage ----------------------------------------------------------------------

@@ -21,6 +21,9 @@ import {
 } from '@/lib/fly/settle';
 import { satelliteVisualsOn, satelliteVisualProfile } from '@/lib/fly/satellite-visuals';
 import { useFlyStore } from '@/stores/fly-store';
+// FRAME LEAN: the engine's stats getter walks every group; the frame loop
+// needs two numbers from it, and the photo gate one test.
+import { frameLeanOn } from '@/lib/fly/frame-lean';
 // SHIP PASS CITY (CT-2): CITY_RANGE resolved per tier through the device policy.
 import { cityRangeFor } from '@/lib/fly/city-range';
 // SHIP PASS CITY (CT-5): NIGHT_RHYTHM's occupancy / twilight uniform.
@@ -58,6 +61,8 @@ const ONE_REVEAL_GATE = oneRevealOn('gate');
  * costs exactly zero — the round's strictest invariant, pinned by
  * scripts/verify-skyline.js alongside verify-sat-depth's total.
  */
+const LEAN_ENGINES = frameLeanOn('engines');
+
 export function SatSkylineLayer({ runtime, flight }) {
   const qualityTier = useFlyStore((s) => s.qualityTier);
   const engine = useMemo(
@@ -125,6 +130,7 @@ export function SatSkylineLayer({ runtime, flight }) {
           if (ONE_REVEAL_GATE) return parts?.terrain && parts.surfaces && parts.buildings ? 'reveal' : parts?.terrain ? 'busy' : false;
           return parts?.terrain && parts.surfaces && parts.buildings ? 'busy' : false;
         }
+        if (LEAN_ENGINES && runtime.satBuildings?.streamBusy) return runtime.satBuildings.streamBusy() ? 'busy' : true;
         const s = runtime.satBuildings?.stats;
         return s && (s.queued || s.building || s.draping) ? 'busy' : true;
       });
@@ -166,7 +172,7 @@ export function SatSkylineLayer({ runtime, flight }) {
     if (NIGHT_RHYTHM_ON) updateNightRhythm(runtime.sun, runtime.geo?.y); // SHIP PASS CITY (CT-5): one shared uniform
     setSatelliteArchitectureCoverage(engine.material, runtime.satBuildings, runtime.origin?.anchor, getSatBldgFade());
     engine.update(t, flight.pos.x, flight.pos.z, eyeAgl, gVis);
-    const ready = engine.stats.ready;
+    const ready = LEAN_ENGINES ? engine.readyCount() : engine.stats.ready;
     const k = birthK(
       birthRef.current,
       t,
@@ -186,7 +192,7 @@ export function SatSkylineLayer({ runtime, flight }) {
       );
       fadeRef.current.lastWritten = Number.NaN;
     }
-    notePopin('satSkyline', ready > 0, birthRef.current.running || engine.stats.births > 0);
+    notePopin('satSkyline', ready > 0, birthRef.current.running || (LEAN_ENGINES ? engine.birthCount() : engine.stats.births) > 0);
     if (
       process.env.NODE_ENV === 'development' &&
       window.__flyStats &&
