@@ -277,6 +277,56 @@ Added 2026-11-23 at the owner's request, after the first build was under way.
 
 The record below says what each round did.
 
+### What was measured before the second round
+
+- **Frame rate is a motion problem.** The owner's own records put a parked
+  Ultra view over New York at 16.7 ms a frame on the RTX 5080, and a 399 kt
+  flight over Argenteuil at about 31 FPS with a 48 ms 95th percentile. The
+  frame is lost while the world streams: tiles arriving, draping, uploading,
+  terrain changing level. That is main-thread work, and it is what this
+  round goes after.
+- **Why loading comes in phases.** The boot hold releases the player when
+  the world is ready or after `LOAD_GUARD.bootCapMs` (20 s; a warp 15 s),
+  and buildings, roads, forest and airports stop blocking after 12 s. On a
+  cold start the driver needs about 24 s to link the terrain program alone,
+  so the cap fires first and the player watches the rest: the preview
+  terrain is swapped for the lit one (26.5 s in the owner's cold run), roofs
+  are drawn on a fallback colour and fade to their photo colour 0.9 s after
+  it lands, the regional colour reference fades in over 1.2 s, and 24 distant
+  groups take their photos one at a time (to 32.7 s). None of the colour
+  arrivals is part of the readiness test.
+- **What this container can and cannot measure.** WebGL here is a software
+  renderer: about 0.1 frames a second at High, 0.6 with a fifth-size drawing
+  buffer, and the full Enhanced world never finishes loading in it. Draw and
+  triangle counts, shader compilation, deterministic pixels at a frozen
+  state, and anything that runs in node (the streaming engines, the worker,
+  the readiness logic) are measurable. Frame rate is not. Even half-loaded,
+  the mapped stand-ins were 590,000 to 790,000 of the 820,000 to 930,000
+  triangles in a Paris frame, in 12 or 13 draws.
+
+### Streams and ownership, second round
+
+| Stream | Owns | Builds |
+|---|---|---|
+| L ONE REVEAL | `components/fly/hud/BootScreen.jsx`, `WarpFlash.jsx`, `lib/fly/world-readiness.js`, `load-guard.js`, `look-roof-patch.js`, `settle.js`, `ground-arrival.js`, `r25-color-ref.js`, `lib/fly/toy-world/sat-stand-in-photo.js`, `lib/fly/horizon-fill/carpet-engine.js`, `coverage.js`, new `lib/fly/one-reveal-*.js`, marked blocks (`// ONE REVEAL L begin` / `end`) in `sat-skyline-engine.js` and `sat-building-engine.js`, `scripts/verify-one-reveal.mjs`, the stream L section of `ONE_REVEAL` | one reveal: the hold waits for final colour and lighting in view, later arrivals are born final, Horizon Fill never rearranges after it appears |
+| M FLIGHT CPU | `lib/fly/toy-world/sat-building-engine.js`, `sat-skyline-engine.js`, `sat-veg-engine.js`, `sat-road-engine.js`, `sat-clutter-engine.js`, `sat-stand-ins.js`, `sat-stand-in-prep.js` (all outside stream L's marked blocks), `lib/fly/terrain-ground-query.js`, `skyline-drape.js`, `parcel-gap.js`, `ground-canopy-*.js`, `earth-surface-engine.js`, `earth-surface-mask.js`, `components/fly/SatParcelHomes.jsx`, `WpCanopyLayer.jsx`, `SatBuildingLayer.jsx`, `SatVegLayer.jsx`, `SatRoadLayer.jsx`, `scripts/bench-flight-cpu.mjs`, `scripts/verify-flight-cpu.mjs`, files named `flight-*` under `scripts/fixtures/horizon-fill/`, the stream M section of `FRAME_LEAN` | a headless flight benchmark of the real streaming engines, and the main-thread work it finds removed |
+| R FRAME LOOP | `components/fly/FlyScene.jsx`, `FlyCanvas.jsx`, `Effects.jsx`, `FlyEffectComposer.jsx`, `CinemaShadowRig.jsx`, `CoastalReflectionRig.jsx`, `TrafficLayer.jsx`, `SatSkylineLayer.jsx`, `HorizonFillLayer.jsx`, the HUD under `components/fly/hud/` except the two files stream L owns, `lib/fly/terrain-engine.js`, `cinema-shadows.js`, `coastal-reflection.js`, `architecture-draw-range.js`, `perf-governor.js`, `frame-stats.js`, `scripts/bench-frame-loop.cjs`, `scripts/verify-frame-loop.mjs`, the stream R section of `FRAME_LEAN` | an instrument for what one frame costs outside the engines (frame callbacks, passes, GL calls, HUD), and that cost reduced |
+
+Rules added for this round:
+
+11. **A performance change leaves the settled picture identical.** It is
+    proven so (bytes of the final geometry, or pixels at a frozen state),
+    sits behind `frameLeanOn('engines' | 'loop')` wherever that is a clean
+    branch, and ships on. Anything that changes what is drawn belongs behind
+    `ONE_REVEAL` or a flag of its own, off.
+12. **Every claim of a saving has a before and an after from the same
+    instrument on the same input**, and the instrument is committed.
+13. **Stream L edits `sat-skyline-engine.js` and `sat-building-engine.js`
+    only inside its marked blocks; stream M does not move or restructure
+    code around those blocks.**
+14. **Do not kill processes by name.** Other people's browsers and servers
+    run on this machine. Stop only the process ids you started.
+
 ## Record
 
 ### Round 1 (2026-11-23): the procedural layer
