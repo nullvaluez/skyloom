@@ -45,10 +45,25 @@ for(const a of assets){
     for(let i=0;i<n.count;i++)assert.ok(Math.abs(Math.hypot(n.getX(i),n.getY(i),n.getZ(i))-1)<.002,`${a.poi}: normalized normal`);
     const v1=new Vector3(),v2=new Vector3(),v3=new Vector3();
     for(let i=0;i<g.index.count;i+=3){const ids=[0,1,2].map(k=>g.index.getX(i+k));assert.ok(ids.every(id=>id>=0&&id<p.count));v1.fromBufferAttribute(p,ids[0]);v2.fromBufferAttribute(p,ids[1]).sub(v1);v3.fromBufferAttribute(p,ids[2]).sub(v1);assert.ok(v2.cross(v3).lengthSq()>1e-25,`${a.poi}: nonzero triangle`);}
-    const original=g.attributes._model_surface.getX(0),emission=g.attributes._model_light.getX(0);
+    const original=g.attributes._model_surface.getX(0),emission=g.attributes._model_light;
     attachCinematicModelAttributes(g,{poi:a.poi,targetHeightM:a.targetHeightM,bakedArchitecture:true,accents:[]});
     assert.ok(Math.abs(g.attributes.aModelSurface.getX(0)-original)<1e-6);
-    assert.ok(Math.abs(g.attributes.aModelLight.getX(0)-emission)<1e-6);
+    const light = g.attributes.aModelLight;
+    let shadowedIron = 0, litIron = 0;
+    for (let i = 0; i < p.count; i++) {
+      if (a.poi === 'Eiffel Tower' && g.attributes.aModelSurface.getY(i) > .5 && emission.getX(i) > 0) {
+        const ratio = light.getX(i) / emission.getX(i);
+        if (ratio < .3) shadowedIron++;
+        if (ratio > 1) litIron++;
+        assert.ok(Math.abs(light.getY(i) - ratio * emission.getY(i)) < 1e-6, 'iron retains its floodlight hue');
+      } else {
+        for (let channel = 0; channel < 3; channel++)
+          assert.ok(Math.abs(light.getComponent(i, channel) - emission.getComponent(i, channel)) < 1e-6);
+      }
+    }
+    if (a.poi === 'Eiffel Tower') {
+      assert.ok(shadowedIron > p.count * .05 && litIron > p.count * .05, `${a.level}: shaded and floodlit iron faces`);
+    }
     assert.equal(g.attributes.aModelLocal.getW(0),0,'legacy clock/window masks must not overlay the new geometry');
     g.dispose();o.material.dispose();
   });assert.equal(meshCount,1,'one merged mesh and no extra draw calls');

@@ -25,6 +25,45 @@ release instruction is recorded separately from the measurements it authorizes.
 
 ## Status
 
+### 2026-11-24 — Paris building lights on phones
+
+Chrome touch emulation reproduced the cream walls on High both after a
+Dublin-to-Paris teleport and on a direct Paris start. Turning off window
+emission in the same frame sequence removed the wash. The single-level
+lit-room filter had been gated on desktop World Look data even though its
+inputs are available on every satellite building. Phones and desktop
+Medium/Low now use that filter when individual windows become too small
+to resolve. The Eiffel Tower had a separate baked floodlight mask. Its
+ironwork now responds to the direction of the floodlights at all three
+detail levels.
+
+The regression check exercises near buildings, the skyline and stand-ins
+at night, twilight and noon. Its nine phone and lower-preset cases all
+failed on the preceding shader. At a fixed Seine view, warm midtones
+covered 26% of the sampled city area before the fix and about 3% after
+it. Chrome on the RTX 5080 ran the phone graphics profile over Paris at
+night, dawn, noon and dusk, and over Manhattan at night. The isolated
+building-material render passed all 12 checks in both Chrome and Windows
+WebKit. The full flight could not start in Windows WebKit because that port
+lacks OffscreenCanvas. The physical iPhone Safari check is still open.
+
+### 2026-11-24 — Cloud and horizon continuity at cruise altitude
+
+Over JFK at 26,000 feet, a quality reduction removed the sunlit cloud deck
+beyond the near clouds. On touch, the same reduction extended the cloud deck
+from 90 km to 180 km and pulled the terrain fade toward the aircraft.
+The selected preset now sets the cloud layers, their lighting and the terrain
+fade distance throughout a flight. The active quality budget still reduces
+cloud resolution, march steps, light samples and fine detail.
+
+With a fixed sunset and camera, Chrome on the RTX 5080 kept the desktop
+cloud deck at 180 km while reducing the march from 96 to 24 steps. Chrome
+touch emulation kept the deck at 90 km. Before the fix, mean ground brightness
+in the sampled part of the phone view rose from 91 to 140 on the Medium-to-Low
+step. Afterward it went from 91 to 93 and returned to 91 on recovery (0–255).
+The desktop flight checks also covered fog at sunrise, rainy dusk, snowy
+daylight, an overcast sky above the clouds, blue hour and a clear night.
+
 ### 2026-11-23 — Lighting across automatic quality changes
 
 At a fixed position and heading over Dublin, Ohio, the Spotting button left

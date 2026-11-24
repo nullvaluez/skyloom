@@ -61,7 +61,7 @@ const step = (a, b) => b < a ? 0 : 1;
 const archHash = (x, y) => { const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return n - Math.floor(n); };
 
 function nightSample(shader) {
-  let source = shader.match(/\/\/ WORLD_LOOK: coarse rooms[^\n]*\n([\s\S]*?)\n}\n/)?.[1];
+  let source = shader.match(/\/\/ (?:Coarse night rooms|WORLD_LOOK: coarse rooms)[^\n]*\n([\s\S]*?)\n}\n/)?.[1];
   if (!source) return () => .14; // previous both-axes-minified area-mean glow
   source += '\n}';
   source = source.replace(/vec2 wlRoomCell=cell\/vec2\(([^,]+),([^\)]+)\),wlRoomWidth=width\/vec2\(([^,]+),([^\)]+)\);/,
@@ -69,15 +69,23 @@ function nightSample(shader) {
     .replace('archHash(vec2(seed*.5387,7.13))', 'archHash(seed*.5387,7.13)')
     .replace('archHash(floor(wlRoomCell)+vec2(seed*.43+1.7,seed*.19))', 'archHash(Math.floor(wlRoomCell.x)+seed*.43+1.7,Math.floor(wlRoomCell.y)+seed*.19)')
     .replace(/\bfloat\(/g, 'Number(').replace(/\bfloat\s+/g, 'let ').replace(/\bmax\(/g, 'Math.max(');
-  const run = new Function('cell', 'width', 'seed', 'family', 'uLookFacade', 'minify', 'archCoverage', 'archHash', 'smoothstep', 'mix', 'step', `let glow=.14,occupancy=.51,nrShare=.8,isWall=1,vFacadeMetres={y:40},darkBuilding=1,buildingGlow=.6,uCinema=1;${source};return glow;`);
-  return (x, y, width = [.8, .8], seed = 100, family = 4, look = 0, minify = 1) => run({ x, y }, { x: width[0], y: width[1] }, seed, family, look, minify, facadeCoverage, archHash, smoothstep, mix, step);
+  const run = new Function('cell', 'width', 'seed', 'family', 'uLookFacade', 'minify', 'uArchitectureNight', 'uNightRhythm', 'archCoverage', 'archHash', 'smoothstep', 'mix', 'step', `let glow=.14,occupancy=.51,nrShare=.8,isWall=1,vFacadeMetres={y:40},darkBuilding=1,buildingGlow=.6,uCinema=1;${source};return glow;`);
+  return (x, y, width = [.8, .8], seed = 100, family = 4, look = 0, minify = 1, night = 1, twilight = 0) => run({ x, y }, { x: width[0], y: width[1] }, seed, family, look, minify, night, { w: twilight }, facadeCoverage, archHash, smoothstep, mix, step);
 }
 
-window.__flyWorldLookOverride = { enabled: false }; WP.__resetWorldPassLatchForTests();
-for (const [name, factory] of Object.entries(make)) check(`${name}: rollback contains neither new response`, () => {
-  const p = program(factory);
-  assert.ok(!p.fragmentShader.includes('wlDirectionalLightInfo') && !p.fragmentShader.includes('wlRoomCell'));
-});
+for (const [preset, mobile] of [['high', true], ['medium', false], ['low', false]]) {
+  window.__flyWorldPassTierOverride = { preset, mobile };
+  WP.__resetWorldPassLatchForTests();
+  for (const [name, factory] of Object.entries(make)) check(`${name}: ${mobile ? 'phone' : 'desktop'} ${preset} cold-start window light`, () => {
+    const p = program(factory), sample = nightSample(p.fragmentShader);
+    assert.ok(!p.fragmentShader.includes('wlDirectionalLightInfo'), 'using the non-World-Look shader');
+    const values = Array.from({ length: 240 }, (_, k) => sample(k % 24, Math.floor(k / 24)));
+    assert.ok(values.some(v => v === 0) && values.some(v => v > .2), 'opaque walls and distinct lit rooms');
+    close(sample(0, 0, [.8, .8], 100, 4, 0, 1, 0, .5), sample(0, 0), 'twilight uses the same room mask as night');
+    close(sample(0, 0, [.8, .8], 100, 4, 0, 1, 0), .14, 'daylight bypasses the night filter');
+  });
+}
+window.__flyWorldPassTierOverride = true;
 window.__flyWorldLookOverride = { enabled: true }; WP.__resetWorldPassLatchForTests();
 for (const [name, factory] of Object.entries(make)) for (const shadowed of [false, true]) {
   const p = program(factory, shadowed), label = `${name}/${shadowed ? 'High CSM2' : 'Low CSM0'}`;

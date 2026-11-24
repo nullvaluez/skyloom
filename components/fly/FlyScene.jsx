@@ -2695,7 +2695,8 @@ export function FlyScene({ runtime }) {
     // write into the LIVE uEdgeFade uniform — every consumer (sky dip below,
     // ultra ring, VoidFloor, TownGlow, clouds) reads it via getEdgeFade().
     // Static styles never enter here; their style effect stays the writer.
-    const skyFade = earth?earthFade(flyState.qualityTier,mercatorScale(flight.latDeg)):WORLD_EDGE.fade[flyState.mapStyle] ?? WORLD_EDGE.fade.satellite;
+    const skyFade = earth ? earthFade(flyState.qualityPreset, mercatorScale(flight.latDeg))
+      : WORLD_EDGE.fade[flyState.mapStyle] ?? WORLD_EDGE.fade.satellite;
     const ah = WORLD_EDGE.altHorizon;
     const ahOn = ah?.enabled && ah.byStyle[flyState.mapStyle];
     if (ahOn && flyState.mapStyle === 'satellite') {

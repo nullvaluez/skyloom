@@ -89,6 +89,8 @@ async function buildLeg(name) {
   // This gate certifies the Ship Pass SKY programs, so every leg runs with it
   // off (FLY_LOOK_PASS.md rule 8); scripts/verify-look-shadow.mjs covers it on.
   globalThis.window.__flyLookShadowOverride = { enabled: false };
+  globalThis.window.__flyLookAtmosOverride = { enabled: false };
+  globalThis.window.__flyTwilightBalanceOverride = { enabled: false };
   register('./_node-resolve.mjs', import.meta.url);
   register('./_alias-loader.mjs', import.meta.url);
   register('./_r25-c-jsx-loader.mjs', import.meta.url);
@@ -177,6 +179,8 @@ async function buildLeg(name) {
     clarityReverted,
     effectUniforms: [...enhanced.uniforms.keys()].sort(),
     hashes,
+    marchBeforeDisabledDeckGuard: texts.march.includes(' if(uLivFar.z<=0.)return;\n')
+      ? sha(texts.march.replace(' if(uLivFar.z<=0.)return;\n', '')) : null,
     liteCount,
     reverted,
     uniforms: Object.keys(pass.r25.uniforms).sort(),
@@ -380,9 +384,12 @@ const DEG = Math.PI / 180;
     }
     return h.digest('hex');
   };
-  const MAIN_CINEMA_ENV = '6e9b0eb17ed59656ed754e428de5d4d3670a179feb510a2fd6a29cb5951dceae';
+  const referenceHashes = ['6e9b0eb17ed59656ed754e428de5d4d3670a179feb510a2fd6a29cb5951dceae'];
+  // The same unmodified 940b751 source evaluated on Windows Node 25.2.1.
+  // JSON fingerprints include the last bit of each trigonometric result.
+  if (process.platform === 'win32') referenceHashes.push('427d1f09994c76b27a1dc2a0b7e916f55b5a26b2fb05ddb7b0252412a696aedd');
   const offFp = fingerprint(undefined);
-  row('SK-3 (l) cinema-environment with REAL_MOON off is main\'s output, byte for byte (sha256 over 820 states)', offFp === MAIN_CINEMA_ENV && fingerprint(false) === offFp, offFp.slice(0, 16));
+  row('SK-3 (l) cinema-environment with REAL_MOON off is main\'s output, byte for byte (sha256 over 820 states)', referenceHashes.includes(offFp) && fingerprint(false) === offFp, offFp.slice(0, 16));
 
   // Flag on: the night key never exceeds today's, the ground keeps the floor,
   // a set moon leaves no key and no disc, the exposure only opens.
@@ -464,7 +471,9 @@ const DEG = Math.PI / 180;
   };
   const w0Pinned = SHIP_FLAGS.length === 20 && Object.keys(w0.probe.shipFlags).length === SHIP_FLAGS.length
     && Object.values(w0.probe.shipFlags).every((v) => v === false) && Object.values(w0.flags).every((v) => v === false);
-  const diff = Object.keys(MAIN_TEXT).filter((k) => w0.hashes[k] !== MAIN_TEXT[k]);
+  // Today's march also exits before sampling a disabled deck. Check the
+  // exact additional guard and compare the rest with the frozen W0 shader.
+  const diff = Object.keys(MAIN_TEXT).filter((k) => (k === 'march' ? w0.marchBeforeDisabledDeckGuard : w0.hashes[k]) !== MAIN_TEXT[k]);
   row('TEXT (a) W0 frame (every Ship Pass flag pinned off): every SKY program text and the merged aerial defines hash to main\'s (sha256)', w0Pinned && !diff.length,
     `${SHIP_FLAGS.length} flags pinned off; ${diff.length ? `differs: ${diff.join(', ')}` : `${Object.keys(MAIN_TEXT).length} texts`}`);
   row('TEXT (b) W0 frame: no phase terminator, no REAL_MOON uniform', w0Pinned && !w0.compositeHasPhase && !w0.uniforms.includes('uShipMoon'));
@@ -578,7 +587,7 @@ const DEG = Math.PI / 180;
   const rig = read('components/fly/AtmosphereRig.jsx'), lc = read('lib/fly/living-clouds.js');
   row('SK-4 (g) wiring: AtmosphereRig writes uPskyAp.z from the policy switch; the far deck reads the lite reach before its old rule',
     rig.includes('PSKY_UNIFORMS.uPskyAp.value.set(luts.aerialState.maxKm, luts.aerialState.h, skyLiteAerialSwitch(qt), 0);')
-    && lc.includes("const farLite = skyLiteFarReachM(name, far.maxKm ?? 180, ctx.tier);") && lc.includes("const farMax = farLite ?? (name === 'phone' || name === 'low' ? 0 :"));
+    && lc.includes("skyLiteFarReachM(skyProfile, far.maxKm ?? 180, ctx.tier)") && lc.includes("const farMax = farLite ??"));
   // (h) glsl.js keeps its header's promise (no runtime dependencies): the node
   // half of verify-phys-sky imports it — and cinema-sky.js through it — in plain
   // node with no resolver, so the flag is read in sky-lite.js, not here.

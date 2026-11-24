@@ -1,7 +1,7 @@
 /** Material gate: pre-pass identity, regional reflectance, real near/far shader
  * assembly, and compile/link + night readback through three's WebGLRenderer.
  * The little block scene is a shader fixture, not a live-city visual verdict.
- * Run: node scripts/verify-architectural-realism.mjs [--node-only]
+ * Run: node scripts/verify-architectural-realism.mjs [--node-only | --webkit]
  */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -11,13 +11,15 @@ import { register } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
 const sha = s => createHash('sha256').update(s).digest('hex');
+// 2574da80 extracted the far vertex coverage loop into architectureCoverage.
+// Inlining that helper reproduces the previous far hash in both profiles.
 const BASE = {
   "enhanced-near": [
     "8a0f512e8acc3f0a640e9b36f010add32c17cf6fffb3aba46b9e1d7c68a182e6",
     "05233a8b6a60044806de1eeeee968e6588d0e6de5d1f195dda897a541d6b3151"
   ],
   "enhanced-far": [
-    "7a9813b23b9f79860d60ea5523f723160cdf762e809c194b541f4aca3517d0a4",
+    "624d343478098df6ff7589815ce58c79891fb9341e9641af6725758f1ed81a79",
     "85c43969ccd228497c5c82d86d0672872e2f397dc872e163b1eb8bfd5e926917"
   ],
   "classic-near": [
@@ -25,7 +27,7 @@ const BASE = {
     "7b11be55f3bfb90bad181c9cb8093df7b0e618e2965b8fb613dd28a6d0cabae7"
   ],
   "classic-far": [
-    "7a9813b23b9f79860d60ea5523f723160cdf762e809c194b541f4aca3517d0a4",
+    "624d343478098df6ff7589815ce58c79891fb9341e9641af6725758f1ed81a79",
     "0950e3260e5813407dfcd12122e8ef9d061a1b3d89e3f02515d4c1d31f0e726c"
   ]
 };
@@ -84,8 +86,8 @@ const runArm = name => {
 const off = runArm('off'), on = runArm('on'), independent = runArm('independent'), look = runArm('look');
 check('LOOK_FACADE on: both rings assemble its day and night edits under their own key', () => {
   for (const [name, p] of Object.entries(look)) {
-    assert.equal(p.key.replace('|look-facade-v4', ''), on[name].key, name);
-    assert.ok(p.key.includes('|look-facade-v4'), name);
+    assert.equal(p.key.replace('|look-facade-v5', ''), on[name].key, name);
+    assert.ok(p.key.includes('|look-facade-v5'), name);
     // r3: distance retire of the pane/floor pattern, the far-skyline lift, the low-sun knee, houses keep their glow.
     assert.ok(p.fs.includes('float lfFadeD=') && p.fs.includes('float lfFadeK=') && p.fs.includes('float lfKeep='), `${name} r3 night/day terms`);
     if (p.fs.includes('float lfDay=') && p.fs.includes('float realGlassMask=')) assert.ok(p.fs.includes('float lfKO='), `${name} low-sun knee`);
@@ -166,8 +168,8 @@ check('a broken or repeated shader anchor fails loudly', () => {
 });
 
 if (!process.argv.includes('--node-only')) {
-  const { chromium } = await import('playwright');
-  const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--enable-gpu'] })
+  const { chromium, webkit } = await import('playwright');
+  const browser = process.argv.includes('--webkit') ? await webkit.launch() : await chromium.launch({ channel: 'chrome', headless: true, args: ['--enable-gpu'] })
     .catch(() => chromium.launch({ headless: true, executablePath: process.env.FLY_CHROMIUM || undefined, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] }));
   try {
     const page = await browser.newPage();
@@ -251,8 +253,12 @@ if (!process.argv.includes('--node-only')) {
     check('full-night pixels remain identical in every material path', () => {
       for (const name of Object.keys(on)) assert.deepEqual(result.output[`on-${name}`].samples[1], result.output[`off-${name}`].samples[1], name);
     });
-    check('LOOK_FACADE program at uLookFacade 0 (Medium/Low) renders the pre-pass pixels, day and night', () => {
-      for (const name of Object.keys(on)) for (const night of [0, 1]) assert.deepEqual(result.output[`look0-${name}`].samples[night], result.output[`on-${name}`].samples[night], `${name} night=${night}`);
+    check('lower-budget facades keep daylight and Classic pixels and resolve lit rooms at night', () => {
+      for (const name of Object.keys(on)) for (const night of [0, 1]) {
+        const actual = result.output[`look0-${name}`].samples[night], previous = result.output[`on-${name}`].samples[night];
+        if (night && name.startsWith('enhanced')) assert.ok(actual.some((v, i) => v !== previous[i]), `${name}: night-room filter is visible`);
+        else assert.deepEqual(actual, previous, `${name} night=${night}`);
+      }
     });
     check('LOOK_FACADE changes Enhanced pixels at uLookFacade 1 and leaves Classic alone', () => {
       for (const name of Object.keys(on)) for (const night of [0, 1]) {

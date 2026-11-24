@@ -136,6 +136,18 @@ test('backup preserves existing aircraft and forgiving-flight preferences',()=>{
   const s=storage();s.setItem('fly-aircraft','cargo');s.setItem('fly-quality-tier','ultra');s.setItem('fly-crash-mode','forgiving');s.setItem(PREFERENCES_KEY,JSON.stringify({version:1,settings:explorerPreferences()}));const backup=createBackup(s),target=storage();restoreBackup(target,backup);assert.equal(target.getItem('fly-aircraft'),'cargo');assert.equal(target.getItem('fly-crash-mode'),'forgiving');assert.equal(target.getItem('fly-quality-tier'),'ultra');
 });
 
+test('automatic scenery reductions preserve the selected horizon', async () => {
+  const {earthFade} = await import('../lib/fly/earth-horizon.js');
+  const scene = readFileSync(new URL('../components/fly/FlyScene.jsx', import.meta.url), 'utf8');
+  assert.match(scene, /earthFade\(flyState\.qualityPreset,/);
+  for (const scale of [1, 1.32, 2, 4]) {
+    for (const [preset, metres] of Object.entries({ ultra: 120000, high: 120000, medium: 90000, low: 60000 })) {
+      const endM = Math.min(120000, scale * metres);
+      assert.deepEqual(earthFade(preset, scale), { startM: endM / 2, endM });
+    }
+  }
+});
+
 test('Earth curvature is latitude consistent, distance bounded, and camera transitions cancel on warp',async()=>{
   const {earthBend,earthFade}=await import('../lib/fly/earth-horizon.js'),{PerspectiveCamera}=await import('three'),{CameraTransition}=await import('../lib/fly/camera-transition.js');
   for(const k of [1,1.3,2,4]){assert.ok(Math.abs(earthBend(k)*(10000*k)**2-7.8480506886)<.00001);assert.ok(earthFade('high',k).endM<=120000);}

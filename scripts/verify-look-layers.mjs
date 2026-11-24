@@ -11,6 +11,7 @@
 //    flag-off uniforms exactly, High and Ultra do not.
 // Each leg runs in its own process (the flag and dials resolve at module load).
 import { register } from 'node:module';
+import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -50,6 +51,42 @@ async function buildLeg(name) {
   const FC = await imp('lib/fly/fly-constants.js');
   const pass = new CP.ImmersiveCloudPass(new THREE.PerspectiveCamera(), {});
   pass.ensureR25();
+  if (name === 'adaptive') {
+    const { useFlyStore } = await imp('stores/fly-store.js');
+    const { setCinemaEffectLevel } = await imp('lib/fly/cinema-policy.js');
+    const u = pass.r25.uniforms;
+    const rt = { sun: {}, weather: { wx: {} } };
+    window.__flySunOverride = Date.UTC(2026, 8, 22, 22);
+    let comparisons = 0;
+    for (const phone of [false, true]) {
+      window.matchMedia = () => ({ matches: phone });
+      window.ontouchstart = null;
+      window.screen = { width: phone ? 390 : 1440, height: 900 };
+      for (const preset of ['ultra', 'high', 'medium', 'low']) {
+        const baseTier = preset === 'ultra' ? 'high' : preset;
+        const reach = preset === 'low' ? 0 : phone || preset === 'medium' ? 90000 : 180000;
+        for (const el of SUNS) for (const overcastT of [0, 1]) {
+          rt.sun.sinEl = Math.sin(el * Math.PI / 180);
+          rt.weather.wx = { overcastT, presenceFrac: 0.65 };
+          let initialLight;
+          for (const [tier, level] of [[baseTier, 0], [baseTier, 1], [baseTier, 2], [baseTier, 3], ['low', 3], [baseTier, 0]]) {
+            useFlyStore.setState({ visuals: 'enhanced', mapStyle: 'satellite', qualityPreset: preset, qualityTier: tier });
+            setCinemaEffectLevel(level);
+            pass.livingFrame(rt, 0, true);
+            const when = JSON.stringify({ phone, preset, tier, level, el, overcastT });
+            assert.equal(u.uLivFar.value.z, reach, when);
+            const light = ['uLivOctave', 'uLivCirrus', 'uLookSun', 'uLookVol', 'uLookHigh', 'uLookBank'].map(k => u[k].value.toArray());
+            if (!initialLight) initialLight = light;
+            assert.deepEqual(light, initialLight, when);
+            if (phone || level === 3 || preset === 'low') assert.equal(u.uLivTaps.value, 2, when);
+            if (level === 3) assert.deepEqual(u.uLookForm.value.toArray().slice(0, 2), [0, 0], when);
+            comparisons++;
+          }
+        }
+      }
+    }
+    return { comparisons };
+  }
   const march = pass.r25.march.fragmentShader;
   const composite = pass.r25.composite.fragmentShader;
   const filter = pass.r25.filter ? pass.r25.filter.fragmentShader : '';
@@ -89,6 +126,8 @@ let pass = 0, fail = 0;
 const ok = (c, m, d = '') => { c ? pass++ : fail++; console.log(`${c ? 'PASS' : 'FAIL'}  ${m}${d ? `  — ${d}` : ''}`); };
 const run = (name) => JSON.parse(execFileSync(process.execPath, [fileURLToPath(import.meta.url), `--leg=${name}`], { cwd: ROOT, maxBuffer: 64 << 20 }).toString());
 const off = run('off'), on = run('on'), zero = run('zero'), bank = run('bank');
+const adaptive = run('adaptive');
+ok(adaptive.comparisons === 384, 'cloud reach, lighting and cirrus survive adaptive steps and recovery on desktop and phone', adaptive.comparisons + ' rendered-pass uniform checks');
 
 // 1. Flag off.
 ok(!off.march.uLook && !off.march.lookBank && !off.march.cool && !off.march.away && !off.march.form, 'flag off: the march carries no LOOK_LAYERS text');

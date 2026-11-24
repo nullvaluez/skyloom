@@ -39,6 +39,9 @@ const pinName = (f) => `__fly${f.toLowerCase().split('_').map((w) => w[0].toUppe
 async function buildTexts(on) {
   globalThis.window = { location: { search: '', href: 'http://localhost/' } };
   for (const f of FLAGS) globalThis.window[pinName(f)] = { enabled: on };
+  // REAL_MOON also attaches the shared uniforms for its phase terminator.
+  // Isolate the Living World flags for the empty-pass control.
+  if (!on) globalThis.window.__flyRealMoonOverride = { enabled: false };
   if (typeof globalThis.OffscreenCanvas === 'undefined') {
     const inert = new Proxy(function () {}, { get: (t, k) => (k === Symbol.toPrimitive ? () => 0 : inert), apply: () => inert, construct: () => inert });
     globalThis.OffscreenCanvas = class { constructor(w, h) { this.width = w; this.height = h; } getContext() { return inert; } };
